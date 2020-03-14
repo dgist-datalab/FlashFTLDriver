@@ -115,7 +115,10 @@ __segment* base_get_segment (struct blockmanager* bm, bool isreserve){
 		if(!isreserve){
 			mh_insert_append(p->base_channel[i].max_heap,(void*)b);
 		}
-		if(!b) abort();
+		if(!b) {
+			printf("lack of free block!!\n");
+			abort();
+		}
 		res->blocks[i]=b;
 		b->seg_idx=p->seg_map_idx;
 	}
@@ -155,6 +158,7 @@ __gsegment* base_get_gc_target (struct blockmanager* bm){
 		__block *b=(__block*)mh_get_max(p->base_channel[i].max_heap);
 		if(!b) abort();
 		res->blocks[i]=b;
+		res->invalidate_number+=b->invalid_number;
 	}
 	res->now=res->max=0;
 	return res;
@@ -292,6 +296,7 @@ int base_get_page_num(struct blockmanager* bm,__segment *s){
 	
 	s->used_page_num++;
 	if(page>_PPB) abort();
+	bm->assigned_page++;
 	return res;
 }
 

@@ -1,7 +1,6 @@
 #include "../../include/container.h"
 typedef struct page_params{
 	request *parents;
-	int test;
 }page_params;
 
 uint32_t page_create (lower_info*,blockmanager *, algorithm *);

@@ -45,9 +45,6 @@ static bool bitmap_get(uint32_t key){
 
 	return bitmap[block]&(1<<offset);
 }
-static inline uint32_t get_value_size(){
-	return ((VALUESIZE==-1?(rand()%(NPCINPAGE)-1)+1:VALUESIZE)*PIECE);
-}
 void bench_init(){
 	OVERLAP=0.0;
 	_master=(master*)malloc(sizeof(master));
@@ -71,19 +68,7 @@ void bench_init(){
 		_master->m[i].type=NOR;
 	}
 	
-	/*
-	for(int i=0;i<BENCHNUM;i++){
-		for(int j=0;j<ALGOTYPE;j++){
-			for(int k=0;k<LOWERTYPE;k++){
-				_master->datas[i].ftl_poll[j][k].min = UINT64_MAX;
-				//_master->datas[i].ftl_npoll[j][k].min = UINT64_MAX;
-			}
-		}
-	}
-	*/
-	printf("bench:%ld\n",TOTALSIZE/PAGESIZE/8);
-	//bitmap=(uint8_t*)malloc(sizeof(uint8_t)*(TOTALSIZE/(PAGESIZE)/8));
-	bitmap=(uint8_t*)malloc(sizeof(uint8_t)*(TOTALSIZE/(PAGESIZE)/8)*NPCINPAGE);
+	bitmap=(uint8_t*)malloc(sizeof(uint8_t)*(RANGE));
 	_master->error_cnt=0;
 }
 void bench_make_data(){
@@ -136,7 +121,6 @@ void bench_make_data(){
 			fillrand(start,end,_m);
 			break;
 #ifndef KVSSD
-
 		case SEQLATENCY:
 			seq_latency(start,end,50,_m);
 			break;
@@ -190,19 +174,20 @@ void bench_free(){
 	free(_master);
 }
 
-bench_value* get_bench(){
+
+bench_value* __get_bench(){
 	monitor * _m=&_master->m[_master->n_num];
 	if(_m->n_num==0){
 		bench_make_data();
-	}
 
+	}
 	if(_m->n_num==_m->m_num){
 		while(!bench_is_finish_n(_master->n_num)){
 			write_stop = false;
         }
 		printf("\rtesting...... [100%%] done!\n");
 		printf("\n");
-        sleep(5);
+        //sleep(5);
 		
 		for(int i=0; i<BENCHSETSIZE; i++){
 			free(_m->body[i]);
@@ -210,6 +195,15 @@ bench_value* get_bench(){
 		_master->n_num++;
 		if(_master->n_num==_master->m_num)
 			return NULL;
+	
+		int type=_master->meta[_master->n_num].type;
+		switch(type){
+			case SEQGET:
+			case SEQSET:
+			case RANDSET:
+			case RANDGET:
+				return get_bench_ondemand();
+		}
 
 		bench_make_data();
 		_m=&_master->m[_master->n_num];
@@ -240,6 +234,19 @@ bench_value* get_bench(){
 	}
 	_m->n_num++;
 	return res;
+}
+bench_value* get_bench(){
+	int idx=_master->n_num;
+	bench_meta *_meta=&_master->meta[idx];
+	switch(_meta->type){
+		case SEQGET:
+		case SEQSET:
+		case RANDSET:
+		case RANDGET:
+			return get_bench_ondemand();
+		default:
+			return __get_bench();
+	}
 }
 extern bool force_write_start;
 bool bench_is_finish_n(volatile int n){
@@ -521,7 +528,9 @@ void bench_reap_data(request *const req,lower_info *li){
 #endif
 		MA(&_m->benchTime);
 	}
-
+	if(_m->ondemand){
+		free(_m->dbody[_m->r_num]);
+	}
 	_m->r_num++;
 	pthread_mutex_unlock(&bench_lock);
 }
@@ -672,7 +681,7 @@ void seqset(uint32_t start, uint32_t end,monitor *m){
 		bitmap_set(m->body[i/m->bech][i%m->bech].key);
 #endif
 #ifdef DVALUE
-		m->body[i/m->bech][i%m->bech].length=get_value_size();
+		m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 #else
 		m->body[i/m->bech][i%m->bech].length=PAGESIZE;
 #endif
@@ -697,7 +706,7 @@ void seqrw(uint32_t start, uint32_t end, monitor *m){
 #endif
 		m->body[i/m->bech][i%m->bech].type=FS_SET_T;
 #ifdef DVALUE
-		m->body[i/m->bech][i%m->bech].length=get_value_size();
+		m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 #else	
 		m->body[i/m->bech][i%m->bech].length=PAGESIZE;
 #endif
@@ -737,7 +746,6 @@ void randget(uint32_t start, uint32_t end,monitor *m){
 
 void randset(uint32_t start, uint32_t end, monitor *m){
 	printf("making rand Set bench!\n");
-	srand(1);
 	for(uint32_t i=0; i<m->m_num; i++){
 #ifdef KVSSD
 		uint32_t t_k;
@@ -758,13 +766,7 @@ void randset(uint32_t start, uint32_t end, monitor *m){
 		bitmap_set(m->body[i/m->bech][i%m->bech].key);
 #endif
 
-#ifdef DVALUE
-//		m->body[i/m->bech][i%m->bech].length=(rand()%(NPCINPAGE-1)+1)*PIECE;
-//	m->body[i/m->bech][i%m->bech].length=0;
-		m->body[i/m->bech][i%m->bech].length=get_value_size();
-#else	
 		m->body[i/m->bech][i%m->bech].length=PAGESIZE;
-#endif
 		m->body[i/m->bech][i%m->bech].mark=m->mark;
 		m->body[i/m->bech][i%m->bech].type=FS_SET_T;
 		m->write_cnt++;
@@ -795,7 +797,7 @@ void randrw(uint32_t start, uint32_t end, monitor *m){
 
 		m->body[i/m->bech][i%m->bech].type=FS_SET_T;
 #ifdef DVALUE
-		m->body[i/m->bech][i%m->bech].length=get_value_size();
+		m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 		if(m->body[i/m->bech][i%m->bech].length>PAGESIZE){
 			abort();
 		}
@@ -850,7 +852,7 @@ void mixed(uint32_t start, uint32_t end,int percentage, monitor *m){
 			bitmap_set(m->body[i/m->bech][i%m->bech].key);
 #endif
 #ifdef DVALUE
-			m->body[i/m->bech][i%m->bech].length=get_value_size();
+			m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 #else
 			m->body[i/m->bech][i%m->bech].length=PAGESIZE;
 #endif
@@ -873,7 +875,7 @@ void seq_latency(uint32_t start, uint32_t end,int percentage, monitor *m){
 		m->body[i/m->bech][i%m->bech].key=start+(i%(end-start));
 		bitmap_set(m->body[i/m->bech][i%m->bech].key);
 #ifdef DVALUE
-		m->body[i/m->bech][i%m->bech].length=get_value_size();
+		m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 #else
 		m->body[i/m->bech][i%m->bech].length=PAGESIZE;
 #endif
@@ -892,7 +894,7 @@ void seq_latency(uint32_t start, uint32_t end,int percentage, monitor *m){
 			m->body[i/m->bech][i%m->bech].type=FS_SET_T;
 			bitmap_set(m->body[i/m->bech][i%m->bech].key);
 #ifdef DVALUE
-			m->body[i/m->bech][i%m->bech].length=get_value_size();
+			m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 #else
 			m->body[i/m->bech][i%m->bech].length=PAGESIZE;
 #endif
@@ -921,7 +923,7 @@ void rand_latency(uint32_t start, uint32_t end,int percentage, monitor *m){
 		m->body[i/m->bech][i%m->bech].key=start+rand()%(end-start);
 		bitmap_set(m->body[i/m->bech][i%m->bech].key);
 #ifdef DVALUE
-		m->body[i/m->bech][i%m->bech].length=get_value_size();
+		m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 #else
 		m->body[i/m->bech][i%m->bech].length=PAGESIZE;
 #endif
@@ -940,7 +942,7 @@ void rand_latency(uint32_t start, uint32_t end,int percentage, monitor *m){
 			m->body[i/m->bech][i%m->bech].type=FS_SET_T;
 			bitmap_set(m->body[i/m->bech][i%m->bech].key);
 #ifdef DVALUE
-			m->body[i/m->bech][i%m->bech].length=get_value_size();
+			m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 #else
 			m->body[i/m->bech][i%m->bech].length=PAGESIZE;
 #endif
@@ -995,7 +997,7 @@ void fillrand(uint32_t start, uint32_t end, monitor *m){
 #endif
 
 #ifdef DVALUE
-		m->body[i/m->bech][i%m->bech].length=get_value_size();
+		m->body[i/m->bech][i%m->bech].length=GET_VALUE_SIZE;
 #else	
 		m->body[i/m->bech][i%m->bech].length=PAGESIZE;
 #endif
@@ -1056,88 +1058,4 @@ void bench_custom_print(MeasureTime *mt,int idx){
 		measure_adding_print(&mt[i]);
 	}
 #endif
-}
-
-int bench_set_params(int argc, char **argv, char **temp_argv){
-	int bit_cnt=0;
-	int piece=PIECE;
-	uint64_t total_size=TOTALSIZE;
-	total_size/=piece;
-	do{bit_cnt++;}while((total_size/=2));
-	if(total_size>32){
-		printf("physical address over 32 bit\n");
-		abort();
-	}
-	struct option options[]={
-		{"locality",1,0,0},
-		{"key-length",1,0,0},
-		{"value-size",1,0,0},
-		{0,0,0,0}
-	};
-	
-	int temp_cnt=0;
-	for(int i=0; i<argc; i++){
-		if(strncmp(argv[i],"--locality",strlen("--locality"))==0) continue;
-		if(strncmp(argv[i],"--key-length",strlen("--key-length"))==0) continue;
-		if(strncmp(argv[i],"--value-size",strlen("--value-size"))==0) continue;
-		temp_argv[temp_cnt++]=argv[i];
-	}
-	int index;
-	int opt;
-	bool locality_setting=false;
-	bool key_length=false;
-	bool value_size=false;
-	opterr=0;
-
-	while((opt=getopt_long(argc,argv,"",options,&index))!=-1){
-		switch(opt){
-			case 0:
-				switch(index){
-					case 0:
-						if(optarg!=NULL){
-							LOCALITY=atoi(optarg);
-							TARGETRATIO=(float)(100-LOCALITY)/100;
-							locality_setting=true;
-					}
-						break;
-					case 1:
-						if(optarg!=NULL){
-							key_length=true;
-							KEYLENGTH=atoi(optarg);
-							if(KEYLENGTH>16 || KEYLENGTH<1){
-								KEYLENGTH=-1;
-							}
-						}
-						break;
-					case 2:
-						if(optarg!=NULL){
-							value_size=true;
-							VALUESIZE=atoi(optarg);
-							if(VALUESIZE>NPCINPAGE || VALUESIZE<0){
-								VALUESIZE=-1;
-							}
-						}
-						break;
-				}
-				break;
-			default:
-				break;
-
-		}
-	}
-	if(!locality_setting){
-		LOCALITY=50; TARGETRATIO=0.5;
-	}
-	if(!key_length){
-		KEYLENGTH=2;
-	}
-	if(!value_size){
-		VALUESIZE=1;
-	}
-	printf("key_length: %d - -1==rand\n",KEYLENGTH==-1?KEYLENGTH:KEYLENGTH*16);
-	printf("value_size: %d - -1==rand\n",VALUESIZE==-1?VALUESIZE:VALUESIZE*PIECE);
-
-	optind=0;
-	seq_padding_opt=0;
-	return temp_cnt;
 }

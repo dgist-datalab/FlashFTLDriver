@@ -1,7 +1,10 @@
 
 SRCS +=\
-	   pipe_lower.c\
 	   posix.c\
+
+ifeq ($(TARGET_ALGO), Lsmtree)
+	SRC+= pipe_lower.c
+endif
 
 OBJS :=\
 	$(patsubst %.c,%.o,$(SRCS))\

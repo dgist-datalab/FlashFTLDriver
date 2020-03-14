@@ -210,7 +210,7 @@ void bb_checker_fixing(){/*
 	}
 	
 	printf("TOTAL segnum:%d\n",start_segnum);
-	
+	/*
 	for(int i=0; i<128; i++){
 		if(checker.ent[i].flag){
 			printf("[badblock] %d(%d) ",checker.ent[i].fixed_segnum,checker.ent[i].origin_segnum);
@@ -219,5 +219,5 @@ void bb_checker_fixing(){/*
 			printf("[normal] %d ",checker.ent[i].origin_segnum);
 		}
 		printf(" && %d\n",checker.ent[i].pair_segnum);
-	}
+	}*/
 }

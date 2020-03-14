@@ -14,6 +14,9 @@
 #define TIMESLOT 10 //micro sec
 #endif
 
+#define GET_VALUE_SIZE \
+	(((VALUESIZE==-1)?(rand()%(NPCINPAGE)-1)+1:VALUESIZE)*PIECE)
+
 #define BENCHSETSIZE (1024+1)
 typedef struct{
 	FSTYPE type;
@@ -54,13 +57,16 @@ typedef struct{
 
 typedef struct{
 	bench_value *body[BENCHSETSIZE];
+	bench_value **dbody;
 	uint32_t bech;
 	uint32_t benchsetsize;
+	uint64_t nth_bench;
 	volatile uint64_t n_num;//request throw num
 	volatile uint64_t m_num;
 	volatile uint64_t r_num;//request end num
 	bool finish;
 	bool empty;
+	bool ondemand;
 	int mark;
 	uint64_t notfound;
 	uint64_t write_cnt;
@@ -103,6 +109,7 @@ void bench_custom_start(MeasureTime *mt,int idx);
 void bench_custom_A(MeasureTime *mt,int idx);
 void bench_custom_print(MeasureTime *mt, int idx);
 int bench_set_params(int argc, char **argv,char **targv);
+bench_value* get_bench_ondemand();
 
 #ifdef CDF
 void bench_cdf_print(uint64_t, uint8_t istype, bench_data*);
@@ -122,3 +129,5 @@ void randset(uint32_t,uint32_t,monitor*);
 void randrw(uint32_t,uint32_t,monitor*);
 void mixed(uint32_t,uint32_t,int percentage,monitor*);
 int my_itoa(uint32_t key, char **_target);
+
+

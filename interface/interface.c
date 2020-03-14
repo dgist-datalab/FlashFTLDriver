@@ -516,6 +516,9 @@ bool inf_make_req(const FSTYPE type, const KEYT key,char* value){
 	measure_init(&req->latency_checker); //make_req
 	measure_start(&req->latency_checker); //make_req
 #endif
+
+	memcpy(req->value->value,&key,sizeof(key));
+
 	assign_req(req);
 	return true;
 }
@@ -839,7 +842,6 @@ bool inf_iter_req_apps(char type, char *prefix, uint8_t key_len,char **value, in
 }
 #endif
 
-int v_cnt[NPCINPAGE+1];
 value_set *inf_get_valueset(PTR in_v, int type, uint32_t length){
 	value_set *res=(value_set*)malloc(sizeof(value_set));
 	//check dma alloc type
@@ -862,7 +864,6 @@ value_set *inf_get_valueset(PTR in_v, int type, uint32_t length){
 		abort();
 	}
 	else{
-		v_cnt[length/PIECE]++;
 		res->dmatag=-1;
 		res->value=(PTR)malloc(length);
 	}
