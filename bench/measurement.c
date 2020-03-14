@@ -93,7 +93,8 @@ void measure_end(MeasureTime *m,std::string input ){
 	struct timeval res; linktime *t;
 	gettimeofday(&m->header->end,NULL);
 	timersub(&m->header->end,&m->header->start,&res);
-	printf("%s:%ld sec and %.6f\n",format,res.tv_sec,(float)res.tv_usec/1000000);
+	double value=res.tv_sec*1000000+res.tv_usec;
+	printf("%s:%.6f\n",format,value/100000);
 	t=m->header;
 	m->header=m->header->next;
 	free(t);
@@ -104,7 +105,8 @@ void measure_end(MeasureTime *m,const char *format){
 	struct timeval res; linktime *t;
 	gettimeofday(&m->header->end,NULL);
 	timersub(&m->header->end,&m->header->start,&res);
-	printf("%s:%ld sec and %.6f\n",format,res.tv_sec,(float)res.tv_usec/1000000);
+	double value=res.tv_sec*1000000+res.tv_usec;
+	printf("%s:%.6f\n",format,value/100000);
 	t=m->header;
 	m->header=m->header->next;
 	free(t);

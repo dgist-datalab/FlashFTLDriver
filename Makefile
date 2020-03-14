@@ -1,9 +1,9 @@
-export CC=gcc
+export CC=g++
 
 TARGET_INF=interface
-TARGET_LOWER=posix_memory
-TARGET_ALGO=Lsmtree
-TARGET_BM=partition
+export TARGET_LOWER=posix_memory
+export TARGET_ALGO=Page_ftl
+export TARGET_BM=base
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
 PPWD=$(pwd)
@@ -12,8 +12,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
-#-fsanitize=address\
-#	-DBUSE_DEBUG
+-fsanitize=address\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\
@@ -25,7 +24,7 @@ export COMMONFLAGS=\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
 			-DCHECKINGTIME\
-			-O3\
+#			-O3\
 #			-DWRITESYNC\
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
@@ -79,7 +78,6 @@ CFLAGS +=\
 SRCS +=\
 	./interface/queue.c\
 	./interface/interface.c\
-	./interface/buse.c\
 	./include/FS.c\
 	./include/slab.c\
 	./include/utils/debug_tools.c\
@@ -93,6 +91,7 @@ SRCS +=\
 	./include/data_struct/lru_list.c\
 	./bench/measurement.c\
 	./bench/bench.c\
+	./bench/bench_demand.c\
 	./include/utils/thpool.c\
 	./include/utils/kvssd.c\
 	./include/utils/sha256.c\

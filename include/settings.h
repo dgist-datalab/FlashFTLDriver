@@ -30,14 +30,7 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define PIECE 512
-#define NPCINPAGE (PAGESIZE/PIECE)
-#define MINVALUE PIECE
-#define DEFKEYLENGTH 32
-#define DEFVALUESIZE (1024*8)
-
 #ifdef MLC
-
 #define TOTALSIZE (300L*G)
 #define REALSIZE (512L*G)
 #define PAGESIZE (8*K)
@@ -47,9 +40,9 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 64L
+#define GIGAUNIT 8L
 #define TOTALSIZE (GIGAUNIT*G)
-#define OP 100
+#define OP 80
 #define REALSIZE (512L*G)
 #define DEVSIZE (64L * G)
 #define PAGESIZE (8*K)
@@ -60,19 +53,15 @@
 
 #endif
 
+#define LPAGESIZE 8192
 #define BLOCKSIZE (_PPB*PAGESIZE)
 #define _NOP (TOTALSIZE/PAGESIZE)
 #define _NOS (TOTALSIZE/(_PPS*PAGESIZE))
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
 
-#define TOTALKEYNUM ((GIGAUNIT)*(G/PAGESIZE))
-//#define RANGE ((GIGAUNIT)*(M/PAGESIZE)*1024L*0.5)
-#define RANGE ((GIGAUNIT)*(M/PAGESIZE)*1024L*0.5*NPCINPAGE)
-#define REQNUM ((GIGAUNIT)*(M/PAGESIZE)*1024L)
-#define SHOWINGSIZE (TOTALSIZE/100*OP)
-#define SHOWINGFULL (SHOWINGSIZE/DEFVALUESIZE)
-#define DEVFULL (TOTALSIZE/DEFVALUESIZE)
+#define RANGE ((uint32_t)_NOP*OP/100)
+#define DEVFULL ((uint32_t)TOTALSIZE/LPAGESIZE)
 
 #define PARTNUM 2
 #define MAPPART_SEGS (_NOS/10)

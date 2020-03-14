@@ -8,6 +8,7 @@ extern struct algorithm __badblock;
 extern struct algorithm __demand;
 extern struct algorithm page_ftl;
 extern struct algorithm algo_lsm;
+extern struct algorithm demand_ftl;
 
 //device layer
 extern struct lower_info memio_info;

@@ -42,7 +42,6 @@ lower_info my_posix={
 	.write=posix_push_data,
 	.read=posix_pull_data,
 #endif
-	.read_hw=posix_read_hw,
 	.device_badblock_checker=NULL,
 #if (LASYNC==1)
 	.trim_block=posix_make_trim,
@@ -58,10 +57,14 @@ lower_info my_posix={
 	.lower_flying_req_wait=posix_flying_req_wait,
 	.lower_show_info=NULL,
 	.lower_tag_num=NULL,
+#ifdef Lsmtree
+	.read_hw=posix_read_hw,
 	.hw_do_merge=posix_hw_do_merge,
 	.hw_get_kt=posix_hw_get_kt,
 	.hw_get_inv=posix_hw_get_inv
+#endif
 };
+
  uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;
 
 #if (LASYNC==1)
@@ -345,7 +348,7 @@ void print_array(uint32_t *arr, int num){
 	for(int i=0; i<num; i++) printf("%d, ",arr[i]);
 	printf("\n");
 }
-
+#ifdef Lsmtree
 uint32_t posix_hw_do_merge(uint32_t lp_num, ppa_t *lp_array, uint32_t hp_num,ppa_t *hp_array,ppa_t *tp_array, uint32_t* ktable_num, uint32_t *invliadate_num){
 	if(lp_num==0 || hp_num==0){
 		fprintf(stderr,"l:%d h:%d\n",lp_num,hp_num);
@@ -487,3 +490,4 @@ void* posix_read_hw(uint32_t _PPA, char *key,uint32_t key_len, value_set *value,
 	//req->type_lower=1;
 	return NULL;
 }
+#endif
