@@ -60,6 +60,9 @@ struct request {
 	int mark;
 
 /*s:for application req*/
+	int table_num;
+	int offset;
+/*s:for application req*/
 	char *target_buf;
 	uint32_t inter_offset;
 	uint32_t target_len;
