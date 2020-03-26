@@ -86,6 +86,9 @@ static bool qmanager_read_checking(processor *t,request *req){
 #endif
 	{
 		res=true;
+		request * req_in = (request*)finding->item;
+		//printf("aaa %s\n", req_in->value->value);
+		memcpy(req->value->value, req_in->value->value, 8192);
 	}
 	pthread_mutex_unlock(&t->qm_lock);
 	return res;
@@ -516,23 +519,50 @@ bool inf_make_req(const FSTYPE type, const KEYT key,char* value){
 	measure_init(&req->latency_checker); //make_req
 	measure_start(&req->latency_checker); //make_req
 #endif
-
-	memcpy(req->value->value,&key,sizeof(key));
-
+	if(type==FS_SET_T){
+	    //printf("set value : %s\n", value);
+	}
 	assign_req(req);
 	return true;
 }
 
+/*
+bool inf_make_req_dlrm(const FSTYPE type, const KEYT key, char *value,int len, int mark, void *_req, void (*end_req)(uint32_t,uint32_t,void*)){
+#ifdef BUSE_MEASURE
+    if(type==FS_GET_T){
+        MS(&infTime);
+    }
+#endif
+	request *req=inf_get_req_instance(type,key,value,len,mark,false);
 
+	req->p_req=_req;
+	req->p_end_req=end_req;
+
+	cl_grap(flying);
+#ifdef CDF
+	req->isstart=false;
+	measure_init(&req->latency_checker); //make_req
+	measure_start(&req->latency_checker); //make_req
+#endif
+	if(type==FS_SET_T){
+	    printf("set value : %s\n", value);
+	}
+	assign_req(req);
+	return true;
+}
+*/
 bool inf_make_multi_set(const FSTYPE type, KEYT *keys, char **values, int *lengths, int req_num, int mark){
 	return 0;
 }
 
-bool inf_make_req_special(const FSTYPE type, const KEYT key, char* value, int len,uint32_t seq, void*(*special)(void*)){
+bool inf_make_req_special(const FSTYPE type, const KEYT key, char* value, int len,uint32_t seq,int table_num, int offset, void*(*special)(void*)){
 	if(type==FS_RMW_T){
 		printf("here!\n");
 	}
 	request *req=inf_get_req_instance(type,key,value,len,0,false);
+
+	req->table_num = table_num;
+	req->offset = offset;
 	req->special_func=special;
 	/*
 	   static int cnt=0;
@@ -577,22 +607,60 @@ bool inf_end_req( request * const req){
 	}else{
 		bench_reap_nostart(req);
 	}
-
 	void *(*special)(void*);
 	special=req->special_func;
 	void **params;
-	uint8_t *type;
-	uint32_t *seq;
+	int *table_num;
+	int *offset;
+	char *my_value;
+
 	if(special){
-		params=(void**)malloc(sizeof(void*)*2);
-		type=(uint8_t*)malloc(sizeof(uint8_t));
-		seq=(uint32_t*)malloc(sizeof(uint32_t));
-		*type=req->type;
-		*seq=req->seq;
-		params[0]=(void*)type;
-		params[1]=(void*)seq;
+		params=(void**)malloc(sizeof(void*)*3);
+		table_num=(int*)malloc(sizeof(int));
+		offset=(int*)malloc(sizeof(int));
+		my_value = (char*)malloc(8192);
+
+		*table_num=req->table_num;
+		*offset=req->offset;
+	    	memcpy(my_value, req->value->value, 8192);
+	    	printf("aaa %d %d \n", *table_num, *offset, my_value);
+
+		params[0]=(void*)table_num;
+		params[1]=(void*)offset;
+		params[2]=(void*)my_value;
+
 		special((void*)params);
 	}
+
+	/*
+	if(req->type==FS_GET_T){
+	    char res[8192];
+	    memcpy(res, req->value->value, 8192);
+	    printf("res : %s\n", res);
+	}
+	*/
+
+	/*
+	void *(*special)(void*);
+	special=req->special_func;
+	void *param;
+	char *my_value;
+	if(special){
+	    	param = (void*)malloc(sizeof(void));
+		my_value = (char*)malloc(8192);
+	    	memcpy(my_value, req->value->value, 8192);
+		param = (void*)my_value;
+
+		special((void*)param);
+	}
+	*/
+	
+	
+	/*
+	char tmp[4096];
+	memcpy(tmp, req->value->value, 4096);
+	printf("%s\n", tmp);
+	*/
 
 	/*for range query*/
 	if(req->added_end_req){
