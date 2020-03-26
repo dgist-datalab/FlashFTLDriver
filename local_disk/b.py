@@ -8,14 +8,14 @@ LEN = 256
 class SocketInfo():
     HOST=""
     PORT=9001
-    BUFSIZE=4*LEN
+    BUFSIZE=4*LEN+8
     ADDR=(HOST, PORT)
  
 class socketInfo(SocketInfo):
     HOST= "10.150.21.55"
 
 PORT=9001
-HOST="10.150.21.56"
+HOST="10.150.21.55"
  
 csock= socket(AF_INET, SOCK_STREAM)
 csock.connect((HOST,PORT))
@@ -37,7 +37,8 @@ for i in range(26) :
 
 #res = torch.zeros([3,4,LEN], dtype=torch.float32)
 result = []
-a = [[1,43,4,1],[9999,2323,9999,232],[9999,2323,9999,232]]
+table_index = []
+a = [[43,1,4,1],[100,232,333,232]]
 for i, x in enumerate(a):
 	res = torch.zeros([4,LEN], dtype=torch.float32)
 
@@ -61,15 +62,19 @@ for i, x in enumerate(a):
 			start = 0
 			end = 4
 			while True:
-				if end > 4*LEN :
+				if end > 4*LEN+8 :
 					break
-				find_val += list(struct.unpack('f', recv_val[start:end]))	
+
+				if start < 8 :
+					table_index += list(struct.unpack('f', recv_val[start:end]))	
+				else :
+					find_val += list(struct.unpack('f', recv_val[start:end]))	
 				start +=4
 				end +=4
 
 #			recv_decoded = struct.unpack('f', recv_val)
 #			find_val = recv_decoded[0]
-		#	print(find_val)
+			print(find_val)
 			Cache[i].put(key, find_val)
 
 		res[j][:] = torch.FloatTensor(find_val)

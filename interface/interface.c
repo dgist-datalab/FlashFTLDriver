@@ -607,19 +607,28 @@ bool inf_end_req( request * const req){
 	}else{
 		bench_reap_nostart(req);
 	}
-	void *(*special)(void*);
-	special=req->special_func;
-	void **params;
+
+
+	/*
 	int *table_num;
 	int *offset;
 	char *my_value;
+	*/
 
+	void *(*special)(void*);
+	special=req->special_func;
+	void **params;
+	
 	if(special){
 		params=(void**)malloc(sizeof(void*)*3);
+
+		/*
 		table_num=(int*)malloc(sizeof(int));
 		offset=(int*)malloc(sizeof(int));
 		my_value = (char*)malloc(8192);
+		*/
 
+		/*
 		*table_num=req->table_num;
 		*offset=req->offset;
 	    	memcpy(my_value, req->value->value, 8192);
@@ -628,7 +637,11 @@ bool inf_end_req( request * const req){
 		params[0]=(void*)table_num;
 		params[1]=(void*)offset;
 		params[2]=(void*)my_value;
+		*/
 
+		params[0]=(void*)&(req->table_num);
+		params[1]=(void*)&(req->offset);
+		params[2]=(void*)(req->value->value);
 		special((void*)params);
 	}
 

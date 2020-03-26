@@ -30,6 +30,8 @@ struct recv_data_t{
 };
 
 struct send_data_t{
+	int  table_num;
+	int  offset;
 	float value[LEN];
 };
 
@@ -61,6 +63,7 @@ int main(int argc,char** argv)
 
 	r_data = (struct recv_data_t*)malloc(sizeof(struct recv_data_t));
 	s_data = (struct send_data_t*)malloc(sizeof(struct send_data_t));
+	//s_data->value = (float*)malloc(sizeof(float)*LEN);
 
 
 	/* open socket */
@@ -157,19 +160,21 @@ int main(int argc,char** argv)
 			printf("%s\n",dir);
 			return -1;
 		}
+		s_data->table_num = r_data->num[0];
+		s_data->offset = r_data->offset[0];
 
-		if( (size = pread(fd, s_data, sizeof(float)*LEN, r_data->offset[0]*sizeof(float)*LEN )) == -1){
+		if( (size = pread(fd, &(s_data->value), sizeof(float)*LEN, r_data->offset[0]*sizeof(float)*LEN )) == -1){
 			printf("read error\n");
 			return -1;
 		}
 		close(fd);
 
-
+			
 		// send data
-		bytes = send(accp_sock, s_data, sizeof(float)*LEN, 0);
+		bytes = send(accp_sock, s_data, sizeof(struct send_data_t), 0);
 
-		if(bytes != sizeof(float)*LEN){
-			fprintf(stderr,"Connection closed. bytes->[%d], dataSize->[%d]\n",bytes, sizeof(float));
+		if(bytes != sizeof(struct send_data_t)){
+			fprintf(stderr,"Connection closed. bytes->[%d], dataSize->[%d]\n",bytes, sizeof(struct send_data_t));
 			close(accp_sock);
 
 			if ((accp_sock = accept(serversock, NULL, NULL)) == -1) {
