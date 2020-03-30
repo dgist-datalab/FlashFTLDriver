@@ -133,7 +133,7 @@ void write_init(){
 			inf_make_req(FS_SET_T, table_addr[i]+offset ,in ,P_SIZE,0);
 			offset += 1;
 		}
-		table_addr[i+1] = offset;
+		table_addr[i+1] = table_addr[i]+offset;
 		printf("%s done!\n", dir);
 	}
 	printf("write all weight file to SSD!\n");
