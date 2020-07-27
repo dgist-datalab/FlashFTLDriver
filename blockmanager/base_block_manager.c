@@ -64,7 +64,7 @@ uint32_t base_create (struct blockmanager* bm, lower_info *li){
 			__block *b=&p->base_block[block_idx];
 			b->block_num=seg_idx;
 			b->punit_num=j;
-			b->bitset=(uint8_t*)calloc(_PPB/8,1);
+			b->bitset=(uint8_t*)calloc(_PPB*L2PGAP/8,1);
 			block_idx++;
 		}
 	}
@@ -194,8 +194,8 @@ void base_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_in
 int base_populate_bit (struct blockmanager* bm, uint32_t ppa){
 	int res=1;
 	bbm_pri *p=(bbm_pri*)bm->private_data;
-	uint32_t bn=GETBLOCKIDX(checker,ppa);
-	uint32_t pn=GETPAGEIDX(ppa);
+	uint32_t bn=GETBLOCKIDX(checker,ppa/L2PGAP);
+	uint32_t pn=GETPAGEIDX(ppa/L2PGAP) * L2PGAP + (ppa%L2PGAP);
 	uint32_t bt=pn/8;
 	uint32_t of=pn%8;
 
@@ -209,8 +209,8 @@ int base_populate_bit (struct blockmanager* bm, uint32_t ppa){
 int base_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 	int res=1;
 	bbm_pri *p=(bbm_pri*)bm->private_data;
-	uint32_t bn=GETBLOCKIDX(checker,ppa);
-	uint32_t pn=GETPAGEIDX(ppa);
+	uint32_t bn=GETBLOCKIDX(checker,ppa/L2PGAP);
+	uint32_t pn=GETPAGEIDX(ppa/L2PGAP) * L2PGAP + (ppa%L2PGAP);
 	uint32_t bt=pn/8;
 	uint32_t of=pn%8;
 	__block *b=&p->base_block[bn];
@@ -252,8 +252,8 @@ int base_erase_bit (struct blockmanager* bm, uint32_t ppa){
 
 bool base_is_valid_page (struct blockmanager* bm, uint32_t ppa){
 	bbm_pri *p=(bbm_pri*)bm->private_data;
-	uint32_t bn=GETBLOCKIDX(checker,ppa);
-	uint32_t pn=GETPAGEIDX(ppa);
+	uint32_t bn=GETBLOCKIDX(checker,ppa/L2PGAP);
+	uint32_t pn=GETPAGEIDX(ppa/L2PGAP) * L2PGAP + (ppa%L2PGAP);
 	uint32_t bt=pn/8;
 	uint32_t of=pn%8;
 

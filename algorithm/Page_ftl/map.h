@@ -13,7 +13,7 @@ typedef struct page_map_body{
 
 
 void page_map_create();
-uint32_t page_map_assign(uint32_t lba);
+uint32_t page_map_assign(KEYT *lba);
 uint32_t page_map_pick(uint32_t lba);
-uint32_t page_map_gc_update(uint32_t lba, uint32_t ppa);
+uint32_t page_map_gc_update(KEYT* lba);
 void page_map_free();

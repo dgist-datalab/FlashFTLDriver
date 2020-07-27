@@ -10,15 +10,15 @@ TARGETOBJ:=\
 	$(addprefix ../../object/,$(OBJS))\
 
 LEAK: all
-all: $(TARGETOBJ) 
+all: $(TARGETOBJ)
 
 libnom.a : $(TARGETOBJ)
 	$(AR) r $(@) $(TARGETOBJ)
 
-.c.o :
+%.o :%.c
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
 
-../../object/%.o: %.c
+../../object/%.o:%.c
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
 
 clean : 

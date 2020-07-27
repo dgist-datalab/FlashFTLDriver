@@ -28,6 +28,13 @@ typedef struct{
 }bench_value;
 
 typedef struct{
+	uint32_t tid;
+	uint32_t req_size;
+	char *buf;
+	int mark;
+}transaction_bench_data;
+
+typedef struct{
 	uint32_t start;
 	uint32_t end;
 	uint64_t number;
@@ -55,15 +62,31 @@ typedef struct{
 	MeasureTime bench;
 }bench_data;
 
+typedef struct transaction_bench_value{
+	char* buf;
+}transaction_bench_value;
+
+typedef struct transaction_configure{
+	uint32_t commit_term;
+	uint32_t transaction_size;
+	uint32_t request_num_per_command;
+	uint32_t request_size;
+}transaction_configure;
+
 typedef struct{
 	bench_value *body[BENCHSETSIZE];
 	bench_value **dbody;
+	transaction_bench_value *tbody;
+
 	uint32_t bech;
 	uint32_t benchsetsize;
 	uint64_t nth_bench;
 	volatile uint64_t n_num;//request throw num
 	volatile uint64_t m_num;
 	volatile uint64_t r_num;//request end num
+	volatile uint64_t command_num;
+	volatile uint64_t command_return_num;
+	volatile uint64_t command_issue_num;
 	bool finish;
 	bool empty;
 	bool ondemand;
@@ -82,13 +105,16 @@ typedef struct{
 	int n_num;
 	int m_num;
 	monitor *m;
+
 	bench_meta *meta;
 	bench_data *datas;
 	lower_info *li;
 	uint32_t error_cnt;
+	transaction_configure trans_configure;
 }master;
 
 void bench_init();
+void bench_vectored_configure();
 void bench_add(bench_type type,uint32_t start, uint32_t end,uint64_t number);
 bench_value* get_bench();
 void bench_refresh(bench_type, uint32_t start, uint32_t end, uint64_t number);
@@ -100,6 +126,7 @@ bool bench_is_finish_n(int n);
 bool bench_is_finish();
 
 void bench_cache_hit(int mark);
+
 void bench_reap_data(request *const,lower_info *);
 void bench_reap_nostart(request *const);
 char *bench_lower_type(int);
@@ -110,6 +137,8 @@ void bench_custom_A(MeasureTime *mt,int idx);
 void bench_custom_print(MeasureTime *mt, int idx);
 int bench_set_params(int argc, char **argv,char **targv);
 bench_value* get_bench_ondemand();
+
+char *get_vectored_bench(uint32_t *mark);
 
 #ifdef CDF
 void bench_cdf_print(uint64_t, uint8_t istype, bench_data*);
@@ -128,6 +157,12 @@ void fillrand(uint32_t,uint32_t,monitor*);
 void randset(uint32_t,uint32_t,monitor*);
 void randrw(uint32_t,uint32_t,monitor*);
 void mixed(uint32_t,uint32_t,int percentage,monitor*);
-int my_itoa(uint32_t key, char **_target);
 
+void vectored_set(uint32_t, uint32_t, monitor*, bool isseq);
+void vectored_get(uint32_t, uint32_t, monitor*, bool isseq);
+void vectored_rw(uint32_t, uint32_t, monitor*, bool isseq);
 
+int my_itoa(uint32_t key, char **_target, char *buf);
+
+void bench_make_data();
+void *bench_transaction_end_req(void *);

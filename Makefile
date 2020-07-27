@@ -3,7 +3,7 @@ export CC=g++
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
 export TARGET_ALGO=Page_ftl
-export TARGET_BM=base
+export TARGET_BM=Base
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
 PPWD=$(pwd)
@@ -78,6 +78,7 @@ CFLAGS +=\
 SRCS +=\
 	./interface/queue.c\
 	./interface/interface.c\
+	./interface/vectored_interface.c\
 	./include/FS.c\
 	./include/slab.c\
 	./include/utils/debug_tools.c\
@@ -88,10 +89,10 @@ SRCS +=\
 	./include/data_struct/list.c\
 	./include/data_struct/redblack.c\
 	./include/data_struct/heap.c\
-	./include/data_struct/lru_list.c\
 	./bench/measurement.c\
 	./bench/bench.c\
 	./bench/bench_demand.c\
+	./bench/bench_transaction.c\
 	./include/utils/thpool.c\
 	./include/utils/kvssd.c\
 	./include/utils/sha256.c\
