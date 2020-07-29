@@ -3,7 +3,7 @@
 extern master *_master;
 
 #define MAXBUFSIZE (16*K)
-#define REQSIZE (sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint32_t)) //except length of key
+#define REQSIZE (sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint32_t)+sizeof(uint32_t))
 #define TXNHEADERSIZE (sizeof(uint32_t)+sizeof(uint32_t))
 
 extern int KEYLENGTH;
@@ -19,7 +19,6 @@ char *get_vectored_bench(uint32_t *mark){
 	static uint64_t real_req_num=0;
 
 	monitor *m=&_master->m[_master->n_num];
-	*mark=_master->n_num;
 
 	if(m->command_num!=0 && m->command_issue_num==m->command_num){
 		_master->n_num++;
@@ -29,12 +28,16 @@ char *get_vectored_bench(uint32_t *mark){
 		printf("\n");
 
 		if(_master->n_num==_master->m_num) return NULL;
+
+		m=&_master->m[_master->n_num];
 	}
 
 	if(m->command_issue_num==0){ //start bench mark
 		bench_make_data();
 		real_req_num=0;
 	}
+
+	*mark=_master->n_num;
 
 #ifdef PROGRESS
 	if(m->command_issue_num % (m->command_num/100)==0){
@@ -199,7 +202,7 @@ void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
 			m->read_cnt++;
 		}	
 	}
-
+	m->m_num=m->read_cnt+m->write_cnt;
 	free(key_buf);
 }
 

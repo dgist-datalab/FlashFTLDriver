@@ -223,6 +223,8 @@ uint32_t convert_ppa(uint32_t PPA){
 void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
+
+
 	if(PPA>_NOP){
 		printf("address error!\n");
 		abort();
@@ -332,6 +334,7 @@ void* posix_trim_a_block(uint32_t _PPA, bool async){
 		abort();
 	}
 	my_posix.req_type_cnt[TRIM]++;
+	static int cnt=0;
 	for(int i=0; i<_PPB; i++){
 		uint32_t t=PPA+i*PUNIT;
 		if(!seg_table[t].storage){

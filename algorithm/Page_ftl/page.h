@@ -3,6 +3,7 @@
 typedef struct page_params{
 	request *parents;
 	uint32_t address;
+	value_set *value;
 }page_params;
 
 typedef struct align_buffer{

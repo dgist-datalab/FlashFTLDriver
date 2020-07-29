@@ -53,6 +53,7 @@
 
 #endif
 
+#define interface_vector
 #define LPAGESIZE 4096
 #define L2PGAP (PAGESIZE/LPAGESIZE)
 #define BLOCKSIZE (_PPB*PAGESIZE)
@@ -61,7 +62,7 @@
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
 
-#define RANGE ((uint32_t)_NOP*OP/100)
+#define RANGE ((uint32_t)_NOP*OP/100 * L2PGAP)
 #define DEVFULL ((uint32_t)TOTALSIZE/LPAGESIZE)
 
 #define PARTNUM 2
@@ -135,7 +136,7 @@ static inline bool KEYVALCHECK(KEYT a){
 #define V_PTR char * const
 #define PTR char*
 #define ASYNC 1
-#define QSIZE (1024)
+#define QSIZE (1)
 #define LOWQDEPTH (64)
 #define QDEPTH (64)
 
@@ -153,7 +154,6 @@ static inline bool KEYVALCHECK(KEYT a){
 
 //#define KEYGEN
 #define SPINSYNC
-#define interface_pq
 //#define BUSE_MEASURE
 //#define BUSE_ASYNC 0
 

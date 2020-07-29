@@ -11,7 +11,6 @@
 #include "../bench/bench.h"
 #include "interface.h"
 #include "vectored_interface.h"
-#include "../algorithm/Lsmtree/lsmtree.h"
 #include "../include/utils/kvssd.h"
 extern int req_cnt_test;
 extern uint64_t dm_intr_cnt;
@@ -23,27 +22,21 @@ extern uint32_t INPUTREQNUM;
 extern master *_master;
 extern bool force_write_start;
 extern int seq_padding_opt;
-extern lsmtree LSM;
-extern int v_cnt[NPCINPAGE+1];
-#ifdef Lsmtree
-int skiplist_hit;
-#endif
 MeasureTime write_opt_time[11];
 extern master_processor mp;
 extern uint64_t cumulative_type_cnt[LREQ_TYPE_NUM];
 int main(int argc,char* argv[]){
-	char *temp_argv[10];
-	int temp_cnt=bench_set_params(argc,argv,temp_argv);
-	inf_init(0,0,temp_cnt,temp_argv);
+	//int temp_cnt=bench_set_params(argc,argv,temp_argv);
+	inf_init(0,0,argc,argv);
 	bench_init();
 	bench_vectored_configure();
-	bench_transaction_configure(4, 2);
-	printf("TOTALKEYNUM: %ld\n",TOTALKEYNUM);
-	bench_add(VECTOREDSET,0,(INPUTREQNUM?INPUTREQNUM:SHOWINGFULL)/1,((INPUTREQNUM?INPUTREQNUM:SHOWINGFULL)));
+	bench_add(VECTOREDSET,0,RANGE,RANGE);
+	bench_add(VECTOREDRW,0,RANGE,RANGE*2);
+
 
 	char *value;
 	uint32_t mark;
-	while((value=get_vectored_bench(&mark, true))){
+	while((value=get_vectored_bench(&mark))){
 		inf_vector_make_req(value, bench_transaction_end_req, mark);
 	}
 

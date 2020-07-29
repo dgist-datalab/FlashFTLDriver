@@ -128,7 +128,7 @@ duma_sim: duma_driver
 debug_driver: ./interface/main.c libdriver_d.a
 	$(CC) $(CFLAGS) -DDEBUG -o $@ $^ $(LIBS)
 
-driver: ./interface/main.c libdriver.a
+driver: ./interface/vectored_main.c libdriver.a
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a

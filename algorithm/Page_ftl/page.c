@@ -39,27 +39,30 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 	/*you can implement your own structur for your specific FTL*/
 	page_params* params=(page_params*)malloc(sizeof(page_params));
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
+	params->value=value;
 	my_req->parents=req;//add the upper request
 	my_req->end_req=page_end_req;//this is callback function
 	my_req->params=(void*)params;//add your parameter structure 
 	my_req->type=type;//DATAR means DATA reads, this affect traffics results
 	/*you note that after read a PPA, the callback function called*/
 
+
 	switch(type){
 		case DATAR:
 			params->address=ppa%L2PGAP;
-			page_ftl.li->read(ppa,PAGESIZE,value,req->isAsync,my_req);
+			page_ftl.li->read(ppa,PAGESIZE,value,ASYNC,my_req);
 			break;
 		case DATAW:
-			page_ftl.li->write(ppa,PAGESIZE,value,req->isAsync,my_req);
+			page_ftl.li->write(ppa,PAGESIZE,value,ASYNC,my_req);
 			break;
 	}
 }
 
 uint32_t page_read(request *const req){
+	
 	value_set *cached_value=buffer->get(req->key);
 	if(!cached_value){
-		for(uint32_t i=0; i<L2PGAP; i++){
+		for(uint32_t i=0; i<a_buffer.idx; i++){
 			if(req->key==a_buffer.key[i]){
 				memcpy(req->value->value, a_buffer.value[i]->value, 4096);
 				req->end_req(req);		
@@ -68,13 +71,12 @@ uint32_t page_read(request *const req){
 		}
 	}
 
-
 	if(cached_value){
 		memcpy(req->value->value, cached_value->value, 4096);
 		req->end_req(req);
 	}
 	else{
-		send_user_req(req, DATAR, page_map_pick(req->key), req->value);
+		send_user_req(req, DATAR, page_map_pick(req->key)/L2PGAP, req->value);
 	}
 	return 1;
 }
@@ -116,6 +118,8 @@ uint32_t page_write(request *const req){
 	}
 	else{
 		align_buffering(req, 0, NULL);
+		req->value=NULL;
+		req->end_req(req);
 		//send_user_req(req, DATAW, page_map_assign(req->key), req->value);
 	}
 
@@ -131,6 +135,11 @@ uint32_t page_flush(request *const req){
 void *page_end_req(algo_req* input){
 	//this function is called when the device layer(lower_info) finish the request.
 	page_params* params=(page_params*)input->params;
+	switch(input->type){
+		case DATAW:
+			inf_free_valueset(params->value,FS_MALLOC_W);
+			break;
+	}
 	request *res=input->parents;
 	if(res){
 		res->end_req(res);//you should call the parents end_req like this

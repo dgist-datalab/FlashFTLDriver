@@ -23,9 +23,11 @@ inline char *buf_parser(char *buf, uint32_t* idx, uint32_t length){
 void* inf_transaction_end_req(void *req);
 extern bool TXN_debug;
 extern char *TXN_debug_ptr;
+static uint32_t seq_val;
 uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark){
 	static int debug_cnt=0;
 	uint32_t idx=0;
+	static uint32_t seq_num=0;
 	vec_request *txn=(vec_request*)malloc(sizeof(vec_request));
 	//idx+=sizeof(uint32_t);//length;
 	txn->tid=*(uint32_t*)buf_parser(buf, &idx, sizeof(uint32_t)); //get tid;
@@ -46,7 +48,9 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		temp->type=*(uint8_t*)buf_parser(buf, &idx, sizeof(uint8_t));
 		temp->end_req=vectored_end_req;
 		temp->params=NULL;
+		temp->value=NULL;
 		temp->isAsync=ASYNC;
+		temp->seq=seq_num++;
 		switch(temp->type){
 #ifdef KVSSD
 			case FS_TRANS_COMMIT:
@@ -56,12 +60,18 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 				continue;
 #endif
 			case FS_GET_T:
+				seq_val=temp->seq;
 				temp->magic=0;
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 				break;
 			case FS_SET_T:
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, 4096);
 				break;
+			default:
+				printf("error type!\n");
+				abort();
+				break;
+
 		}
 #ifdef KVSSD
 		temp->key.len=*(uint8_t*)buf_parser(buf, &idx, sizeof(uint8_t));
@@ -169,7 +179,8 @@ bool vectored_end_req (request * const req){
 			bench_reap_data(req, mp.li);
 			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);
 			break;
-	
+		default:
+			abort();
 	}
 	preq->done_cnt++;
 	if(preq->size==preq->done_cnt){

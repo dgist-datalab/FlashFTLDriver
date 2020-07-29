@@ -63,16 +63,18 @@ void do_gc(){
 	/*by using this for loop, you can traversal all page in block*/
 	for_each_page_in_seg(target,page,bidx,pidx){
 		//this function check the page is valid or not
-		bool read=false;
+		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
 			if(bm->is_invalid_page(bm,page*L2PGAP+i)) continue;
 			else{
-				read=true;
+				should_read=true;
 				break;
 			}
 		}
-		gv=send_req(page,GCDR,NULL);
-		list_insert(temp_list,(void*)gv);
+		if(should_read){
+			gv=send_req(page,GCDR,NULL);
+			list_insert(temp_list,(void*)gv);
+		}
 	}
 
 	li_node *now,*nxt;
@@ -80,9 +82,9 @@ void do_gc(){
 	KEYT *lbas;
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list,now,nxt){
+
 			gv=(gc_value*)now->data;
 			if(!gv->isdone) continue;
-
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
@@ -92,8 +94,10 @@ void do_gc(){
 				g_buffer.idx++;
 
 				if(g_buffer.idx==L2PGAP){
-					uint32_t res=page_map_gc_update(g_buffer.key);
+					uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP);
+					validate_ppa(res, g_buffer.key);
 					send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
+					g_buffer.idx=0;
 				}
 			}
 
@@ -102,6 +106,13 @@ void do_gc(){
 			//you can get lba from OOB(spare area) in physicall page
 			list_delete_node(temp_list,now);
 		}
+	}
+
+	if(g_buffer.idx!=0){
+		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx);
+		validate_ppa(res, g_buffer.key);
+		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
+		g_buffer.idx=0;	
 	}
 
 	bm->trim_segment(bm,target,page_ftl.li); //erase a block

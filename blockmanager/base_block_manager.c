@@ -153,6 +153,7 @@ bool base_is_gc_needed (struct blockmanager* bm){
 __gsegment* base_get_gc_target (struct blockmanager* bm){
 	bbm_pri *p=(bbm_pri*)bm->private_data;
 	__gsegment* res=(__gsegment*)malloc(sizeof(__gsegment));
+	res->invalidate_number=0;
 	for(int i=0; i<BPS; i++){
 		mh_construct(p->base_channel[i].max_heap);
 		__block *b=(__block*)mh_get_max(p->base_channel[i].max_heap);

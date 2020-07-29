@@ -84,8 +84,10 @@ void bench_make_data(){
 		return;
 	}
 	printf("%d X %d = %d, answer=%lu\n",_m->bech,_m->benchsetsize,_m->bech*_m->benchsetsize,_meta->number);
-	for(uint32_t i=0; i<_m->benchsetsize; i++){
-		_m->body[i]=(bench_value*)malloc(sizeof(bench_value)*_m->bech);
+	if(_meta->type<VECTOREDSET){
+		for(uint32_t i=0; i<_m->benchsetsize; i++){
+			_m->body[i]=(bench_value*)malloc(sizeof(bench_value)*_m->bech);
+		}
 	}
 
 	_m->n_num=0;
@@ -119,6 +121,15 @@ void bench_make_data(){
 			break;
 		case FILLRAND:
 			fillrand(start,end,_m);
+			break;
+		case VECTOREDSET:
+			vectored_set(start,end,_m,false);
+			break;
+		case VECTOREDGET:
+			vectored_get(start,end,_m,false);
+			break;
+		case VECTOREDRW:
+			vectored_rw(start,end,_m,false);
 			break;
 #ifndef KVSSD
 		case SEQLATENCY:
