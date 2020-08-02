@@ -14,6 +14,7 @@ struct blockmanager base_bm={
 	.is_gc_needed=base_is_gc_needed, 
 	.get_gc_target=base_get_gc_target,
 	.trim_segment=base_trim_segment,
+	.free_segment=base_free_segment,
 	.populate_bit=base_populate_bit,
 	.unpopulate_bit=base_unpopulate_bit,
 	.erase_bit=base_erase_bit,
@@ -345,3 +346,6 @@ __block *base_pick_block(struct blockmanager *bm, uint32_t page_num){
 	return &p->base_block[GETBLOCKIDX(checker,page_num)];
 }
 
+void base_free_segment(struct blockmanager*, __segment*){
+
+}

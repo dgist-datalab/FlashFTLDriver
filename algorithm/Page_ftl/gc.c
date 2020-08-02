@@ -116,7 +116,9 @@ void do_gc(){
 	}
 
 	bm->trim_segment(bm,target,page_ftl.li); //erase a block
-	
+
+	bm->free_segment(bm, p->active);
+
 	p->active=p->reserve;//make reserved to active block
 	p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
 
@@ -137,6 +139,8 @@ retry:
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active);
 
 	if(res==UINT32_MAX){
+		
+		page_ftl.bm->free_segment(page_ftl.bm, p->active);
 		p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
 		goto retry;
 	}

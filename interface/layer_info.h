@@ -20,6 +20,7 @@ extern struct lower_info no_info;
 //block manager
 extern struct blockmanager base_bm;
 extern struct blockmanager pt_bm;
+extern struct blockmanager seq_bm;
 
 static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 #if defined(posix) || defined(posix_async) || defined(posix_memory)
@@ -51,6 +52,8 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 
 #if defined(partition) && !defined(Page_ftl)
 	mp->bm=&pt_bm;
+#elif defined(sequential)
+	mp->bm=&seq_bm;
 #else
 	mp->bm=&base_bm;
 #endif

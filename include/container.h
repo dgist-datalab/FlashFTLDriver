@@ -52,7 +52,8 @@ struct request {
 	uint32_t tid;
 	uint32_t length;
 	char *buf;
-	//uint64_t ppa;/*it can be the iter_idx*/
+	
+	uint64_t ppa;/*it can be the iter_idx*/
 	uint32_t seq;
 #ifdef hash_dftl
 	volatile int num; /*length of requests*/
@@ -224,6 +225,7 @@ struct blockmanager{
 	bool (*is_gc_needed) (struct blockmanager*);
 	__gsegment* (*get_gc_target) (struct blockmanager*);
 	void (*trim_segment) (struct blockmanager*, __gsegment*, struct lower_info*);
+	void (*free_segment)(struct blockmanager *,__segment*);
 	int (*populate_bit) (struct blockmanager*, uint32_t ppa);
 	int (*unpopulate_bit) (struct blockmanager*, uint32_t ppa);
 	int (*erase_bit)(struct blockmanager*, uint32_t ppa);
@@ -248,7 +250,6 @@ struct blockmanager{
 	uint32_t assigned_page;
 };
 
-#define PPAMAKER(bl,idx) ((bl)->punit_num)+(idx<<6)+((bl)->block_num)
 
 #define for_each_block(segs,block,idx)\
 	for(idx=0,block=segs->blocks[idx];idx<BPS; block=++idx>BPS?segs->blocks[idx-1]:segs->blocks[idx])
@@ -256,12 +257,28 @@ struct blockmanager{
 #define for_each_page(blocks,page,idx)\
 	for(idx=0,page=blocks->ppa; idx!=PPB; page++,idx++)
 
-#define for_each_page_in_seg(segs,page,bidx,pidx)\
-	for(pidx=0;pidx<_PPB; pidx++)\
-		for(bidx=0,page=PPAMAKER(segs->blocks[bidx],pidx); bidx<BPS; bidx++,page=PPAMAKER(segs->blocks[(bidx!=BPS?bidx:BPS-1)],pidx))
+#ifdef sequential
+	#define PPAMAKER(bl,idx) ((bl)->block_num*_PPB+idx)
+	#define for_each_page_in_seg(segs,page,bidx,pidx)\
+		for(bidx=0; bidx<BPS; bidx++)\
+			for(pidx=0, page=PPAMAKER(segs->blocks[bidx],pidx); pidx<_PPB; pidx++, page=PPAMAKER(segs->blocks[bidx],pidx))
+
+	#define for_each_page_in_seg_blocks(segs,block,page,bidx,pidx)\
+		for(bidx=0, block=segs->blocks[bidx]; bidx<BPS; bidx++, block=segs->blocks[(bidx!=BPS?bidx:BPS-1)])\
+			for(pidx=0, page=PPAMAKER(segs->blocks[bidx],pidx); pidx<_PPB; pidx++, page=PPAMAKER(segs->blocks[bidx],pidx))
+		
+#else
+	#define PPAMAKER(bl,idx) ((bl)->punit_num)+(idx<<6)+((bl)->block_num)
+	#define for_each_page_in_seg(segs,page,bidx,pidx)\
+		for(pidx=0;pidx<_PPB; pidx++)\
+			for(bidx=0,page=PPAMAKER(segs->blocks[bidx],pidx); bidx<BPS; bidx++,page=PPAMAKER(segs->blocks[(bidx!=BPS?bidx:BPS-1)],pidx))
 
 
-#define for_each_page_in_seg_blocks(segs,block,page,bidx,pidx)\
-	for(pidx=0;pidx<_PPB; pidx++)\
-		for(bidx=0,block=segs->blocks[bidx],page=PPAMAKER(segs->blocks[bidx],pidx); bidx<BPS; bidx++,page=PPAMAKER(segs->blocks[(bidx!=BPS?bidx:BPS-1)],pidx),block=segs->blocks[(bidx!=BPS?bidx:BPS-1)])
+	#define for_each_page_in_seg_blocks(segs,block,page,bidx,pidx)\
+		for(pidx=0;pidx<_PPB; pidx++)\
+			for(bidx=0,block=segs->blocks[bidx],page=PPAMAKER(segs->blocks[bidx],pidx); bidx<BPS; bidx++,page=PPAMAKER(segs->blocks[(bidx!=BPS?bidx:BPS-1)],pidx),block=segs->blocks[(bidx!=BPS?bidx:BPS-1)])
+#endif
+
+
+
 #endif

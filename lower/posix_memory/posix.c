@@ -217,13 +217,15 @@ static uint8_t convert_type(uint8_t type) {
 	return (type & (0xff>>1));
 }
 extern bb_checker checker;
-uint32_t convert_ppa(uint32_t PPA){
-	return PPA-checker.start_block*_PPS;
+inline uint32_t convert_ppa(uint32_t PPA){
+	return PPA;
 }
 void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
-
+	if(PPA==8192){
+		printf("8192 populate!\n");
+	}
 
 	if(PPA>_NOP){
 		printf("address error!\n");
@@ -285,7 +287,7 @@ void *posix_pull_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 	}
 	if(!seg_table[PPA].storage){
 		printf("%u not populated!\n",PPA);
-		//abort();
+		abort();
 	} else {
 		memcpy(value->value,seg_table[PPA].storage,size);
 	}
@@ -297,24 +299,20 @@ void *posix_pull_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 }
 
 void *posix_trim_block(uint32_t _PPA, bool async){
-	abort();
-
 	uint32_t PPA=convert_ppa(_PPA);
-	char *temp=(char *)malloc(my_posix.SOB);
-	memset(temp,0,my_posix.SOB);
-	pthread_mutex_lock(&fd_lock);
 	if(my_posix.SOP*PPA >= my_posix.TS || PPA%my_posix.PPS != 0){
 		printf("\ntrim error\n");
 		abort();
 	}
 	
 	my_posix.req_type_cnt[TRIM]++;
-	if(seg_table[PPA].storage){
-		free(seg_table[PPA/my_posix.PPS].storage);
-		seg_table[PPA/my_posix.PPS].storage = NULL;
+	for(uint32_t i=PPA; i<PPA+my_posix.PPS; i++){
+		if(i==8192){
+			printf("8192 erase!\n");
+		}
+		free(seg_table[i].storage);
+		seg_table[i].storage=NULL;
 	}
-	pthread_mutex_unlock(&fd_lock);
-	free(temp);
 	return NULL;
 }
 
