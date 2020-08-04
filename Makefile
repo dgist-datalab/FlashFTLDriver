@@ -1,7 +1,7 @@
 export CC=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=posix_memory
+export TARGET_LOWER=AMF
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64

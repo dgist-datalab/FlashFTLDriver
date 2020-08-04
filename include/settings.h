@@ -48,7 +48,7 @@
 #define PAGESIZE (8*K)
 #define _PPB (256)
 
-#ifdef amf_info
+#ifdef AMF
 	#define NOC 2
 	#define BPS (64*NOC)
 	#define _PPS (_PPB*BPS)
