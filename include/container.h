@@ -99,6 +99,7 @@ e:for application req*/
 
 struct algo_req{
 	uint32_t ppa;
+	uint32_t test_ppa; //for lower layer
 	request * parents;
 	MeasureTime latency_lower;
 	uint8_t type;

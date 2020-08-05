@@ -56,7 +56,7 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
 		KEYT t_lba=lba[i];
 		if(p->mapping[t_lba]!=UINT_MAX){
 			/*when mapping was updated, the old one is checked as a inavlid*/
-			invalidate_ppa(p->mapping[t_lba]);
+		//	invalidate_ppa(p->mapping[t_lba]);
 		}
 		if(t_lba==1409711){
 			old_ppa=p->mapping[t_lba];

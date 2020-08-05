@@ -25,9 +25,8 @@ extern bool TXN_debug;
 extern char *TXN_debug_ptr;
 static uint32_t seq_val;
 uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark){
-	static int debug_cnt=0;
-	uint32_t idx=0;
 	static uint32_t seq_num=0;
+	uint32_t idx=0;
 	vec_request *txn=(vec_request*)malloc(sizeof(vec_request));
 	//idx+=sizeof(uint32_t);//length;
 	txn->tid=*(uint32_t*)buf_parser(buf, &idx, sizeof(uint32_t)); //get tid;
@@ -166,7 +165,6 @@ void *vectored_main(void *__input){
 
 bool vectored_end_req (request * const req){
 	vectored_request *preq=req->parents;
-	static int return_cnt=0;
 	switch(req->type){
 		case FS_NOTFOUND_T:
 		case FS_GET_T:

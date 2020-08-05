@@ -6,6 +6,9 @@
 
 extern algorithm page_ftl;
 void invalidate_ppa(uint32_t t_ppa){
+	if(t_ppa<32768){
+		//abort();
+	}
 	/*when the ppa is invalidated this function must be called*/
 	page_ftl.bm->unpopulate_bit(page_ftl.bm, t_ppa);
 }
@@ -61,7 +64,12 @@ void do_gc(){
 	gc_value *gv;
 
 	/*by using this for loop, you can traversal all page in block*/
+	bool flag=false;
 	for_each_page_in_seg(target,page,bidx,pidx){
+		if(!flag){
+			printf("page :%u\n", page);
+			flag=true;
+		}
 		//this function check the page is valid or not
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
@@ -139,7 +147,6 @@ retry:
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active);
 
 	if(res==UINT32_MAX){
-		
 		page_ftl.bm->free_segment(page_ftl.bm, p->active);
 		p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
 		goto retry;
@@ -147,7 +154,7 @@ retry:
 
 	/*validate a page*/
 	validate_ppa(res,lbas);
-
+	//printf("assigned %u\n",res);
 	return res;
 }
 

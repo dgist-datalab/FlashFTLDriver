@@ -17,6 +17,8 @@ typedef struct seq_bm_private{
 	block_set *logical_segment;
 	queue *free_logical_segment_q;
 	mh *max_heap;
+	uint32_t assigned_block;
+	uint32_t free_block;
 }sbm_pri;
 
 uint32_t seq_create (struct blockmanager*, lower_info *li);

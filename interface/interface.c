@@ -623,8 +623,7 @@ bool inf_end_req( request * const req){
 	return true;
 }
 void inf_free(){
-	bench_print();
-	bench_free();
+
 	mp.li->stop();
 	mp.stopflag=true;
 	int *temp;
@@ -655,6 +654,9 @@ void inf_free(){
 #endif
 	mp.algo->destroy(mp.li,mp.algo);
 	mp.li->destroy(mp.li);
+
+	bench_print();
+	bench_free();
 }
 
 void inf_print_debug(){

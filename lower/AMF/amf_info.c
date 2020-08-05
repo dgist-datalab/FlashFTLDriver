@@ -1,18 +1,19 @@
-
-#define BPS (64*2)
-#define _PPB (256)
-#define _PPS (_PPB*BPS)
-
-#include "AmfManager.h"
+#include "./libamfdriver/AmfManager.h"
 #include "amf_info.h"
 #include "../../include/settings.h"
 #include "../../bench/bench.h"
+#include <unistd.h>
 AmfManager *am;
 
-void amf_call_back(void *req);
-void amf_error_call_back(void *req);
+void amf_call_back_r(void *req);
+void amf_call_back_w(void *req);
+void amf_call_back_e(void *req);
+void amf_error_call_back_r(void *req);
+void amf_error_call_back_w(void *req);
+void amf_error_call_back_e(void *req);
 
 typedef struct dummy_req{
+	uint32_t test_ppa;
 	uint8_t type;
 }dummy_req;
 
@@ -40,13 +41,18 @@ static uint8_t test_type(uint8_t type){
 }
 
 uint32_t amf_info_create(lower_info *li, blockmanager *bm){
-	am=AmfOpen(2);
+	
+	if (access("aftl.bin", F_OK)!=-1){
+		am=AmfOpen(1);
+	}
+	else{
+		am=AmfOpen(2);
+	}
 
-	SetReadCb(am, amf_call_back, amf_error_call_back);
-	SetWriteCb(am, amf_call_back, amf_error_call_back);
-	SetEraseCb(am, amf_call_back, amf_error_call_back);
+	SetReadCb(am, amf_call_back_r, amf_error_call_back_r);
+	SetWriteCb(am, amf_call_back_w, amf_error_call_back_w);
+	SetEraseCb(am, amf_call_back_e, amf_error_call_back_e);
 
-	bm->create(bm, &amf_info);
 	return 1;
 }
 
@@ -73,7 +79,9 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,bool async,al
 		amf_info.req_type_cnt[t_type]++;
 	}
 
-	AmfRead(am, ppa, value->value, (void *)req);
+	req->test_ppa=ppa;
+
+	AmfWrite(am, ppa, value->value, (void *)req);
 	return NULL;
 }
 
@@ -84,6 +92,8 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,bool async,alg
 		amf_info.req_type_cnt[t_type]++;
 	}
 
+	req->test_ppa=ppa;
+
 	AmfRead(am, ppa, value->value, (void *)req);
 	return NULL;
 }
@@ -92,7 +102,14 @@ void* amf_info_trim_block(uint32_t ppa,bool async){
 	dummy_req *temp=(dummy_req*)malloc(sizeof(dummy_req));
 	amf_info.req_type_cnt[TRIM]++;
 	temp->type=TRIM;
-	AmfErase(am,ppa,(void*)temp);
+	if(ppa%PAGES_PER_SEGMENT){
+		printf("not aligned!\n");
+		abort();
+	}
+	temp->test_ppa=ppa;
+	for(uint32_t i=0; i< 128; i++){
+		AmfErase(am,ppa+i,(void*)temp);
+	}
 	return NULL;
 }
 
@@ -111,6 +128,38 @@ uint32_t amf_info_lower_tag_num(){
 }
 
 void amf_flying_req_wait(){
-	while(!IsAmfBusy(am)){}
+	while(IsAmfBusy(am)){}
 	return;
+}
+
+void amf_call_back_r(void *_req){
+	algo_req *req=(algo_req*)_req;
+	req->end_req(req);
+}
+void amf_call_back_w(void *_req){
+	algo_req *req=(algo_req*)_req;
+	req->end_req(req);
+}
+void amf_call_back_e(void *_req){
+}
+void amf_error_call_back_r(void *_req){
+	algo_req *req=(algo_req*)_req;
+
+	printf("error! in AMF read ppa:%u\n",req->test_ppa);
+
+	req->end_req(req);
+}
+void amf_error_call_back_w(void *_req){
+	algo_req *req=(algo_req*)_req;
+
+	printf("error! in AMF write ppa:%u\n",req->test_ppa);
+
+	req->end_req(req);
+}
+void amf_error_call_back_e(void *_req){
+	dummy_req *req=(dummy_req*)_req;
+
+	printf("error! in AMF erase ppa:%u\n",req->test_ppa);
+
+	//req->end_req(req);
 }

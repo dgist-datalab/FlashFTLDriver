@@ -113,6 +113,10 @@ ifeq ($(TARGET_LOWER),bdbm_drv)
 	ARCH +=./object/libmemio.a
 endif
 
+ifeq ($(TARGET_LOWER),AMF)
+	ARCH +=./object/libAmfManager.a
+endif
+
 LIBS +=\
 		-lpthread\
 		-lm\
@@ -183,6 +187,7 @@ clean :
 	cd ./lower/$(TARGET_LOWER) && $(MAKE) clean && cd ../../
 	@$(RM) ./data/*
 	@$(RM) ./object/*.o
+	@$(RM) ./object/*.a
 	@$(RM) *.a
 	@$(RM) driver_memory_check
 	@$(RM) debug_driver

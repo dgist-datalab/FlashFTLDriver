@@ -69,7 +69,7 @@ void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
 
 	m->command_num=number_of_command;
 	m->command_issue_num=0;
-	printf("total command : %u\n", m->command_num);
+	printf("total command : %lu\n", m->command_num);
 	for(uint32_t i=0; i<number_of_command; i++){
 		uint32_t idx=0;
 		m->tbody[i].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
