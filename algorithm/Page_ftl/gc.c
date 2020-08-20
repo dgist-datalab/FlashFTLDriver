@@ -52,6 +52,74 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value){
 	return res;
 }
 
+void new_do_gc(){
+	/*this function return a block which have the most number of invalidated page*/
+	__gsegment *target=page_ftl.bm->get_gc_target(page_ftl.bm);
+	uint32_t page;
+	uint32_t bidx, pidx;
+	blockmanager *bm=page_ftl.bm;
+	pm_body *p=(pm_body*)page_ftl.algo_body;
+	//list *temp_list=list_init();
+	gc_value **gv_array=(gc_value**)malloc(sizeof(gc_value*)*_PPS);
+	align_gc_buffer g_buffer;
+	gc_value *gv;
+	uint32_t gv_idx=0;
+
+	/*by using this for loop, you can traversal all page in block*/
+	for_each_page_in_seg(target,page,bidx,pidx){
+		//this function check the page is valid or not
+		gv=send_req(page,GCDR,NULL);
+		gv_array[gv_idx++]=gv;
+	}
+
+	g_buffer.idx=0;
+	KEYT *lbas;
+	gv_idx=0;
+	uint32_t done_cnt=0;
+	while(done_cnt!=_PPS){
+		gv=gv_array[gv_idx];
+		if(!gv->isdone){
+			goto next;
+		}
+		lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
+		for(uint32_t i=0; i<L2PGAP; i++){
+			if(page_map_pick(lbas[i])!=gv->ppa*L2PGAP+i) continue;
+			memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
+			g_buffer.key[g_buffer.idx]=lbas[i];
+
+			g_buffer.idx++;
+
+			if(g_buffer.idx==L2PGAP){
+				uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP);
+				validate_ppa(res, g_buffer.key);
+				send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
+				g_buffer.idx=0;
+			}
+		}
+
+		done_cnt++;
+
+		inf_free_valueset(gv->value, FS_MALLOC_R);
+		free(gv);
+next:
+		gv_idx=(gv_idx+1)%_PPS;
+	}	
+
+	if(g_buffer.idx!=0){
+		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx);
+		validate_ppa(res, g_buffer.key);
+		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
+		g_buffer.idx=0;	
+	}
+
+	bm->trim_segment(bm,target,page_ftl.li); //erase a block
+
+	bm->free_segment(bm, p->active);
+
+	p->active=p->reserve;//make reserved to active block
+	p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
+}
+
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
 	__gsegment *target=page_ftl.bm->get_gc_target(page_ftl.bm);
@@ -64,12 +132,7 @@ void do_gc(){
 	gc_value *gv;
 
 	/*by using this for loop, you can traversal all page in block*/
-	bool flag=false;
 	for_each_page_in_seg(target,page,bidx,pidx){
-		if(!flag){
-			printf("page :%u\n", page);
-			flag=true;
-		}
 		//this function check the page is valid or not
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
@@ -136,10 +199,14 @@ void do_gc(){
 
 ppa_t get_ppa(KEYT *lbas){
 	uint32_t res;
+	static uint32_t cnt=0;
+	if(cnt++==2302004){
+		printf("break!\n");
+	}
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
 	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && page_ftl.bm->is_gc_needed(page_ftl.bm)){
-		do_gc();//call gc
+		new_do_gc();//call gc
 	}
 
 retry:

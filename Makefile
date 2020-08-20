@@ -1,7 +1,7 @@
 export CC=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=AMF
+export TARGET_LOWER=posix_memory
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -12,7 +12,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
--fsanitize=address\
+#-fsanitize=address\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\
@@ -24,7 +24,7 @@ export COMMONFLAGS=\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
 			-DCHECKINGTIME\
-#			-O3\
+			-O3\
 #			-DWRITESYNC\
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
@@ -39,6 +39,7 @@ export CFLAGS_LOWER=\
 			 -lpthread\
 			 -Wall\
 			 -D_FILE_OFFSET_BITS=64\
+#			 -DLOWER_MEM_DEV\
 
 export priority="false"
 export ORIGINAL_PATH=$(PPWD)

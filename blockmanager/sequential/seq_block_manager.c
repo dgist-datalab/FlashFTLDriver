@@ -31,6 +31,7 @@ struct blockmanager seq_bm={
 	.pt_trim_segment=NULL
 };
 
+static uint32_t age=UINT_MAX;
 void seq_mh_swap_hptr(void *a, void *b){
 	block_set *aa=(block_set*)a;
 	block_set *bb=(block_set*)b;
@@ -91,11 +92,6 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 		p->free_block++;
 	}
 
-	if(p->assigned_block+p->free_block!=_NOS){
-		printf("missing segment error\n");
-		abort();
-	}
-
 	bm->private_data=(void*)p;
 	return 1;
 }
@@ -126,7 +122,14 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 		abort();
 	}
 
-	mh_insert_append(p->max_heap, (void*)free_block_set);
+
+	if(isreserve){
+
+	}
+	else{
+		free_block_set->total_invalid_number=age--;
+		mh_insert_append(p->max_heap, (void*)free_block_set);
+	}
 
 	memcpy(res->blocks, free_block_set->blocks, sizeof(__block*)*BPS);
 
@@ -147,6 +150,15 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 }
 
 __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
+
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
+	uint32_t segment_idx=segment_start_block_number/BPS;
+	block_set *bs=&p->logical_segment[segment_idx];
+	bs->total_invalid_number=age--;
+
+	mh_insert_append(p->max_heap, (void*)bs);
+
 	return seq_get_segment(bm,true);
 }
 
@@ -242,11 +254,11 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 	}
 	b->bitset[bt]&=~(1<<of);
 	b->invalid_number++;
-
+/*
 	uint32_t segment_idx=b->block_num/BPS;
 	block_set *seg=&p->logical_segment[segment_idx];
 	seg->total_invalid_number++;
-	
+*/	
 	if(b->invalid_number>_PPB * L2PGAP){
 		abort();
 	}

@@ -5,6 +5,11 @@
 #include <unistd.h>
 AmfManager *am;
 
+#ifdef LOWER_MEM_DEV
+char **mem_pool;
+char *temp_mem_buf;
+#endif
+
 void amf_call_back_r(void *req);
 void amf_call_back_w(void *req);
 void amf_call_back_e(void *req);
@@ -49,9 +54,20 @@ uint32_t amf_info_create(lower_info *li, blockmanager *bm){
 		am=AmfOpen(2);
 	}
 
+
 	SetReadCb(am, amf_call_back_r, amf_error_call_back_r);
 	SetWriteCb(am, amf_call_back_w, amf_error_call_back_w);
 	SetEraseCb(am, amf_call_back_e, amf_error_call_back_e);
+
+#ifdef LOWER_MEM_DEV
+	printf("lower mem dev  mode\n");
+	mem_pool=(char**)malloc(sizeof(char*)*_NOP);
+	for(uint32_t i=0; i<_NOP; i++){
+		mem_pool[i]=(char*)malloc(PAGESIZE);
+	}
+
+	temp_mem_buf=(char*)malloc(PAGESIZE);
+#endif
 
 	return 1;
 }
@@ -69,6 +85,14 @@ void* amf_info_destroy(lower_info *li){
 
 	li->write_op=li->read_op=li->trim_op=0;
 	AmfClose(am);
+
+#ifdef LOWER_MEM_DEV
+	for(uint32_t i=0; i<_NOP; i++){
+		free(mem_pool[i]);
+	}
+	free(mem_pool);
+	free(temp_mem_buf);
+#endif
 	return NULL;
 }
 
@@ -80,8 +104,13 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,bool async,al
 	}
 
 	req->test_ppa=ppa;
-
+	req->type_lower=0;
+#ifdef LOWER_MEM_DEV
+	memcpy(mem_pool[ppa], value->value, PAGESIZE);
+	AmfWrite(am, ppa, temp_mem_buf, (void *)req);
+#else
 	AmfWrite(am, ppa, value->value, (void *)req);
+#endif
 	return NULL;
 }
 
@@ -94,7 +123,13 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,bool async,alg
 
 	req->test_ppa=ppa;
 
+	req->type_lower=0;
+#ifdef LOWER_MEM_DEV
+	memcpy(value->value, mem_pool[ppa], PAGESIZE);
+	AmfRead(am, ppa, temp_mem_buf, (void *)req);
+#else
 	AmfRead(am, ppa, value->value, (void *)req);
+#endif
 	return NULL;
 }
 

@@ -33,7 +33,6 @@ SRCS +=\
 	   page.c\
 	   nocpy.c\
 	   lops_default.c\
-	   cache.c\
 	   page_kv.c\
 	   variable.c\
 	   lsmtree_multi.c\

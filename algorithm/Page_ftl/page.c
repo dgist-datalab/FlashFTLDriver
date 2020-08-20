@@ -59,7 +59,6 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 }
 
 uint32_t page_read(request *const req){
-	
 	value_set *cached_value=buffer->get(req->key);
 	if(!cached_value){
 		for(uint32_t i=0; i<a_buffer.idx; i++){
@@ -70,6 +69,8 @@ uint32_t page_read(request *const req){
 			}
 		}
 	}
+
+	//printf("read key :%u\n",req->key);
 
 	if(cached_value){
 		memcpy(req->value->value, cached_value->value, 4096);
@@ -106,6 +107,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 }
 
 uint32_t page_write(request *const req){
+	//printf("write key :%u\n",req->key);
 	std::pair<ppa_t, value_set *> r; 
 	if(caching_num_lb!=0){
 		r=buffer->put(req->key, req->value);
@@ -142,6 +144,7 @@ void *page_end_req(algo_req* input){
 	}
 	request *res=input->parents;
 	if(res){
+		res->type_ftl=res->type_lower=0;
 		res->end_req(res);//you should call the parents end_req like this
 	}
 	free(params);

@@ -307,9 +307,6 @@ void *posix_trim_block(uint32_t _PPA, bool async){
 	
 	my_posix.req_type_cnt[TRIM]++;
 	for(uint32_t i=PPA; i<PPA+my_posix.PPS; i++){
-		if(i==8192){
-			printf("8192 erase!\n");
-		}
 		free(seg_table[i].storage);
 		seg_table[i].storage=NULL;
 	}

@@ -123,7 +123,7 @@ void bench_make_data(){
 			fillrand(start,end,_m);
 			break;
 		case VECTOREDSET:
-			vectored_set(start,end,_m,false);
+			vectored_set(start,end,_m,true);
 			break;
 		case VECTOREDGET:
 			vectored_get(start,end,_m,false);

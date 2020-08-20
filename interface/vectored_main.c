@@ -31,7 +31,9 @@ int main(int argc,char* argv[]){
 	bench_init();
 	bench_vectored_configure();
 	bench_add(VECTOREDSET,0,RANGE,RANGE);
-	bench_add(VECTOREDRW,0,RANGE,RANGE*2);
+	bench_add(VECTOREDGET,0,RANGE/100*99,RANGE/100*99);
+	printf("range: %u!\n",RANGE);
+	//bench_add(VECTOREDRW,0,RANGE,RANGE*2);
 
 
 	char *value;
