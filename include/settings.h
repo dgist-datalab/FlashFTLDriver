@@ -71,7 +71,7 @@
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
 
-#define RANGE (SHOWINGSIZE/4/k)
+#define RANGE (SHOWINGSIZE/4/K)
 #define DEVFULL ((uint32_t)TOTALSIZE/LPAGESIZE)
 
 #define PARTNUM 2
@@ -145,9 +145,9 @@ static inline bool KEYVALCHECK(KEYT a){
 #define V_PTR char * const
 #define PTR char*
 #define ASYNC 1
-#define QSIZE (1)
-#define LOWQDEPTH (64)
-#define QDEPTH (64)
+#define QSIZE (128)
+#define LOWQDEPTH (128)
+#define QDEPTH (128)
 
 #define THPOOL
 #define NUM_THREAD 4

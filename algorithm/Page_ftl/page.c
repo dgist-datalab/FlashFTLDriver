@@ -7,7 +7,7 @@
 #include "page.h"
 #include "map.h"
 #include "../../bench/bench.h"
-
+extern uint32_t test_key;
 uint32_t caching_num_lb;
 cache::lru_cache <ppa_t, value_set *>* buffer;
 align_buffer a_buffer;
@@ -49,7 +49,6 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 
 	switch(type){
 		case DATAR:
-			params->address=ppa%L2PGAP;
 			page_ftl.li->read(ppa,PAGESIZE,value,ASYNC,my_req);
 			break;
 		case DATAW:
@@ -59,6 +58,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 }
 
 uint32_t page_read(request *const req){
+
 	value_set *cached_value=buffer->get(req->key);
 	if(!cached_value){
 		for(uint32_t i=0; i<a_buffer.idx; i++){
@@ -77,7 +77,8 @@ uint32_t page_read(request *const req){
 		req->end_req(req);
 	}
 	else{
-		send_user_req(req, DATAR, page_map_pick(req->key)/L2PGAP, req->value);
+		req->value->ppa=page_map_pick(req->key);
+		send_user_req(req, DATAR, req->value->ppa/L2PGAP, req->value);
 	}
 	return 1;
 }
@@ -97,6 +98,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		ppa_t ppa=page_map_assign(a_buffer.key);
 		value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 		for(uint32_t i=0; i<L2PGAP; i++){
+
 			memcpy(&value->value[i*4096], a_buffer.value[i]->value, 4096);
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
@@ -140,6 +142,11 @@ void *page_end_req(algo_req* input){
 	switch(input->type){
 		case DATAW:
 			inf_free_valueset(params->value,FS_MALLOC_W);
+			break;
+		case DATAR:
+			if(params->value->ppa%L2PGAP){
+				memmove(params->value->value, &params->value->value[4096], 4096);
+			}
 			break;
 	}
 	request *res=input->parents;

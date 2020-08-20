@@ -2,7 +2,7 @@
 #include "../include/settings.h"
 extern master *_master;
 
-#define MAXBUFSIZE (16*K)
+#define MAXBUFSIZE (1*K)
 #define REQSIZE (sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint32_t)+sizeof(uint32_t))
 #define TXNHEADERSIZE (sizeof(uint32_t)+sizeof(uint32_t))
 
@@ -96,6 +96,59 @@ void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
 			m->write_cnt++;
 		}
 	}
+}
+
+void vectored_unique_rset(uint32_t start, uint32_t end, monitor* m){
+	uint32_t request_per_command=_master->trans_configure.request_num_per_command;
+	uint32_t number_of_command=(m->m_num)/request_per_command;
+	m->m_num=number_of_command*request_per_command;
+	m->tbody=(transaction_bench_value*)malloc(number_of_command * sizeof(transaction_bench_value));
+
+	uint32_t request_buf_size=_master->trans_configure.request_size * request_per_command;
+
+	m->command_num=number_of_command;
+	m->command_issue_num=0;
+	printf("total command : %lu\n", m->command_num);
+	uint32_t max_num_of_req=number_of_command*request_per_command;
+	uint32_t *key_buf=(uint32_t *)malloc(sizeof(uint32_t)*max_num_of_req);
+
+	for(uint32_t i=0; i<max_num_of_req; i++){
+		key_buf[i]=max_num_of_req-1-i;
+	}
+	/*
+	for(uint32_t i=0; i<max_num_of_req; i++){
+		uint32_t temp_idx=rand()%max_num_of_req;
+		uint32_t temp_idx2=rand()%max_num_of_req;
+
+		uint32_t temp=key_buf[temp_idx];
+		key_buf[temp_idx]=key_buf[temp_idx2];
+		key_buf[temp_idx2]=temp;
+	}*/
+
+	
+	uint32_t key_idx=0;
+	for(uint32_t i=0; i<number_of_command; i++){
+		uint32_t idx=0;
+		m->tbody[i].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
+		char *buf=m->tbody[i].buf;
+
+		idx+=sizeof(uint32_t);//tid
+		(*(uint32_t*)&buf[idx])=request_per_command;
+		idx+=sizeof(uint32_t);
+
+		for(uint32_t j=0; j<request_per_command; j++){
+			(*(uint8_t*)&buf[idx])=FS_SET_T;
+			idx+=sizeof(uint8_t);
+
+			(*(uint32_t*)&buf[idx])=key_buf[key_idx++];
+			idx+=sizeof(uint32_t);
+
+			(*(uint32_t*)&buf[idx])=0; //offset
+			idx+=sizeof(uint32_t);
+			m->write_cnt++;
+		}
+	}
+	free(key_buf);
 }
 
 void vectored_get(uint32_t start, uint32_t end, monitor* m, bool isseq){

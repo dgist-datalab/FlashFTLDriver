@@ -1,7 +1,10 @@
-export CC=g++
+override export CC=g++-9
+override export CXX=g++-9
+override export AR=gcc-ar
+override export NM=gcc-nm
 
 TARGET_INF=interface
-export TARGET_LOWER=posix_memory
+export TARGET_LOWER=AMF
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -23,9 +26,10 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-DCHECKINGTIME\
-			-O3\
+			-O3 -march=native -mtune=native -flto=20 \
+#		-DCHECKINGDATA\
 #			-DWRITESYNC\
+			-DCHECKINGTIME\
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
 
@@ -86,6 +90,7 @@ SRCS +=\
 	./include/utils/dl_sync.c\
 	./include/utils/rwlock.c\
 	./include/utils/cond_lock.c\
+	./include/utils/data_checker.c\
 	./include/data_struct/hash_kv.c\
 	./include/data_struct/list.c\
 	./include/data_struct/redblack.c\
@@ -97,6 +102,7 @@ SRCS +=\
 	./include/utils/thpool.c\
 	./include/utils/kvssd.c\
 	./include/utils/sha256.c\
+	./include/utils/tag_q.c\
 	./blockmanager/base_block_manager.c\
 	./blockmanager/bb_checker.c\
 
@@ -121,8 +127,8 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
+		-ljemalloc\
 #	-laio\
-	#	-ljemalloc\
 
 all: driver
 

@@ -2,6 +2,7 @@
 #include "../include/types.h"
 #include "../include/settings.h"
 #include "../include/utils/kvssd.h"
+#include "../interface/interface.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -84,7 +85,7 @@ void bench_make_data(){
 		return;
 	}
 	printf("%d X %d = %d, answer=%lu\n",_m->bech,_m->benchsetsize,_m->bech*_m->benchsetsize,_meta->number);
-	if(_meta->type<VECTOREDSET){
+	if(_meta->type < VECTOREDRSET){
 		for(uint32_t i=0; i<_m->benchsetsize; i++){
 			_m->body[i]=(bench_value*)malloc(sizeof(bench_value)*_m->bech);
 		}
@@ -122,14 +123,23 @@ void bench_make_data(){
 		case FILLRAND:
 			fillrand(start,end,_m);
 			break;
-		case VECTOREDSET:
-			vectored_set(start,end,_m,true);
+		case VECTOREDUNIQRSET:
+			vectored_unique_rset(start,end, _m);
 			break;
-		case VECTOREDGET:
-			vectored_get(start,end,_m,false);
+		case VECTOREDSSET:
+			vectored_set(start,end, _m, true);
+			break;
+		case VECTOREDRSET:
+			vectored_set(start,end, _m, false);
+			break;
+		case VECTOREDRGET:
+			vectored_get(start,end, _m, false);
+			break;
+		case VECTOREDSGET:
+			vectored_get(start,end, _m, true);
 			break;
 		case VECTOREDRW:
-			vectored_rw(start,end,_m,false);
+			vectored_rw(start,end, _m, false);
 			break;
 #ifndef KVSSD
 		case SEQLATENCY:
@@ -145,6 +155,7 @@ void bench_make_data(){
 	}
 	_d->read_cnt=_m->read_cnt;
 	_d->write_cnt=_m->write_cnt;
+	_m->m_num=_m->read_cnt+_m->write_cnt;
 	measure_init(&_m->benchTime);
 	MS(&_m->benchTime);
 }
@@ -214,6 +225,7 @@ bench_value* __get_bench(){
 			case RANDSET:
 			case RANDGET:
 				return get_bench_ondemand();
+				break;
 		}
 
 		bench_make_data();
@@ -261,6 +273,21 @@ bench_value* get_bench(){
 }
 extern bool force_write_start;
 bool bench_is_finish_n(volatile int n){
+
+	if(_master->m[n].command_num){
+		if(_master->m[n].command_num <= _master->m[n].command_return_num+2){
+			if(_master->m[n].r_num==_master->m[n].m_num){
+				return true;
+			}
+			else{
+				return false;
+			}
+		}
+		else{
+			return false;
+		}
+	}
+
 	if(_master->m[n].r_num==_master->m[n].m_num){
 		_master->m[n].finish=true;
 		return true;
@@ -325,7 +352,7 @@ void bench_print(){
 		bench_li_print(&_master->li[i],_m);
 #endif
 		printf("\n----summary----\n");
-		if(_m->type==RANDRW || _m->type==SEQRW){
+		if(_m->type==RANDRW || _m->type==SEQRW || _m->type==VECTOREDRW){
 			uint64_t total_data=(PAGESIZE * _m->m_num/2)/1024;
 			double total_time2=_m->benchTime.adding.tv_sec+(double)_m->benchTime.adding.tv_usec/1000000;
 			double total_time1=_m->benchTime2.adding.tv_sec+(double)_m->benchTime2.adding.tv_usec/1000000;
@@ -364,10 +391,10 @@ void bench_print(){
 			fprintf(stderr,"[throughput] %lf(kb/s)\n",throughput);
 			fprintf(stderr,"             %lf(mb/s)\n",throughput/1024);
 			printf("[IOPS] %lf\n",_m->m_num/total_time);
-			if(_m->read_cnt){
-				printf("[cache hit cnt,ratio] %ld, %lf\n",_m->cache_hit,(double)_m->cache_hit/(_m->read_cnt));
-				printf("[cache hit cnt,ratio dftl] %ld, %lf\n",_m->cache_hit,(double)_m->cache_hit/(_m->read_cnt+_m->write_cnt));
-			}
+			//if(_m->read_cnt){
+			printf("[cache hit cnt,ratio] %ld, %lf\n",_m->cache_hit,(double)_m->cache_hit/(_m->read_cnt));
+			printf("[cache hit cnt,ratio dftl] %ld, %lf\n",_m->cache_hit,(double)_m->cache_hit/(_m->read_cnt+_m->write_cnt));
+			//}
 			printf("[READ WRITE CNT] %ld %ld\n",_m->read_cnt,_m->write_cnt);
 		}
 		printf("error cnt:%d\n",_master->error_cnt);
@@ -441,7 +468,7 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 	} */
 	static int cnt=0;
 	cumulate_number=0;
-	if((type>RANDSET || type%2==0) || type==NOR || type==FILLRAND){
+	if((type>RANDSET || type%2==0)|| type==RANDGET || type==NOR || type==FILLRAND){
 		printf("\n(%d)[cdf]read---\n",cnt++);
 		for(int i=0; i<1000000/TIMESLOT+1; i++){
 			cumulate_number+=_d->read_cdf[i];
@@ -472,6 +499,7 @@ void bench_reap_data(request *const req,lower_info *li){
 		return;
 	}
 	int idx=req->mark;
+	if(idx==-1){return;}
 	monitor *_m=&_master->m[idx];
 	bench_data *_data=&_master->datas[idx];
 
@@ -522,7 +550,8 @@ void bench_reap_data(request *const req,lower_info *li){
 	if(_m->m_num==_m->r_num+1){
 		_data->bench=_m->benchTime;
 	}
-	if(_m->r_num+1==_m->m_num/2 && (_m->type==SEQRW || _m->type==RANDRW)){
+	if(_m->r_num+1==_m->m_num/2 && (_m->type==SEQRW || _m->type==RANDRW || _m->type==VECTOREDRW)){
+		//inf_wait_background();
 		MA(&_m->benchTime);
 		_m->benchTime2=_m->benchTime;
 		measure_init(&_m->benchTime);

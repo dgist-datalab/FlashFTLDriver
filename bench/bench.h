@@ -139,6 +139,7 @@ int bench_set_params(int argc, char **argv,char **targv);
 bench_value* get_bench_ondemand();
 
 char *get_vectored_bench(uint32_t *mark);
+char *get_vectored_one_command(uint8_t type, uint32_t tid, uint32_t key);
 
 #ifdef CDF
 void bench_cdf_print(uint64_t, uint8_t istype, bench_data*);
@@ -161,6 +162,7 @@ void mixed(uint32_t,uint32_t,int percentage,monitor*);
 void vectored_set(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_get(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_rw(uint32_t, uint32_t, monitor*, bool isseq);
+void vectored_unique_rset(uint32_t, uint32_t, monitor*);
 
 int my_itoa(uint32_t key, char **_target, char *buf);
 

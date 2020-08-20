@@ -28,8 +28,11 @@ bool inf_make_range_query_apps(char type, char *keys, uint8_t key_len,int seq, i
 
 bool inf_make_mreq_apps(char type, char **keys, uint8_t *key_len, char **values,int num, int seq, void *req,void (*end_req)(uint32_t,uint32_t, void*));
 bool inf_iter_req_apps(char type, char *prefix, uint8_t key_len,char **value, int seq,void *req, void (*end_req)(uint32_t,uint32_t, void *));
+
+bool inf_wait_background();
 #endif
 
+uint32_t inf_algorithm_caller(request *const);
 bool inf_end_req(request*const);
 bool inf_assign_try(request *req);
 void inf_free();
@@ -37,7 +40,7 @@ void inf_print_debug();
 void* qmanager_find_by_algo(KEYT key);
 value_set *inf_get_valueset(PTR,int,uint32_t length);//NULL is uninitial, non-NULL is memcpy
 void inf_free_valueset(value_set*, int);
-uint32_t inf_algorithm_caller(request *const);
+
 
 #endif
 
