@@ -1,4 +1,0 @@
-Go to ./algorithm/dftl_fm/dftl.c
-At 72th line, you can control maximum cache size
-Control maximum_cache_size by changing num_max_cache variable
-Ex) num_max_cache = max_cache_entry/4 means 1/4 cache
