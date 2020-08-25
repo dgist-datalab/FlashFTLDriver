@@ -5,7 +5,7 @@
 //alogrithm layer
 extern struct algorithm __normal;
 extern struct algorithm __badblock;
-extern struct algorithm __demand;
+extern struct algorithm demand_ftl;
 extern struct algorithm page_ftl;
 extern struct algorithm algo_lsm;
 extern struct algorithm demand_ftl;
@@ -43,8 +43,8 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 	mp->algo=&__normal;
 #elif defined(Page_ftl)
 	mp->algo=&page_ftl;
-#elif defined(dftl) || defined(ctoc) || defined(dftl_test) || defined(ctoc_batch) || defined(hash_dftl)
-	mp->algo=&__demand;
+#elif defined(DFTL)
+	mp->algo=&demand_ftl;
 #elif defined(demand)
 	mp->algo=&__demand;
 #elif defined(Lsmtree)

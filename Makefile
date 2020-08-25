@@ -4,8 +4,8 @@ override export AR=gcc-ar
 override export NM=gcc-nm
 
 TARGET_INF=interface
-export TARGET_LOWER=AMF
-export TARGET_ALGO=Page_ftl
+export TARGET_LOWER=posix_memory
+export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
@@ -95,6 +95,7 @@ SRCS +=\
 	./include/data_struct/list.c\
 	./include/data_struct/redblack.c\
 	./include/data_struct/heap.c\
+	./include/data_struct/lru_list.c\
 	./bench/measurement.c\
 	./bench/bench.c\
 	./bench/bench_demand.c\
