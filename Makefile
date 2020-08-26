@@ -4,7 +4,7 @@ override export AR=gcc-ar
 override export NM=gcc-nm
 
 TARGET_INF=interface
-export TARGET_LOWER=AMF
+export TARGET_LOWER=posix_memory
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -130,7 +130,10 @@ LIBS +=\
 		-ljemalloc\
 #	-laio\
 
-all: driver
+all: cheeze_block_driver
+
+cheeze_block_driver: ./interface/cheeze_block.c ./interface/mainfiles/cheeze_block_main.c libdriver.a
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 DEBUG: debug_driver
 

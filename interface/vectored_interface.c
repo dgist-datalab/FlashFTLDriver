@@ -38,7 +38,6 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 	txn->tid=*(uint32_t*)buf_parser(buf, &idx, sizeof(uint32_t)); //get tid;
 	txn->size=*(uint32_t*)buf_parser(buf, &idx, sizeof(uint32_t)); //request size;
 
-
 	txn->buf=buf;
 	txn->done_cnt=0;
 	txn->end_req=end_req;
@@ -90,6 +89,11 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		
 	}
 
+	assign_vectored_req(txn);
+	return 1;
+}
+
+void assign_vectored_req(vec_request *txn){
 	while(1){
 		pthread_mutex_lock(&flying_cnt_lock);
 		if(flying_cnt - (int32_t)txn->size < 0){
@@ -109,10 +113,20 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 			break;
 		}
 	}
-
-	return 1;
 }
 
+void release_each_req(request *req){
+	uint32_t tag_num=req->tag_num;
+	pthread_mutex_lock(&flying_cnt_lock);
+	flying_cnt++;
+	if(flying_cnt > QDEPTH){
+		printf("???\n");
+		abort();
+	}
+	pthread_mutex_unlock(&flying_cnt_lock);
+
+	tag_manager_free_tag(tm, tag_num);
+}
 
 static uint32_t get_next_request(processor *pr, request** inf_req, vec_request **vec_req){
 	if(((*inf_req)=(request*)q_dequeue(pr->retry_q))){
@@ -208,19 +222,9 @@ bool vectored_end_req (request * const req){
 			abort();
 	}
 	preq->done_cnt++;
-	uint32_t tag_num=req->tag_num;
 	if(preq->size==preq->done_cnt){
 		if(preq->end_req)
 			preq->end_req((void*)preq);	
 	}
-	pthread_mutex_lock(&flying_cnt_lock);
-	flying_cnt++;
-	if(flying_cnt > QDEPTH){
-		printf("???\n");
-		abort();
-	}
-	pthread_mutex_unlock(&flying_cnt_lock);
-
-	tag_manager_free_tag(tm, tag_num);
 	return true;
 }
