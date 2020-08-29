@@ -26,6 +26,7 @@ int main(int argc,char* argv[]){
 
 	inf_init(1,0,argc,argv);
 
+	init_cheeze();
 	vec_request *req=NULL;
 	while((req=get_vectored_request())){
 		assign_vectored_req(req);

@@ -63,6 +63,7 @@ uint32_t page_read(request *const req){
 	if(!cached_value){
 		for(uint32_t i=0; i<a_buffer.idx; i++){
 			if(req->key==a_buffer.key[i]){
+				printf("buffered read!\n");
 				memcpy(req->value->value, a_buffer.value[i]->value, 4096);
 				req->end_req(req);		
 				return 1;
@@ -78,7 +79,14 @@ uint32_t page_read(request *const req){
 	}
 	else{
 		req->value->ppa=page_map_pick(req->key);
-		send_user_req(req, DATAR, req->value->ppa/L2PGAP, req->value);
+	//	printf("\t\tmap info : %u->%u\n", req->key, req->value->ppa);
+		if(req->value->ppa==UINT32_MAX){
+			req->type=FS_NOTFOUND_T;
+			req->end_req(req);
+		}
+		else{
+			send_user_req(req, DATAR, req->value->ppa/L2PGAP, req->value);
+		}
 	}
 	return 1;
 }

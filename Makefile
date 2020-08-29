@@ -15,7 +15,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
-#-fsanitize=address\
+-fsanitize=address\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\
@@ -26,8 +26,8 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-O3 -march=native -mtune=native -flto=20 \
-#		-DCHECKINGDATA\
+		-DCHECKINGDATA\
+#			-O3 -march=native -mtune=native -flto=20 \
 #			-DWRITESYNC\
 			-DCHECKINGTIME\
 
@@ -91,6 +91,7 @@ SRCS +=\
 	./include/utils/rwlock.c\
 	./include/utils/cond_lock.c\
 	./include/utils/data_checker.c\
+	./include/utils/crc32.c\
 	./include/data_struct/hash_kv.c\
 	./include/data_struct/list.c\
 	./include/data_struct/redblack.c\

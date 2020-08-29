@@ -4,6 +4,7 @@
 #include "threading.h"
 #include "../bench/bench.h"
 #include "vectored_interface.h"
+#include "../include/utils/crc32.h"
 #include <pthread.h>
 
 pthread_t t_id;
@@ -14,6 +15,10 @@ int chrfd;
 bool cheeze_end_req(request *const req);
 void *ack_to_dev(void*);
 queue *ack_queue;
+char *null_value;
+#ifdef CHECKINGDATA
+uint32_t* CRCMAP;
+#endif
 
 void init_cheeze(){
 	chrfd = open("/dev/cheeze_chr", O_RDWR);
@@ -23,14 +28,25 @@ void init_cheeze(){
 		return;
 	}
 
+	null_value=(char*)malloc(PAGESIZE);
+	memset(null_value,0,PAGESIZE);
 	q_init(&ack_queue, 128);
+#ifdef CHECKINGDATA
+	CRCMAP=(uint32_t*)malloc(sizeof(uint32_t) * RANGE);
+	memset(CRCMAP, 0, sizeof(uint32_t) *RANGE);
+#endif
 	pthread_create(&t_id, NULL, &ack_to_dev, NULL);
 }
 
 inline void error_check(cheeze_req *creq){
-	if(unlikely(creq->index%4096)){printf("index not align %s:%d\n", __FILE__, __LINE__);}
-	if(unlikely(creq->size%4096)){printf("size not align %s:%d\n", __FILE__, __LINE__);}
-	if(unlikely(creq->offset)){printf("offset not align %s:%d\n", __FILE__, __LINE__);}
+	if(unlikely(creq->size%LPAGESIZE)){
+		printf("size not align %s:%d\n", __FILE__, __LINE__);
+		abort();
+	}
+	if(unlikely(creq->offset%LPAGESIZE)){
+		printf("offset not align %s:%d\n", __FILE__, __LINE__);
+		abort();
+	}
 }
 
 inline FSTYPE decode_type(int rw){
@@ -54,7 +70,7 @@ vec_request *get_vectored_request(){
 	error_check(creq);
 
 	res->origin_req=(void*)creq;
-	res->size=creq->size/4096;
+	res->size=creq->size/LPAGESIZE;
 	res->req_array=(request*)calloc(res->size,sizeof(request));
 	res->end_req=NULL;
 	res->mark=0;
@@ -65,6 +81,16 @@ vec_request *get_vectored_request(){
 	creq->user_buf=res->buf;
 	if(type==FS_SET_T){
 		r=write(chrfd, creq, sizeof(struct cheeze_req));
+		bool zero_value=true;
+		for(uint32_t i=0; i<creq->size; i++){
+			if(((char*)creq->user_buf)[i]!=0){
+				zero_value=false;
+				break;
+			}
+		}
+		if(zero_value){
+			printf("zero value come!!!!!\n");
+		}
 		if(r<0){
 			free(res);
 			return NULL;
@@ -83,14 +109,22 @@ vec_request *get_vectored_request(){
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 				break;
 			case FS_SET_T:
-				temp->value=inf_get_valueset(&res->buf[4096*i],FS_MALLOC_W,4096);
+
+				temp->value=inf_get_valueset(&res->buf[LPAGESIZE*i],FS_MALLOC_W,LPAGESIZE);
 				break;	
 			default:
 				printf("error type!\n");
 				abort();
 				break;
 		}
-		temp->key=creq->index/4096+i;
+		temp->key=creq->offset/LPAGESIZE+i;
+
+#ifdef CHECKINGDATA
+		if(temp->type==FS_SET_T){
+			CRCMAP[temp->key]=crc32(&res->buf[LPAGESIZE*i],LPAGESIZE);	
+		}
+#endif
+		printf("REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type==FS_GET_T?"FS_GET_T":"FS_SET_T",creq->id, i, temp->key);
 	}
 
 	return res;
@@ -98,12 +132,35 @@ vec_request *get_vectored_request(){
 
 bool cheeze_end_req(request *const req){
 	vectored_request *preq=req->parents;
+	if(req->key==1){
+		printf("break!\n");
+	}
 	switch(req->type){
 		case FS_NOTFOUND_T:
+			bench_reap_data(req, mp.li);
+			printf("%u not found!\n",req->key);
+#ifdef CHECKINGDATA
+			if(CRCMAP[req->key]){
+				printf("\n");
+				printf("\t\tcrc checking error in key:%u\n", req->key);	
+				printf("\n");		
+			}
+#endif
+			memcpy(&preq->buf[req->seq*LPAGESIZE], null_value,LPAGESIZE);
+			inf_free_valueset(req->value,FS_MALLOC_R);
+			break;
 		case FS_GET_T:
 			bench_reap_data(req, mp.li);
 			if(req->value){
-				memcpy(&preq->buf[req->seq*4096], req->value->value,4096);
+				memcpy(&preq->buf[req->seq*LPAGESIZE], req->value->value,LPAGESIZE);
+#ifdef CHECKINGDATA
+			if(CRCMAP[req->key]!=crc32(&preq->buf[req->seq*LPAGESIZE], LPAGESIZE)){
+				printf("\n");
+				printf("\t\tcrc checking error in key:%u\n", req->key);	
+				printf("\n");
+			}	
+#endif
+
 				inf_free_valueset(req->value,FS_MALLOC_R);
 			}
 			break;
@@ -124,6 +181,7 @@ bool cheeze_end_req(request *const req){
 			free(preq);
 		}
 		else{
+
 			while(!q_enqueue((void*)preq, ack_queue)){}
 		}
 	}
@@ -137,7 +195,18 @@ void *ack_to_dev(void* a){
 	ssize_t r;
 	while(1){
 		if(!(vec=(vec_request*)q_dequeue(ack_queue))) continue;
+		cheeze_req *creq=(cheeze_req*)vec->origin_req;
+
+#ifdef CHECKINGDATA
+		if(CRCMAP[creq->offset/LPAGESIZE] && CRCMAP[creq->offset/LPAGESIZE]!=crc32((char*)creq->user_buf, LPAGESIZE)){
+				printf("\n");
+				printf("\t\tcrc checking error in key:%u, it maybe copy error!\n", creq->offset/LPAGESIZE);	
+				printf("\n");
+		}
+#endif
+
 		r=write(chrfd, vec->origin_req, sizeof(cheeze_req));
+		printf("[DONE] REQ INFO(%d) LBA: %u ~ %u\n", creq->id, creq->offset/LPAGESIZE, creq->offset/LPAGESIZE+creq->size/LPAGESIZE-1);
 		if(r<0){
 			break;
 		}
@@ -149,5 +218,8 @@ void *ack_to_dev(void* a){
 }
 
 void free_cheeze(){
+#ifdef CHECKINGDATA
+	free(CRCMAP);
+#endif
 	return;
 }

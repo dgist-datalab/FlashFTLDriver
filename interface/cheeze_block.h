@@ -16,17 +16,16 @@
 
 #define OP_READ 0
 #define OP_WRITE 1
-
 struct cheeze_req {
-	int rw;
-	volatile int acked;
-	unsigned int index;
-	unsigned int offset;
-	unsigned int size;
-	unsigned long id;
-	void *addr;
-	void *user_buf;
+    int rw; 
+    unsigned int offset;
+    unsigned int size;
+    int id; 
+    void *addr;
+    void *user_buf;
+    char acked[32]; // struct completion acked;
 } __attribute__((aligned(8), packed));
+
 
 typedef struct cheeze_req cheeze_req;
 

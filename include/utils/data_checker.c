@@ -118,6 +118,8 @@ bool __checking_data_check(uint32_t key, char *data){
 }
 
 void __checking_data_free(){
-	free(keymap);
-	fdriver_destroy(&data_check_lock);
+	if(keymap){
+		free(keymap);
+		fdriver_destroy(&data_check_lock);
+	}
 }
