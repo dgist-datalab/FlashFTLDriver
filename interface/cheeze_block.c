@@ -43,10 +43,11 @@ inline void error_check(cheeze_req *creq){
 		printf("size not align %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
+	/*
 	if(unlikely(creq->offset%LPAGESIZE)){
 		printf("offset not align %s:%d\n", __FILE__, __LINE__);
 		abort();
-	}
+	}*/
 }
 
 inline FSTYPE decode_type(int rw){
@@ -81,16 +82,6 @@ vec_request *get_vectored_request(){
 	creq->user_buf=res->buf;
 	if(type==FS_SET_T){
 		r=write(chrfd, creq, sizeof(struct cheeze_req));
-		bool zero_value=true;
-		for(uint32_t i=0; i<creq->size; i++){
-			if(((char*)creq->user_buf)[i]!=0){
-				zero_value=false;
-				break;
-			}
-		}
-		if(zero_value){
-			printf("zero value come!!!!!\n");
-		}
 		if(r<0){
 			free(res);
 			return NULL;
@@ -117,7 +108,7 @@ vec_request *get_vectored_request(){
 				abort();
 				break;
 		}
-		temp->key=creq->offset/LPAGESIZE+i;
+		temp->key=creq->offset+i;
 
 #ifdef CHECKINGDATA
 		if(temp->type==FS_SET_T){
@@ -198,15 +189,15 @@ void *ack_to_dev(void* a){
 		cheeze_req *creq=(cheeze_req*)vec->origin_req;
 
 #ifdef CHECKINGDATA
-		if(CRCMAP[creq->offset/LPAGESIZE] && CRCMAP[creq->offset/LPAGESIZE]!=crc32((char*)creq->user_buf, LPAGESIZE)){
+		if(CRCMAP[creq->offset] && CRCMAP[creq->offset]!=crc32((char*)creq->user_buf, LPAGESIZE)){
 				printf("\n");
-				printf("\t\tcrc checking error in key:%u, it maybe copy error!\n", creq->offset/LPAGESIZE);	
+				printf("\t\tcrc checking error in key:%u, it maybe copy error!\n", creq->offset);	
 				printf("\n");
 		}
 #endif
 
 		r=write(chrfd, vec->origin_req, sizeof(cheeze_req));
-		printf("[DONE] REQ INFO(%d) LBA: %u ~ %u\n", creq->id, creq->offset/LPAGESIZE, creq->offset/LPAGESIZE+creq->size/LPAGESIZE-1);
+		printf("[DONE] REQ INFO(%d) LBA: %u ~ %u\n", creq->id, creq->offset, creq->offset+creq->size/LPAGESIZE-1);
 		if(r<0){
 			break;
 		}
