@@ -18,6 +18,15 @@ void log_print(int sig){
 	exit(1);
 }
 
+void * thread_test(void *){
+	vec_request *req=NULL;
+	while((req=get_vectored_request())){
+		assign_vectored_req(req);
+	}
+	return NULL;
+}
+
+pthread_t thr; 
 int main(int argc,char* argv[]){
 	struct sigaction sa;
 	sa.sa_handler = log_print;
@@ -27,10 +36,9 @@ int main(int argc,char* argv[]){
 	inf_init(1,0,argc,argv);
 
 	init_cheeze();
-	vec_request *req=NULL;
-	while((req=get_vectored_request())){
-		assign_vectored_req(req);
-	}
+
+	pthread_create(&thr, NULL, thread_test, NULL);
+	pthread_join(thr, NULL);
 
 	free_cheeze();
 	inf_free();
