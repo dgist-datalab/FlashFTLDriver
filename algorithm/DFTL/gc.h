@@ -22,6 +22,8 @@ typedef struct pm_body{
 	__segment *map_reserve;
 }pm_body;
 
+
+pm_body *pm_body_create(blockmanager *bm);
 void invalidate_ppa(uint32_t t_ppa);
 void validate_ppa(uint32_t t_ppa, KEYT *lbas);
 ppa_t get_ppa(KEYT* lba);

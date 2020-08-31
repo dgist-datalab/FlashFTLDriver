@@ -1,5 +1,6 @@
 SRCS +=\
 	   seq_block_manager.c\
+	   seq_pt_block_manager.c\
 
 OBJS :=\
 	$(patsubst %.c,%.o,$(SRCS))\

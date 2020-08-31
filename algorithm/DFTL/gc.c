@@ -1,9 +1,20 @@
 #include "gc.h"
 #include "../../include/data_struct/list.h"
+#include "../../include/container.h"
 #include <stdlib.h>
 #include <stdint.h>
 
 extern algorithm demand_ftl;
+pm_body *pm_body_create(blockmanager *bm){
+	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
+
+	res->active=bm->pt_get_segment(bm, DATA_S, false);
+	res->reserve=bm->pt_get_segment(bm, DATA_S, true);
+
+	res->map_active=bm->pt_get_segment(bm, MAP_S, false);
+	res->map_reserve=bm->pt_get_segment(bm, MAP_S, true);
+	return res;
+}
 void invalidate_ppa(uint32_t t_ppa){
 	if(t_ppa<32768){
 		//abort();

@@ -68,8 +68,6 @@ typedef struct demand_map_manager{
 	my_cache *cache;
 	lower_info *li;
 	blockmanager *bm;
-	__segment *reserve;
-	__segment *active;
 }demand_map_manager;
 
 

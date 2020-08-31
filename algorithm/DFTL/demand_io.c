@@ -34,7 +34,7 @@ void *demend_inter_end_req(algo_req *my_req){
 }
 
 void demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *params){
-	algo_req *my_req=(algo_req*)malloc(sizeof(my_req));
+	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	my_req->type=MAPPINGR;
 	my_req->parents=req;
 	my_req->type_lower=0;
@@ -45,7 +45,7 @@ void demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *param
 }
 
 void demand_mapping_write(uint32_t ppa, lower_info *li, request *req, void *params){
-	algo_req *my_req=(algo_req*)malloc(sizeof(my_req));
+	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	my_req->type=MAPPINGW;
 	my_req->parents=req;
 	my_req->type_lower=0;
@@ -56,7 +56,7 @@ void demand_mapping_write(uint32_t ppa, lower_info *li, request *req, void *para
 }
 
 void demand_mapping_inter_read(uint32_t ppa, lower_info *li, gc_map_value *params){
-	algo_req *my_req=(algo_req*)malloc(sizeof(my_req));
+	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	my_req->type=GCMR_DGC;
 	my_req->parents=NULL;
 	my_req->type_lower=0;
@@ -68,7 +68,7 @@ void demand_mapping_inter_read(uint32_t ppa, lower_info *li, gc_map_value *param
 }
 
 void demand_mapping_inter_write(uint32_t ppa, lower_info *li, gc_map_value *params){
-	algo_req *my_req=(algo_req*)malloc(sizeof(my_req));
+	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	my_req->type=GCMW_DGC;
 	my_req->parents=NULL;
 	my_req->type_lower=0;

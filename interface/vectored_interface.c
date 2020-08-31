@@ -71,7 +71,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 				break;
 			case FS_SET_T:
-				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, 4096);
+				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 				break;
 			default:
 				printf("error type!\n");

@@ -1,7 +1,7 @@
 #include "seq_block_manager.h"
 #include <stdlib.h>
 #include <stdio.h>
-extern bb_checker checker;
+
 struct blockmanager seq_bm={
 	.create=seq_create,
 	.destroy=seq_destroy,
@@ -24,14 +24,17 @@ struct blockmanager seq_bm={
 	.get_oob=seq_get_oob,
 	.change_reserve=seq_change_reserve,
 
-	.pt_create=NULL,
-	.pt_destroy=NULL,
-	.pt_get_segment=NULL,
-	.pt_get_gc_target=NULL,
-	.pt_trim_segment=NULL
+	.pt_create=seq_pt_create,
+	.pt_destroy=seq_pt_destroy,
+	.pt_get_segment=seq_pt_get_segment,
+	.pt_get_gc_target=seq_pt_get_gc_target,
+	.pt_trim_segment=seq_pt_trim_segment,
+	.pt_remain_page=seq_pt_remain_page,
+	.pt_isgc_needed=seq_pt_isgc_needed,
+	.change_pt_reserve=seq_change_pt_reserve,
+	.pt_reserve_to_free=seq_pt_reserve_to_free,
 };
 
-static uint32_t age=UINT_MAX;
 void seq_mh_swap_hptr(void *a, void *b){
 	block_set *aa=(block_set*)a;
 	block_set *bb=(block_set*)b;
@@ -127,7 +130,6 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 
 	}
 	else{
-		free_block_set->total_invalid_number=age--;
 		mh_insert_append(p->max_heap, (void*)free_block_set);
 	}
 
@@ -155,7 +157,6 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 	uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
 	uint32_t segment_idx=segment_start_block_number/BPS;
 	block_set *bs=&p->logical_segment[segment_idx];
-	bs->total_invalid_number=age--;
 
 	mh_insert_append(p->max_heap, (void*)bs);
 
@@ -173,11 +174,6 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 	__gsegment* res=(__gsegment*)malloc(sizeof(__gsegment));
 	res->invalidate_number=0;
 
-
-	/*
-	for(uint32_t i=0; i<_NOS; i++){
-		p->logical_segment[i].total_invalid_number=UINT_MAX;
-	}*/
 
 	mh_construct(p->max_heap);
 	block_set* target=(block_set*)mh_get_max(p->max_heap);
@@ -252,13 +248,14 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 	if(!(p->seq_block[bn].bitset[bt]&(1<<of))){
 		res=0;
 	}
+
 	b->bitset[bt]&=~(1<<of);
 	b->invalid_number++;
-/*
+
 	uint32_t segment_idx=b->block_num/BPS;
 	block_set *seg=&p->logical_segment[segment_idx];
 	seg->total_invalid_number++;
-*/	
+	
 	if(b->invalid_number>_PPB * L2PGAP){
 		abort();
 	}

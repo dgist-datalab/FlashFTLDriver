@@ -28,11 +28,14 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	buffer=new cache::lru_cache<ppa_t, value_set *>(caching_num_lb);
 	demand_map_create(100,li,bm);
 
+	demand_ftl.algo_body=(void*)pm_body_create(bm);
+	a_buffer.value=(char*)malloc(PAGESIZE);
 	return 1;
 }
 
 void page_destroy (lower_info* li, algorithm *algo){
 	demand_map_free();
+	free(a_buffer.value);
 	return;
 }
 
@@ -44,7 +47,7 @@ uint32_t page_read(request *const req){
 		if(!cached_value){
 			for(uint32_t i=0; i<a_buffer.idx; i++){
 				if(req->key==a_buffer.key[i]){
-					memcpy(req->value->value, a_buffer.value[i]->value, 4096);
+					memcpy(req->value->value, &a_buffer.value[i*4096], 4096);
 					req->end_req(req);		
 					return 1;
 				}
@@ -61,22 +64,18 @@ uint32_t page_read(request *const req){
 
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	if(req){
-		a_buffer.value[a_buffer.idx]=req->value;
+		memcpy(&a_buffer.value[a_buffer.idx*4096], req->value->value, 4096);
 		a_buffer.key[a_buffer.idx]=req->key;
 	}
 	else{
-		a_buffer.value[a_buffer.idx]=value;
+		memcpy(&a_buffer.value[a_buffer.idx*4096], req->value->value, 4096);
 		a_buffer.key[a_buffer.idx]=key;
 	}
 	a_buffer.idx++;
 
 	if(a_buffer.idx==L2PGAP){
 		ppa_t ppa=get_ppa(a_buffer.key);
-		value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
-		for(uint32_t i=0; i<L2PGAP; i++){
-			memcpy(&value->value[i*4096], a_buffer.value[i]->value, 4096);
-			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
-		}
+		value_set *value=inf_get_valueset(a_buffer.value, FS_MALLOC_W, PAGESIZE);
 		send_user_req(NULL, DATAW, ppa, value);
 		
 		KEYT physical[2];
@@ -86,12 +85,12 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		demand_map_assign(req, a_buffer.key, physical);
 
 		a_buffer.idx=0;
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 uint32_t page_write(request *const req){
-	//printf("write key :%u\n",req->key);
 	if(req->params){
 		return demand_map_assign(req, NULL, NULL);
 	}
@@ -100,17 +99,15 @@ uint32_t page_write(request *const req){
 	if(caching_num_lb!=0){
 		r=buffer->put(req->key, req->value);
 		if(r.first!=UINT_MAX){
-			align_buffering(NULL, r.first, r.second);
-			//send_user_req(NULL, DATAW, page_map_assign(r.first), r.second);
+			if(!align_buffering(NULL, r.first, r.second)){
+				req->end_req(req);
+			}
 		}
-		req->value=NULL;
-		req->end_req(req);
 	}
 	else{
-		align_buffering(req, 0, NULL);
-		req->value=NULL;
-		req->end_req(req);
-		//send_user_req(req, DATAW, page_map_assign(req->key), req->value);
+		if(!align_buffering(req, 0, NULL)){
+			req->end_req(req);
+		}
 	}
 
 	return 0;

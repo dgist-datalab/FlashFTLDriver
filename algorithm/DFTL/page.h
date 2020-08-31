@@ -8,8 +8,8 @@ typedef struct page_params{
 
 typedef struct align_buffer{
 	uint8_t idx;
-	value_set *value[L2PGAP];
 	KEYT key[L2PGAP];
+	char *value;
 }align_buffer;
 
 uint32_t page_create (lower_info*,blockmanager *, algorithm *);

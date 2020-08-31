@@ -60,6 +60,10 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		ln=lru_push(ccm.lru, cc);
 		etr->private_data=(void*)ln;
 		ccm.now_caching_page++;
+		if(ccm.now_caching_page > ccm.max_caching_page){
+			printf("caching overflow! %s:%d\n", __FILE__, __LINE__);
+			abort();
+		}
 	}else{
 		if(etr->private_data==NULL){
 			printf("insert translation page before cache update! %s:%d\n",__FILE__, __LINE__);
@@ -151,6 +155,7 @@ bool coarse_update_eviction_target_translation(struct my_cache* , GTD_entry *etr
 	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
 	memcpy(data, c_data, PAGESIZE);
 	lru_delete(ccm.lru, (lru_node*)etr->private_data);
+	etr->private_data=NULL;
 	ccm.now_caching_page--;
 	return true;
 }

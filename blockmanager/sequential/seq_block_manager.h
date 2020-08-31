@@ -8,6 +8,7 @@
 
 typedef struct block_set{
 	uint32_t total_invalid_number;
+	uint8_t type;
 	__block *blocks[BPS];
 	void *hptr;
 }block_set;
@@ -19,6 +20,9 @@ typedef struct seq_bm_private{
 	mh *max_heap;
 	uint32_t assigned_block;
 	uint32_t free_block;
+	int pnum;
+	queue **free_logical_seg_q_pt;
+	mh **max_heap_pt;
 }sbm_pri;
 
 uint32_t seq_create (struct blockmanager*, lower_info *li);
@@ -44,4 +48,21 @@ int seq_pick_page_num(struct blockmanager* ,__segment *);
 
 uint32_t seq_map_ppa(struct blockmanager* , uint32_t lpa);
 void seq_free_segment(struct blockmanager *, __segment *);
+
+
+uint32_t seq_pt_create(struct blockmanager *, int, int*, lower_info *);
+uint32_t seq_pt_destroy(struct blockmanager *);
+__segment* seq_pt_get_segment (struct blockmanager*, int pt_num, bool isreserve);
+__gsegment* seq_pt_get_gc_target (struct blockmanager*, int pt_num);
+void seq_pt_trim_segment(struct blockmanager*, int pt_num, __gsegment *, lower_info*);
+int seq_pt_remain_page(struct blockmanager*, __segment *active,int pt_num);
+bool seq_pt_isgc_needed(struct blockmanager*, int pt_num);
+__segment* seq_change_pt_reserve(struct blockmanager *,int pt_num, __segment *reserve);
+uint32_t seq_pt_reserve_to_free(struct blockmanager*, int pt_num, __segment *reserve);
+
+
+void seq_mh_swap_hptr(void *a, void *b);
+void seq_mh_assign_hptr(void *a, void *hn);
+int seq_get_cnt(void *a);
+
 #endif
