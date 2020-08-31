@@ -31,7 +31,7 @@ uint32_t page_map_assign(KEYT* lba){
 		}
 		/*mapping update*/
 		p->mapping[t_lba]=res*L2PGAP+i;
-		printf("\tmap set : %u->%u\n", t_lba, p->mapping[t_lba]);
+		DPRINTF("\tmap set : %u->%u\n", t_lba, p->mapping[t_lba]);
 	}
 
 	return res;
@@ -41,8 +41,22 @@ uint32_t page_map_pick(uint32_t lba){
 	uint32_t res=0;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	res=p->mapping[lba];
-	
 	return res;
+}
+
+
+uint32_t page_map_trim(uint32_t lba){
+	uint32_t res=0;
+	pm_body *p=(pm_body*)page_ftl.algo_body;
+	res=p->mapping[lba];
+	if(res==UINT32_MAX){
+		return 0;
+	}
+	else{
+		invalidate_ppa(res);
+		p->mapping[lba]=UINT32_MAX;
+		return 1;
+	}
 }
 
 uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
@@ -76,3 +90,5 @@ void page_map_free(){
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	free(p->mapping);
 }
+
+

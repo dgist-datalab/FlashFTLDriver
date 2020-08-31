@@ -15,6 +15,9 @@
 void log_print(int sig){
 	free_cheeze();
 	inf_free();
+	fflush(stdout);
+	fflush(stderr);
+	sync();
 	exit(1);
 }
 

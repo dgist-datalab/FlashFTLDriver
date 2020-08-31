@@ -26,10 +26,11 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-		-DCHECKINGDATA\
+			-DDEBUG\
+			-DCHECKINGDATA\
 #			-O3 -march=native -mtune=native -flto=20 \
 #			-DWRITESYNC\
-			-DCHECKINGTIME\
+
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
 
@@ -43,7 +44,7 @@ export CFLAGS_LOWER=\
 			 -lpthread\
 			 -Wall\
 			 -D_FILE_OFFSET_BITS=64\
-#			 -DLOWER_MEM_DEV\
+			 -DLOWER_MEM_DEV\
 
 export priority="false"
 export ORIGINAL_PATH=$(PPWD)

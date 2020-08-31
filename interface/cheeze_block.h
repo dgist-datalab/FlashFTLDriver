@@ -16,18 +16,18 @@
 
 #define OP_READ 0
 #define OP_WRITE 1
-struct cheeze_req {
-    int rw; 
-    unsigned int offset;
-    unsigned int size;
+#define OP_TRIM 2
+
+
+struct cheeze_req_user {
     int id; 
-    void *addr;
-    void *user_buf;
-    char acked[32]; // struct completion acked;
+    int rw; 
+    char *buf;
+    unsigned int pos; // sector_t but divided by 4096
+    unsigned int len;
 } __attribute__((aligned(8), packed));
 
-
-typedef struct cheeze_req cheeze_req;
+typedef struct cheeze_req_user cheeze_req;
 
 #define COPY_TARGET "/tmp/vdb"
 

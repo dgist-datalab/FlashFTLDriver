@@ -20,8 +20,6 @@
 #include "../../include/sem_lock.h"
 #include "../../bench/bench.h"
 
-#ifdef DEBUG
-#endif
 
 #ifdef KVSSD
 extern KEYT key_min, key_max;

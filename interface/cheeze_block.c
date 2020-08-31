@@ -39,13 +39,13 @@ void init_cheeze(){
 }
 
 inline void error_check(cheeze_req *creq){
-	if(unlikely(creq->size%LPAGESIZE)){
+	if(unlikely(creq->len%LPAGESIZE)){
 		printf("size not align %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
 	/*
-	if(unlikely(creq->offset%LPAGESIZE)){
-		printf("offset not align %s:%d\n", __FILE__, __LINE__);
+	if(unlikely(creq->pos%LPAGESIZE)){
+		printf("pos not align %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}*/
 }
@@ -54,14 +54,20 @@ inline FSTYPE decode_type(int rw){
 	switch(rw){
 		case OP_READ: return FS_GET_T;
 		case OP_WRITE: return FS_SET_T;
+		case OP_TRIM: return FS_DELETE_T;
 	}
 	return 1;
 }
 
 vec_request *get_vectored_request(){
+	static bool isstart=false;
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
 	cheeze_req *creq=(cheeze_req*)malloc(sizeof(cheeze_req));
 	
+	if(!isstart){
+		isstart=true;
+		printf("now waiting req!!\n");
+	}
 	ssize_t r=read(chrfd, creq, sizeof(cheeze_req));
 	if(r<0){
 		free(res);
@@ -71,21 +77,27 @@ vec_request *get_vectored_request(){
 	error_check(creq);
 
 	res->origin_req=(void*)creq;
-	res->size=creq->size/LPAGESIZE;
+	res->size=creq->len/LPAGESIZE;
 	res->req_array=(request*)calloc(res->size,sizeof(request));
 	res->end_req=NULL;
 	res->mark=0;
 
 	FSTYPE type=decode_type(creq->rw);
 
-	res->buf=(char*)malloc(creq->size);
-	creq->user_buf=res->buf;
+	res->buf=(char*)malloc(creq->len);
+	creq->buf=res->buf;
 	if(type==FS_SET_T){
-		r=write(chrfd, creq, sizeof(struct cheeze_req));
+		r=write(chrfd, creq, sizeof(cheeze_req));
 		if(r<0){
 			free(res);
 			return NULL;
 		}
+	}
+
+	if(res->size > QSIZE){
+		printf("----------------number of reqs is over %u < %u\n", QSIZE, res->size);
+		abort();
+		return NULL;
 	}
 
 	for(uint32_t i=0; i<res->size; i++){
@@ -108,14 +120,14 @@ vec_request *get_vectored_request(){
 				abort();
 				break;
 		}
-		temp->key=creq->offset+i;
+		temp->key=creq->pos+i;
 
 #ifdef CHECKINGDATA
 		if(temp->type==FS_SET_T){
 			CRCMAP[temp->key]=crc32(&res->buf[LPAGESIZE*i],LPAGESIZE);	
 		}
 #endif
-		printf("REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type==FS_GET_T?"FS_GET_T":"FS_SET_T",creq->id, i, temp->key);
+		DPRINTF("REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type==FS_GET_T?"FS_GET_T":"FS_SET_T",creq->id, i, temp->key);
 	}
 
 	return res;
@@ -123,13 +135,10 @@ vec_request *get_vectored_request(){
 
 bool cheeze_end_req(request *const req){
 	vectored_request *preq=req->parents;
-	if(req->key==1){
-		printf("break!\n");
-	}
 	switch(req->type){
 		case FS_NOTFOUND_T:
 			bench_reap_data(req, mp.li);
-			printf("%u not found!\n",req->key);
+			DPRINTF("%u not found!\n",req->key);
 #ifdef CHECKINGDATA
 			if(CRCMAP[req->key]){
 				printf("\n");
@@ -169,14 +178,14 @@ bool cheeze_end_req(request *const req){
 		if(req->type==FS_SET_T){
 			free(preq->buf);
 			free(preq->origin_req);
+			free(preq->req_array);
 			free(preq);
 		}
 		else{
-
 			while(!q_enqueue((void*)preq, ack_queue)){}
 		}
 	}
-	free(req);
+
 	return true;
 }
 
@@ -186,23 +195,30 @@ void *ack_to_dev(void* a){
 	ssize_t r;
 	while(1){
 		if(!(vec=(vec_request*)q_dequeue(ack_queue))) continue;
+
+#if defined(DEBUG) || defined(CHECKINGDATA)
 		cheeze_req *creq=(cheeze_req*)vec->origin_req;
+#endif
 
 #ifdef CHECKINGDATA
-		if(CRCMAP[creq->offset] && CRCMAP[creq->offset]!=crc32((char*)creq->user_buf, LPAGESIZE)){
-				printf("\n");
-				printf("\t\tcrc checking error in key:%u, it maybe copy error!\n", creq->offset);	
-				printf("\n");
+		for(uint32_t i=0; i<creq->len/LPAGESIZE; i++){
+			if(CRCMAP[creq->pos+i] && CRCMAP[creq->pos+i]!=crc32((char*)&creq->buf[LPAGESIZE*i], LPAGESIZE)){
+					printf("\n");
+					printf("\t\tcrc checking error in key:%u, it maybe copy error!\n", creq->pos);	
+					printf("\n");
+			}
 		}
 #endif
 
 		r=write(chrfd, vec->origin_req, sizeof(cheeze_req));
-		printf("[DONE] REQ INFO(%d) LBA: %u ~ %u\n", creq->id, creq->offset, creq->offset+creq->size/LPAGESIZE-1);
+
+		DPRINTF("[DONE] REQ INFO(%d) LBA: %u ~ %u\n", creq->id, creq->pos, creq->pos+creq->len/LPAGESIZE-1);
 		if(r<0){
 			break;
 		}
 		free(vec->buf);
 		free(vec->origin_req);
+		free(vec->req_array);
 		free(vec);
 	}
 	return NULL;

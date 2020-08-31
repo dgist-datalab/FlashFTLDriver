@@ -113,12 +113,3 @@ void measure_end(MeasureTime *m,const char *format){
 	return;
 }
 #endif
-
-#ifdef DEBUG
-int main(){
-	MeasureTime t;
-	measure_init(&t);
-	measure_start(&t);
-	measure_end(&t);
-}
-#endif

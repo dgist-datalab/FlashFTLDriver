@@ -170,6 +170,9 @@ void *vectored_main(void *__input){
 			inf_algorithm_caller(inf_req);	
 		}else{
 			uint32_t size=vec_req->size;
+			if(size!=0){
+				printf("break!\n");
+			}
 			for(uint32_t i=0; i<size; i++){
 				/*retry queue*/
 				while(1){
@@ -221,6 +224,8 @@ bool vectored_end_req (request * const req){
 		default:
 			abort();
 	}
+
+	release_each_req(req);
 	preq->done_cnt++;
 	if(preq->size==preq->done_cnt){
 		if(preq->end_req)

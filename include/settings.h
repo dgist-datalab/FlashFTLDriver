@@ -23,6 +23,16 @@
 #define BENCH_LOG "./result/"
 #define CACHING_RATIO 1
 
+#ifdef DEBUG
+#define DPRINTF(fmt, ...) \
+	do{\
+		printf(fmt, __VA_ARGS__); \
+	}while(0)
+#else
+#define DPRINTF(fmt, ...)\
+	do{}while(0)
+#endif
+
 #define K (1024)
 #define M (1024*K)
 #define G (1024*M)
@@ -40,7 +50,7 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 16L
+#define GIGAUNIT 8L
 #define OP 70
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
@@ -145,9 +155,9 @@ static inline bool KEYVALCHECK(KEYT a){
 #define V_PTR char * const
 #define PTR char*
 #define ASYNC 1
-#define QSIZE (128)
-#define LOWQDEPTH (128)
-#define QDEPTH (128)
+#define QSIZE (1024)
+#define LOWQDEPTH (1024)
+#define QDEPTH (1024)
 
 #define THPOOL
 #define NUM_THREAD 4

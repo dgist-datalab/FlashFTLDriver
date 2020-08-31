@@ -22,5 +22,4 @@
 #define DEBUG_LOG(c) ({\
 		printf("[%s]:",c);\
 		printf("%s:%d\n",__FILE__,__LINE__);})
-
 #endif
