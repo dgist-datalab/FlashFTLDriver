@@ -120,8 +120,12 @@ next:
 	p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
 }
 
+static int gc_cnt=0;
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
+	if(gc_cnt < 2){
+		printf("gc start\n");
+	}
 	__gsegment *target=page_ftl.bm->get_gc_target(page_ftl.bm);
 	uint32_t page;
 	uint32_t bidx, pidx;
@@ -194,6 +198,9 @@ void do_gc(){
 	p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
 
 	list_free(temp_list);
+	if(gc_cnt < 2){
+		printf("gc end\n");
+	}
 }
 
 
