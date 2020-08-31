@@ -409,17 +409,13 @@ retry:
 				printf("%s:%d non populate error!\n", __FILE__,__LINE__);
 				abort();
 			}
-			/*if(demand_check_pending_mapping(req, etr, &ppa)){
-				goto read_data;
-			}*/
+
 			if(!dmm.cache->exist(dmm.cache, req->key)){//cache miss
 				if(dmm.cache->is_needed_eviction(dmm.cache)){
 					if(dmm.cache->type==COARSE){
 						dp->et.gtd=dmm.cache->get_eviction_GTD_entry(dmm.cache);
 						dp->status=EVICTIONR; //it is dirty
-						if(dp->et.gtd->physical_address==UINT32_MAX){
-							goto retry;						
-						}
+						goto retry;						
 					}
 					else{
 						dp->et.mapping=dmm.cache->get_eviction_mapping_entry(dmm.cache);
