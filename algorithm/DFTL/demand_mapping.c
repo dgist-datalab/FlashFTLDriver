@@ -3,7 +3,7 @@
 #include "gc.h"
 #include <stdlib.h>
 #include <stdint.h>
-
+extern uint32_t test_key;
 demand_map_manager dmm;
 extern my_cache coarse_cache_func;
 
@@ -66,6 +66,10 @@ inline void __demand_map_pending_read(request *req, demand_params *dp, pick_para
 		printf("try to read invalidate ppa %s:%d\n", __FILE__,__LINE__);
 		abort();
 	}
+	if(req->key==test_key){
+		printf("%u:%u read data\n", req->key, ppa);
+	}
+	req->value->ppa=ppa;
 	send_user_req(req, DATAR, ppa/L2PGAP, req->value);
 	free(pp);
 	free(dp);
@@ -311,6 +315,9 @@ retry:
 						dp->status=EVICTIONR; //it is dirty
 						if(dmm.cache->type==COARSE){
 							dp->et.gtd=dmm.cache->get_eviction_GTD_entry(dmm.cache);
+							if(!dp->et.gtd){
+								dp->status=EVICTIONW;
+							}
 							goto retry;
 						}
 						else{
@@ -393,6 +400,7 @@ uint32_t demand_page_read(request *const req){
 		gtd_idx=GETGTDIDX(req->key);
 		trans_offset=TRANSOFFSET(req->key);
 		etr=dp->etr=&dmm.GTD[gtd_idx];
+		req->params=(void*)dp;
 	}else{
 		dp=(demand_params*)req->params;
 		etr=dp->etr;
@@ -414,7 +422,12 @@ retry:
 				if(dmm.cache->is_needed_eviction(dmm.cache)){
 					if(dmm.cache->type==COARSE){
 						dp->et.gtd=dmm.cache->get_eviction_GTD_entry(dmm.cache);
-						dp->status=EVICTIONR; //it is dirty
+						if(!dp->et.gtd){
+							dp->status=EVICTIONW; // it is clean
+						}
+						else{
+							dp->status=EVICTIONR; //it is dirty
+						}
 						goto retry;						
 					}
 					else{
@@ -442,7 +455,7 @@ retry:
 			}
 			if(target_etr->physical_address!=UINT32_MAX)
 				invalidate_ppa(target_etr->physical_address);
-			target_etr->physical_address=get_map_ppa(gtd_idx);
+			target_etr->physical_address=get_map_ppa(gtd_idx) * L2PGAP;
 			demand_mapping_write(target_etr->physical_address/L2PGAP, dmm.li, req, dp);
 			return 1;
 		case MISSR:
@@ -459,6 +472,11 @@ read_data:
 		printf("try to read invalidate ppa %s:%d\n", __FILE__,__LINE__);
 		abort();
 	}
+	if(req->key==test_key){
+		printf("%u:%u read data\n", req->key, ppa);
+	}
+	req->value->ppa=ppa;
+	free(req->params);
 	send_user_req(req, DATAR, ppa/L2PGAP, req->value);
 end:
 	return 1;
@@ -482,6 +500,8 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 			if(read_start && gtd_idx==temp_gtd_idx) continue;
 			if(!read_start){read_start=true;}
 
+			gtd_idx=temp_gtd_idx;
+
 			gmv=(gc_map_value*)malloc(sizeof(gc_map_value));
 			gmv->pair=target[i];
 			gmv->start_idx=i;
@@ -489,7 +509,7 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 			gmv->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 			gmv->isdone=false;
 			list_insert(temp_list, (void*)gmv);
-			demand_mapping_inter_read(dmm.GTD[gtd_idx].physical_address, dmm.li, gmv);
+			demand_mapping_inter_read(dmm.GTD[gtd_idx].physical_address/L2PGAP, dmm.li, gmv);
 		}
 	}
 	
@@ -502,13 +522,17 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 
 			gtd_idx=gmv->gtd_idx;
 			for(uint32_t i=gmv->start_idx; GETGTDIDX(target[i].lba)==gtd_idx; i++){
+				if(target[i].lba==test_key){
+					printf("%u map to %u in gc\n", test_key, target[i].ppa);	
+				}
 				dmm.cache->update_from_translation_gc(dmm.cache, gmv->value->value, target[i].lba, target[i].ppa);	
 			}
 			
 			invalidate_ppa(dmm.GTD[gtd_idx].physical_address);
 			uint32_t new_ppa=get_map_ppa(gtd_idx);
-			dmm.GTD[gtd_idx].physical_address=new_ppa;
+			dmm.GTD[gtd_idx].physical_address=new_ppa*L2PGAP;
 			demand_mapping_inter_write(new_ppa, dmm.li, gmv);
+			list_delete_node(temp_list, now);
 		}	
 	}
 	return 1;

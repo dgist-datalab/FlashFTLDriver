@@ -82,6 +82,12 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		physical[0]=ppa*L2PGAP;
 		physical[1]=ppa*L2PGAP+1;
 
+		for(uint8_t i=0; i<L2PGAP; i++){
+			if(a_buffer.key[i]==test_key){
+				printf("\n%u map to %u\n", test_key, physical[i]);	
+			}	
+		}
+
 		demand_map_assign(req, a_buffer.key, physical);
 
 		a_buffer.idx=0;

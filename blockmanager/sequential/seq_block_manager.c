@@ -298,6 +298,9 @@ bool seq_is_invalid_page (struct blockmanager* bm, uint32_t ppa){
 }
 
 void seq_set_oob(struct blockmanager* bm, char *data,int len, uint32_t ppa){
+	if(ppa==300564){
+		printf("break!\n");
+	}
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	__block *b=&p->seq_block[ppa/_PPB];
 	memcpy(b->oob_list[ppa%_PPB].d,data,len);

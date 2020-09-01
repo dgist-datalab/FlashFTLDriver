@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+extern uint32_t test_key;
 
 my_cache coarse_cache_func{
 	.init=coarse_init,
@@ -33,6 +34,12 @@ uint32_t coarse_init(struct my_cache *mc, uint32_t total_caching_physical_pages)
 }
 
 uint32_t coarse_free(struct my_cache *mc){
+	while(1){
+		coarse_cache *cc=(coarse_cache*)lru_pop(ccm.lru);
+		if(!cc) break;
+		free(cc->data);
+		free(cc);
+	}
 	lru_free(ccm.lru);
 	return 1;
 }
@@ -76,6 +83,10 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	uint32_t *ppa_list=(uint32_t*)cc->data;
 	old_ppa=ppa_list[GETOFFSET(lba)];
 	ppa_list[GETOFFSET(lba)]=ppa;
+
+	if(lba==test_key){
+		printf("%u ppa change %u to %u\n",test_key, old_ppa, ppa);
+	}
 
 	if(!isgc){
 		lru_update(ccm.lru, ln);
@@ -137,6 +148,10 @@ struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *){
 			continue;
 		}
 		if(etr->status==CLEAN){
+			etr->private_data=NULL;
+			cc=(coarse_cache*)target->data;
+			free(cc->data);
+			free(target->data);
 			lru_delete(ccm.lru, target);
 			ccm.now_caching_page--;
 			return NULL;
@@ -154,6 +169,8 @@ struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *){
 bool coarse_update_eviction_target_translation(struct my_cache* , GTD_entry *etr, char *data){
 	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
 	memcpy(data, c_data, PAGESIZE);
+	free(c_data);
+	free(((lru_node*)etr->private_data)->data);
 	lru_delete(ccm.lru, (lru_node*)etr->private_data);
 	etr->private_data=NULL;
 	ccm.now_caching_page--;

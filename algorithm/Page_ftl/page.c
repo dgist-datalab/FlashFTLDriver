@@ -58,7 +58,6 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 }
 
 uint32_t page_read(request *const req){
-
 	value_set *cached_value=buffer->get(req->key);
 	if(!cached_value){
 		for(uint32_t i=0; i<a_buffer.idx; i++){

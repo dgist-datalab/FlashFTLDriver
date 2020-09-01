@@ -65,7 +65,8 @@ lower_info my_posix={
 #endif
 };
 
- uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;
+uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;
+uint32_t test_ppa=530188/2;
 
 #if (LASYNC==1)
 void *l_main(void *__input){
@@ -223,8 +224,8 @@ inline uint32_t convert_ppa(uint32_t PPA){
 void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
-	if(PPA==8192){
-		printf("8192 populate!\n");
+	if(PPA==test_ppa){
+		printf("%u populate!\n", test_ppa);
 	}
 
 	if(PPA>_NOP){
@@ -262,6 +263,9 @@ void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 void *posix_pull_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
+	if(PPA==test_ppa){
+		printf("%u read!\n", test_ppa);
+	}
 	if(PPA>_NOP){
 		printf("address error!\n");
 		abort();
@@ -308,6 +312,9 @@ void *posix_trim_block(uint32_t _PPA, bool async){
 	my_posix.req_type_cnt[TRIM]++;
 	for(uint32_t i=PPA; i<PPA+my_posix.PPS; i++){
 		free(seg_table[i].storage);
+		if(i==test_ppa){
+			printf("%u trim!\n", test_ppa);
+		}
 		seg_table[i].storage=NULL;
 	}
 	return NULL;

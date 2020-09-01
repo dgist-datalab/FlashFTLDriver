@@ -47,6 +47,9 @@ void do_map_gc(){
 
 	for_each_page_in_seg(target,page,bidx,pidx){
 		//this function check the page is valid or not
+		if(page==667793){
+			printf("gc!!!!\n");
+		}
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
 			if(bm->is_invalid_page(bm,page*L2PGAP)) continue;

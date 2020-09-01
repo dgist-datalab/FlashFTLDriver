@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 extern algorithm demand_ftl;
+extern uint32_t test_key;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -112,6 +113,9 @@ void do_gc(){
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
+				if(lbas[i]==test_key){
+					printf("%u is gc target, it is got from %u\n", test_key, gv->ppa);
+				}
 				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 

@@ -45,6 +45,9 @@ void demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *param
 }
 
 void demand_mapping_write(uint32_t ppa, lower_info *li, request *req, void *params){
+	if(ppa==667793){
+		printf("break!\n");
+	}
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	my_req->type=MAPPINGW;
 	my_req->parents=req;
