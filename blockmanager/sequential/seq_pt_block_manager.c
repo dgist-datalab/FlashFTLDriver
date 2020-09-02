@@ -90,16 +90,16 @@ __gsegment* seq_pt_get_gc_target (struct blockmanager* bm, int pt_num){
 void seq_pt_trim_segment(struct blockmanager* bm, int pt_num, __gsegment *gs, lower_info* li){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	uint32_t segment_startblock_number=gs->blocks[0]->block_num;
+	uint32_t segment_idx=segment_startblock_number/BPS;
 
 	for(int i=0; i<BPS; i++){
 		__block *b=gs->blocks[i];
 		b->invalid_number=0;
 		b->now=0;
-		memset(b->bitset,0,_PPB/8);
+		memset(b->bitset,0,_PPB*L2PGAP/8);
 		memset(b->oob_list,0,sizeof(b->oob_list));
 	}
 
-	uint32_t segment_idx=segment_startblock_number/BPS;
 	block_set *bs=&p->logical_segment[segment_idx];
 	bs->total_invalid_number=0;
 

@@ -199,10 +199,6 @@ void do_gc(){
 
 ppa_t get_ppa(KEYT *lbas){
 	uint32_t res;
-	static uint32_t cnt=0;
-	if(cnt++==2302004){
-		printf("break!\n");
-	}
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
 	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && page_ftl.bm->is_gc_needed(page_ftl.bm)){

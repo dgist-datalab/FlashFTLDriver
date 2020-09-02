@@ -206,6 +206,10 @@ void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_inf
 	uint32_t segment_idx=segment_startblock_number/BPS;
 	block_set *bs=&p->logical_segment[segment_idx];
 	bs->total_invalid_number=0;
+	/*
+	if(bs==&p->logical_segment[1228928/16384]){
+		bs->blocks[(1228928%16384)%256]
+	}*/
 
 	q_enqueue((void*)bs, p->free_logical_segment_q);
 	
@@ -231,6 +235,7 @@ int seq_populate_bit (struct blockmanager* bm, uint32_t ppa){
 
 	if(p->seq_block[bn].bitset[bt]&(1<<of)){
 		res=0;
+		abort();
 	}
 	p->seq_block[bn].bitset[bt]|=(1<<of);
 	return res;
@@ -247,6 +252,7 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 
 	if(!(p->seq_block[bn].bitset[bt]&(1<<of))){
 		res=0;
+		abort();
 	}
 
 	b->bitset[bt]&=~(1<<of);
@@ -298,9 +304,6 @@ bool seq_is_invalid_page (struct blockmanager* bm, uint32_t ppa){
 }
 
 void seq_set_oob(struct blockmanager* bm, char *data,int len, uint32_t ppa){
-	if(ppa==300564){
-		printf("break!\n");
-	}
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	__block *b=&p->seq_block[ppa/_PPB];
 	memcpy(b->oob_list[ppa%_PPB].d,data,len);

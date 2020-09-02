@@ -31,7 +31,6 @@ extern bool TXN_debug;
 extern char *TXN_debug_ptr;
 static uint32_t seq_val;
 uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark){
-	static uint32_t seq_num=0;
 	uint32_t idx=0;
 	vec_request *txn=(vec_request*)malloc(sizeof(vec_request));
 	//idx+=sizeof(uint32_t);//length;

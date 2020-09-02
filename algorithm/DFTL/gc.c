@@ -71,6 +71,9 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
+	static int gc_cnt=0;
+	printf("gc_cnt :%d\n", gc_cnt++);
+
 	__gsegment *target=demand_ftl.bm->pt_get_gc_target(demand_ftl.bm, DATA_S);
 	uint32_t page;
 	uint32_t bidx, pidx;
@@ -113,9 +116,11 @@ void do_gc(){
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
+/*
 				if(lbas[i]==test_key){
 					printf("%u is gc target, it is got from %u\n", test_key, gv->ppa);
 				}
+*/
 				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
@@ -189,10 +194,12 @@ ppa_t get_rppa(KEYT *lbas, uint8_t idx, mapping_entry *target, uint32_t *_target
 		target[target_idx].lba=t_lba;
 		target[target_idx].ppa=res*L2PGAP+i;
 		target_idx++;
+
+		demand_ftl.bm->populate_bit(demand_ftl.bm, res*L2PGAP+i);
 	}
 	(*_target_idx)=target_idx;
 
-	validate_ppa(res, lbas);
+	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)lbas,sizeof(KEYT)*L2PGAP, res);
 	return res;
 }
 

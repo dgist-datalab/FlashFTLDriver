@@ -1,7 +1,10 @@
-override export CC=g++-9
-override export CXX=g++-9
-override export AR=gcc-ar
-override export NM=gcc-nm
+#override export CC=g++-9
+#override export CXX=g++-9
+#override export AR=gcc-ar
+#override export NM=gcc-nm
+
+export CC=g++
+export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
@@ -26,9 +29,9 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-DCHECKINGDATA\
 #			-O3 -march=native -mtune=native -flto=20 \
 #			-DWRITESYNC\
+#			-DCHECKINGDATA\
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
 

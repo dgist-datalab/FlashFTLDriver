@@ -66,7 +66,7 @@ lower_info my_posix={
 };
 
 uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;
-uint32_t test_ppa=530188/2;
+uint32_t test_ppa=366183/2;
 
 #if (LASYNC==1)
 void *l_main(void *__input){

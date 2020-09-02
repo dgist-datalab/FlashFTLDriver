@@ -2,8 +2,6 @@
 #include "demand_mapping.h"
 extern struct algorithm demand_ftl;
 ppa_t get_map_ppa(KEYT gtd_idx){
-	static uint32_t cnt=0;
-	//printf("now_cnt:%u\n", cnt++);
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	if(demand_ftl.bm->check_full(demand_ftl.bm, p->map_active,MASTER_PAGE) && demand_ftl.bm->pt_isgc_needed(demand_ftl.bm, MAP_S)){
@@ -36,7 +34,6 @@ ppa_t get_map_rppa(KEYT gtd_idx){
 extern demand_map_manager dmm;
 
 void do_map_gc(){
-	//printf("do map_gc!\n");
 	__gsegment *target=demand_ftl.bm->pt_get_gc_target(demand_ftl.bm, MAP_S);
 	uint32_t page;
 	uint32_t bidx, pidx;
@@ -47,9 +44,6 @@ void do_map_gc(){
 
 	for_each_page_in_seg(target,page,bidx,pidx){
 		//this function check the page is valid or not
-		if(page==667793){
-			printf("gc!!!!\n");
-		}
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
 			if(bm->is_invalid_page(bm,page*L2PGAP)) continue;
