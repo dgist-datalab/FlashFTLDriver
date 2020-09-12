@@ -17,8 +17,8 @@ typedef struct my_cache{
 	uint32_t (*get_mapping)(struct my_cache *, uint32_t lba);
 	struct GTD_entry *(*get_eviction_GTD_entry)(struct my_cache *);//if return value is NULL, it is clean eviction.
 	struct mapping_entry *(*get_eviction_mapping_entry)(struct my_cache *);//if return value is NULL, it is clean eviction.
-	bool (*update_eviction_target_translation)(struct my_cache* , GTD_entry *etr, char *data);
-
+	bool (*update_eviction_target_translation)(struct my_cache* , GTD_entry *etr, mapping_entry *map, char *data);
+	bool (*evict_target)(struct my_cache *,GTD_entry *, mapping_entry *);
 	bool (*exist)(struct my_cache *, uint32_t lba);
 	CACHE_TYPE type;
 	void *private_data;

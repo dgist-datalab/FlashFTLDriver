@@ -71,8 +71,9 @@
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
 
-#define RANGE (SHOWINGSIZE/4/K)
+#define RANGE (SHOWINGSIZE/LPAGESIZE)
 #define DEVFULL ((uint32_t)TOTALSIZE/LPAGESIZE)
+#define TOTALLPN ((uint32_t)RANGE)
 
 #define PARTNUM 2
 #define MAPPART_SEGS (_NOS/10)

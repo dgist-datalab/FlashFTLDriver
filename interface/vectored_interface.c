@@ -187,6 +187,7 @@ void *vectored_main(void *__input){
 
 bool vectored_end_req (request * const req){
 	vectored_request *preq=req->parents;
+	static uint32_t i=UINT32_MAX;
 	switch(req->type){
 		case FS_NOTFOUND_T:
 		case FS_GET_T:
@@ -200,6 +201,19 @@ bool vectored_end_req (request * const req){
 				inf_free_valueset(req->value,FS_MALLOC_R);
 			break;
 		case FS_SET_T:
+			if(i==UINT32_MAX){
+				i=req->seq;
+			}
+			else{
+			//	printf("return seq:%u\n", i+1, req->seq);
+				if(i+1==req->seq){
+					i=req->seq;
+				}
+				else{
+					printf("not return:%u return seq:%u\n", i+1, req->seq);
+					abort();
+				}
+			}
 			bench_reap_data(req, mp.li);
 			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);
 			break;

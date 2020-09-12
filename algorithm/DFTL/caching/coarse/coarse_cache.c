@@ -18,6 +18,7 @@ my_cache coarse_cache_func{
 	.get_eviction_GTD_entry=coarse_get_eviction_GTD_entry,
 	.get_eviction_mapping_entry=NULL,
 	.update_eviction_target_translation=coarse_update_eviction_target_translation,
+	.evict_target=NULL,
 	.exist=coarse_exist,
 };
 
@@ -30,7 +31,7 @@ uint32_t coarse_init(struct my_cache *mc, uint32_t total_caching_physical_pages)
 	ccm.now_caching_page=0;
 	mc->type=COARSE;
 	mc->private_data=NULL;
-	return 1;
+	return ccm.max_caching_page * (PAGESIZE/sizeof(uint32_t));
 }
 
 uint32_t coarse_free(struct my_cache *mc){
@@ -121,9 +122,9 @@ uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *etr,
 
 uint32_t coarse_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa){
 	uint32_t *ppa_list=(uint32_t*)data;
-	uint32_t old_offset=ppa_list[GETOFFSET(lba)];
+	uint32_t old_ppa=ppa_list[GETOFFSET(lba)];
 	ppa_list[GETOFFSET(lba)]=ppa;
-	return old_offset;
+	return old_ppa;
 }
 
 uint32_t coarse_get_mapping(struct my_cache *, uint32_t lba){
@@ -166,7 +167,7 @@ struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *){
 	return NULL;
 }
 
-bool coarse_update_eviction_target_translation(struct my_cache* , GTD_entry *etr, char *data){
+bool coarse_update_eviction_target_translation(struct my_cache* , GTD_entry *etr,mapping_entry *map, char *data){
 	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
 	memcpy(data, c_data, PAGESIZE);
 	free(c_data);

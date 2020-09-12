@@ -22,6 +22,7 @@ typedef struct demand_map_format{
 typedef struct mapping_entry{
 	KEYT lba;
 	KEYT ppa;
+	void *private_data;
 }mapping_entry;
 
 typedef enum{

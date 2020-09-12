@@ -27,4 +27,8 @@ void lru_delete(LRU*, lru_node*);
 
 #define for_each_lru_backword(lru, lru_node)\
 	for(lru_node=lru->tail; lru_node!=NULL; lru_node=lru_node->prev)
+
+#define for_each_lru_list(lru, lru_node)\
+	for(lru_node=lru->head; lru_node!=NULL; lru_node=lru_node->next)
+
 #endif
