@@ -97,9 +97,6 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 }
 
 uint32_t page_write(request *const req){
-	if(req->seq==158763){
-		printf("asdf\n");
-	}
 	if(req->params){
 		return demand_map_assign(req, NULL, NULL);
 	}

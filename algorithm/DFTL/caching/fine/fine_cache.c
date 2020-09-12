@@ -48,8 +48,8 @@ uint32_t fine_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 uint32_t fine_free(struct my_cache *mc){
 	while(1){
 		fine_cache *fc=(fine_cache*)lru_pop(fcm.lru);
-		free(fc->private_data);
 		if(!fc) break;
+		free(fc->private_data);
 		free(fc);
 	}
 	free(mc->private_data);
@@ -64,6 +64,19 @@ bool fine_is_needed_eviction(struct my_cache *mc){
 		abort();
 	}
 	return false;
+}
+
+static inline void checking_lba_exist(uint32_t lba){
+	/*
+	lru_node *target;
+	for_each_lru_list(fcm.lru, target){
+		fine_cache *fc=(fine_cache*)target->data;
+		if(fc->lba==lba){
+		//	printf("find lba! in lru\n");	
+			return;
+		}
+	}*/
+	//printf("not find in lba");
 }
 
 static inline fine_cache * __find_lru_map(uint32_t lba){
@@ -84,6 +97,7 @@ static inline uint32_t __update_entry(GTD_entry *etr,uint32_t lba, uint32_t ppa,
 	fine_cache *fc;
 	fine_cache_node *fcn;
 	uint32_t old_ppa=UINT32_MAX;
+	//checking_lba_exist(1778630);
 	if((fc=__find_lru_map(lba))==NULL){
 		if(isgc) return old_ppa;
 		fc=(fine_cache*)malloc(sizeof(fine_cache));
@@ -162,6 +176,7 @@ uint32_t fine_get_mapping(struct my_cache *, uint32_t lba){
 
 mapping_entry *fine_get_eviction_entry(struct my_cache *){
 	lru_node *target;
+	//checking_lba_exist(1778630);
 	for_each_lru_backword(fcm.lru, target){
 		fine_cache *fc=(fine_cache*)target->data;
 		if(get_flag(fc)==0){
