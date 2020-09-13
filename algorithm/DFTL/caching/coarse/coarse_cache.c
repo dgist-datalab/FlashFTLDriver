@@ -84,11 +84,11 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	uint32_t *ppa_list=(uint32_t*)cc->data;
 	old_ppa=ppa_list[GETOFFSET(lba)];
 	ppa_list[GETOFFSET(lba)]=ppa;
-
+/*
 	if(lba==test_key){
 		printf("%u ppa change %u to %u\n",test_key, old_ppa, ppa);
 	}
-
+*/
 	if(!isgc){
 		lru_update(ccm.lru, ln);
 	}

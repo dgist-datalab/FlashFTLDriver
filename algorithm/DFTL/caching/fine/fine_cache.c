@@ -1,5 +1,6 @@
 #include "fine_cache.h"
 #include "../../demand_mapping.h"
+#include "../../gc.h"
 #include "../../../../include/settings.h"
 #include "../../../../include/data_struct/bitmap.h"
 #include "../../../../include/dftl_settings.h"
@@ -7,6 +8,7 @@
 #include <stdlib.h>
 
 extern uint32_t test_key;
+extern demand_map_manager dmm;
 fine_cache_monitor fcm;
 
 my_cache fine_cache_func{
@@ -27,7 +29,7 @@ my_cache fine_cache_func{
 
 uint32_t fine_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&fcm.lru, NULL);
-	fcm.max_caching_map=(total_caching_physical_pages*PAGESIZE/sizeof(mapping_entry));
+	fcm.max_caching_map=(total_caching_physical_pages*PAGESIZE/(sizeof(uint32_t)*2));
 	fcm.now_caching_map=0;
 	mc->type=FINE;
 	mc->private_data=NULL;
@@ -35,7 +37,7 @@ uint32_t fine_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 #ifdef SEARCHSPEEDUP
 	cache_node_lru_mapping* cl_mapping;
 	cl_mapping=(cache_node_lru_mapping*)malloc(sizeof(cache_node_lru_mapping));
-	cl_mapping->fc_array=(void**)malloc(sizeof(void*) * TOTALLPN);
+	cl_mapping->fc_array=(void**)calloc(TOTALLPN, sizeof(void*));
 	fcm.cl_mapping=cl_mapping;
 #endif
 
@@ -97,6 +99,10 @@ static inline uint32_t __update_entry(GTD_entry *etr,uint32_t lba, uint32_t ppa,
 	fine_cache *fc;
 	fine_cache_node *fcn;
 	uint32_t old_ppa=UINT32_MAX;
+	/*
+	if(lba==test_key){
+		printf("%u map to %u\n", lba, ppa);
+	}*/
 	//checking_lba_exist(1778630);
 	if((fc=__find_lru_map(lba))==NULL){
 		if(isgc) return old_ppa;
@@ -205,12 +211,17 @@ bool fine_update_eviction_target_translation(struct my_cache* , GTD_entry *etr, 
 	}
 	uint32_t *ppa_list=(uint32_t*)data;
 	fine_cache *fc;
+	uint32_t old_ppa;
 #ifdef SEARCHSPEEDUP
 	uint32_t unit=PAGESIZE/sizeof(DMF);
 	for(uint32_t i=0; i<unit; i++){
 		fc=__find_lru_map(gtd_idx*unit+i);
-		if(!fc) continue;
+		if(!fc || !get_flag(fc)) continue;
+		old_ppa=ppa_list[GETOFFSET(fc->lba)];
 		ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
+		if(old_ppa!=UINT32_MAX && !dmm.bm->is_invalid_page(dmm.bm, old_ppa)){
+			invalidate_ppa(old_ppa);
+		}
 		set_flag(fc,0);
 	}
 #else
@@ -218,7 +229,12 @@ bool fine_update_eviction_target_translation(struct my_cache* , GTD_entry *etr, 
 	for_each_lru_list(fcm.lru, target){
 		fc=(fine_cache*)target->data;
 		if(GETGTDIDX(fc->lba)!=gtd_idx) continue;
+		if(!get_flag(fc)) continue;
+		old_ppa=ppa_list[GETOFFSET(fc->lba)];
 		ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
+		if(old_ppa!=UINT32_MAX && !dmm.bm->is_invalid_page(dmm.bm, old_ppa)){
+			invalidate_ppa(old_ppa);
+		}
 		set_flag(fc,0);
 	}
 #endif

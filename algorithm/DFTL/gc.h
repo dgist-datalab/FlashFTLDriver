@@ -32,6 +32,5 @@ ppa_t get_map_ppa(KEYT gtd_idx);
 ppa_t get_map_rppa(KEYT gtd_idx);
 void do_gc();
 void do_map_gc();
-
 void *page_gc_end_req(algo_req *input);
 gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv);

@@ -1,6 +1,6 @@
 #ifndef __H_SETDFTL__
 #define __H_SETDFTL__
-//#define FINECACHE
+#define FINECACHE
 
 
 #ifdef COARSECACHE

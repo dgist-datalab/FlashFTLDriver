@@ -2,30 +2,43 @@
 #include "page.h"
 #include "gc.h"
 #include <stdlib.h>
+#include <getopt.h>
 #include <stdint.h>
 extern uint32_t test_key;
 demand_map_manager dmm;
-extern my_cache coarse_cache_func;
-extern my_cache fine_cache_func;
+dmi DMI;
+
 
 inline static void cpy_keys(uint32_t **des, uint32_t *src){
 	(*des)=(uint32_t*)malloc(sizeof(KEYT)*L2PGAP);
 	memcpy((*des), src, sizeof(KEYT)*L2PGAP);
 }
 
-static inline char *cache_type(my_cache* mc){
-	if(mc==&coarse_cache_func)
-		return "coarse_cache";
-	else if (mc==&fine_cache_func)
-		return "fine_cache";
-	else
-		return NULL;
+static inline char *cache_type(cache_algo_type t){
+	switch(t){
+		case DEMAND_COARSE: return "DEMAND_COARSE";
+		case DEMAND_FINE: return "DEMAND_FINE";
+		case SFTL: return "SFTL";
+		case TPFTL: return "TPFTL";
+		default:
+			abort();
+	}
 }
-void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
-	uint32_t total_logical_page_num=(SHOWINGSIZE/LPAGESIZE);
-	uint32_t total_translation_page_num=total_logical_page_num/(PAGESIZE/sizeof(DMF));
 
-	dmm.max_caching_pages=total_caching_physical_pages;
+void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
+	uint32_t total_logical_page_num;
+	uint32_t total_translation_page_num;
+
+	total_logical_page_num=(SHOWINGSIZE/LPAGESIZE);
+	total_translation_page_num=total_logical_page_num/(PAGESIZE/sizeof(DMF));
+
+	if(total_caching_physical_pages!=UINT32_MAX){
+		dmm.max_caching_pages=total_caching_physical_pages;
+	}
+	else{
+
+	}
+
 	dmm.GTD=(GTD_entry*)calloc(total_translation_page_num,sizeof(GTD_entry));
 	for(uint32_t i=0; i<total_translation_page_num; i++){
 		fdriver_mutex_init(&dmm.GTD[i].lock);
@@ -37,20 +50,30 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 	dmm.bm=bm;
 
 
-//	dmm.cache=&coarse_cache_func;
-	dmm.cache=&fine_cache_func;
-	uint32_t cached_entry=dmm.cache->init(dmm.cache, total_caching_physical_pages);
-
-
 	printf("--------------------\n");
 	printf("|DFTL settings\n");
-	printf("|cache type: %s\n", cache_type(dmm.cache));
+	printf("|cache type: %s\n", cache_type(dmm.c_type));
 	printf("|cache size: %.2lf(mb)\n", ((double)dmm.max_caching_pages * PAGESIZE)/M);
-	printf("|caching percentage: %.2lf%%\n", (double)cached_entry/total_logical_page_num);
+	printf("|\tratio of PFTL: %.2lf%%\n", ((double)dmm.max_caching_pages * PAGESIZE)/(SHOWINGSIZE/K)*100);
+
+	uint32_t cached_entry=dmm.cache->init(dmm.cache, dmm.max_caching_pages);
+	printf("|\tcaching percentage: %.2lf%%\n", (double)cached_entry/total_logical_page_num *100);
 	printf("--------------------\n");
 }
 
 void demand_map_free(){
+	printf("===========cache results========\n");
+	printf("Cache miss num: %u\n",DMI.miss_num);
+	printf("\tCache cold miss num: %u\n",DMI.cold_miss_num);
+	printf("\tCache capacity miss num: %u\n",DMI.miss_num - DMI.cold_miss_num);
+	printf("Cache hit num: %u\n",DMI.hit_num);
+	printf("Cache hit ratio: %.2lf%%\n", (double) DMI.hit_num / (DMI.miss_num+DMI.hit_num) * 100);
+
+	printf("\nCache eviction cnt: %u\n", DMI.eviction_cnt);
+	printf("\tEviction clean cnt: %u\n", DMI.clean_eviction);
+	printf("\tEviction dirty cnt: %u\n", DMI.dirty_eviction);
+	printf("===============================\n");
+
 	uint32_t total_logical_page_num=(SHOWINGSIZE/LPAGESIZE);
 	uint32_t total_translation_page_num=total_logical_page_num/(PAGESIZE/sizeof(DMF));
 
@@ -139,6 +162,8 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 			else{
 				if(req==treq){
 					list_delete_node(etr->pending_req, now);
+					dp->status=NONE;
+					ap->idx=i;
 					continue;
 				}
 				dp->status=NONE;
@@ -297,9 +322,6 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 		mapping_entry *target=&dp->target;
 		target->lba=lba[i];
 		target->ppa=physical[i];
-		if(target->lba==1778630){
-			printf("break!\n");
-		}
 retry:
 		switch(dp->status){
 			case EVICTIONW:
@@ -317,12 +339,18 @@ retry:
 				return map_read_wrapper(etr, req, dmm.li, (void*)dp);
 			case NONE:
 				if(!dmm.cache->exist(dmm.cache, lba[i])){
+					DMI.miss_num++;
 					if(dmm.cache->is_needed_eviction(dmm.cache)){
+						DMI.eviction_cnt++;
 						dp->status=EVICTIONR; //it is dirty
 						if(dmm.cache->type==COARSE){
 							dp->et.gtd=dmm.cache->get_eviction_GTD_entry(dmm.cache);
 							if(!dp->et.gtd){
+								DMI.clean_eviction++;
 								dp->status=EVICTIONW;
+							}
+							else{
+								DMI.dirty_eviction++;							
 							}
 							goto retry;
 						}
@@ -330,9 +358,14 @@ retry:
 							dp->et.mapping=dmm.cache->get_eviction_mapping_entry(dmm.cache);
 							if(!dp->et.mapping){
 								dp->status=HIT;
+								DMI.clean_eviction++;
 								goto retry;
 							}
+							else{
+								DMI.dirty_eviction++;							
+							}
 							target_etr=&dmm.GTD[GETGTDIDX(dp->et.mapping->lba)];
+
 							if(target_etr->physical_address==UINT32_MAX){
 								dp->status=EVICTIONR;
 								fdriver_lock(&target_etr->lock);
@@ -345,12 +378,19 @@ retry:
 							}
 						}
 					}
+					else{
+						DMI.cold_miss_num++;
+					}
+
 					if(etr->status!=EMPTY){
 						dp->status=MISSR;
 						if(dmm.cache->type==COARSE){
 							return map_read_wrapper(etr, req, dmm.li, (void*)dp);
 						}
 					}
+				}
+				else{
+					DMI.hit_num++;
 				}
 				dp->status=HIT;
 			case HIT:
@@ -381,7 +421,6 @@ retry:
 				demand_mapping_write(target_etr->physical_address/L2PGAP, dmm.li, req, (void*)dp);
 				return 1;
 			case MISSR:
-				dp->status=NONE;
 				if(dmm.cache->type==FINE){
 					printf("fine cache can't be this status %s:%d\n", __FILE__, __LINE__);
 					abort();
@@ -390,6 +429,7 @@ retry:
 				else if(demand_map_coarse_type_pending(req, etr, req->value->value)==1){
 					return 1;
 				}
+				dp->status=NONE;
 				break;
 		}
 	}
@@ -418,9 +458,12 @@ uint32_t demand_page_read(request *const req){
 	uint32_t ppa;
 	GTD_entry *etr;
 
-	if(req->key==1778630){
-		printf("break!\n");
-	}
+	/*/if(req->key==1778630){
+		printf("read break %u!\n", req->seq);
+		if(req->seq==2100346){
+			printf("break!\n");
+		}
+	}*/
 
 	if(!req->params){
 		dp=(demand_params*)malloc(sizeof(demand_params));
@@ -447,14 +490,18 @@ retry:
 			}
 
 			if(!dmm.cache->exist(dmm.cache, req->key)){//cache miss
+				DMI.miss_num++;	
 				if(dmm.cache->is_needed_eviction(dmm.cache)){
+					DMI.eviction_cnt++;
 					if(dmm.cache->type==COARSE){
 						dp->et.gtd=dmm.cache->get_eviction_GTD_entry(dmm.cache);
 						if(!dp->et.gtd){
 							dp->status=EVICTIONW; // it is clean
+							DMI.clean_eviction++;
 						}
 						else{
 							dp->status=EVICTIONR; //it is dirty
+							DMI.dirty_eviction++;
 						}
 						goto retry;						
 					}
@@ -462,11 +509,15 @@ retry:
 						dp->et.mapping=dmm.cache->get_eviction_mapping_entry(dmm.cache);
 						if(!dp->et.mapping){
 							dp->status=EVICTIONW;
+							DMI.clean_eviction++;
 							goto retry;
 						}
+						else{
+							DMI.dirty_eviction++;
+						}
 						target_etr=&dmm.GTD[GETGTDIDX(dp->et.mapping->lba)];
+						dp->status=EVICTIONR;
 						if(target_etr->physical_address==UINT32_MAX){
-							dp->status=EVICTIONR;
 							fdriver_lock(&target_etr->lock);
 							list_insert(target_etr->pending_req, (void*)req);
 							fdriver_unlock(&target_etr->lock);
@@ -479,6 +530,12 @@ retry:
 					dp->status=MISSR;
 					return map_read_wrapper(etr, req, dmm.li, (void*)dp);
 				}
+				else{
+					DMI.cold_miss_num++;
+				}
+			}
+			else{
+				DMI.hit_num++;	
 			}
 			dp->status=HIT;
 		case HIT:
@@ -538,10 +595,14 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	uint32_t gtd_idx=0, temp_gtd_idx;
 	gc_map_value *gmv;
 	list *temp_list=list_init();
+	uint32_t old_ppa;
 	for(uint32_t i=0; i<idx; i++){
 		temp_gtd_idx=GETGTDIDX(target[i].lba);
-		if(dmm.cache->exist(dmm.cache, target[i].lba)){
-			dmm.cache->update_entry_gc(dmm.cache, &dmm.GTD[temp_gtd_idx], target[i].lba, target[i].ppa);
+		if(dmm.cache->exist(dmm.cache, target[i].lba) && target[i].ppa!=UINT32_MAX){
+			old_ppa=dmm.cache->update_entry_gc(dmm.cache, &dmm.GTD[temp_gtd_idx], target[i].lba, target[i].ppa);
+			if(old_ppa!=UINT32_MAX){
+				invalidate_ppa(old_ppa);
+			}
 		}else{
 			if(read_start && gtd_idx==temp_gtd_idx) continue;
 			if(!read_start){read_start=true;}
@@ -563,14 +624,12 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	list_node *now, *nxt;
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list, now, nxt){
+
 			gmv=(gc_map_value*)now->data;
 			if(!gmv->isdone) continue;
 
 			gtd_idx=gmv->gtd_idx;
 			for(uint32_t i=gmv->start_idx; GETGTDIDX(target[i].lba)==gtd_idx; i++){
-				if(target[i].lba==test_key){
-					printf("%u map to %u in gc\n", test_key, target[i].ppa);	
-				}
 				dmm.cache->update_from_translation_gc(dmm.cache, gmv->value->value, target[i].lba, target[i].ppa);	
 			}
 			
@@ -581,5 +640,90 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 			list_delete_node(temp_list, now);
 		}	
 	}
+
+	list_free(temp_list);
+	return 1;
+}
+
+inline uint32_t xx_to_byte(char *a){
+	switch(a[0]){
+		case 'K':
+			return 1024;
+		case 'M':
+			return 1024*1024;
+		case 'G':
+			return 1024*1024*1024;
+		default:
+			break;
+	}
+	return 1;
+}
+extern my_cache coarse_cache_func;
+extern my_cache fine_cache_func;
+
+uint32_t demand_argument(int argc, char **argv){
+	bool cache_size=false;
+	bool cache_type_set=false;
+	uint32_t len;
+	int c;
+	char temp;
+	uint32_t gran=1;
+	uint64_t base;
+	uint32_t physical_page_num;
+	double cache_percentage;
+	cache_algo_type c_type;
+	while((c=getopt(argc,argv,"ctp"))!=-1){
+		switch(c){
+			case 'c':
+				cache_size=true;
+				len=strlen(argv[optind]);
+				temp=argv[optind][len-1];
+				if(temp < '0' || temp >'9'){
+					argv[optind][len-1]=0;
+					gran=xx_to_byte(&temp);
+				}
+				base=atoi(argv[optind]);
+				physical_page_num=base*gran/PAGESIZE;
+				break;
+			case 't':
+				cache_type_set=true;
+				c_type=(cache_algo_type)atoi(argv[optind]);
+				dmm.c_type=c_type;
+				break;
+			case 'p':
+				cache_size=true;
+				cache_percentage=atof(argv[optind])/100;
+				physical_page_num=(SHOWINGSIZE/K) * cache_percentage;
+				physical_page_num/=PAGESIZE;
+				break;
+			default:
+				break;
+		}
+	}
+	
+	if(cache_type_set){
+		switch(c_type){
+			case DEMAND_COARSE:
+				dmm.cache=&coarse_cache_func;
+				break;
+			case DEMAND_FINE:
+				dmm.cache=&fine_cache_func;
+				break;
+			case SFTL:
+			case TPFTL:
+				printf("not implemented!\n");
+				abort();
+				break;
+		}
+	}
+	else{
+		dmm.c_type=DEMAND_COARSE;
+		dmm.cache=&coarse_cache_func;
+	}
+
+	if(!cache_size){
+		physical_page_num=((SHOWINGSIZE/K)/4)/PAGESIZE;
+	}
+	dmm.max_caching_pages=physical_page_num;
 	return 1;
 }

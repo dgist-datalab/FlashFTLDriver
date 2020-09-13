@@ -196,6 +196,7 @@ bool vectored_end_req (request * const req){
 #endif
 
 	//		memcpy(req->buf, req->value->value, 4096);
+	//		printf("return read break %u!\n", req->seq);
 			if(req->value)
 				inf_free_valueset(req->value,FS_MALLOC_R);
 			break;

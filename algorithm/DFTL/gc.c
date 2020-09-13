@@ -1,11 +1,14 @@
 #include "gc.h"
 #include "../../include/data_struct/list.h"
 #include "../../include/container.h"
+#include "demand_mapping.h"
 #include <stdlib.h>
 #include <stdint.h>
 
 extern algorithm demand_ftl;
+extern demand_map_manager dmm;
 extern uint32_t test_key;
+static uint32_t test_ppa=114787;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -17,9 +20,6 @@ pm_body *pm_body_create(blockmanager *bm){
 	return res;
 }
 void invalidate_ppa(uint32_t t_ppa){
-	if(t_ppa<32768){
-		//abort();
-	}
 	/*when the ppa is invalidated this function must be called*/
 	demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa);
 }
@@ -71,10 +71,8 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
-	static int gc_cnt=0;
-	printf("gc_cnt :%d\n", gc_cnt++);
-
 	__gsegment *target=demand_ftl.bm->pt_get_gc_target(demand_ftl.bm, DATA_S);
+//	printf("gc range : %u~%u\n", target->blocks[0]->block_num * _PPB, (target->blocks[63]->block_num+1) * _PPB-1);
 	uint32_t page;
 	uint32_t bidx, pidx;
 	blockmanager *bm=demand_ftl.bm;
@@ -102,10 +100,11 @@ void do_gc(){
 			update_target_idx+=2;
 		}
 	}
-	
-	update_target=(mapping_entry*)malloc(sizeof(update_target)*update_target_idx);
+	update_target=(mapping_entry*)malloc(sizeof(mapping_entry)*update_target_idx);
 	update_target_idx=0;
 
+	uint32_t debuging_cnt=0;
+	uint32_t cached_ppa;
 	li_node *now,*nxt;
 	g_buffer.idx=0;
 	KEYT *lbas;
@@ -115,7 +114,20 @@ void do_gc(){
 			if(!gv->isdone) continue;
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
+	
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
+				//check cache 
+				if(dmm.cache->exist(dmm.cache, lbas[i])){
+					cached_ppa=dmm.cache->get_mapping(dmm.cache, lbas[i]);
+					if(cached_ppa!=gv->ppa*L2PGAP+i){
+						//should not move data but mapping update
+						update_target[update_target_idx].lba=lbas[i];
+						update_target[update_target_idx].ppa=UINT32_MAX;
+						update_target_idx++;
+						continue;
+					}
+				}
+
 /*
 				if(lbas[i]==test_key){
 					printf("%u is gc target, it is got from %u\n", test_key, gv->ppa);
@@ -150,6 +162,8 @@ void do_gc(){
 
 	bm->pt_trim_segment(bm,DATA_S,target,demand_ftl.li); //erase a block
 	bm->free_segment(bm, p->active);
+
+	free(update_target);
 
 	p->active=p->reserve;//make reserved to active block
 	p->reserve=bm->change_pt_reserve(bm,DATA_S, p->reserve); //get new reserve block from block_manager
@@ -194,7 +208,6 @@ ppa_t get_rppa(KEYT *lbas, uint8_t idx, mapping_entry *target, uint32_t *_target
 		target[target_idx].lba=t_lba;
 		target[target_idx].ppa=res*L2PGAP+i;
 		target_idx++;
-
 		demand_ftl.bm->populate_bit(demand_ftl.bm, res*L2PGAP+i);
 	}
 	(*_target_idx)=target_idx;

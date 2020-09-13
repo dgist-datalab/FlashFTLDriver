@@ -10,6 +10,10 @@
 #define GETGTDIDX(lba) (lba/(PAGESIZE/sizeof(DMF)))
 #define TRANSOFFSET(lba) (lba%(PAGESIZE/sizeof(DMF)))
 
+typedef enum {
+	DEMAND_COARSE, DEMAND_FINE, SFTL, TPFTL,
+}cache_algo_type;
+
 typedef enum GTD_ETR_STATUS{
 	EMPTY				= 0x0000,
 	POPULATE,CLEAN,DIRTY,FLYING,EVICTING,
@@ -65,6 +69,7 @@ typedef struct pick_params_ex{
 
 typedef struct demand_map_manager{
 	uint32_t max_caching_pages;
+	cache_algo_type c_type;
 	GTD_entry *GTD;	
 	my_cache *cache;
 	lower_info *li;
@@ -80,6 +85,16 @@ typedef struct gc_map_value{
 	mapping_entry pair;
 }gc_map_value;
 
+typedef struct demand_map_monitoer{
+	uint32_t hit_num;
+	uint32_t miss_num;
+	uint32_t cold_miss_num;
+	uint32_t eviction_cnt;
+	uint32_t dirty_eviction;
+	uint32_t clean_eviction;
+}dmi;
+
+uint32_t demand_argument(int argc, char **argv);
 void demand_map_create(uint32_t total_caching_physical_pages, lower_info *, blockmanager *);
 uint32_t demand_map_assign(request *req, KEYT *lba, KEYT *physical);
 uint32_t demand_map_some_update(mapping_entry *, uint32_t idx); //for gc
@@ -87,6 +102,5 @@ uint32_t demand_page_read(request *const req);
 
 void demand_map_free();
 void demand_eviction(void *);
-
 
 #endif

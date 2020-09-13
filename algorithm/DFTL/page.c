@@ -13,7 +13,7 @@ cache::lru_cache <ppa_t, value_set *>* buffer;
 align_buffer a_buffer;
 extern MeasureTime mt;
 struct algorithm demand_ftl={
-	.argument_set=page_argument,
+	.argument_set=demand_argument,
 	.create=page_create,
 	.destroy=page_destroy,
 	.read=page_read,
@@ -26,7 +26,8 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	algo->li=li; //lower_info means the NAND CHIP
 	algo->bm=bm; //blockmanager is managing invalidation 
 	buffer=new cache::lru_cache<ppa_t, value_set *>(caching_num_lb);
-	demand_map_create(100,li,bm);
+
+	demand_map_create(UINT32_MAX,li,bm);
 
 	demand_ftl.algo_body=(void*)pm_body_create(bm);
 	a_buffer.value=(char*)malloc(PAGESIZE);
@@ -81,12 +82,6 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		KEYT physical[2];
 		physical[0]=ppa*L2PGAP;
 		physical[1]=ppa*L2PGAP+1;
-
-		for(uint8_t i=0; i<L2PGAP; i++){
-			if(a_buffer.key[i]==test_key){
-				printf("\n%u map to %u\n", test_key, physical[i]);	
-			}	
-		}
 
 		demand_map_assign(req, a_buffer.key, physical);
 
@@ -146,46 +141,4 @@ void *page_end_req(algo_req* input){
 	free(params);
 	free(input);
 	return NULL;
-}
-
-inline uint32_t xx_to_byte(char *a){
-	switch(a[0]){
-		case 'K':
-			return 1024;
-		case 'M':
-			return 1024*1024;
-		case 'G':
-			return 1024*1024*1024;
-		default:
-			break;
-	}
-	return 1;
-}
-
-uint32_t page_argument(int argc, char **argv){
-	bool cache_size;
-	uint32_t len;
-	int c;
-	char temp;
-	uint32_t base;
-	uint32_t value;
-	while((c=getopt(argc,argv,"c"))!=-1){
-		switch(c){
-			case 'c':
-				cache_size=true;
-				len=strlen(argv[optind]);
-				temp=argv[optind][len-1];
-				if(temp < '0' || temp >'9'){
-					argv[optind][len-1]=0;
-					base=xx_to_byte(&temp);
-				}
-				value=atoi(argv[optind]);
-				value*=base;
-				caching_num_lb=value/4096;
-				break;
-			default:
-				break;
-		}
-	}
-	return 1;
 }

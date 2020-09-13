@@ -9,7 +9,7 @@
 uint32_t *keymap;
 static uint32_t my_seed;
 static fdriver_lock_t data_check_lock;
-uint32_t test_key=847199;
+uint32_t test_key=496069;
 
 int str2int(const char* str, int len)
 {
@@ -23,7 +23,7 @@ int str2int(const char* str, int len)
 }
 
 void __checking_data_init(){
-	keymap=(uint32_t *)malloc(sizeof(uint32_t)*SHOWINGSIZE);
+	keymap=(uint32_t *)malloc(sizeof(uint32_t)*RANGE);
 	fdriver_mutex_init(&data_check_lock);
 }
 

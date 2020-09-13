@@ -29,9 +29,9 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
+#		-DCHECKINGDATA\
 #			-O3 -march=native -mtune=native -flto=20 \
 #			-DWRITESYNC\
-#			-DCHECKINGDATA\
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
 
