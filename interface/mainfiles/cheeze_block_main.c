@@ -14,10 +14,13 @@
 
 void log_print(int sig){
 	free_cheeze();
+	printf("f cheeze\n");
 	inf_free();
+	printf("f inf\n");
 	fflush(stdout);
 	fflush(stderr);
 	sync();
+	printf("before exit\n");
 	exit(1);
 }
 
@@ -32,6 +35,8 @@ void * thread_test(void *){
 pthread_t thr; 
 int main(int argc,char* argv[]){
 	struct sigaction sa;
+	setbuf(stdout, NULL);
+	setbuf(stderr, NULL);
 	sa.sa_handler = log_print;
 	sigaction(SIGINT, &sa, NULL);
 	printf("signal add!\n");

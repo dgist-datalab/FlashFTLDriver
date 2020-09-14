@@ -50,13 +50,27 @@ inline void error_check(cheeze_req *creq){
 	}*/
 }
 
-inline FSTYPE decode_type(int rw){
-	switch(rw){
-		case OP_READ: return FS_GET_T;
-		case OP_WRITE: return FS_SET_T;
-		case OP_TRIM: return FS_DELETE_T;
+inline FSTYPE decode_type(int op){
+	switch(op){
+		case REQ_OP_READ: return FS_GET_T;
+		case REQ_OP_WRITE: return FS_SET_T;
+		case REQ_OP_FLUSH: return FS_FLUSH_T;
+		case REQ_OP_DISCARD: return FS_DELETE_T;
+		default:
+			printf("not valid type!\n");
+			abort();
 	}
 	return 1;
+}
+
+const char *type_to_str(uint32_t type){
+	switch(type){
+		case FS_GET_T: return "FS_GET_T";
+		case FS_SET_T: return "FS_SET_T";
+		case FS_FLUSH_T: return "FS_FLUSH_T";
+		case FS_DELETE_T: return "FS_DELETE_T";
+	}
+	return NULL;
 }
 
 vec_request *get_vectored_request(){
@@ -82,17 +96,29 @@ vec_request *get_vectored_request(){
 	res->end_req=NULL;
 	res->mark=0;
 
-	FSTYPE type=decode_type(creq->rw);
-
-	res->buf=(char*)malloc(creq->len);
-	creq->buf=res->buf;
-	if(type==FS_SET_T){
+	FSTYPE type=decode_type(creq->op);
+	if(type!=FS_GET_T && type!=FS_SET_T){
+		res->buf=NULL;
 		r=write(chrfd, creq, sizeof(cheeze_req));
 		if(r<0){
+			printf("ack error!\n");
 			free(res);
 			return NULL;
 		}
 	}
+	else{
+		res->buf=(char*)malloc(creq->len);
+		creq->buf=res->buf;
+		if(type==FS_SET_T){
+			r=write(chrfd, creq, sizeof(cheeze_req));
+			if(r<0){
+				printf("ack error!\n");
+				free(res);
+				return NULL;
+			}
+		}
+	}
+
 
 	if(res->size > QSIZE){
 		printf("----------------number of reqs is over %u < %u\n", QSIZE, res->size);
@@ -112,9 +138,12 @@ vec_request *get_vectored_request(){
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 				break;
 			case FS_SET_T:
-
 				temp->value=inf_get_valueset(&res->buf[LPAGESIZE*i],FS_MALLOC_W,LPAGESIZE);
 				break;	
+			case FS_FLUSH_T:
+				break;
+			case FS_DELETE_T:
+				break;
 			default:
 				printf("error type!\n");
 				abort();
@@ -126,8 +155,11 @@ vec_request *get_vectored_request(){
 		if(temp->type==FS_SET_T){
 			CRCMAP[temp->key]=crc32(&res->buf[LPAGESIZE*i],LPAGESIZE);	
 		}
+		else if(temp->type==FS_DELETE_T){
+			CRCMAP[temp->key]=crc32(null_value, LPAGESIZE);
+		}
 #endif
-		DPRINTF("REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type==FS_GET_T?"FS_GET_T":"FS_SET_T",creq->id, i, temp->key);
+		DPRINTF("REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type_to_str(temp->type),creq->id, i, temp->key);
 	}
 
 	return res;
@@ -154,19 +186,21 @@ bool cheeze_end_req(request *const req){
 			if(req->value){
 				memcpy(&preq->buf[req->seq*LPAGESIZE], req->value->value,LPAGESIZE);
 #ifdef CHECKINGDATA
-			if(CRCMAP[req->key]!=crc32(&preq->buf[req->seq*LPAGESIZE], LPAGESIZE)){
-				printf("\n");
-				printf("\t\tcrc checking error in key:%u\n", req->key);	
-				printf("\n");
-			}	
+				if(CRCMAP[req->key]!=crc32(&preq->buf[req->seq*LPAGESIZE], LPAGESIZE)){
+					printf("\n");
+					printf("\t\tcrc checking error in key:%u\n", req->key);	
+					printf("\n");
+				}	
 #endif
-
 				inf_free_valueset(req->value,FS_MALLOC_R);
 			}
 			break;
 		case FS_SET_T:
 			bench_reap_data(req, mp.li);
 			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);
+			break;
+		case FS_FLUSH_T:
+		case FS_DELETE_T:
 			break;
 		default:
 			abort();
@@ -175,7 +209,7 @@ bool cheeze_end_req(request *const req){
 	release_each_req(req);
 
 	if(preq->size==preq->done_cnt){
-		if(req->type==FS_SET_T){
+		if(req->type!=FS_GET_T && req->type!=FS_NOTFOUND_T){
 			free(preq->buf);
 			free(preq->origin_req);
 			free(preq->req_array);
