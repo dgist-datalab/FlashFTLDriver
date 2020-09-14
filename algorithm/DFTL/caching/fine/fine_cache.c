@@ -25,6 +25,7 @@ my_cache fine_cache_func{
 	.get_eviction_mapping_entry=fine_get_eviction_entry,
 	.update_eviction_target_translation=fine_update_eviction_target_translation,
 	.evict_target=fine_evict_target, 
+	.update_dynamic_size=NULL,
 	.exist=fine_exist,
 };
 

@@ -35,6 +35,7 @@ typedef enum{
 }MAP_ASSIGN_STATUS;
 
 typedef struct GTD_entry{
+	uint32_t idx;
 	uint32_t physical_address;
 	GTD_ETR_STATUS status;
 	fdriver_lock_t lock;
@@ -53,7 +54,6 @@ typedef struct demand_params{
 	GTD_entry *etr;
 	evict_target et;
 	mapping_entry target;
-
 	void *params_ex;
 }demand_params;
 

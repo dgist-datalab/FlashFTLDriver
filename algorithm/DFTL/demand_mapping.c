@@ -42,6 +42,7 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 	dmm.GTD=(GTD_entry*)calloc(total_translation_page_num,sizeof(GTD_entry));
 	for(uint32_t i=0; i<total_translation_page_num; i++){
 		fdriver_mutex_init(&dmm.GTD[i].lock);
+		dmm.GTD[i].idx=i;
 		dmm.GTD[i].pending_req=list_init();
 		dmm.GTD[i].physical_address=UINT32_MAX;
 	}
@@ -340,7 +341,7 @@ retry:
 			case NONE:
 				if(!dmm.cache->exist(dmm.cache, lba[i])){
 					DMI.miss_num++;
-					if(dmm.cache->is_needed_eviction(dmm.cache)){
+					if(dmm.cache->is_needed_eviction(dmm.cache, lba[i])){
 						DMI.eviction_cnt++;
 						dp->status=EVICTIONR; //it is dirty
 						if(dmm.cache->type==COARSE){
@@ -409,8 +410,13 @@ retry:
 					target_etr=&dmm.GTD[GETGTDIDX(dp->et.mapping->lba)];
 					demand_map_fine_type_pending(req, dp->et.mapping, req->value->value);
 				}
-
-				dp->status=EVICTIONW;
+				
+				if(dmm.cache->entry_type==DYNAMIC && dmm.cache->need_more_eviction(dmm.cache,lba[i])){
+					dp->status=NONE;
+				}
+				else{
+					dp->status=EVICTIONW;
+				}
 				
 				if(target_etr->physical_address!=UINT32_MAX){
 					invalidate_ppa(target_etr->physical_address);
@@ -550,11 +556,11 @@ retry:
 				demand_map_fine_type_pending(req, dp->et.mapping, req->value->value);
 			}
 
-			dp->status=EVICTIONW;
-			if(dmm.cache->entry_type==DYNAMIC){
-				if(dmm.cache->need_more_eviction(dmm.cache, req->key)){
-					dp->status=NONE;
-				}
+			if(dmm.cache->entry_type==DYNAMIC && dmm.cache->need_more_eviction(dmm.cache, req->key)){
+				dp->status=NONE;
+			}
+			else{
+				dp->status=EVICTIONW;
 			}
 
 			if(target_etr->physical_address!=UINT32_MAX)
@@ -637,6 +643,10 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 				dmm.cache->update_from_translation_gc(dmm.cache, gmv->value->value, target[i].lba, target[i].ppa);	
 			}
 			
+			if(dmm.cache->entry_type==DYNAMIC){
+				dmm.cache->update_dynamic_size(dmm.cache, gtd_idx*PAGESIZE/sizeof(uint32_t), gmv->value->value);
+			}
+
 			invalidate_ppa(dmm.GTD[gtd_idx].physical_address);
 			uint32_t new_ppa=get_map_ppa(gtd_idx);
 			dmm.GTD[gtd_idx].physical_address=new_ppa*L2PGAP;

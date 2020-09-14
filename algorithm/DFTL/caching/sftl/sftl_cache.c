@@ -11,7 +11,7 @@ my_cache sftl_cache_func{
 	.init=sftl_init,
 	.free=sftl_free,
 	.is_needed_eviction=sftl_is_needed_eviction,
-	.need_more_eviction=sftl_need_more_eviction,
+	.need_more_eviction=sftl_is_needed_eviction,
 	.update_entry=sftl_update_entry,
 	.update_entry_gc=sftl_update_entry_gc,
 	.insert_entry_from_translation=sftl_insert_entry_from_translation,
@@ -21,6 +21,7 @@ my_cache sftl_cache_func{
 	.get_eviction_mapping_entry=NULL,
 	.update_eviction_target_translation=sftl_update_eviction_target_translation,
 	.evict_target=NULL,
+	.update_dynamic_size=sftl_update_dynamic_size,
 	.exist=sftl_exist,
 };
 
@@ -35,8 +36,8 @@ uint32_t sftl_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	mc->entry_type=DYNAMIC;
 	mc->private_data=NULL;
 	scm.gtd_size=(uint32_t*)malloc(GTDNUM *sizeof(uint32_t));
-	for(uint32_t i=0; i<scm.gtd_size; i++){
-		scm.gtd_size[i]=BITMAPSIZE;
+	for(uint32_t i=0; i<GTDNUM; i++){
+		scm.gtd_size[i]=BITMAPSIZE+PAGESIZE;
 	}
 
 	printf("|\tcaching <min> percentage: %.2lf%%\n", (double) ((scm.max_caching_byte/(BITMAPSIZE+PAGESIZE)) * BITMAPMEMBER)/ RANGE *100);
@@ -45,11 +46,11 @@ uint32_t sftl_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 
 uint32_t sftl_free(struct my_cache *mc){
 	while(1){
-		sftl_cache *cc=(coarse_cache*)lru_pop(ccm.lru);
-		if(!cc) break;
-		free(cc->head_array);
-		bitmap_free(cc->map);
-		free(acc);
+		sftl_cache *sc=(sftl_cache*)lru_pop(scm.lru);
+		if(!sc) break;
+		free(sc->head_array);
+		bitmap_free(sc->map);
+		free(sc);
 	}
 	lru_free(scm.lru);
 	free(scm.gtd_size);
@@ -58,21 +59,22 @@ uint32_t sftl_free(struct my_cache *mc){
 
 bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba){
 	uint32_t target_size=scm.gtd_size[GETGTDIDX(lba)];
-	if(ccm.max_caching_byte>= ccm.now_caching_byte+target_size){
+	if(scm.max_caching_byte>= scm.now_caching_byte+target_size){
 		return true;
 	}
-	if(ccm.max_caching_byte>=ccm.now_caching_byte){
+	if(scm.max_caching_byte>=scm.now_caching_byte){
 		printf("now caching byte bigger!!!! %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
 	return false;
 }
 
+
 inline static sftl_cache* get_initial_state_cache(uint32_t gtd_idx, GTD_entry *etr){
 	sftl_cache *res=(sftl_cache *)malloc(sizeof(sftl_cache));
 	res->head_array=(uint32_t*)malloc(PAGESIZE);
-	memset(head_array, -1, PAGESIZE);
-	res->bitmap=bitamp_set_init(BITMAPMEMBER);
+	memset(res->head_array, -1, PAGESIZE);
+	res->map=bitamp_set_init(BITMAPMEMBER);
 	res->etr=etr;
 	
 	scm.gtd_size[gtd_idx]=PAGESIZE+BITMAPSIZE;
@@ -80,29 +82,167 @@ inline static sftl_cache* get_initial_state_cache(uint32_t gtd_idx, GTD_entry *e
 	return res;
 }
 
+inline static uint32_t get_ppa_from_sc(sftl_cache *sc, uint32_t lba){
+	uint32_t res=0;
+	uint32_t head_offset=get_head_offset(sc->map, lba);
+	uint32_t distance=get_distance(sc->map, lba);
+	return sc->head_array[head_offset]+distance;
+}
+
+inline static bool is_sequential(sftl_cache *sc, uint32_t lba, uint32_t ppa){
+	uint32_t offset=GETOFFSET(lba);
+	if(offset==0) return false;
+
+	uint32_t head_offset=get_head_offset(sc->map, lba-1);
+	uint32_t distance=0;
+	if(!bitmap_is_set(sc->map, lba-1)){
+		distance=get_distance(sc->map, lba-1);
+	}
+
+	if(sc->head_array[head_offset]+distance+1==ppa) return true;
+	else return false;
+}
+
+enum NEXT_STEP{
+	DONE, SHRINK, EXPAND
+};
+
+inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, char *should_more, uint32_t *more_ppa){
+
+	uint32_t old_ppa;
+	if(bitmap_is_set(sc->map, lba)){
+		bitmap_unset(sc->map, lba);
+
+		uint32_t head_offset=get_head_offset(sc->map, lba);
+		old_ppa=sc->head_array[head_offset];
+		uint32_t total_head=scm.gtd_size[GETGTDIDX(lba)]/sizeof(uint32_t);
+		uint32_t *new_head_array=(uint32_t*)malloc((total_head-1)*sizeof(uint32_t));
+	
+		memcpy(new_head_array, sc->head_array, head_offset*sizeof(uint32_t));
+		memcpy(&new_head_array[head_offset*sizeof(uint32_t)], &sc->head_array[(head_offset+1)*sizeof(uint32_t)], (total_head-1-head_offset)*sizeof(uint32_t));
+		
+		free(sc->head_array);
+		sc->head_array=new_head_array;
+		scm.gtd_size[GETGTDIDX(lba)]=(total_head-1)*sizeof(uint32_t);
+	}
+	else{
+		printf("it cannot be sequential with previous ppa %s:%d\n", __FILE__, __LINE__);
+		abort();
+	}
+
+	if(lba+1 < PAGESIZE/sizeof(uint32_t) ){
+		if(bitmap_is_set(sc->map, lba+1)){
+			*should_more=DONE;
+		}
+		else{
+			*should_more=EXPAND;
+			*more_ppa=get_ppa_from_sc(sc, lba+1);
+		}
+	}
+	else
+		*should_more=DONE;
+
+	return old_ppa;
+}
+
+inline static uint32_t expand_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, char *should_more, uint32_t *more_ppa){
+	uint32_t old_ppa;	
+	uint32_t head_offset;
+	uint32_t distance=0;
+	head_offset=get_head_offset(sc->map, lba);
+
+	if(!bitmap_is_set(sc->map, lba)){
+		distance=get_distance(sc->map, lba);
+
+		old_ppa=sc->head_array[head_offset]+distance;
+
+		uint32_t total_head=scm.gtd_size[GETGTDIDX(lba)]/sizeof(uint32_t);
+		uint32_t *new_head_array=(uint32_t*)malloc((total_head+1)*sizeof(uint32_t));
+		memcpy(new_head_array, sc->head_array, head_offset * sizeof(uint32_t));
+
+		sc->head_array[head_offset+1]=ppa;
+
+		memcpy(&new_head_array[head_offset+1], &sc->head_array[head_offset], total_head-head_offset);
+		free(sc->head_array);
+		sc->head_array=new_head_array;
+		scm.gtd_size[GETGTDIDX(lba)]=(total_head+1)*sizeof(uint32_t);
+	}
+	else{
+		old_ppa=sc->head_array[head_offset];
+		sc->head_array[head_offset]=ppa;
+	}
+
+	bitmap_set(sc->map, lba);
+
+	if(lba+1< PAGESIZE/sizeof(uint32_t)){
+		if(bitmap_is_set(sc->map, lba+1)){
+			//check if it can be compressed
+			*more_ppa=get_ppa_from_sc(sc, lba+1);
+			if(ppa+1==(*more_ppa)){
+				*should_more=SHRINK;
+			}
+			else{
+				*should_more=DONE;
+			}
+		}
+		else{
+			*more_ppa=get_ppa_from_sc(sc, lba+1);
+			*should_more=EXPAND;	
+		}
+	}
+	return old_ppa;
+}
+
 inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc){
 	sftl_cache *sc;
 	uint32_t old_ppa;
+	uint32_t gtd_idx=GETGTDIDX(lba);
 	lru_node *ln;
+	scm.now_caching_byte-=scm.gtd_size[gtd_idx];
 	if(etr->status==EMPTY){
-	
+		sc=get_initial_state_cache(gtd_idx, etr);
+		ln=lru_push(scm.lru, sc);
+		etr->private_data=(void*)ln;
+		if(scm.now_caching_byte > scm.max_caching_byte){
+			printf("caching overflow! %s:%d\n", __FILE__, __LINE__);
+			abort();
+		}
 	}else{
 		if(etr->private_data==NULL){
 			printf("insert translation page before cache update! %s:%d\n",__FILE__, __LINE__);
 			abort();
 		}
 		ln=(lru_node*)etr->private_data;
-		cc=(sftl_cache*)(ln->data);
+		sc=(sftl_cache*)(ln->data);
+	}
+	
+	uint32_t more_lba=lba;
+	uint32_t more_ppa;
+	char should_more=false;
+	if(is_sequential(sc, lba, ppa)){
+		old_ppa=shrink_cache(sc, lba, ppa, &should_more, &more_ppa);
+	}
+	else{
+		old_ppa=expand_cache(sc, lba, ppa, &should_more, &more_ppa);
 	}
 
-	uint32_t *ppa_list=(uint32_t*)cc->data;
-	old_ppa=ppa_list[GETOFFSET(lba)];
-	ppa_list[GETOFFSET(lba)]=ppa;
-/*
-	if(lba==test_key){
-		printf("%u ppa change %u to %u\n",test_key, old_ppa, ppa);
+	while(should_more!=DONE){
+		more_lba++;
+		scm.now_caching_byte-=scm.gtd_size[GETGTDIDX(more_lba)];
+		switch(should_more){
+			case SHRINK:
+				shrink_cache(sc, more_lba, more_ppa, &should_more, &more_ppa);
+				break;
+			case EXPAND:
+				expand_cache(sc, more_lba, more_ppa, &should_more, &more_ppa);
+				break;
+			default:
+				break;
+		}
+		scm.now_caching_byte+=scm.gtd_size[GETGTDIDX(more_lba)];
 	}
-*/
+
+	scm.now_caching_byte+=scm.gtd_size[gtd_idx];
 	if(!isgc){
 		lru_update(scm.lru, ln);
 	}
@@ -118,19 +258,59 @@ uint32_t sftl_update_entry_gc(struct my_cache *, GTD_entry *etr, uint32_t lba, u
 	return __update_entry(etr, lba, ppa, true);
 }
 
+static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, uint32_t lba, char *data){
+	sftl_cache *sc=(sftl_cache*)malloc(sizeof(sftl_cache));
+	sc->map=bitmap_init(BITMAPMEMBER);
+	sc->etr=etr;
+
+	uint32_t total_head=scm.gtd_size[GETGTDIDX(lba)]/sizeof(uint32_t);
+	uint32_t *new_head_array=(uint32_t*)malloc(total_head * sizeof(uint32_t));
+	uint32_t *ppa_list=(uint32_t*)data;
+	uint32_t last_ppa, new_head_idx=0;
+	bool sequential_flag=false;
+
+	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
+		if(new_head_idx>total_head){
+			printf("total_head cannot smaller then new_head_idx %s:%d\n", __FILE__, __LINE__);
+			abort();
+		}
+		if(i==0){
+			last_ppa=ppa_list[i];
+			new_head_array[new_head_idx++]=last_ppa;
+			bitmap_set(sc->map, i);
+		}
+		else{
+			sequential_flag=false;
+			if(last_ppa+1==data[i]){
+				sequential_flag=true;
+			}
+
+			if(sequential_flag){
+				bitmap_unset(sc->map, i);
+				last_ppa++;
+			}
+			else{
+				bitmap_set(sc->map, i);
+				last_ppa=ppa_list[i];
+				new_head_array[new_head_idx++]=last_ppa;
+			}
+		}
+		
+	}
+	sc->head_array=new_head_array;
+	return sc;
+}
+
 uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data){
 	if(etr->private_data){
 		printf("already lru node exists! %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
 
-	sftl_cache *cc=(coarse_cache*)malloc(sizeof(coarse_cache));
-	cc->data=(char*)malloc(PAGESIZE);
-	memcpy(cc->data, data, PAGESIZE);
-	cc->etr=etr;
-	etr->private_data=(void *)lru_push(ccm.lru, (void*)cc);
+	sftl_cache *sc=make_sc_from_translation(etr, lba, data);
+	etr->private_data=(void *)lru_push(scm.lru, (void*)sc);
 	etr->status=CLEAN;
-	ccm.now_caching_page++;
+	scm.now_caching_byte+=scm.gtd_size[GETGTDIDX(lba)];
 	return 1;
 }
 
@@ -141,6 +321,33 @@ uint32_t sftl_update_from_translation_gc(struct my_cache *, char *data, uint32_t
 	return old_ppa;
 }
 
+void sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
+	uint32_t total_head=0;
+	uint32_t last_ppa=0;
+	bool sequential_flag=false;
+	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
+		if(i==0){
+			last_ppa=data[i];
+			total_head++;
+		}
+		else{
+			sequential_flag=false;
+			if(last_ppa+1==data[i]){
+				sequential_flag=true;
+			}
+
+			if(sequential_flag){
+				last_ppa++;
+			}
+			else{
+				last_ppa=data[i];
+				total_head++;
+			}
+		}
+	}
+	scm.gtd_size[GETGTDIDX(lba)]=total_head*sizeof(uint32_t);
+}
+
 uint32_t sftl_get_mapping(struct my_cache *, uint32_t lba){
 	uint32_t gtd_idx=GETGTDIDX(lba);
 	GTD_entry *etr=&dmm.GTD[gtd_idx];
@@ -149,26 +356,25 @@ uint32_t sftl_get_mapping(struct my_cache *, uint32_t lba){
 		abort();
 	}
 
-	uint32_t *ppa_list=(uint32_t*)DATAFROMLN((lru_node*)etr->private_data);
-	return ppa_list[GETOFFSET(lba)];
+	return get_ppa_from_sc((sftl_cache*)((lru_node*)etr->private_data)->data, lba);
 }
 
 struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *){
 	lru_node *target;
 	GTD_entry *etr=NULL;
-	for_each_lru_backword(ccm.lru, target){
-		sftl_cache *cc=(coarse_cache*)target->data;
-		etr=cc->etr;
+	for_each_lru_backword(scm.lru, target){
+		sftl_cache *sc=(sftl_cache*)target->data;
+		etr=sc->etr;
 		if(etr->status==FLYING || etr->status==EVICTING){
 			continue;
 		}
 		if(etr->status==CLEAN){
 			etr->private_data=NULL;
-			cc=(sftl_cache*)target->data;
-			free(cc->data);
-			free(target->data);
-			lru_delete(ccm.lru, target);
-			ccm.now_caching_page--;
+			sc=(sftl_cache*)target->data;
+			free(sc->head_array);
+			bitmap_free(sc->map);
+			lru_delete(scm.lru, target);
+			scm.now_caching_byte-=scm.gtd_size[etr->idx];
 			return NULL;
 		}
 
@@ -181,14 +387,32 @@ struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *){
 	return NULL;
 }
 
+
 bool sftl_update_eviction_target_translation(struct my_cache* , GTD_entry *etr,mapping_entry *map, char *data){
-	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
-	memcpy(data, c_data, PAGESIZE);
-	free(c_data);
-	free(((lru_node*)etr->private_data)->data);
-	lru_delete(ccm.lru, (lru_node*)etr->private_data);
+	sftl_cache *sc=(sftl_cache*)((lru_node*)etr->private_data)->data;
+
+	bool target;
+	uint32_t max=scm.gtd_size[etr->idx]/sizeof(uint32_t);
+	uint32_t last_ppa=0;
+	uint32_t head_idx=0;
+	uint32_t *ppa_array=(uint32_t*)data;
+	uint32_t ppa_array_idx=0;
+	uint32_t offset=0;
+	for_each_bitmap_forward(sc->map, offset, target, max){
+		if(target){
+			last_ppa=sc->head_array[head_idx++];
+			ppa_array[ppa_array_idx++]=last_ppa;	
+		}
+		else{
+			ppa_array[ppa_array_idx++]=++last_ppa;
+		}
+	}
+	
+	free(sc->head_array);
+	bitmap_free(sc->map);
+	lru_delete(scm.lru, (lru_node*)etr->private_data);
 	etr->private_data=NULL;
-	ccm.now_caching_page--;
+	scm.now_caching_byte-=scm.gtd_size[etr->idx];
 	return true;
 }
 

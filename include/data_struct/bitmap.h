@@ -34,7 +34,7 @@ static inline bool bitmap_unset(bitmap *b, uint32_t idx){
 	return res;
 }
 
-static inline void bitamp_free(bitmap* b){
+static inline void bitmap_free(bitmap* b){
 	free(b);
 }
 

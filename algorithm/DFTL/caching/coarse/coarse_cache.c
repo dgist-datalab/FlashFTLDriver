@@ -20,6 +20,7 @@ my_cache coarse_cache_func{
 	.get_eviction_mapping_entry=NULL,
 	.update_eviction_target_translation=coarse_update_eviction_target_translation,
 	.evict_target=NULL,
+	.update_dynamic_size=NULL,
 	.exist=coarse_exist,
 };
 
