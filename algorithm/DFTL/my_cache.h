@@ -3,13 +3,18 @@
 #include <stdint.h>
 
 typedef enum {
-	COARSE, FINE,
+	COARSE, FINE
 } CACHE_TYPE;
+
+typedef enum{
+	STATIC, DYNAMIC, 
+}ENTRY_SIZE_TYPE;
 
 typedef struct my_cache{
 	uint32_t (*init)(struct my_cache *, uint32_t total_caching_physical_pages);
 	uint32_t (*free)(struct my_cache *);
-	bool (*is_needed_eviction)(struct my_cache *);
+	bool (*is_needed_eviction)(struct my_cache *, uint32_t lba);
+	bool (need_more_eviction)(struct my_cache *, uint32_t lba);//it is valid if type is VARIABLE
 	uint32_t (*update_entry)(struct my_cache *, struct GTD_entry *, uint32_t lba, uint32_t ppa);
 	uint32_t (*update_entry_gc)(struct my_cache *, struct GTD_entry *, uint32_t lba, uint32_t ppa);
 	uint32_t (*insert_entry_from_translation)(struct my_cache *, GTD_entry *, uint32_t lba, char *data);
@@ -21,6 +26,7 @@ typedef struct my_cache{
 	bool (*evict_target)(struct my_cache *,GTD_entry *, mapping_entry *);
 	bool (*exist)(struct my_cache *, uint32_t lba);
 	CACHE_TYPE type;
+	ENTRY_SIZE_TYPE entry_type;
 	void *private_data;
 }my_cache;
 

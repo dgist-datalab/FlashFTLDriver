@@ -10,6 +10,7 @@ my_cache coarse_cache_func{
 	.init=coarse_init,
 	.free=coarse_free,
 	.is_needed_eviction=coarse_is_needed_eviction,
+	.need_more_eviction=NULL,
 	.update_entry=coarse_update_entry,
 	.update_entry_gc=coarse_update_entry_gc,
 	.insert_entry_from_translation=coarse_insert_entry_from_translation,
@@ -31,6 +32,7 @@ uint32_t coarse_init(struct my_cache *mc, uint32_t total_caching_physical_pages)
 	ccm.now_caching_page=0;
 	mc->type=COARSE;
 	mc->private_data=NULL;
+
 	return ccm.max_caching_page * (PAGESIZE/sizeof(uint32_t));
 }
 
@@ -45,7 +47,7 @@ uint32_t coarse_free(struct my_cache *mc){
 	return 1;
 }
 
-bool coarse_is_needed_eviction(struct my_cache *mc){
+bool coarse_is_needed_eviction(struct my_cache *mc, uint32_t ){
 	if(ccm.max_caching_page==ccm.now_caching_page){
 		return true;
 	}

@@ -411,8 +411,7 @@ retry:
 				}
 
 				dp->status=EVICTIONW;
-			
-
+				
 				if(target_etr->physical_address!=UINT32_MAX){
 					invalidate_ppa(target_etr->physical_address);
 				}
@@ -491,7 +490,7 @@ retry:
 
 			if(!dmm.cache->exist(dmm.cache, req->key)){//cache miss
 				DMI.miss_num++;	
-				if(dmm.cache->is_needed_eviction(dmm.cache)){
+				if(dmm.cache->is_needed_eviction(dmm.cache, req->key)){
 					DMI.eviction_cnt++;
 					if(dmm.cache->type==COARSE){
 						dp->et.gtd=dmm.cache->get_eviction_GTD_entry(dmm.cache);
@@ -552,6 +551,11 @@ retry:
 			}
 
 			dp->status=EVICTIONW;
+			if(dmm.cache->entry_type==DYNAMIC){
+				if(dmm.cache->need_more_eviction(dmm.cache, req->key)){
+					dp->status=NONE;
+				}
+			}
 
 			if(target_etr->physical_address!=UINT32_MAX)
 				invalidate_ppa(target_etr->physical_address);

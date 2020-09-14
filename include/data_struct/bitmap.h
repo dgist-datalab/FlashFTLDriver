@@ -12,6 +12,12 @@ static inline bitmap *bitmap_init(uint32_t member_num){
 	return (bitmap*)calloc(member_num/8+(member_num%8?1:0), sizeof(uint8_t));
 }
 
+static inline bitmap *bitamp_set_init(uint32_t member_num){
+	bitmap *res=(bitmap*)malloc(member_num/8+(member_num%8?1:0) * sizeof(uint8_t));
+	memset(res, -1, member_num/8+(member_num%8?1:0) * sizeof(uint8_t));
+	return res;
+}
+
 static inline bool bitmap_is_set(bitmap *b, uint32_t idx){
 	return b[idx/8] & (1<<(idx%8));
 }

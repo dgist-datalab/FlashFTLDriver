@@ -15,6 +15,7 @@ my_cache fine_cache_func{
 	.init=fine_init,
 	.free=fine_free,
 	.is_needed_eviction=fine_is_needed_eviction,
+	.need_more_eviction=NULL,
 	.update_entry=fine_update_entry,
 	.update_entry_gc=fine_update_entry_gc,
 	.insert_entry_from_translation=fine_insert_entry_from_translation,
@@ -59,7 +60,7 @@ uint32_t fine_free(struct my_cache *mc){
 	return 1;
 }
 
-bool fine_is_needed_eviction(struct my_cache *mc){
+bool fine_is_needed_eviction(struct my_cache *mc, uint32_t ){
 	if(fcm.max_caching_map==fcm.now_caching_map) return true;
 	if(fcm.max_caching_map < fcm.now_caching_map){
 		printf("now caching map bigger!!!! %s:%d\n", __FILE__, __LINE__);
