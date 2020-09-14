@@ -170,7 +170,6 @@ void *vectored_main(void *__input){
 			inf_algorithm_caller(inf_req);	
 		}else{
 			uint32_t size=vec_req->size;
-
 			for(uint32_t i=0; i<size; i++){
 				/*retry queue*/
 				while(1){

@@ -31,7 +31,7 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 }
 
 void page_destroy (lower_info* li, algorithm *algo){
-	page_map_free();
+	//page_map_free();
 	return;
 }
 
