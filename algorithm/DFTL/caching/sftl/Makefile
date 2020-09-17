@@ -1,5 +1,6 @@
 SRCS+=\
 	  sftl_cache.c\
+	  sftl_verify.c\
 
 OBJS :=\
 	   $(patsubst %.c, %.o, $(SRCS))\

@@ -59,10 +59,10 @@ uint32_t sftl_free(struct my_cache *mc){
 
 bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba){
 	uint32_t target_size=scm.gtd_size[GETGTDIDX(lba)];
-	if(scm.max_caching_byte>= scm.now_caching_byte+target_size){
+	if(scm.max_caching_byte <= scm.now_caching_byte+target_size){
 		return true;
 	}
-	if(scm.max_caching_byte>=scm.now_caching_byte){
+	if(scm.max_caching_byte <= scm.now_caching_byte){
 		printf("now caching byte bigger!!!! %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
@@ -95,7 +95,7 @@ inline static bool is_sequential(sftl_cache *sc, uint32_t lba, uint32_t ppa){
 
 	uint32_t head_offset=get_head_offset(sc->map, lba-1);
 	uint32_t distance=0;
-	if(!bitmap_is_set(sc->map, lba-1)){
+	if(!bitmap_is_set(sc->map, GETOFFSET(lba-1))){
 		distance=get_distance(sc->map, lba-1);
 	}
 
@@ -108,39 +108,44 @@ enum NEXT_STEP{
 };
 
 inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, char *should_more, uint32_t *more_ppa){
+	if(!ISLASTOFFSET(lba)){
+		if(GETOFFSET(lba+1)< PAGESIZE/sizeof(uint32_t) ){
+			if(bitmap_is_set(sc->map, GETOFFSET(lba+1))){
+				*should_more=DONE;
+			}
+			else{
+				*should_more=EXPAND;
+				*more_ppa=get_ppa_from_sc(sc, lba+1);
+			}
+		}
+		else
+			*should_more=DONE;
+	}
 
 	uint32_t old_ppa;
-	if(bitmap_is_set(sc->map, lba)){
-		bitmap_unset(sc->map, lba);
+	if(bitmap_is_set(sc->map, GETOFFSET(lba))){
 
 		uint32_t head_offset=get_head_offset(sc->map, lba);
 		old_ppa=sc->head_array[head_offset];
-		uint32_t total_head=scm.gtd_size[GETGTDIDX(lba)]/sizeof(uint32_t);
+		uint32_t total_head=(scm.gtd_size[GETGTDIDX(lba)]-BITMAPSIZE)/sizeof(uint32_t);
 		uint32_t *new_head_array=(uint32_t*)malloc((total_head-1)*sizeof(uint32_t));
 	
-		memcpy(new_head_array, sc->head_array, head_offset*sizeof(uint32_t));
-		memcpy(&new_head_array[head_offset*sizeof(uint32_t)], &sc->head_array[(head_offset+1)*sizeof(uint32_t)], (total_head-1-head_offset)*sizeof(uint32_t));
+		memcpy(new_head_array, sc->head_array, (head_offset)*sizeof(uint32_t));
+
+		if(total_head!=head_offset){
+			memcpy(&new_head_array[head_offset], &sc->head_array[(head_offset+1)], (total_head-1-head_offset)*sizeof(uint32_t));
+		}
 		
 		free(sc->head_array);
 		sc->head_array=new_head_array;
-		scm.gtd_size[GETGTDIDX(lba)]=(total_head-1)*sizeof(uint32_t);
+		scm.gtd_size[GETGTDIDX(lba)]=(total_head-1)*sizeof(uint32_t)+BITMAPSIZE;
+
+		bitmap_unset(sc->map, GETOFFSET(lba));
 	}
 	else{
 		printf("it cannot be sequential with previous ppa %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
-
-	if(lba+1 < PAGESIZE/sizeof(uint32_t) ){
-		if(bitmap_is_set(sc->map, lba+1)){
-			*should_more=DONE;
-		}
-		else{
-			*should_more=EXPAND;
-			*more_ppa=get_ppa_from_sc(sc, lba+1);
-		}
-	}
-	else
-		*should_more=DONE;
 
 	return old_ppa;
 }
@@ -151,31 +156,72 @@ inline static uint32_t expand_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 	uint32_t distance=0;
 	head_offset=get_head_offset(sc->map, lba);
 
-	if(!bitmap_is_set(sc->map, lba)){
-		distance=get_distance(sc->map, lba);
+	bool is_next_do=false;
+	uint32_t next_original_ppa;
+	if(ISLASTOFFSET(lba+1)){}
+	else{
+		if(!bitmap_is_set(sc->map, GETOFFSET(lba+1))){
+			is_next_do=true;
+			next_original_ppa=get_ppa_from_sc(sc, lba+1);
+		}
+	}
 
+	if(!bitmap_is_set(sc->map, GETOFFSET(lba))){
+
+		distance=get_distance(sc->map, lba);
 		old_ppa=sc->head_array[head_offset]+distance;
 
-		uint32_t total_head=scm.gtd_size[GETGTDIDX(lba)]/sizeof(uint32_t);
-		uint32_t *new_head_array=(uint32_t*)malloc((total_head+1)*sizeof(uint32_t));
-		memcpy(new_head_array, sc->head_array, head_offset * sizeof(uint32_t));
+		uint32_t total_head=(scm.gtd_size[GETGTDIDX(lba)]-BITMAPSIZE)/sizeof(uint32_t);
+		uint32_t *new_head_array=(uint32_t*)malloc((total_head+1+(is_next_do?1:0))*sizeof(uint32_t));
 
-		sc->head_array[head_offset+1]=ppa;
+		memcpy(new_head_array, sc->head_array, (head_offset+1) * sizeof(uint32_t));
+		new_head_array[head_offset+1]=ppa;
 
-		memcpy(&new_head_array[head_offset+1], &sc->head_array[head_offset], total_head-head_offset);
+		if(is_next_do){
+			bitmap_set(sc->map, GETOFFSET(lba+1));
+			new_head_array[head_offset+2]=next_original_ppa;
+			if(total_head!=head_offset+1){
+				memcpy(&new_head_array[head_offset+3], &sc->head_array[head_offset+1], (total_head-(head_offset+1)) * sizeof(uint32_t));
+			}
+		}
+		else{
+			if(total_head!=head_offset+1){
+				memcpy(&new_head_array[head_offset+2], &sc->head_array[head_offset+1], (total_head-(head_offset+1)) * sizeof(uint32_t));
+			}
+		}
 		free(sc->head_array);
 		sc->head_array=new_head_array;
-		scm.gtd_size[GETGTDIDX(lba)]=(total_head+1)*sizeof(uint32_t);
+		scm.gtd_size[GETGTDIDX(lba)]=(total_head+1+(is_next_do?1:0))*sizeof(uint32_t)+BITMAPSIZE;
+		bitmap_set(sc->map, GETOFFSET(lba));
+	//	sftl_print_mapping(sc);
 	}
 	else{
 		old_ppa=sc->head_array[head_offset];
 		sc->head_array[head_offset]=ppa;
+	
+		if(is_next_do){
+			uint32_t total_head=(scm.gtd_size[GETGTDIDX(lba)]-BITMAPSIZE)/sizeof(uint32_t);
+			uint32_t *new_head_array=(uint32_t*)malloc((total_head+1)*sizeof(uint32_t));
+
+			memcpy(new_head_array, sc->head_array, (head_offset+1) * sizeof(uint32_t));
+			new_head_array[head_offset+1]=next_original_ppa;
+			bitmap_set(sc->map, GETOFFSET(lba+1));
+
+			if(total_head!=head_offset+1){
+				memcpy(&new_head_array[head_offset+2], &sc->head_array[head_offset+1], (total_head-(head_offset+1)) * sizeof(uint32_t));
+			}
+			sc->head_array=new_head_array;
+			scm.gtd_size[GETGTDIDX(lba)]=(total_head+1)*sizeof(uint32_t)+BITMAPSIZE;
+			bitmap_set(sc->map, GETOFFSET(lba));
+	//		sftl_print_mapping(sc);
+		}
+		else{
+			bitmap_set(sc->map, GETOFFSET(lba));
+		}
 	}
 
-	bitmap_set(sc->map, lba);
-
-	if(lba+1< PAGESIZE/sizeof(uint32_t)){
-		if(bitmap_is_set(sc->map, lba+1)){
+	if(GETOFFSET(lba+1)< PAGESIZE/sizeof(uint32_t)){
+		if(bitmap_is_set(sc->map, GETOFFSET(lba+1))){
 			//check if it can be compressed
 			*more_ppa=get_ppa_from_sc(sc, lba+1);
 			if(ppa+1==(*more_ppa)){
@@ -190,15 +236,23 @@ inline static uint32_t expand_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 			*should_more=EXPAND;	
 		}
 	}
+
 	return old_ppa;
 }
 
 inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc){
 	sftl_cache *sc;
+
 	uint32_t old_ppa;
 	uint32_t gtd_idx=GETGTDIDX(lba);
 	lru_node *ln;
-	scm.now_caching_byte-=scm.gtd_size[gtd_idx];
+	if(scm.now_caching_byte <= scm.gtd_size[gtd_idx]){
+		scm.now_caching_byte=0;
+	}
+	else{
+		scm.now_caching_byte-=scm.gtd_size[gtd_idx];
+	}
+
 	if(etr->status==EMPTY){
 		sc=get_initial_state_cache(gtd_idx, etr);
 		ln=lru_push(scm.lru, sc);
@@ -215,7 +269,7 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		ln=(lru_node*)etr->private_data;
 		sc=(sftl_cache*)(ln->data);
 	}
-	
+
 	uint32_t more_lba=lba;
 	uint32_t more_ppa;
 	char should_more=false;
@@ -228,7 +282,6 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 
 	while(should_more!=DONE){
 		more_lba++;
-		scm.now_caching_byte-=scm.gtd_size[GETGTDIDX(more_lba)];
 		switch(should_more){
 			case SHRINK:
 				shrink_cache(sc, more_lba, more_ppa, &should_more, &more_ppa);
@@ -239,7 +292,6 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 			default:
 				break;
 		}
-		scm.now_caching_byte+=scm.gtd_size[GETGTDIDX(more_lba)];
 	}
 
 	scm.now_caching_byte+=scm.gtd_size[gtd_idx];
@@ -263,7 +315,7 @@ static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, uint32_t lba,
 	sc->map=bitmap_init(BITMAPMEMBER);
 	sc->etr=etr;
 
-	uint32_t total_head=scm.gtd_size[GETGTDIDX(lba)]/sizeof(uint32_t);
+	uint32_t total_head=(scm.gtd_size[GETGTDIDX(lba)]-BITMAPSIZE)/sizeof(uint32_t);
 	uint32_t *new_head_array=(uint32_t*)malloc(total_head * sizeof(uint32_t));
 	uint32_t *ppa_list=(uint32_t*)data;
 	uint32_t last_ppa, new_head_idx=0;
@@ -277,7 +329,7 @@ static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, uint32_t lba,
 		if(i==0){
 			last_ppa=ppa_list[i];
 			new_head_array[new_head_idx++]=last_ppa;
-			bitmap_set(sc->map, i);
+			bitmap_set(sc->map, GETOFFSET(i));
 		}
 		else{
 			sequential_flag=false;
@@ -286,11 +338,11 @@ static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, uint32_t lba,
 			}
 
 			if(sequential_flag){
-				bitmap_unset(sc->map, i);
+				bitmap_unset(sc->map, GETOFFSET(i));
 				last_ppa++;
 			}
 			else{
-				bitmap_set(sc->map, i);
+				bitmap_set(sc->map, GETOFFSET(i));
 				last_ppa=ppa_list[i];
 				new_head_array[new_head_idx++]=last_ppa;
 			}
@@ -345,7 +397,7 @@ void sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
 			}
 		}
 	}
-	scm.gtd_size[GETGTDIDX(lba)]=total_head*sizeof(uint32_t);
+	scm.gtd_size[GETGTDIDX(lba)]=(total_head*sizeof(uint32_t)+BITMAPSIZE);
 }
 
 uint32_t sftl_get_mapping(struct my_cache *, uint32_t lba){

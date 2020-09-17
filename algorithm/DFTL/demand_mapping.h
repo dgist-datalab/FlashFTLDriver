@@ -7,8 +7,8 @@
 #include "../../include/container.h"
 
 
-#define GETGTDIDX(lba) (lba/(PAGESIZE/sizeof(DMF)))
-#define TRANSOFFSET(lba) (lba%(PAGESIZE/sizeof(DMF)))
+#define GETGTDIDX(lba) ((lba)/(PAGESIZE/sizeof(DMF)))
+#define TRANSOFFSET(lba) ((lba)%(PAGESIZE/sizeof(DMF)))
 #define GTDNUM (RANGE/(PAGESIZE/sizeof(DMF)) + (RANGE%(PAGESIZE/sizeof(DMF))?1:0))
 
 typedef enum {

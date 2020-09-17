@@ -274,7 +274,7 @@ end:
 uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 	//static int cnt=0;
 	//printf("map_assign called %d %u\n", cnt++, _lba[0]);
-	//printf("req->key:%u\n", req->key);
+//	printf("req->key:%u\n", req->key);
 	uint8_t i=0;
 	demand_params *dp;
 	assign_params_ex *mp;
@@ -674,6 +674,7 @@ inline uint32_t xx_to_byte(char *a){
 }
 extern my_cache coarse_cache_func;
 extern my_cache fine_cache_func;
+extern my_cache sftl_cache_func;
 
 uint32_t demand_argument(int argc, char **argv){
 	bool cache_size=false;
@@ -724,6 +725,8 @@ uint32_t demand_argument(int argc, char **argv){
 				dmm.cache=&fine_cache_func;
 				break;
 			case SFTL:
+				dmm.cache=&sftl_cache_func;
+				break;
 			case TPFTL:
 				printf("not implemented!\n");
 				abort();
@@ -731,12 +734,13 @@ uint32_t demand_argument(int argc, char **argv){
 		}
 	}
 	else{
-		dmm.c_type=DEMAND_COARSE;
-		dmm.cache=&coarse_cache_func;
+		dmm.c_type=SFTL;
+		dmm.cache=&sftl_cache_func;
 	}
 
 	if(!cache_size){
-		physical_page_num=((SHOWINGSIZE/K)/4)/PAGESIZE;
+		//physical_page_num=((SHOWINGSIZE/K)/4)/PAGESIZE;
+		physical_page_num=((SHOWINGSIZE/K))/2/PAGESIZE;
 	}
 	dmm.max_caching_pages=physical_page_num;
 	return 1;
