@@ -2,6 +2,7 @@
 #include "amf_info.h"
 #include "../../include/settings.h"
 #include "../../bench/bench.h"
+#include "../../include/utils/slap_page.h"
 #include <unistd.h>
 AmfManager *am;
 
@@ -32,11 +33,15 @@ lower_info amf_info={
 	.trim_a_block=NULL,
 	.refresh=amf_info_refresh,
 	.stop=amf_info_stop,
+#ifdef SLAPPAGE
+	.lower_alloc=spm_memory_alloc,
+	.lower_free=spm_memory_free,
+#else
 	.lower_alloc=NULL,
 	.lower_free=NULL,
+#endif
 	.lower_flying_req_wait=amf_flying_req_wait,
 	.lower_show_info=amf_info_show_info,
-
 	.lower_tag_num=amf_info_lower_tag_num,
 };
 
@@ -64,9 +69,15 @@ uint32_t amf_info_create(lower_info *li, blockmanager *bm){
 	mem_pool=(char**)malloc(sizeof(char*)*_NOP);
 	for(uint32_t i=0; i<_NOP; i++){
 		mem_pool[i]=(char*)malloc(PAGESIZE);
+		memset(mem_pool[i],0, PAGESIZE);
 	}
 
 	temp_mem_buf=(char*)malloc(PAGESIZE);
+#endif
+
+#ifdef DSLAPPAGE
+	printf("assigned slap!\n");
+	spm_init(_NOP/10);
 #endif
 
 	return 1;

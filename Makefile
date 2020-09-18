@@ -1,10 +1,11 @@
-override export CC=g++-9
-override export CXX=g++-9
+override export CC=g++
+override export CXX=g++
 override export AR=gcc-ar
 override export NM=gcc-nm
 
 TARGET_INF=interface
-export TARGET_LOWER=AMF
+#export TARGET_LOWER=AMF
+export TARGET_LOWER=posix_memory
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -15,7 +16,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
-#-fsanitize=address\
+-fsanitize=address\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\
@@ -26,10 +27,11 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-O3 -march=native -mtune=native -flto=20 \
+			-DSLAPPAGE\
 #			-DWRITESYNC\
 			-DDEBUG\
 			-DCHECKINGDATA\
+			-O3 -march=native -mtune=native -flto=20 \
 
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
@@ -107,6 +109,7 @@ SRCS +=\
 	./include/utils/tag_q.c\
 	./blockmanager/base_block_manager.c\
 	./blockmanager/bb_checker.c\
+	./include/utils/slap_page.c\
 
 TARGETOBJ =\
 			$(patsubst %.c,%.o,$(SRCS))\
@@ -129,7 +132,7 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
-		-ljemalloc\
+#	-ljemalloc\
 #	-laio\
 
 all: cheeze_block_driver

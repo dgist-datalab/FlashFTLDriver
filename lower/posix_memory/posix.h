@@ -36,5 +36,6 @@ typedef struct posix_request {
 
 typedef struct mem_seg {
 	PTR storage;
+	int tag;
 } mem_seg;
 #endif
