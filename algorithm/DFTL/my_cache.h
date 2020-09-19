@@ -15,8 +15,10 @@ typedef struct my_cache{
 	uint32_t (*free)(struct my_cache *);
 	bool (*is_needed_eviction)(struct my_cache *, uint32_t lba);
 	bool (*need_more_eviction)(struct my_cache *, uint32_t lba);//it is valid if type is VARIABLE
+	bool (*is_hit_eviction)(struct my_cache *, struct GTD_entry*, uint32_t lba, uint32_t ppa);
 	uint32_t (*update_entry)(struct my_cache *, struct GTD_entry *, uint32_t lba, uint32_t ppa);
 	uint32_t (*update_entry_gc)(struct my_cache *, struct GTD_entry *, uint32_t lba, uint32_t ppa);
+	void (*force_put_mru)(struct my_cache *, struct GTD_entry *, struct mapping_entry *);
 	uint32_t (*insert_entry_from_translation)(struct my_cache *, GTD_entry *, uint32_t lba, char *data);
 	uint32_t (*update_from_translation_gc)(struct my_cache *, char *data, uint32_t lba, uint32_t ppa);
 	uint32_t (*get_mapping)(struct my_cache *, uint32_t lba);

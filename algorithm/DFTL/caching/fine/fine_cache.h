@@ -46,3 +46,4 @@ mapping_entry *fine_get_eviction_entry(struct my_cache *);
 bool fine_update_eviction_target_translation(struct my_cache* , GTD_entry *etr, mapping_entry *map, char *data);
 bool fine_evict_target(struct my_cache *, GTD_entry *, mapping_entry *etr);
 bool fine_exist(struct my_cache *, uint32_t lba);
+void fine_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *);

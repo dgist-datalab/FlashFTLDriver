@@ -11,8 +11,10 @@ my_cache coarse_cache_func{
 	.free=coarse_free,
 	.is_needed_eviction=coarse_is_needed_eviction,
 	.need_more_eviction=NULL,
+	.is_hit_eviction=NULL,
 	.update_entry=coarse_update_entry,
 	.update_entry_gc=coarse_update_entry_gc,
+	.force_put_mru=coarse_force_put_mru,
 	.insert_entry_from_translation=coarse_insert_entry_from_translation,
 	.update_from_translation_gc=coarse_update_from_translation_gc,
 	.get_mapping=coarse_get_mapping,
@@ -183,4 +185,8 @@ bool coarse_update_eviction_target_translation(struct my_cache* , GTD_entry *etr
 
 bool coarse_exist(struct my_cache *, uint32_t lba){
 	return dmm.GTD[GETGTDIDX(lba)].private_data!=NULL;
+}
+
+void coarse_force_put_mru(struct my_cache*, struct GTD_entry *etr, mapping_entry* map){
+	lru_update(ccm.lru, (lru_node*)etr->private_data);
 }

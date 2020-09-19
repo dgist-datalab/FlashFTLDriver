@@ -55,6 +55,7 @@ typedef struct demand_params{
 	evict_target et;
 	mapping_entry target;
 	void *params_ex;
+	bool is_hit_eviction;
 }demand_params;
 
 typedef struct assign_params_ex{
@@ -88,9 +89,16 @@ typedef struct gc_map_value{
 
 typedef struct demand_map_monitoer{
 	uint32_t hit_num;
+	uint32_t write_hit_num;
+	uint32_t read_hit_num;
+
 	uint32_t miss_num;
-	uint32_t cold_miss_num;
+	uint32_t cold_miss_num;	
+	uint32_t write_miss_num;
+	uint32_t read_miss_num;
+
 	uint32_t eviction_cnt;
+	uint32_t hit_eviction;
 	uint32_t dirty_eviction;
 	uint32_t clean_eviction;
 }dmi;

@@ -99,10 +99,14 @@ uint32_t sftl_print_mapping_target(sftl_cache *sc, uint32_t lba){
 			printf("target: %u -> %u\n", lba, now_ppa+seq_cnt);
 			return now_ppa+seq_cnt;
 		}
+		if(now_ppa==0  && i!=0){
+			abort();
+		}
 		i++;
 	}
 	if(GETOFFSET(lba)==i){
 		printf("target: %u -> %u\n", lba, now_ppa==UINT32_MAX? UINT32_MAX:now_ppa+seq_cnt);
 		return now_ppa==UINT32_MAX? UINT32_MAX:now_ppa+seq_cnt;
 	}
+	return -1;
 }

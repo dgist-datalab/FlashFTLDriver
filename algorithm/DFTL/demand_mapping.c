@@ -5,6 +5,7 @@
 #include <getopt.h>
 #include <stdint.h>
 extern uint32_t test_key;
+extern bool global_debug_flag;
 demand_map_manager dmm;
 dmi DMI;
 
@@ -67,10 +68,16 @@ void demand_map_free(){
 	printf("Cache miss num: %u\n",DMI.miss_num);
 	printf("\tCache cold miss num: %u\n",DMI.cold_miss_num);
 	printf("\tCache capacity miss num: %u\n",DMI.miss_num - DMI.cold_miss_num);
+	printf("\tread miss num: %u\n", DMI.read_miss_num);
+	printf("\twrite miss num: %u\n", DMI.write_miss_num);
+
 	printf("Cache hit num: %u\n",DMI.hit_num);
+	printf("\tread hit num: %u\n", DMI.read_hit_num);
+	printf("\twrite hit num: %u\n", DMI.write_hit_num);
 	printf("Cache hit ratio: %.2lf%%\n", (double) DMI.hit_num / (DMI.miss_num+DMI.hit_num) * 100);
 
 	printf("\nCache eviction cnt: %u\n", DMI.eviction_cnt);
+	printf("\tHit eviction: %u\n", DMI.hit_eviction);
 	printf("\tEviction clean cnt: %u\n", DMI.clean_eviction);
 	printf("\tEviction dirty cnt: %u\n", DMI.dirty_eviction);
 	printf("===============================\n");
@@ -298,7 +305,7 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 		cpy_keys(&mp->physical, _physical);
 		i=mp->idx=0;
 		dp->params_ex=(void*)mp;
-
+		dp->is_hit_eviction=false;
 		req->params=(void*)dp;
 	}
 	else{
@@ -312,7 +319,6 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 	}
 	
 	GTD_entry *target_etr;
-
 	for(;i<L2PGAP; i++){
 		gtd_idx=GETGTDIDX(lba[i]);
 		trans_offset=TRANSOFFSET(lba[i]);
@@ -326,6 +332,10 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 retry:
 		switch(dp->status){
 			case EVICTIONW:
+				if(dp->is_hit_eviction){
+					dp->status=HIT;
+					goto retry;
+				}
 				dp->status=MISSR;
 				if(dmm.cache->type==FINE){
 					dp->status=HIT;
@@ -341,7 +351,9 @@ retry:
 			case NONE:
 				if(!dmm.cache->exist(dmm.cache, lba[i])){
 					DMI.miss_num++;
+					DMI.write_miss_num++;
 					if(dmm.cache->is_needed_eviction(dmm.cache, lba[i])){
+eviction_path:
 						DMI.eviction_cnt++;
 						dp->status=EVICTIONR; //it is dirty
 						if(dmm.cache->type==COARSE){
@@ -391,7 +403,15 @@ retry:
 					}
 				}
 				else{
+					if(dmm.cache->entry_type==DYNAMIC &&
+							dmm.cache->is_hit_eviction(dmm.cache, etr, lba[i], physical[i])){
+						DMI.hit_eviction++;
+						dmm.cache->force_put_mru(dmm.cache, etr, NULL);
+						dp->is_hit_eviction=true;
+						goto eviction_path;
+					}
 					DMI.hit_num++;
+					DMI.write_hit_num++;
 				}
 				dp->status=HIT;
 			case HIT:
@@ -399,6 +419,7 @@ retry:
 				if(old_ppa!=UINT32_MAX){
 					invalidate_ppa(old_ppa);
 				}
+				dp->is_hit_eviction=false;
 				dp->status=NONE;
 				break;
 			case EVICTIONR:
@@ -410,8 +431,12 @@ retry:
 					target_etr=&dmm.GTD[GETGTDIDX(dp->et.mapping->lba)];
 					demand_map_fine_type_pending(req, dp->et.mapping, req->value->value);
 				}
-				
-				if(dmm.cache->entry_type==DYNAMIC && dmm.cache->need_more_eviction(dmm.cache,lba[i])){
+
+				if(dp->is_hit_eviction){
+					dp->status=HIT;
+				}
+				else if(dmm.cache->entry_type==DYNAMIC && dmm.cache->need_more_eviction(dmm.cache,lba[i])){
+					//printf("more eviction!!!\n");
 					dp->status=NONE;
 				}
 				else{
@@ -476,6 +501,7 @@ uint32_t demand_page_read(request *const req){
 		gtd_idx=GETGTDIDX(req->key);
 		trans_offset=TRANSOFFSET(req->key);
 		etr=dp->etr=&dmm.GTD[gtd_idx];
+		dp->is_hit_eviction=false;
 		req->params=(void*)dp;
 	}else{
 		dp=(demand_params*)req->params;
@@ -496,6 +522,7 @@ retry:
 
 			if(!dmm.cache->exist(dmm.cache, req->key)){//cache miss
 				DMI.miss_num++;	
+				DMI.read_miss_num++;
 				if(dmm.cache->is_needed_eviction(dmm.cache, req->key)){
 					DMI.eviction_cnt++;
 					if(dmm.cache->type==COARSE){
@@ -537,10 +564,13 @@ retry:
 				}
 				else{
 					DMI.cold_miss_num++;
+					dp->status=MISSR;
+					return map_read_wrapper(etr, req, dmm.li, (void*)dp);
 				}
 			}
 			else{
 				DMI.hit_num++;	
+				DMI.read_hit_num++;
 			}
 			dp->status=HIT;
 		case HIT:
@@ -557,6 +587,7 @@ retry:
 			}
 
 			if(dmm.cache->entry_type==DYNAMIC && dmm.cache->need_more_eviction(dmm.cache, req->key)){
+				//printf("more eviction!!!\n");
 				dp->status=NONE;
 			}
 			else{
@@ -599,6 +630,7 @@ int mapping_entry_compare(const void * a, const void *b){
 	return (int)((mapping_entry*)a)->lba - (int)((mapping_entry*)b)->lba;
 }
 
+extern int gc_cnt;
 uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	qsort(target, idx, sizeof(mapping_entry), mapping_entry_compare);
 	bool read_start=false;
@@ -606,6 +638,8 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	gc_map_value *gmv;
 	list *temp_list=list_init();
 	uint32_t old_ppa;
+
+	bool debug_test=false;
 	for(uint32_t i=0; i<idx; i++){
 		temp_gtd_idx=GETGTDIDX(target[i].lba);
 		if(dmm.cache->exist(dmm.cache, target[i].lba) && target[i].ppa!=UINT32_MAX){
@@ -639,7 +673,7 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 			if(!gmv->isdone) continue;
 
 			gtd_idx=gmv->gtd_idx;
-			for(uint32_t i=gmv->start_idx; GETGTDIDX(target[i].lba)==gtd_idx; i++){
+			for(uint32_t i=gmv->start_idx;  i<idx && GETGTDIDX(target[i].lba)==gtd_idx; i++){
 				dmm.cache->update_from_translation_gc(dmm.cache, gmv->value->value, target[i].lba, target[i].ppa);	
 			}
 			
@@ -740,7 +774,7 @@ uint32_t demand_argument(int argc, char **argv){
 
 	if(!cache_size){
 		//physical_page_num=((SHOWINGSIZE/K)/4)/PAGESIZE;
-		physical_page_num=((SHOWINGSIZE/K))/2/PAGESIZE;
+		physical_page_num=((SHOWINGSIZE/K))/4/PAGESIZE;
 	}
 	dmm.max_caching_pages=physical_page_num;
 	return 1;

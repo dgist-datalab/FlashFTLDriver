@@ -16,8 +16,10 @@ my_cache fine_cache_func{
 	.free=fine_free,
 	.is_needed_eviction=fine_is_needed_eviction,
 	.need_more_eviction=NULL,
+	.is_hit_eviction=NULL,
 	.update_entry=fine_update_entry,
 	.update_entry_gc=fine_update_entry_gc,
+	.force_put_mru=fine_force_put_mru,
 	.insert_entry_from_translation=fine_insert_entry_from_translation,
 	.update_from_translation_gc=fine_update_from_translation_gc,
 	.get_mapping=fine_get_mapping,
@@ -266,4 +268,8 @@ bool fine_evict_target(struct my_cache *, GTD_entry *, mapping_entry *fc){
 
 bool fine_exist(struct my_cache *, uint32_t lba){
 	return bitmap_is_set(fcm.populated_cache_entry, lba);
+}
+
+void fine_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *map){
+	lru_update(fcm.lru, get_ln(map));
 }

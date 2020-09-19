@@ -8,7 +8,7 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
-static uint32_t test_ppa=114787;
+uint32_t test_ppa=2296549;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -114,7 +114,6 @@ void do_gc(){
 			if(!gv->isdone) continue;
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
-	
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
 				//check cache 
 				if(dmm.cache->exist(dmm.cache, lbas[i])){
@@ -128,11 +127,7 @@ void do_gc(){
 					}
 				}
 
-/*
-				if(lbas[i]==test_key){
-					printf("%u is gc target, it is got from %u\n", test_key, gv->ppa);
-				}
-*/
+
 				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
@@ -208,6 +203,9 @@ ppa_t get_rppa(KEYT *lbas, uint8_t idx, mapping_entry *target, uint32_t *_target
 		target[target_idx].lba=t_lba;
 		target[target_idx].ppa=res*L2PGAP+i;
 		target_idx++;
+		if(res*L2PGAP+i==test_ppa){
+			printf("%u is map for %u in rppa\n",test_ppa, lbas[i]);	
+		}
 		demand_ftl.bm->populate_bit(demand_ftl.bm, res*L2PGAP+i);
 	}
 	(*_target_idx)=target_idx;

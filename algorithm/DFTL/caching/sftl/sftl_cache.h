@@ -7,6 +7,7 @@
 
 #define BITMAPFROMLN(ln) (((sftl_cache*)((ln)->data))->map)
 #define HEADARRFROMLN(ln) (((sftl_cache*)((ln)->data))->head_array)
+#define GETSCFROMETR(etr) ((sftl_cache*)((lru_node*)etr->private_data)->data)
 #define BITMAPMEMBER (PAGESIZE/sizeof(DMF))
 #define BITMAPSIZE (BITMAPMEMBER/8+(BITMAPMEMBER%8?1:0))
 
@@ -42,4 +43,7 @@ void sftl_update_dynamic_size(struct my_cache *, uint32_t lba,char *data);
 void sftl_mapping_verify(sftl_cache* sc);
 void sftl_print_mapping(sftl_cache* sc);
 uint32_t sftl_print_mapping_target(sftl_cache *sc, uint32_t lba);
+
+bool sftl_is_hit_eviction(struct my_cache *, GTD_entry *,uint32_t lba, uint32_t ppa);
+void sftl_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *);
 #endif

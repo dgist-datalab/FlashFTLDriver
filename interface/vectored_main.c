@@ -29,7 +29,7 @@ int main(int argc,char* argv[]){
 	inf_init(0,0,argc,argv);
 	bench_init();
 	bench_vectored_configure();
-	//bench_add(VECTOREDSSET,0,RANGE/2/100*99,RANGE/2/100*99);
+	bench_add(VECTOREDSSET,0,RANGE,RANGE);
 	//bench_add(VECTOREDRW,0,RANGE/2/100*99,RANGE/100*99);
 	bench_add(VECTOREDRW,0,RANGE,RANGE*2);
 	printf("range: %lu!\n",RANGE);

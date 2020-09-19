@@ -28,3 +28,4 @@ uint32_t coarse_get_mapping(struct my_cache *, uint32_t lba);
 struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *);//if return value is NULL, it is clean eviction.
 bool coarse_update_eviction_target_translation(struct my_cache* , GTD_entry *etr, mapping_entry * map, char *data);
 bool coarse_exist(struct my_cache *, uint32_t lba);
+void coarse_force_put_mru(struct my_cache*, struct GTD_entry *, mapping_entry*);
