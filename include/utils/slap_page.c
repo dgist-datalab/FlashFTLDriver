@@ -28,9 +28,7 @@ void spm_free(){
 int spm_memory_alloc(int type, char **buf){
 	int tag_num=tag_manager_get_tag(my_spm.tag_m);
 	(*buf)=my_spm.storage[tag_num];
-	printf("tab_num:%d\n", tag_num);
 	if((uint64_t)tag_num*PAGESIZE > my_spm.allocated_size){
-		printf("over allocated!\n");
 		abort();
 	}
 	return tag_num;

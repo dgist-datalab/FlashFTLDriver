@@ -10,7 +10,7 @@
 #include "../../bench/bench.h"
 #include "../interface.h"
 #include "../vectored_interface.h"
-#include "../cheeze_block.h"
+#include "../cheeze_hg_block.h"
 
 void log_print(int sig){
 	free_cheeze();

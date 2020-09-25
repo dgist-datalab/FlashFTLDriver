@@ -837,6 +837,10 @@ value_set *inf_get_valueset(PTR in_v, int type, uint32_t length){
 		memcpy(res->value,in_v,length);
 	}
 	else{
+		static int cnt=0;
+		if(cnt++==394212){
+			printf("cnt:%d\n", cnt++);
+		}
 		memset(res->value,0,length);
 	}
 	res->ppa=UINT32_MAX;

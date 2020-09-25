@@ -1,4 +1,4 @@
-#include "cheeze_block.h"
+#include "cheeze_hg_block.h"
 #include "queue.h"
 #include "interface.h"
 #include "threading.h"
@@ -7,50 +7,81 @@
 #include "../include/utils/crc32.h"
 #include <pthread.h>
 
-#define PHYS_ADDR 0x3280000000
-#define TOTAL_SIZE (1024L * 1024L * 1024L)
-
-pthread_t t_id;
 extern master_processor mp;
 
-int chrfd;
+#define TOTAL_SIZE (3ULL *1024L *1024L *1024L)
+
+static void *page_addr;
+static uint8_t *send_event_addr; // CHEEZE_QUEUE_SIZE ==> 16B
+static uint8_t *recv_event_addr; // 16B
+static uint64_t *seq_addr; // 8KB
+struct cheeze_req_user *ureq_addr; // sizeof(req) * 1024
+static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
+static uint64_t seq = 0;
+
+static inline char *get_buf_addr(char **pdata_addr, int id) {
+    int idx = id / ITEMS_PER_HP;
+    return pdata_addr[idx] + ((id % ITEMS_PER_HP) * CHEEZE_BUF_SIZE);
+}
+
+static void shm_meta_init(void *ppage_addr) {
+    memset(ppage_addr, 0, (1ULL * 1024 * 1024 * 1024));
+    send_event_addr = (uint8_t*)(ppage_addr + SEND_OFF); // CHEEZE_QUEUE_SIZE ==> 16B
+    recv_event_addr =(uint8_t*)(ppage_addr + RECV_OFF); // 16B
+    seq_addr = (uint64_t*)(ppage_addr + SEQ_OFF); // 8KB
+    ureq_addr = (cheeze_req_user*)(ppage_addr + REQS_OFF); // sizeof(req) * 1024
+}
+
+static void shm_data_init(void *ppage_addr) {
+    data_addr[0] = ((char *)ppage_addr) + (1ULL * 1024 * 1024 * 1024);
+    data_addr[1] = ((char *)ppage_addr) + (2ULL * 1024 * 1024 * 1024);
+}
+
 
 bool cheeze_end_req(request *const req);
-void *ack_to_dev(void*);
-queue *ack_queue;
 char *null_value;
+
 #ifdef CHECKINGDATA
 uint32_t* CRCMAP;
 #endif
 
 void init_cheeze(){
-	chrfd = open("/dev/cheeze_chr", O_RDWR);
+	int chrfd = open("/dev/mem", O_RDWR);
 	if (chrfd < 0) {
-		perror("Failed to open /dev/cheeze_chr");
+		perror("Failed to open /dev/mem");
 		abort();
 		return;
 	}
 
+	uint64_t pagesize, addr, len;
+	pagesize=getpagesize();
+	addr = PHYS_ADDR & (~(pagesize - 1));
+    len = (PHYS_ADDR & (pagesize - 1)) + TOTAL_SIZE;
+
+	page_addr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, chrfd, addr);
+    if (page_addr == MAP_FAILED) {
+        perror("Failed to mmap plain device path");
+        exit(1);
+    }
+	close(chrfd);
+
+	shm_meta_init(page_addr);
+	shm_data_init(page_addr);
+	
 	null_value=(char*)malloc(PAGESIZE);
 	memset(null_value,0,PAGESIZE);
-	q_init(&ack_queue, 128);
+
 #ifdef CHECKINGDATA
 	CRCMAP=(uint32_t*)malloc(sizeof(uint32_t) * RANGE);
 	memset(CRCMAP, 0, sizeof(uint32_t) *RANGE);
 #endif
-	pthread_create(&t_id, NULL, &ack_to_dev, NULL);
 }
 
-inline void error_check(cheeze_req *creq){
+inline void error_check(cheeze_ureq *creq){
 	if(unlikely(creq->len%LPAGESIZE)){
 		printf("size not align %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
-	/*
-	if(unlikely(creq->pos%LPAGESIZE)){
-		printf("pos not align %s:%d\n", __FILE__, __LINE__);
-		abort();
-	}*/
 }
 
 inline FSTYPE decode_type(int op){
@@ -76,20 +107,11 @@ const char *type_to_str(uint32_t type){
 	return NULL;
 }
 
-vec_request *get_vectored_request(){
-	static bool isstart=false;
+
+
+static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
-	cheeze_req *creq=(cheeze_req*)malloc(sizeof(cheeze_req));
-	
-	if(!isstart){
-		isstart=true;
-		printf("now waiting req!!\n");
-	}
-	ssize_t r=read(chrfd, creq, sizeof(cheeze_req));
-	if(r<0){
-		free(res);
-		return NULL;
-	}
+	res->tag_id=id;
 
 	error_check(creq);
 
@@ -102,24 +124,9 @@ vec_request *get_vectored_request(){
 	FSTYPE type=decode_type(creq->op);
 	if(type!=FS_GET_T && type!=FS_SET_T){
 		res->buf=NULL;
-		r=write(chrfd, creq, sizeof(cheeze_req));
-		if(r<0){
-			printf("ack error!\n");
-			free(res);
-			return NULL;
-		}
 	}
 	else{
-		res->buf=(char*)malloc(creq->len);
-		creq->buf=res->buf;
-		if(type==FS_SET_T){
-			r=write(chrfd, creq, sizeof(cheeze_req));
-			if(r<0){
-				printf("ack error!\n");
-				free(res);
-				return NULL;
-			}
-		}
+		res->buf=get_buf_addr(data_addr, id);
 	}
 
 
@@ -163,6 +170,44 @@ vec_request *get_vectored_request(){
 		}
 #endif
 		DPRINTF("REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type_to_str(temp->type),creq->id, i, temp->key);
+	}
+	return res;
+}
+
+vec_request *get_vectored_request(){
+	static bool isstart=false;
+	
+	if(!isstart){
+		isstart=true;
+		printf("now waiting req!!\n");
+	}
+
+	cheeze_ureq *ureq;
+	vec_request *res=NULL;
+	uint8_t *send, *recv;
+	int id;
+	while(1){
+		for (int i = 0; i < CHEEZE_QUEUE_SIZE; i++) {
+			send = &send_event_addr[i];
+			recv = &recv_event_addr[i];
+			if (*send) {
+				id = i;
+				// printf("id: %d (i: %d, j: %d), seq_addr[id]: %lu, seq: %lu\n", id, i, j, seq_addr[id], seq);
+				// ureq_print(ureq);
+				if (seq_addr[id] == seq) {
+					ureq = ureq_addr + id; 
+					res=ch_ureq2vec_req(ureq, id);
+					*send = 0;
+					if(ureq->op!=REQ_OP_READ){
+						*recv = 1;
+					}
+					seq++;
+					return res;
+				} else {
+					continue;
+				}
+			}
+		}
 	}
 
 	return res;
@@ -212,53 +257,15 @@ bool cheeze_end_req(request *const req){
 	release_each_req(req);
 
 	if(preq->size==preq->done_cnt){
-		if(req->type!=FS_GET_T && req->type!=FS_NOTFOUND_T){
-			free(preq->buf);
-			free(preq->origin_req);
-			free(preq->req_array);
-			free(preq);
+		if(req->type==FS_GET_T && req->type==FS_NOTFOUND_T){
+			recv_event_addr[preq->tag_id]=1;		
 		}
-		else{
-			while(!q_enqueue((void*)preq, ack_queue)){}
-		}
+		free(preq->origin_req);
+		free(preq->req_array);
+		free(preq);
 	}
 
 	return true;
-}
-
-
-void *ack_to_dev(void* a){
-	vec_request *vec=NULL;
-	ssize_t r;
-	while(1){
-		if(!(vec=(vec_request*)q_dequeue(ack_queue))) continue;
-
-#if defined(DEBUG) || defined(CHECKINGDATA)
-		cheeze_req *creq=(cheeze_req*)vec->origin_req;
-#endif
-
-#ifdef CHECKINGDATA
-		for(uint32_t i=0; i<creq->len/LPAGESIZE; i++){
-			if(CRCMAP[creq->pos+i] && CRCMAP[creq->pos+i]!=crc32((char*)&creq->buf[LPAGESIZE*i], LPAGESIZE)){
-					printf("\n");
-					printf("\t\tcrc checking error in key:%u, it maybe copy error!\n", creq->pos);	
-					printf("\n");
-			}
-		}
-#endif
-
-		r=write(chrfd, vec->origin_req, sizeof(cheeze_req));
-
-		DPRINTF("[DONE] REQ INFO(%d) LBA: %u ~ %u\n", creq->id, creq->pos, creq->pos+creq->len/LPAGESIZE-1);
-		if(r<0){
-			break;
-		}
-		free(vec->buf);
-		free(vec->origin_req);
-		free(vec->req_array);
-		free(vec);
-	}
-	return NULL;
 }
 
 void free_cheeze(){

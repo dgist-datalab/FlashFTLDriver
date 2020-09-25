@@ -16,7 +16,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
--fsanitize=address\
+#-fsanitize=address\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\
@@ -27,7 +27,7 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-DSLAPPAGE\
+#			-DSLAPPAGE\
 #			-DWRITESYNC\
 			-DDEBUG\
 			-DCHECKINGDATA\
@@ -88,7 +88,6 @@ SRCS +=\
 	./interface/interface.c\
 	./interface/vectored_interface.c\
 	./include/FS.c\
-	./include/slab.c\
 	./include/utils/debug_tools.c\
 	./include/utils/dl_sync.c\
 	./include/utils/rwlock.c\
@@ -137,7 +136,7 @@ LIBS +=\
 
 all: cheeze_block_driver
 
-cheeze_block_driver: ./interface/cheeze_block.c ./interface/mainfiles/cheeze_block_main.c libdriver.a
+cheeze_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_block_main.c libdriver.a
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 DEBUG: debug_driver
