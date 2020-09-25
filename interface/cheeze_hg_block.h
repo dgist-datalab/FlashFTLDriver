@@ -22,7 +22,6 @@ struct cheeze_req_user {
 } __attribute__((aligned(8), packed));
 
 
-#define PHYS_ADDR 0x800000000
 #define CHEEZE_QUEUE_SIZE 1024
 #define CHEEZE_BUF_SIZE (2ULL * 1024 * 1024)
 #define ITEMS_PER_HP ((1ULL * 1024 * 1024 * 1024) / CHEEZE_BUF_SIZE)
@@ -79,7 +78,7 @@ enum req_opf {
 typedef struct cheeze_req_user cheeze_ureq;
 
 
-void init_cheeze();
+void init_cheeze(uint64_t phy_addr);
 void free_cheeze();
 vec_request *get_vectored_request();
 

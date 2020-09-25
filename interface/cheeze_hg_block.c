@@ -11,6 +11,7 @@ extern master_processor mp;
 
 #define TOTAL_SIZE (3ULL *1024L *1024L *1024L)
 
+static uint64_t PHYS_ADDR=0x800000000;
 static void *page_addr;
 static uint8_t *send_event_addr; // CHEEZE_QUEUE_SIZE ==> 16B
 static uint8_t *recv_event_addr; // 16B
@@ -45,12 +46,16 @@ char *null_value;
 uint32_t* CRCMAP;
 #endif
 
-void init_cheeze(){
+void init_cheeze(uint64_t phy_addr){
 	int chrfd = open("/dev/mem", O_RDWR);
 	if (chrfd < 0) {
 		perror("Failed to open /dev/mem");
 		abort();
 		return;
+	}
+	
+	if(phy_addr){
+		PHYS_ADDR=phy_addr;
 	}
 
 	uint64_t pagesize, addr, len;

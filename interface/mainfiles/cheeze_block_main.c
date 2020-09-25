@@ -43,7 +43,12 @@ int main(int argc,char* argv[]){
 
 	inf_init(1,0,argc,argv);
 
-	init_cheeze();
+	if(argc<2){
+		init_cheeze(0);
+	}
+	else{
+		init_cheeze(atoll(argv[1]));
+	}
 
 	pthread_create(&thr, NULL, thread_test, NULL);
 	pthread_join(thr, NULL);
