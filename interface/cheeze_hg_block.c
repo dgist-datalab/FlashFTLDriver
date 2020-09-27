@@ -262,7 +262,7 @@ bool cheeze_end_req(request *const req){
 	release_each_req(req);
 
 	if(preq->size==preq->done_cnt){
-		if(req->type==FS_GET_T && req->type==FS_NOTFOUND_T){
+		if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
 			recv_event_addr[preq->tag_id]=1;		
 		}
 		free(preq->req_array);

@@ -69,7 +69,7 @@ uint32_t amf_info_create(lower_info *li, blockmanager *bm){
 	mem_pool=(char**)malloc(sizeof(char*)*_NOP);
 	for(uint32_t i=0; i<_NOP; i++){
 		mem_pool[i]=(char*)malloc(PAGESIZE);
-		memset(mem_pool[i],0, PAGESIZE);
+	//	memset(mem_pool[i],0, PAGESIZE);
 	}
 
 	temp_mem_buf=(char*)malloc(PAGESIZE);
