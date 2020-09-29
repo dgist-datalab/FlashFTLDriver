@@ -221,15 +221,41 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 		pp=NULL;
 
 		if(dp->status==MISSR){
-			if(treq->type==FS_SET_T){
-				printf("FINE type doesn't need to read mapping in SET %s:%d\n", __FILE__, __LINE__);
-				abort();
-			}
-			if(treq==req) res=1;
-
 			dmm.cache->insert_entry_from_translation(dmm.cache, etr, mapping->lba, value);
-			__demand_map_pending_read(treq, dp, pp);
-
+			if(treq->type==FS_SET_T){
+				ap=(assign_params_ex*)dp->params_ex;
+				lba=ap->lba;
+				physical=ap->physical;
+				i=ap->idx;
+				old_ppa=dmm.cache->update_entry(dmm.cache, etr, lba[i], physical[i]);
+				if(old_ppa!=UINT32_MAX){
+					invalidate_ppa(old_ppa);
+				}
+				i++;
+				if(i==L2PGAP){
+					free(lba);
+					free(physical);
+					free(ap);
+					free(dp);
+					treq->end_req(treq);
+					if(treq==req) res=1;
+				}
+				else{
+					if(req==treq){
+						list_delete_node(etr->pending_req, now);
+						dp->status=NONE;
+						ap->idx=i;
+						continue;
+					}	
+					dp->status=NONE;
+					ap->idx=i;
+					inf_assign_try(treq);
+				}
+			}
+			else{
+				if(treq==req) res=1;
+				__demand_map_pending_read(treq, dp, pp);
+			}
 			list_delete_node(etr->pending_req, now);
 		}
 	}
@@ -330,6 +356,9 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 		mapping_entry *target=&dp->target;
 		target->lba=lba[i];
 		target->ppa=physical[i];
+		if(target->lba==673818){
+			printf("debug_b\n");
+		}
 retry:
 		switch(dp->status){
 			case EVICTIONW:
@@ -338,15 +367,9 @@ retry:
 					goto retry;
 				}
 				dp->status=MISSR;
-				if(dmm.cache->type==FINE){
+				if(etr->status==EMPTY){
 					dp->status=HIT;
 					goto retry;
-				}
-				else{
-					if(etr->status==EMPTY){
-						dp->status=HIT;
-						goto retry;
-					}
 				}
 				return map_read_wrapper(etr, req, dmm.li, (void*)dp);
 			case NONE:
@@ -371,8 +394,8 @@ eviction_path:
 						else{
 							dp->et.mapping=dmm.cache->get_eviction_mapping_entry(dmm.cache, target->lba);
 							if(!dp->et.mapping){
-								dp->status=HIT;
 								DMI.clean_eviction++;
+								dp->status=EVICTIONW;
 								goto retry;
 							}
 							else{
@@ -398,9 +421,7 @@ eviction_path:
 
 					if(etr->status!=EMPTY){
 						dp->status=MISSR;
-						if(dmm.cache->type==COARSE){
-							return map_read_wrapper(etr, req, dmm.li, (void*)dp);
-						}
+						return map_read_wrapper(etr, req, dmm.li, (void*)dp);
 					}
 				}
 				else{
@@ -453,9 +474,9 @@ eviction_path:
 				return 1;
 			case MISSR:
 				if(dmm.cache->type==FINE){
-					printf("fine cache can't be this status %s:%d\n", __FILE__, __LINE__);
-					abort();
-					return 1;
+					if(demand_map_fine_type_pending(req, target, req->value->value)==1){
+						return 1;
+					}
 				}
 				else if(demand_map_coarse_type_pending(req, etr, req->value->value)==1){
 					return 1;
@@ -488,13 +509,6 @@ uint32_t demand_page_read(request *const req){
 	uint32_t gtd_idx, trans_offset;
 	uint32_t ppa;
 	GTD_entry *etr;
-
-	/*/if(req->key==1778630){
-		printf("read break %u!\n", req->seq);
-		if(req->seq==2100346){
-			printf("break!\n");
-		}
-	}*/
 
 	if(!req->params){
 		dp=(demand_params*)malloc(sizeof(demand_params));
@@ -646,7 +660,7 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	for(uint32_t i=0; i<idx; i++){
 		temp_gtd_idx=GETGTDIDX(target[i].lba);
 		if(target[i].ppa==test_ppa){
-			printf("break!\n");
+			printf("gc_break!\n");
 			debug_gtd_idx=temp_gtd_idx;
 			debug_idx=i;
 		}
@@ -657,21 +671,22 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 			}
 			if(dmm.cache->type==COARSE) continue;
 		}
+		else{
+			if(dmm.GTD[temp_gtd_idx].physical_address==UINT32_MAX) continue;
+			if(read_start && gtd_idx==temp_gtd_idx) continue;
+			if(!read_start){read_start=true;}
 
-		if(dmm.GTD[temp_gtd_idx].physical_address==UINT32_MAX) continue;
-		if(read_start && gtd_idx==temp_gtd_idx) continue;
-		if(!read_start){read_start=true;}
+			gtd_idx=temp_gtd_idx;
 
-		gtd_idx=temp_gtd_idx;
-
-		gmv=(gc_map_value*)malloc(sizeof(gc_map_value));
-		gmv->pair=target[i];
-		gmv->start_idx=i;
-		gmv->gtd_idx=gtd_idx;
-		gmv->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
-		gmv->isdone=false;
-		list_insert(temp_list, (void*)gmv);
-		demand_mapping_inter_read(dmm.GTD[gtd_idx].physical_address/L2PGAP, dmm.li, gmv);
+			gmv=(gc_map_value*)malloc(sizeof(gc_map_value));
+			gmv->pair=target[i];
+			gmv->start_idx=i;
+			gmv->gtd_idx=gtd_idx;
+			gmv->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+			gmv->isdone=false;
+			list_insert(temp_list, (void*)gmv);
+			demand_mapping_inter_read(dmm.GTD[gtd_idx].physical_address/L2PGAP, dmm.li, gmv);
+		}
 
 	}
 	
@@ -779,8 +794,8 @@ uint32_t demand_argument(int argc, char **argv){
 		}
 	}
 	else{
-		dmm.c_type=DEMAND_FINE;
-		dmm.cache=&fine_cache_func;
+		dmm.c_type=TPFTL;
+		dmm.cache=&tp_cache_func;
 	}
 
 	if(!cache_size){

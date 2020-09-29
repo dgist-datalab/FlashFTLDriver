@@ -129,6 +129,9 @@ static inline uint32_t __update_entry(GTD_entry *etr,uint32_t lba, uint32_t ppa,
 	fc->ppa=ppa;
 	
 last:
+	if(lba==1652090){
+		printf("%u %u->%u\n", lba, old_ppa, ppa);
+	}
 	set_flag(fc,1);
 	if(!isgc){
 		lru_update(fcm.lru, get_ln(fc));
@@ -211,17 +214,26 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 	}
 	uint32_t *ppa_list=(uint32_t*)data;
 	fine_cache *fc;
+	bool debug_flag=false;
+	if(etr->idx==1652090/2048){
+		printf("break!\n");
+		debug_flag=true;
+	}
 	uint32_t old_ppa;
 #ifdef SEARCHSPEEDUP
 	uint32_t unit=PAGESIZE/sizeof(DMF);
 	for(uint32_t i=0; i<unit; i++){
 		fc=__find_lru_map(gtd_idx*unit+i);
 		if(!fc || !get_flag(fc)) continue;
+		if(debug_flag && fc->lba==1652090){
+			printf("break2\n");
+		}
 		old_ppa=ppa_list[GETOFFSET(fc->lba)];
 		ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
+		/*
 		if(old_ppa!=UINT32_MAX && !dmm.bm->is_invalid_page(dmm.bm, old_ppa)){
 			invalidate_ppa(old_ppa);
-		}
+		}*/
 		set_flag(fc,0);
 	}
 #else
@@ -232,9 +244,10 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 		if(!get_flag(fc)) continue;
 		old_ppa=ppa_list[GETOFFSET(fc->lba)];
 		ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
+		/*
 		if(old_ppa!=UINT32_MAX && !dmm.bm->is_invalid_page(dmm.bm, old_ppa)){
 			invalidate_ppa(old_ppa);
-		}
+		}*/
 		set_flag(fc,0);
 	}
 #endif
@@ -263,7 +276,14 @@ bool fine_evict_target(struct my_cache *, GTD_entry *, mapping_entry *fc){
 }
 
 bool fine_exist(struct my_cache *, uint32_t lba){
-	return bitmap_is_set(fcm.populated_cache_entry, lba);
+	bool res=bitmap_is_set(fcm.populated_cache_entry, lba);
+	if(res){
+		if(!fcm.cl_mapping->fc_array[lba]){
+			printf("bitmap is wiered! %u\n",lba);
+			abort();
+		}
+	}
+	return res;
 }
 
 void fine_force_put_mru(struct my_cache *, GTD_entry *,mapping_entry *map,  uint32_t lba){

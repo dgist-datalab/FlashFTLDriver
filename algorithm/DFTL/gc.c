@@ -8,7 +8,7 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
-uint32_t test_ppa=1896175;
+uint32_t test_ppa=UINT32_MAX;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -125,10 +125,12 @@ void do_gc(){
 				if(dmm.cache->exist(dmm.cache, lbas[i])){
 					cached_ppa=dmm.cache->get_mapping(dmm.cache, lbas[i]);
 					if(cached_ppa!=gv->ppa*L2PGAP+i){
+						printf("it can't be!! L:%u, P:%u, oldP:%u\n",lbas[i], cached_ppa, gv->ppa*L2PGAP+i);
+						abort();
 						//should not move data but mapping update
-						update_target[update_target_idx].lba=lbas[i];
-						update_target[update_target_idx].ppa=UINT32_MAX;
-						update_target_idx++;
+			//			update_target[update_target_idx].lba=lbas[i];
+			//			update_target[update_target_idx].ppa=UINT32_MAX;
+			//			update_target_idx++;
 						continue;
 					}
 				}

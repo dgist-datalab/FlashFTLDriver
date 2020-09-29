@@ -55,7 +55,7 @@ __segment* seq_pt_get_segment (struct blockmanager*bm, int pt_num, bool isreserv
 	
 	block_set *free_block_set=(block_set*)q_dequeue(p->free_logical_seg_q_pt[pt_num]);
 	if(!free_block_set){
-		printf("fuck!!\n");
+		printf("no free block error\n");
 		abort();
 	}
 

@@ -350,9 +350,10 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_
 		if(tc->dirty_bit){
 			old_ppa=ppa_list[tc->offset];
 			ppa_list[tc->offset]=tc->ppa;
+			/*
 			if(old_ppa!=UINT32_MAX && !dmm.bm->is_invalid_page(dmm.bm, old_ppa) && old_ppa!=tc->ppa){
 				invalidate_ppa(old_ppa);
-			}
+			}*/
 			tc->dirty_bit=0;
 		}
 	}
