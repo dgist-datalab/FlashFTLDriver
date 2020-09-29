@@ -87,7 +87,6 @@ inline static sftl_cache* get_initial_state_cache(uint32_t gtd_idx, GTD_entry *e
 }
 
 inline static uint32_t get_ppa_from_sc(sftl_cache *sc, uint32_t lba){
-	uint32_t res=0;
 	uint32_t head_offset=get_head_offset(sc->map, lba);
 	uint32_t distance=get_distance(sc->map, lba);
 	return sc->head_array[head_offset]+distance;
@@ -456,7 +455,7 @@ uint32_t sftl_get_mapping(struct my_cache *, uint32_t lba){
 	return get_ppa_from_sc((sftl_cache*)((lru_node*)etr->private_data)->data, lba);
 }
 
-struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *){
+struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *, uint32_t lba){
 	lru_node *target;
 	GTD_entry *etr=NULL;
 	for_each_lru_backword(scm.lru, target){
@@ -485,7 +484,7 @@ struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *){
 }
 
 
-bool sftl_update_eviction_target_translation(struct my_cache* , GTD_entry *etr,mapping_entry *map, char *data){
+bool sftl_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr,mapping_entry *map, char *data){
 	sftl_cache *sc=(sftl_cache*)((lru_node*)etr->private_data)->data;
 
 	bool target;
@@ -528,6 +527,6 @@ bool sftl_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint3
 	return false;
 }
 
-void sftl_force_put_mru(struct my_cache *, GTD_entry *etr, mapping_entry *){
+void sftl_force_put_mru(struct my_cache *, GTD_entry *etr,mapping_entry *map, uint32_t lba){
 	lru_update(scm.lru, (lru_node*)etr->private_data);
 }

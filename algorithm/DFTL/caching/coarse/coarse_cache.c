@@ -144,7 +144,7 @@ uint32_t coarse_get_mapping(struct my_cache *, uint32_t lba){
 	return ppa_list[GETOFFSET(lba)];
 }
 
-struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *){
+struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *, uint32_t lba){
 	lru_node *target;
 	GTD_entry *etr=NULL;
 	for_each_lru_backword(ccm.lru, target){
@@ -172,7 +172,7 @@ struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *){
 	return NULL;
 }
 
-bool coarse_update_eviction_target_translation(struct my_cache* , GTD_entry *etr,mapping_entry *map, char *data){
+bool coarse_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr,mapping_entry *map, char *data){
 	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
 	memcpy(data, c_data, PAGESIZE);
 	free(c_data);
@@ -187,6 +187,6 @@ bool coarse_exist(struct my_cache *, uint32_t lba){
 	return dmm.GTD[GETGTDIDX(lba)].private_data!=NULL;
 }
 
-void coarse_force_put_mru(struct my_cache*, struct GTD_entry *etr, mapping_entry* map){
+void coarse_force_put_mru(struct my_cache*, struct GTD_entry *etr, mapping_entry *m, uint32_t lba){
 	lru_update(ccm.lru, (lru_node*)etr->private_data);
 }

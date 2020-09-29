@@ -45,7 +45,7 @@ uint32_t fine_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	fcm.cl_mapping=cl_mapping;
 #endif
 
-	fcm.GTD_internal_state=(char*)calloc((TOTALLPN/(PAGESIZE/sizeof(DMF))),sizeof(char));
+	fcm.GTD_internal_state=(char*)calloc((TOTALLPN/(PAGESIZE/sizeof(DMF)))+(TOTALLPN%(PAGESIZE/sizeof(DMF))?1:0),sizeof(char));
 	fcm.populated_cache_entry=bitmap_init(TOTALLPN);
 
 	return fcm.max_caching_map;
@@ -103,11 +103,7 @@ static inline uint32_t __update_entry(GTD_entry *etr,uint32_t lba, uint32_t ppa,
 	fine_cache *fc;
 	fine_cache_node *fcn;
 	uint32_t old_ppa=UINT32_MAX;
-	/*
-	if(lba==test_key){
-		printf("%u map to %u\n", lba, ppa);
-	}*/
-	//checking_lba_exist(1778630);
+
 	if((fc=__find_lru_map(lba))==NULL){
 		if(isgc) return old_ppa;
 		fc=(fine_cache*)malloc(sizeof(fine_cache));
@@ -132,9 +128,7 @@ static inline uint32_t __update_entry(GTD_entry *etr,uint32_t lba, uint32_t ppa,
 	old_ppa=fc->ppa;
 	fc->ppa=ppa;
 	
-	//printf("assigned map: %u -> %u\n",fc->lba, fc->ppa);
 last:
-
 	set_flag(fc,1);
 	if(!isgc){
 		lru_update(fcm.lru, get_ln(fc));
@@ -181,10 +175,12 @@ uint32_t fine_update_from_translation_gc(struct my_cache *, char *data, uint32_t
 }
 
 uint32_t fine_get_mapping(struct my_cache *, uint32_t lba){
-	return ((fine_cache*)__find_lru_map(lba))->ppa;
+	fine_cache *fc=((fine_cache*)__find_lru_map(lba));
+	lru_update(fcm.lru, get_ln(fc));
+	return fc->ppa;
 }
 
-mapping_entry *fine_get_eviction_entry(struct my_cache *){
+mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba){
 	lru_node *target;
 	//checking_lba_exist(1778630);
 	for_each_lru_backword(fcm.lru, target){
@@ -207,7 +203,7 @@ mapping_entry *fine_get_eviction_entry(struct my_cache *){
 	return NULL;
 }
 
-bool fine_update_eviction_target_translation(struct my_cache* , GTD_entry *etr, mapping_entry *map, char *data){
+bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr, mapping_entry *map, char *data){
 	uint32_t gtd_idx=GETGTDIDX(map->lba);
 	if(fcm.GTD_internal_state[gtd_idx]==0){
 		fcm.GTD_internal_state[gtd_idx]=1;
@@ -270,6 +266,6 @@ bool fine_exist(struct my_cache *, uint32_t lba){
 	return bitmap_is_set(fcm.populated_cache_entry, lba);
 }
 
-void fine_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *map){
+void fine_force_put_mru(struct my_cache *, GTD_entry *,mapping_entry *map,  uint32_t lba){
 	lru_update(fcm.lru, get_ln(map));
 }

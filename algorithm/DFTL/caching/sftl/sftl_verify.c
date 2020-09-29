@@ -6,7 +6,7 @@ void sftl_mapping_verify(sftl_cache* sc){
 	bool isset;
 	int32_t max=PAGESIZE/sizeof(uint32_t);
 	uint32_t offset=0;
-	uint32_t ppa=sc->head_array[0];
+	//uint32_t ppa=sc->head_array[0];
 	uint32_t i=0;
 	uint32_t max_head=(scm.gtd_size[sc->etr->idx]-BITMAPSIZE)/sizeof(uint32_t);
 	uint32_t ppa_list_idx=0;
@@ -84,7 +84,6 @@ uint32_t sftl_print_mapping_target(sftl_cache *sc, uint32_t lba){
 	uint32_t i=0;
 	bool isstart=true;
 
-	bool debug_flag=false;
 	for_each_bitmap_forward(sc->map, offset, isset, max){
 		if(isset){
 			now_ppa=sc->head_array[ppa_list_idx++];

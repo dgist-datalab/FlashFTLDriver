@@ -28,6 +28,22 @@ lru_node* lru_push(LRU* lru, void* table_ptr){
 	return now;
 }
 
+lru_node* lru_push_last(LRU* lru, void* table_ptr){
+	lru_node *now = (lru_node*)malloc(sizeof(lru_node));
+	now->data = table_ptr;
+	now->next = now->prev = NULL;
+	if(lru->size == 0){
+		lru->head = lru->tail = now;
+	}
+	else{
+		lru->tail->next = now;
+		now->prev = lru->tail;
+		lru->tail = now;
+	}
+	lru->size++;
+	return now;
+}
+
 void* lru_pop(LRU* lru){
 	if(!lru->head || lru->size == 0){
 		return NULL;

@@ -8,7 +8,7 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
-uint32_t test_ppa=2296549;
+uint32_t test_ppa=1896175;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -21,12 +21,18 @@ pm_body *pm_body_create(blockmanager *bm){
 }
 void invalidate_ppa(uint32_t t_ppa){
 	/*when the ppa is invalidated this function must be called*/
+	if(t_ppa==test_ppa){
+		printf("%u unpopulated!\n",test_ppa);
+	}
 	demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa);
 }
 
 void validate_ppa(uint32_t ppa, KEYT *lbas){
 	/*when the ppa is validated this function must be called*/
 	for(uint32_t i=0; i<L2PGAP; i++){
+		if(ppa*L2PGAP+i==test_ppa){
+			printf("%u populated!\n", test_ppa);
+		}
 		demand_ftl.bm->populate_bit(demand_ftl.bm,ppa * L2PGAP+i);
 	}
 

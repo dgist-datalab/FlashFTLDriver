@@ -10,6 +10,7 @@
 #define GETGTDIDX(lba) ((lba)/(PAGESIZE/sizeof(DMF)))
 #define TRANSOFFSET(lba) ((lba)%(PAGESIZE/sizeof(DMF)))
 #define GTDNUM (RANGE/(PAGESIZE/sizeof(DMF)) + (RANGE%(PAGESIZE/sizeof(DMF))?1:0))
+#define GETETR(dmm, lba) (&(dmm).GTD[GETGTDIDX(lba)])
 
 typedef enum {
 	DEMAND_COARSE, DEMAND_FINE, SFTL, TPFTL,
