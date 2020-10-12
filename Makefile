@@ -1,11 +1,11 @@
-override export CC=g++
-override export CXX=g++
+override export CC=g++-9
+override export CXX=g++-9
 override export AR=gcc-ar
 override export NM=gcc-nm
 
 TARGET_INF=interface
-#export TARGET_LOWER=AMF
-export TARGET_LOWER=posix_memory
+export TARGET_LOWER=AMF
+#export TARGET_LOWER=posix_memory
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -27,11 +27,11 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
+			-O3 -march=native -mtune=native -flto=20 \
 #			-DSLAPPAGE\
 #			-DWRITESYNC\
 			-DDEBUG\
 			-DCHECKINGDATA\
-			-O3 -march=native -mtune=native -flto=20 \
 
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
@@ -131,7 +131,7 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
-#	-ljemalloc\
+	-ljemalloc\
 #	-laio\
 
 all: cheeze_block_driver

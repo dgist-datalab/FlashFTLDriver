@@ -9,9 +9,11 @@
 
 extern master_processor mp;
 
+#define barrier() __asm__ __volatile__("": : :"memory")
+
 #define TOTAL_SIZE (3ULL *1024L *1024L *1024L)
 
-static uint64_t PHYS_ADDR=0x800000000;
+static uint64_t PHYS_ADDR=0x3800000000;
 static void *page_addr;
 static uint8_t *send_event_addr; // CHEEZE_QUEUE_SIZE ==> 16B
 static uint8_t *recv_event_addr; // 16B
@@ -202,8 +204,10 @@ vec_request *get_vectored_request(){
 				if (seq_addr[id] == seq) {
 					ureq = ureq_addr + id; 
 					res=ch_ureq2vec_req(ureq, id);
+					barrier();
 					*send = 0;
 					if(ureq->op!=REQ_OP_READ){
+						barrier();
 						*recv = 1;
 					}
 					seq++;
@@ -262,7 +266,8 @@ bool cheeze_end_req(request *const req){
 	release_each_req(req);
 
 	if(preq->size==preq->done_cnt){
-		if(req->type==FS_GET_T && req->type==FS_NOTFOUND_T){
+		if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
+			barrier();
 			recv_event_addr[preq->tag_id]=1;		
 		}
 		free(preq->req_array);
