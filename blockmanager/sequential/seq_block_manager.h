@@ -6,6 +6,8 @@
 #include "../bb_checker.h"
 #include <stdint.h>
 
+//#define USINGAGETARGET
+
 typedef struct block_set{
 	uint32_t total_invalid_number;
 	__block *blocks[BPS];

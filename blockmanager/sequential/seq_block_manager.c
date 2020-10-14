@@ -30,8 +30,9 @@ struct blockmanager seq_bm={
 	.pt_get_gc_target=NULL,
 	.pt_trim_segment=NULL
 };
-
+#ifdef USINGAGETARGET
 static uint32_t age=UINT_MAX;
+#endif
 void seq_mh_swap_hptr(void *a, void *b){
 	block_set *aa=(block_set*)a;
 	block_set *bb=(block_set*)b;
@@ -127,7 +128,9 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 
 	}
 	else{
+#ifdef USINGAGETARGET
 		free_block_set->total_invalid_number=age--;
+#endif
 		mh_insert_append(p->max_heap, (void*)free_block_set);
 	}
 
@@ -155,7 +158,11 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 	uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
 	uint32_t segment_idx=segment_start_block_number/BPS;
 	block_set *bs=&p->logical_segment[segment_idx];
+#ifdef USINGAGETARGET 
 	bs->total_invalid_number=age--;
+#else
+	bs->total_invalid_number=0;
+#endif
 
 	mh_insert_append(p->max_heap, (void*)bs);
 
@@ -173,18 +180,11 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 	__gsegment* res=(__gsegment*)malloc(sizeof(__gsegment));
 	res->invalidate_number=0;
 
-
-	/*
-	for(uint32_t i=0; i<_NOS; i++){
-		p->logical_segment[i].total_invalid_number=UINT_MAX;
-	}*/
-
 	mh_construct(p->max_heap);
 	block_set* target=(block_set*)mh_get_max(p->max_heap);
 
 	memcpy(res->blocks, target->blocks, sizeof(__block*)*BPS);
 	res->invalidate_number=target->total_invalid_number;
-
 
 	if(res->invalidate_number==0){
 		printf("invalid!\n");	
@@ -254,11 +254,15 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 	}
 	b->bitset[bt]&=~(1<<of);
 	b->invalid_number++;
-/*
+
+#ifdef USINGAGETARGET
+
+#else
 	uint32_t segment_idx=b->block_num/BPS;
 	block_set *seg=&p->logical_segment[segment_idx];
 	seg->total_invalid_number++;
-*/	
+#endif
+
 	if(b->invalid_number>_PPB * L2PGAP){
 		abort();
 	}

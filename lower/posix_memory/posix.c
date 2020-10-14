@@ -243,9 +243,6 @@ inline uint32_t convert_ppa(uint32_t PPA){
 void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
-	if(PPA==8192){
-		printf("8192 populate!\n");
-	}
 
 	if(PPA>_NOP){
 		printf("address error!\n");
@@ -282,8 +279,8 @@ void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 		abort();
 	}
 #endif
-	printf("seg_table %d %p, value:%d %p\n", seg_table[PPA].tag, seg_table[PPA].storage, value->dmatag, value->value);
-	memcpy(seg_table[PPA].storage,value->value,size);
+	//printf("seg_table %d %p, value:%d %p\n", seg_table[PPA].tag, seg_table[PPA].storage, value->dmatag, value->value);
+	//memcpy(seg_table[PPA].storage,value->value,size);
 
 	req->end_req(req);
 	return NULL;

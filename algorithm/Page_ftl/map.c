@@ -79,7 +79,7 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
 		p->mapping[t_lba]=res*L2PGAP+i;
 		if(t_lba==1409711){
 			new_ppa=p->mapping[t_lba];
-			printf("%d change %d to %d\n", t_lba, old_ppa, new_ppa);
+		//	printf("%d change %d to %d\n", t_lba, old_ppa, new_ppa);
 		}
 	}
 
