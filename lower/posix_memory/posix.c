@@ -280,7 +280,7 @@ void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 	}
 #endif
 	//printf("seg_table %d %p, value:%d %p\n", seg_table[PPA].tag, seg_table[PPA].storage, value->dmatag, value->value);
-	//memcpy(seg_table[PPA].storage,value->value,size);
+	memcpy(seg_table[PPA].storage,value->value,size);
 
 	req->end_req(req);
 	return NULL;

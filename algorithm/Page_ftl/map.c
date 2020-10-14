@@ -70,17 +70,14 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
 		KEYT t_lba=lba[i];
 		if(p->mapping[t_lba]!=UINT_MAX){
 			/*when mapping was updated, the old one is checked as a inavlid*/
-		//	invalidate_ppa(p->mapping[t_lba]);
-		}
-		if(t_lba==1409711){
-			old_ppa=p->mapping[t_lba];
+			//invalidate_ppa(p->mapping[t_lba]);
 		}
 		/*mapping update*/
 		p->mapping[t_lba]=res*L2PGAP+i;
-		if(t_lba==1409711){
-			new_ppa=p->mapping[t_lba];
-		//	printf("%d change %d to %d\n", t_lba, old_ppa, new_ppa);
-		}
+	}
+
+	for(uint32_t i=idx; i<L2PGAP; i++){
+		invalidate_ppa(res*L2PGAP+idx);
 	}
 
 	return res;
