@@ -4,7 +4,7 @@
 #include "../../bench/bench.h"
 #include <unistd.h>
 AmfManager *am;
-
+/*testtest*/
 #ifdef LOWER_MEM_DEV
 char **mem_pool;
 char *temp_mem_buf;

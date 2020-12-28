@@ -2,7 +2,7 @@
 #include "posix.h"
 #include <stdio.h>
 #include <stdlib.h>
-
+/*testtest*/
 pl_body *plbody_init(mem_seg *data, uint32_t *map_ppa_list,uint32_t list_size){
 	pl_body *res=(pl_body*)calloc(sizeof(pl_body),1);
 	res->data_ptr=data;
