@@ -6,6 +6,7 @@
 #define GETOFFSET(lba) TRANSOFFSET(lba)
 #define GETTPLRU(etr) ((LRU*)((etr)->private_data))
 #define GETLBA(tn, tc) ((tn->idx*(PAGESIZE/sizeof(uint32_t)))+tc->offset)
+#define MAXOFFSET ((PAGESIZE/sizeof(uint32_t))-1)
 #define PREFETCHINGTH 3
 
 typedef struct tp_entry{
@@ -18,7 +19,7 @@ typedef struct tp_entry{
 typedef struct tp_node{
 	struct lru_node *lru_node;
 	LRU *tp_lru;
-	uint32_t idx;
+	uint32_t idx; //transaction page number
 }tp_node;
 
 typedef struct tp_cache_monitor{

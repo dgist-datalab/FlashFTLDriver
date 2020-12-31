@@ -250,6 +250,10 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 	uint32_t of=pn%8;
 	__block *b=&p->seq_block[bn];
 
+	if(ppa==172957){
+		printf("target %u inserted!!\n", ppa);
+	}
+
 	if(!(p->seq_block[bn].bitset[bt]&(1<<of))){
 		res=0;
 		abort();

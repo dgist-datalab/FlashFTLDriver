@@ -11,10 +11,10 @@
 #define TRANSOFFSET(lba) ((lba)%(PAGESIZE/sizeof(DMF)))
 #define GTDNUM (RANGE/(PAGESIZE/sizeof(DMF)) + (RANGE%(PAGESIZE/sizeof(DMF))?1:0))
 #define GETETR(dmm, lba) (&(dmm).GTD[GETGTDIDX(lba)])
-
 typedef enum {
 	DEMAND_COARSE, DEMAND_FINE, SFTL, TPFTL,
 }cache_algo_type;
+#define CACHE_TYPE_MAX_NUM (TPFTL+1)
 
 typedef enum GTD_ETR_STATUS{
 	EMPTY				= 0x0000,

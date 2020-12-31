@@ -92,6 +92,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 }
 
 uint32_t page_write(request *const req){
+	if(req->key==2097102){
+		printf("2097102 write!!!!\n");
+	}
 	if(req->params){
 		return demand_map_assign(req, NULL, NULL);
 	}

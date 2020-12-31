@@ -113,6 +113,14 @@ typedef struct{
 	transaction_configure trans_configure;
 }master;
 
+typedef struct{
+	int max_bench_num;
+	bench_meta *bench_list;
+	bool data_check_flag;
+}bench_parameters;
+
+bench_parameters *bench_parsing_parameters(int *argc, char *argv[]);
+void bench_parameters_free(bench_parameters*);
 void bench_init();
 void bench_vectored_configure();
 void bench_add(bench_type type,uint32_t start, uint32_t end,uint64_t number);

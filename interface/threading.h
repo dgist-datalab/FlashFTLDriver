@@ -19,6 +19,7 @@ typedef struct processor{
 }processor;
 
 struct master_processor{
+	bool _data_check_flag;
 	processor *processors;
 	pthread_mutex_t flag;
 	lower_info *li;

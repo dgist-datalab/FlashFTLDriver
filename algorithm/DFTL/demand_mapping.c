@@ -114,11 +114,14 @@ inline void __demand_map_pending_read(request *req, demand_params *dp, pick_para
 	uint32_t ppa=dmm.cache->get_mapping(dmm.cache, req->key);
 	if(ppa==UINT32_MAX){
 		printf("try to read invalidate ppa %s:%d\n", __FILE__,__LINE__);
-		abort();
+		req->type=FS_NOTFOUND_T;
+		req->end_req(req);
+		return;
 	}
+	/*
 	if(req->key==test_key){
 		printf("%u:%u read data\n", req->key, ppa);
-	}
+	}*/
 	req->value->ppa=ppa;
 	send_user_req(req, DATAR, ppa/L2PGAP, req->value);
 	free(pp);
@@ -306,9 +309,6 @@ end:
 }
 
 uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
-	//static int cnt=0;
-	//printf("map_assign called %d %u\n", cnt++, _lba[0]);
-//	printf("req->key:%u\n", req->key);
 	uint8_t i=0;
 	demand_params *dp;
 	assign_params_ex *mp;
@@ -356,9 +356,6 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 		mapping_entry *target=&dp->target;
 		target->lba=lba[i];
 		target->ppa=physical[i];
-		if(target->lba==673818){
-			printf("debug_b\n");
-		}
 retry:
 		switch(dp->status){
 			case EVICTIONW:
@@ -458,7 +455,6 @@ eviction_path:
 					dp->status=HIT;
 				}
 				else if(dmm.cache->entry_type==DYNAMIC && dmm.cache->need_more_eviction(dmm.cache,lba[i])){
-					//printf("more eviction!!!\n");
 					dp->status=NONE;
 				}
 				else{
@@ -629,7 +625,9 @@ retry:
 read_data:
 	if(ppa==UINT32_MAX){
 		printf("try to read invalidate ppa %s:%d\n", __FILE__,__LINE__);
-		abort();
+		req->type=FS_NOTFOUND_T;
+		req->end_req(req);
+		goto end;
 	}
 	if(req->key==test_key){
 		printf("%u:%u read data\n", req->key, ppa);
@@ -660,7 +658,6 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	for(uint32_t i=0; i<idx; i++){
 		temp_gtd_idx=GETGTDIDX(target[i].lba);
 		if(target[i].ppa==test_ppa){
-			printf("gc_break!\n");
 			debug_gtd_idx=temp_gtd_idx;
 			debug_idx=i;
 		}
@@ -737,6 +734,20 @@ extern my_cache fine_cache_func;
 extern my_cache sftl_cache_func;
 extern my_cache tp_cache_func;
 
+static void print_help(){
+	printf("-----help------\n");
+	printf("parameters (c, p, t)\n");
+	printf("-c: set cache size as absolute input value\n");
+	printf("\tex: 1M, 1K, 1G\n");
+	printf("\tIt cannot over the memory usage for Page FTL\n");
+	printf("-p: set cache size as percentage of Page FTL\n");
+	printf("\tex: 10 for 10%% of total amount of Page FTL\n");
+	printf("-t: cache type \n");
+	for(int i=0; i<CACHE_TYPE_MAX_NUM; i++){
+		printf("\t%d: %s\n", i, cache_type((cache_algo_type)i));
+	}
+}
+
 uint32_t demand_argument(int argc, char **argv){
 	bool cache_size=false;
 	bool cache_type_set=false;
@@ -748,8 +759,12 @@ uint32_t demand_argument(int argc, char **argv){
 	uint32_t physical_page_num;
 	double cache_percentage;
 	cache_algo_type c_type;
-	while((c=getopt(argc,argv,"ctp"))!=-1){
+	while((c=getopt(argc,argv,"ctph"))!=-1){
 		switch(c){
+			case 'h':
+				print_help();
+				exit(1);
+				break;
 			case 'c':
 				cache_size=true;
 				len=strlen(argv[optind]);
@@ -773,6 +788,9 @@ uint32_t demand_argument(int argc, char **argv){
 				physical_page_num/=PAGESIZE;
 				break;
 			default:
+				print_help();
+				printf("not invalid parameter!!\n");
+				abort();
 				break;
 		}
 	}

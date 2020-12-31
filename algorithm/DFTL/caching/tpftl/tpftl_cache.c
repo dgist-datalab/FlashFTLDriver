@@ -40,6 +40,25 @@ inline static uint32_t get_bits_from_int(uint32_t t){
 	return cnt;
 }
 
+inline static void etr_sanity_check(GTD_entry *etr){
+	if(!etr || !etr->private_data) return;
+	tp_node *tn=(tp_node*)etr->private_data;
+	if(tn->idx!=etr->idx){
+		printf("sanity failed!!\n");
+	}
+}
+
+inline static void tc_lru_traverse(LRU *lru, tp_node *tn){
+	tp_cache_node *tc;
+	lru_node *ln, *lp;
+	uint32_t idx=0;
+	for_each_lru_backword_safe(lru, ln, lp){
+		tc=(tp_cache_node*)ln->data;
+		printf("[%u] lba:%u-(offset:%u) ppa:%u addr:%p dirty_bit:%d\n", 
+				idx++, GETLBA(tn, tc),tc->offset, tc->ppa, tc, tc->dirty_bit);
+	}
+}
+
 uint32_t tp_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&tcm.lru, NULL);
 	uint32_t target_bits=(32+get_bits_from_int(PAGESIZE/sizeof(uint32_t))+1); // ppa, offset, dirty
@@ -90,16 +109,17 @@ static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
 	if(tn->tp_lru->size-1 < cnt){
 		cnt=tn->tp_lru->size-1;
 	}
-	
-	if(GETGTDIDX(lba+cnt) > GETGTDIDX(lba)){
-		cnt=GETGTDIDX(lba+cnt)*(PAGESIZE/sizeof(uint32_t)) - lba;
-	}
 
+	if(GETOFFSET(lba)+cnt > MAXOFFSET){
+		cnt=MAXOFFSET-GETOFFSET(lba);
+	}
 	return cnt;
 }
 
 bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba){
 	GTD_entry *etr=GETETR(dmm, lba);
+
+	etr_sanity_check(etr);
 	uint32_t target_byte;
 	if(etr->private_data){
 		uint32_t cnt=__get_prefetching_length((tp_node*)etr->private_data, lba);
@@ -117,6 +137,7 @@ bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba){
 
 static inline tp_node* __find_tp_node(GTD_entry *etr){
 	if(!etr->private_data) return NULL;
+	etr_sanity_check(etr);
 	return (tp_node*)etr->private_data;
 }
 
@@ -137,12 +158,7 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	uint32_t old_ppa;
 	uint32_t target_byte=0;
 	
-	if(ppa==test_ppa){
-		printf("test_ppa %u mapped to %u\n",lba, ppa);
-	}
-	if(lba==test_key){
-		printf("test_key %u mapped to %u\n",lba, ppa);
-	}
+	etr_sanity_check(etr);
 
 	if(tn){
 		if(!(tc=__find_tp_cache_node(tn, lba))){
@@ -176,6 +192,12 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		target_byte+=TP_ENTRY_SZ+TP_NODE_SZ;
 	}
 
+	
+	if(tn->idx>GTDNUM){
+		printf("over flow idx!!\n");
+		abort();
+	}
+
 	tcm.now_caching_byte+=target_byte;
 
 	tc->ppa=ppa;
@@ -202,7 +224,7 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
 	}
-
+	etr_sanity_check(etr);
 	tp_node *tn;
 	if(etr->private_data){
 		tn=(tp_node*)etr->private_data;
@@ -212,10 +234,19 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		lru_init(&tn->tp_lru, NULL);
 		tn->lru_node=lru_push(tcm.lru, (void*)tn);
 		etr->private_data=(void*)tn;
+		tn->idx=etr->idx;
+
 		tcm.tp_node_change_cnt++;
 		if(tcm.tp_node_change_cnt > PREFETCHINGTH){
 			tcm.prefetching_mode=true;
 		}
+		tcm.now_caching_byte+=TP_NODE_SZ;
+	}
+
+	etr_sanity_check(etr);
+	if(tn->idx>GTDNUM){
+		printf("over flow idx!!\n");
+		abort();
 	}
 
 	uint32_t prefetching_len=0;
@@ -228,8 +259,13 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 	tp_cache_node *tc;
 	uint32_t *ppa_list=(uint32_t*)data;
 	for(uint32_t i=0; i<1+prefetching_len; i++){
+		if(bitmap_is_set(tcm.populated_cache_entry, lba+i)){
+			continue;
+		}
+
 		tc=(tp_cache_node*)malloc(sizeof(tp_cache_node));
 		tc->offset=GETOFFSET((lba+i));
+
 		tc->ppa=ppa_list[tc->offset];
 		tc->dirty_bit=false;
 
@@ -241,20 +277,20 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		}
 		
 		bitmap_set(tcm.populated_cache_entry, lba+i);
+		tcm.now_caching_byte+=TP_ENTRY_SZ;
 	}
 
 	return 1;
 }
 
 uint32_t tp_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa){
-	if(lba==test_key){
-		printf("break!\n");
-	}
 	uint32_t *ppa_list=(uint32_t*)data;
 	uint32_t old_ppa=ppa_list[GETOFFSET(lba)];
 	ppa_list[GETOFFSET(lba)]=ppa;
 	
 	GTD_entry *etr=GETETR(dmm,lba);
+
+	etr_sanity_check(etr);
 	if(etr->idx==test_key/2048 && ppa==test_ppa){
 		printf("%s-", tp_exist(NULL,lba)?"true":"false");
 		printf("%u gc dirty evict!\n",etr->idx);
@@ -272,7 +308,14 @@ uint32_t tp_get_mapping(struct my_cache *, uint32_t lba){
 
 mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
 	GTD_entry *etr=GETETR(dmm,lba);
+	etr_sanity_check(etr);
+
 	tp_node *tn=(tp_node*)etr->private_data;
+
+	if(tn && tn->idx>GTDNUM){
+		printf("over flow idx!!\n");
+		abort();
+	}
 	uint32_t target_cnt=__get_prefetching_length(tn, lba)+1;
 	uint32_t remain_byte=tcm.max_caching_byte-tcm.now_caching_byte;
 	uint32_t eviction_cnt=0;
@@ -282,10 +325,15 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
 	else{
 		eviction_cnt=target_cnt-remain_byte/TP_ENTRY_SZ;
 	}
-	
+
 	tp_node *target_tn=(tp_node*)tcm.lru->tail->data;
 	tp_cache_node *tc;
 	lru_node *ln, *lp;
+
+	if(target_tn->idx>GTDNUM){
+		printf("over flow idx!!\n");
+		abort();
+	}
 	//GTD_entry *target_etr=GETETR(dmm, target_tn->idx *(PAGESIZE/sizeof(uint32_t)));
 	for_each_lru_backword_safe(target_tn->tp_lru, ln, lp){
 		tc=(tp_cache_node*)ln->data;
@@ -294,14 +342,17 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
 			bitmap_unset(tcm.populated_cache_entry, GETLBA(target_tn, tc));
 			free(tc);
 			tcm.now_caching_byte-=TP_ENTRY_SZ;
+			if(!--eviction_cnt) break;
 		}
-		if(!--eviction_cnt) break;
 	}
+
+
 
 	if(!target_tn->tp_lru->size){
 		lru_delete(tcm.lru, target_tn->lru_node);
 		lru_free(target_tn->tp_lru);
 		GTD_entry *evict_etr=&dmm.GTD[target_tn->idx];
+		etr_sanity_check(evict_etr);
 		free(target_tn);
 		evict_etr->private_data=NULL;
 	
@@ -323,6 +374,10 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
 			mapping_entry *target=(mapping_entry*)malloc(sizeof(mapping_entry));
 			target->lba=GETLBA(target_tn, tc);
 			target->ppa=tc->ppa;
+			if(target->lba > UINT32_MAX/2){
+				printf("wtf??\n");
+				abort();
+			}
 			return target;
 		}
 	}
@@ -336,15 +391,14 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_
 		memset(data, -1, PAGESIZE);
 	}
 
+	etr_sanity_check(etr);
 	uint32_t *ppa_list=(uint32_t *)data;
 	tp_node *tn=(tp_node*)etr->private_data;
 	tp_cache_node *tc;
 
 	lru_node *ln;
 	uint32_t old_ppa;
-	if(etr->idx==test_key/2048){
-		printf("%u dirty evict!\n",etr->idx);
-	}
+
 	for_each_lru_list(tn->tp_lru, ln){
 		tc=(tp_cache_node*)ln->data;
 		if(tc->dirty_bit){
@@ -379,8 +433,8 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_
 			bitmap_unset(tcm.populated_cache_entry, GETLBA(tn, tc));
 			free(tc);
 			tcm.now_caching_byte-=TP_ENTRY_SZ;
+			if(--eviction_cnt) break;
 		}
-		if(--eviction_cnt) break;
 	}
 
 	if(!tn->tp_lru->size){
@@ -410,6 +464,7 @@ bool tp_exist(struct my_cache *, uint32_t lba){
 
 void tp_force_put_mru(struct my_cache *, GTD_entry *etr, mapping_entry *, uint32_t lba){
 	tp_node *tn=(tp_node*)etr->private_data;
+	etr_sanity_check(etr);
 	tp_cache_node *tc=__find_tp_cache_node(tn, lba);
 	lru_update(tn->tp_lru, tc->lru_node);
 	lru_update(tcm.lru, tn->lru_node);
@@ -417,6 +472,7 @@ void tp_force_put_mru(struct my_cache *, GTD_entry *etr, mapping_entry *, uint32
 
 bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa){
 	if(!etr->private_data) return false;
+	etr_sanity_check(etr);
 	if(tcm.now_caching_byte + TP_ENTRY_SZ > tcm.max_caching_byte){
 		return true;
 	}

@@ -80,11 +80,9 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		}
 
 		temp->key=*(uint32_t*)buf_parser(buf,&idx,sizeof(uint32_t));
-#ifdef CHECKINGDATA
-		if(temp->type==FS_SET_T){
+		if(mp._data_check_flag && temp->type==FS_SET_T){
 			__checking_data_make( temp->key,temp->value->value);
 		}
-#endif
 		temp->offset=*(uint32_t*)buf_parser(buf, &idx, sizeof(uint32_t));
 		
 	}
@@ -188,13 +186,12 @@ void *vectored_main(void *__input){
 bool vectored_end_req (request * const req){
 	vectored_request *preq=req->parents;
 	switch(req->type){
-		case FS_NOTFOUND_T:
 		case FS_GET_T:
+			if(mp._data_check_flag){
+				__checking_data_check(req->key, req->value->value);
+			}
+		case FS_NOTFOUND_T:
 			bench_reap_data(req, mp.li);
-#ifdef CHECKINGDATA
-			__checking_data_check(req->key, req->value->value);
-#endif
-
 	//		memcpy(req->buf, req->value->value, 4096);
 	//		printf("return read break %u!\n", req->seq);
 			if(req->value)

@@ -26,14 +26,27 @@ extern master_processor mp;
 extern uint64_t cumulative_type_cnt[LREQ_TYPE_NUM];
 int main(int argc,char* argv[]){
 	//int temp_cnt=bench_set_params(argc,argv,temp_argv);
-	inf_init(0,0,argc,argv);
-	bench_init();
-	bench_vectored_configure();
-	bench_add(VECTOREDSSET,0,RANGE,RANGE);
-	//bench_add(VECTOREDRW,0,RANGE/2/100*99,RANGE/100*99);
-	bench_add(VECTOREDRW,0,RANGE,RANGE*2);
+	setbuf(stdout, NULL);
+	setbuf(stderr, NULL);
+	bench_parameters* bp=bench_parsing_parameters(&argc,argv);
+	if(bp){
+		inf_init(0,0,argc,argv, bp->data_check_flag);
+		bench_init();
+		bench_vectored_configure();
+		for(int i=0; i<bp->max_bench_num; i++){
+			bench_meta *bpv=&bp->bench_list[i];
+			bench_add(bpv->type,bpv->start, bpv->end, bpv->number);
+		}
+	}
+	else{
+		inf_init(0,0,argc,argv, false);
+		bench_init();
+		bench_vectored_configure();
+		bench_add(VECTOREDSSET,0,RANGE,RANGE);
+		//bench_add(VECTOREDRW,0,RANGE/2/100*99,RANGE/100*99);
+		bench_add(VECTOREDRW,0,RANGE,RANGE*2);
+	}
 	printf("range: %lu!\n",RANGE);
-
 
 	char *value;
 	uint32_t mark;
@@ -51,6 +64,9 @@ int main(int argc,char* argv[]){
 	}
 
 	inf_free();
+	if(bp){
+		bench_parameters_free(bp);
+	}
 	bench_custom_print(write_opt_time,11);
 	return 0;
 }

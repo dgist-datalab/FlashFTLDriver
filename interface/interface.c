@@ -343,7 +343,7 @@ bool inf_make_req_fromApp(char _type, KEYT _key,uint32_t offset, uint32_t len,PT
 	return true;
 }
 
-void inf_init(int apps_flag, int total_num,int argc, char **argv){
+void inf_init(int apps_flag, int total_num, int argc, char **argv, bool data_check_flag){
 #ifdef BUSE_MEASURE
     measure_init(&infTime);
     measure_init(&infendTime);
@@ -374,12 +374,12 @@ void inf_init(int apps_flag, int total_num,int argc, char **argv){
 		bench_init();
 		bench_add(NOR,0,-1,total_num);
 	}
-	
-	layer_info_mapping(&mp, argc, argv);
 
-#ifdef CHECKINGDATA
-	__checking_data_init();
-#endif
+	layer_info_mapping(&mp, argc, argv);
+	mp._data_check_flag=data_check_flag;
+	if(mp._data_check_flag){
+		__checking_data_init();
+	}
 	
 /*
 	mp.li->create(mp.li,mp.bm);
@@ -648,10 +648,9 @@ void inf_free(){
 #endif
 	mp.algo->destroy(mp.li,mp.algo);
 	mp.li->destroy(mp.li);
-
-#ifdef CHECKINGDATA
-	__checking_data_free();
-#endif
+	if(mp._data_check_flag){
+		__checking_data_free();
+	}
 }
 
 void inf_print_debug(){

@@ -18,7 +18,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
-#-fsanitize=address\
+-fsanitize=address\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\
@@ -30,8 +30,6 @@ export COMMONFLAGS=\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
 			-O3 -march=native -mtune=native -flto=20 \
-	-DCHECKINGDATA\
-#			-DWRITESYNC\
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
 
@@ -102,6 +100,7 @@ SRCS +=\
 	./bench/bench.c\
 	./bench/bench_demand.c\
 	./bench/bench_transaction.c\
+	./bench/bench_parsing.c\
 	./include/utils/thpool.c\
 	./include/utils/kvssd.c\
 	./include/utils/sha256.c\
