@@ -291,10 +291,10 @@ uint32_t tp_update_from_translation_gc(struct my_cache *, char *data, uint32_t l
 	GTD_entry *etr=GETETR(dmm,lba);
 
 	etr_sanity_check(etr);
-	if(etr->idx==test_key/2048 && ppa==test_ppa){
+	/*if(etr->idx==test_key/2048 && ppa==test_ppa){
 		printf("%s-", tp_exist(NULL,lba)?"true":"false");
 		printf("%u gc dirty evict!\n",etr->idx);
-	}
+	}*/
 	return old_ppa;
 }
 

@@ -19,14 +19,11 @@
 #include <limits.h>
 //#include <readline/readline.h>
 //#include <readline/history.h>
-#define LASYNC 0
 pthread_mutex_t fd_lock;
 mem_seg *seg_table;
-#if (LASYNC==1)
 queue *p_q;
 pthread_t t_id;
 bool stopflag;
-#endif
 #define PPA_LIST_SIZE (240*1024)
 cl_lock *lower_flying;
 char *invalidate_ppa_ptr;
@@ -35,18 +32,18 @@ char *result_addr;
 lower_info my_posix={
 	.create=posix_create,
 	.destroy=posix_destroy,
-#if (LASYNC==1)
+#ifdef LASYNC
 	.write=posix_make_push,
 	.read=posix_make_pull,
-#elif (LASYNC==0)
+#else
 	.write=posix_push_data,
 	.read=posix_pull_data,
 #endif
 	.device_badblock_checker=NULL,
-#if (LASYNC==1)
+#ifdef LASYNC
 	.trim_block=posix_make_trim,
 	.trim_a_block=posix_trim_a_block,
-#elif (LASYNC==0)
+#else
 	.trim_block=posix_trim_block,
 	.trim_a_block=posix_trim_a_block,
 #endif
@@ -66,9 +63,9 @@ lower_info my_posix={
 };
 
 uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;
-extern uint32_t test_ppa;
+//extern uint32_t test_ppa;
 
-#if (LASYNC==1)
+#ifdef LASYNC
 void *l_main(void *__input){
 	posix_request *inf_req;
 	while(1){
@@ -172,14 +169,18 @@ uint32_t posix_create(lower_info *li, blockmanager *b){
 	invalidate_ppa_ptr=(char*)malloc(sizeof(uint32_t)*PPA_LIST_SIZE*20);
 	result_addr=(char*)malloc(8192*(PPA_LIST_SIZE));
 
-	printf("!!! posix memory LASYNC: %d NOP:%d!!!\n", LASYNC,li->NOP);
+#ifdef LASYNC
+	printf("!!! (ASYNC) posix memory NOP:%d!!!\n",li->NOP);
+#else
+	printf("!!! (SYNC) posix memory NOP:%d!!!\n",li->NOP);
+#endif
 	li->write_op=li->read_op=li->trim_op=0;
 	seg_table = (mem_seg*)malloc(sizeof(mem_seg)*li->NOP);
 	for(uint32_t i = 0; i < li->NOP; i++){
 		seg_table[i].storage = NULL;
 	}
 	pthread_mutex_init(&fd_lock,NULL);
-#if (LASYNC==1)
+#ifdef LASYNC
 	stopflag = false;
 	q_init(&p_q, 1024);
 	pthread_create(&t_id,NULL,&l_main,NULL);
@@ -206,7 +207,7 @@ void *posix_destroy(lower_info *li){
 	pthread_mutex_destroy(&fd_lock);
 	free(invalidate_ppa_ptr);
 	free(result_addr);
-#if (LASYNC==1)
+#ifdef LASYNC
 	stopflag = true;
 	q_free(p_q);
 #endif
@@ -224,9 +225,10 @@ inline uint32_t convert_ppa(uint32_t PPA){
 void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
+	/*
 	if(PPA==test_ppa/2){
 		printf("%u populate!\n", test_ppa);
-	}
+	}*/
 
 	if(PPA>_NOP){
 		printf("address error!\n");
@@ -263,9 +265,10 @@ void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 void *posix_pull_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
+	/*
 	if(PPA==test_ppa/2){
 		printf("%u read!\n", test_ppa/2);
-	}
+	}*/
 	if(PPA>_NOP){
 		printf("address error!\n");
 		abort();
@@ -312,9 +315,10 @@ void *posix_trim_block(uint32_t _PPA, bool async){
 	my_posix.req_type_cnt[TRIM]++;
 	for(uint32_t i=PPA; i<PPA+my_posix.PPS; i++){
 		free(seg_table[i].storage);
+		/*
 		if(i==test_ppa/2){
 			printf("%u trim!\n", test_ppa/2);
-		}
+		}*/
 		seg_table[i].storage=NULL;
 	}
 	return NULL;
@@ -323,7 +327,7 @@ void *posix_trim_block(uint32_t _PPA, bool async){
 void posix_stop(){}
 
 void posix_flying_req_wait(){
-#if (LASYNC==1)
+#ifdef LASYNC
 	while(p_q->size!=0){}
 #endif
 }

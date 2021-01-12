@@ -19,7 +19,7 @@ struct algorithm page_ftl={
 	.read=page_read,
 	.write=page_write,
 	.flush=page_flush,
-	.remove=NULL,
+	.remove=page_remove,
 };
 
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
@@ -31,7 +31,7 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 }
 
 void page_destroy (lower_info* li, algorithm *algo){
-	page_map_free();
+	//page_map_free();
 	return;
 }
 
@@ -46,7 +46,6 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 	my_req->type=type;//DATAR means DATA reads, this affect traffics results
 	/*you note that after read a PPA, the callback function called*/
 
-
 	switch(type){
 		case DATAR:
 			page_ftl.li->read(ppa,PAGESIZE,value,ASYNC,my_req);
@@ -58,10 +57,12 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 }
 
 uint32_t page_read(request *const req){
+
 	value_set *cached_value=buffer->get(req->key);
 	if(!cached_value){
 		for(uint32_t i=0; i<a_buffer.idx; i++){
 			if(req->key==a_buffer.key[i]){
+		//		printf("buffered read!\n");
 				memcpy(req->value->value, a_buffer.value[i]->value, 4096);
 				req->end_req(req);		
 				return 1;
@@ -77,7 +78,15 @@ uint32_t page_read(request *const req){
 	}
 	else{
 		req->value->ppa=page_map_pick(req->key);
-		send_user_req(req, DATAR, req->value->ppa/L2PGAP, req->value);
+
+		DPRINTF("\t\tmap info : %u->%u\n", req->key, req->value->ppa);
+		if(req->value->ppa==UINT32_MAX){
+			req->type=FS_NOTFOUND_T;
+			req->end_req(req);
+		}
+		else{
+			send_user_req(req, DATAR, req->value->ppa/L2PGAP, req->value);
+		}
 	}
 	return 1;
 }
@@ -97,7 +106,6 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		ppa_t ppa=page_map_assign(a_buffer.key);
 		value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 		for(uint32_t i=0; i<L2PGAP; i++){
-
 			memcpy(&value->value[i*4096], a_buffer.value[i]->value, 4096);
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
@@ -126,6 +134,31 @@ uint32_t page_write(request *const req){
 		//send_user_req(req, DATAW, page_map_assign(req->key), req->value);
 	}
 
+	return 0;
+}
+
+uint32_t page_remove(request *const req){
+	if(caching_num_lb!=0){
+		printf("not implemented %s:%d\n", __FILE__, __LINE__);
+		abort();
+	}
+
+	for(uint8_t i=0; i<a_buffer.idx; i++){
+		if(a_buffer.key[i]==req->key){
+			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
+			if(i==1){
+				a_buffer.value[0]=a_buffer.value[1];
+				a_buffer.key[0]=a_buffer.key[1];
+			}
+
+			a_buffer.idx--;
+			goto end;
+		}
+	}
+	
+	page_map_trim(req->key);
+end:
+	req->end_req(req);
 	return 0;
 }
 

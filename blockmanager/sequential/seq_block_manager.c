@@ -199,7 +199,7 @@ void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_inf
 		__block *b=gs->blocks[i];
 		b->invalid_number=0;
 		b->now=0;
-		memset(b->bitset,0,_PPB/8);
+		memset(b->bitset,0,_PPB*L2PGAP/8);
 		memset(b->oob_list,0,sizeof(b->oob_list));
 	}
 

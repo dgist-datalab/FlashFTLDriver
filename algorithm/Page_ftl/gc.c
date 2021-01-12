@@ -10,12 +10,24 @@ void invalidate_ppa(uint32_t t_ppa){
 		//abort();
 	}
 	/*when the ppa is invalidated this function must be called*/
+	if(t_ppa==24537){
+		printf("%d invalidate!\n", t_ppa);
+	}
+	if(t_ppa==1933569){
+		printf("%d invalidate!\n", t_ppa);
+	}
 	page_ftl.bm->unpopulate_bit(page_ftl.bm, t_ppa);
 }
 
 void validate_ppa(uint32_t ppa, KEYT *lbas){
 	/*when the ppa is validated this function must be called*/
 	for(uint32_t i=0; i<L2PGAP; i++){
+		if(24536==ppa*L2PGAP+i || 24537==ppa*L2PGAP+i){
+			printf("%d validate!\n", ppa*L2PGAP+i);
+		}
+		if(1933569==ppa*L2PGAP+i){
+			printf("%d validate!\n", ppa*L2PGAP+i);
+		}
 		page_ftl.bm->populate_bit(page_ftl.bm,ppa * L2PGAP+i);
 	}
 
@@ -131,6 +143,8 @@ void do_gc(){
 	align_gc_buffer g_buffer;
 	gc_value *gv;
 
+	static int cnt=0;
+	printf("gc: %d\n", cnt++);
 	/*by using this for loop, you can traversal all page in block*/
 	for_each_page_in_seg(target,page,bidx,pidx){
 		//this function check the page is valid or not
@@ -158,6 +172,9 @@ void do_gc(){
 			if(!gv->isdone) continue;
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
+				if(gv->ppa*L2PGAP+i==1933569){
+					printf("target is gcing %u\n",1933569);
+				}
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
 				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
@@ -202,7 +219,8 @@ ppa_t get_ppa(KEYT *lbas){
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
 	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && page_ftl.bm->is_gc_needed(page_ftl.bm)){
-		new_do_gc();//call gc
+//		new_do_gc();//call gc
+		do_gc();//call gc
 	}
 
 retry:

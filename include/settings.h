@@ -23,6 +23,16 @@
 #define BENCH_LOG "./result/"
 #define CACHING_RATIO 1
 
+#ifdef DEBUG
+#define DPRINTF(fmt, ...) \
+	do{\
+		printf(fmt, __VA_ARGS__); \
+	}while(0)
+#else
+#define DPRINTF(fmt, ...)\
+	do{}while(0)
+#endif
+
 #define K (1024)
 #define M (1024*K)
 #define G (1024*M)
@@ -166,6 +176,12 @@ static inline bool KEYVALCHECK(KEYT a){
 #define SPINSYNC
 //#define BUSE_MEASURE
 //#define BUSE_ASYNC 0
+
+#define EPRINT(error, isabort)\
+	do{\
+		printf("[%s:%d]-%s\n", __FILE__,__LINE__, (error));\
+		if((isabort)){abort();}\
+	}while(0)
 
 #ifndef __GNUG__
 typedef enum{false,true} bool;
