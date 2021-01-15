@@ -28,3 +28,4 @@ cscope*
 bd_testcase
 testing/
 test_sh/
+.vscode/

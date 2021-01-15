@@ -7,6 +7,7 @@ extern struct algorithm __normal;
 extern struct algorithm __badblock;
 extern struct algorithm demand_ftl;
 extern struct algorithm page_ftl;
+extern struct algorithm pftl;
 extern struct algorithm algo_lsm;
 extern struct algorithm demand_ftl;
 
@@ -43,6 +44,8 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 	mp->algo=&__normal;
 #elif defined(Page_ftl)
 	mp->algo=&page_ftl;
+#elif defined(PFTL)
+	mp->algo=&pftl;
 #elif defined(DFTL)
 	mp->algo=&demand_ftl;
 #elif defined(demand)
