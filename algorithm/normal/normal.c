@@ -4,6 +4,7 @@
 #include <limits.h>
 #include "normal.h"
 #include "../../bench/bench.h"
+#include "../../interface/interface.h"
 struct algorithm __normal={
 	.argument_set=NULL,
 	.create=normal_create,
@@ -48,6 +49,8 @@ uint32_t normal_write(request *const req){
 	my_req->type=DATAW;
 	my_req->params=(void*)params;
 	memcpy(req->value->value, &req->key, sizeof(req->key));
+
+	//value_set *temp_value=inf_get_valueset(NULL, PAGESIZE, FS_MALLOC_W);
 	__normal.li->write(req->key,PAGESIZE,req->value,req->isAsync,my_req);
 	return 0;
 }
