@@ -22,7 +22,7 @@ int main(int argc,char* argv[]){
 	bench_init();
 
 	/*adding benchmark type for testing*/
-	bench_add(RANDSET,0,RANGE,RANGE*2);
+	bench_add(SEQRW,0,RANGE,RANGE*2);
 
 	bench_value *value;
 	while((value=get_bench())){

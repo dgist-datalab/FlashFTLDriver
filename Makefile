@@ -2,7 +2,7 @@ export CC=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=Page_ftl
+export TARGET_ALGO=normal
 export TARGET_BM=base
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
