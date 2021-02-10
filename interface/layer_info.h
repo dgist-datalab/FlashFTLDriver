@@ -9,6 +9,7 @@ extern struct algorithm demand_ftl;
 extern struct algorithm page_ftl;
 extern struct algorithm algo_lsm;
 extern struct algorithm demand_ftl;
+extern struct algorithm lsm_ftl;
 
 //device layer
 extern struct lower_info memio_info;
@@ -47,8 +48,8 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 	mp->algo=&demand_ftl;
 #elif defined(demand)
 	mp->algo=&__demand;
-#elif defined(Lsmtree)
-	mp->algo=&algo_lsm;
+#elif defined(lsmftl)
+	mp->algo=&lsm_ftl;
 #elif defined(badblock)
 	mp->algo=&__badblock;
 #endif

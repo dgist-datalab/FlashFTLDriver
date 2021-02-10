@@ -1,0 +1,51 @@
+#ifndef __WRITE_BUFFER_H__
+#define __WRITE_BUFFER_H__
+#include "../../include/settings.h"
+#include "../../interface/interface.h"
+#include "page_manager.h"
+#include "global_return_code.h"
+#include "lftl_slab.h"
+#include "key_value_pair.h"
+#include <map>
+
+typedef enum write_buffer_return_code{
+	WB_NONE=0,
+	WB_FULL,
+	WB_IS_IMMUTABLE,
+}WB_return_code;
+
+typedef struct buffer_entry{
+	uint32_t lba;
+	value_set *data;
+}buffer_entry;
+
+typedef struct write_buffer{
+	bool is_immutable;
+	uint32_t buffered_entry_num;
+	uint32_t max_buffer_entry_num;
+	slab_master *sm;
+	page_manager *pm;
+//	buffer_entry **data;
+	std::map<uint32_t, buffer_entry *> *data;
+	uint32_t flushed_req_cnt;
+	fdriver_lock_t cnt_lock;
+	fdriver_lock_t sync_lock;
+}write_buffer;
+
+write_buffer *write_buffer_reinit(write_buffer *wb);
+write_buffer *write_buffer_init(uint32_t max_buffered_entry_num, page_manager *pm);
+key_ptr_pair* write_buffer_flush(write_buffer *, bool sync);
+uint32_t write_buffer_insert(write_buffer *, uint32_t lba, value_set* value);
+char *write_buffer_get(write_buffer *, uint32_t lba);
+void write_buffer_free(write_buffer*);
+
+inline static uint32_t write_buffer_isfull(write_buffer *wb){
+	return wb->buffered_entry_num >= wb->max_buffer_entry_num;
+}
+
+inline static uint32_t write_needed_page(write_buffer *wb){
+	return wb->data->size()+((wb->data->size()/MAPINPAGE)+ 
+			(wb->data->size()%MAPINPAGE?1:0));
+}
+
+#endif

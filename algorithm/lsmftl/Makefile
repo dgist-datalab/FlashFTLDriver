@@ -1,9 +1,12 @@
 SRCS +=\
-	   page.c\
-	   gc.c\
-	   gc_map.c\
-	   demand_io.c\
-	   demand_mapping.c\
+	   bloomfilter.c\
+	   io.c\
+	   level.c\
+	   lftl_slab.c\
+	   lsmtree.c\
+	   page_manager.c\
+	   run.c\
+	   write_buffer.c\
 
 DIRS := $(shell find ./caching/ -type d)
 
@@ -18,7 +21,7 @@ TARGETOBJ:=\
 
 
 LEAK: all
-all: $(TARGETOBJ) traverse
+all: $(TARGETOBJ)
 
 libnom.a : $(TARGETOBJ)
 	$(AR) r $(@) $(TARGETOBJ)
@@ -28,11 +31,6 @@ libnom.a : $(TARGETOBJ)
 
 ../../object/%.o:%.c
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
-
-traverse: $(DIRS)
-	for d in $+; do \
-		$(MAKE) -i -C "$$d"; \
-	done
 
 clean : 
 	@$(RM) libnom.a
