@@ -17,7 +17,7 @@ typedef struct level{
 #define FIRST_RUN_PTR(lev_ptr) (&(lev_ptr)->array[0])
 #define LEVELING_SST_AT_PTR(lev_ptr, idx) &(((leve_ptr)->array[0]).sst_set[idx]) 
 
-level *level_init(uint32_t max_sst_num);
+level *level_init(uint32_t max_sst_num, uint32_t run_num);
 run *level_find_run(level *, uint32_t lba);
 uint32_t level_append_sstfile(level *, run *);
 uint32_t level_deep_append_sstfile(level *, run *);

@@ -39,10 +39,10 @@ typedef struct {
 compaction_master *compaction_init(uint32_t compaction_queue_num);
 void compaction_free();
 void compaction_issue_req(compaction_req *);
-uint32_t compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
-uint32_t compaction_leveling(compaction_master *cm, level *src, level *des);
-uint32_t compaction_tiering(compaction_master *cm, level *src, level *des);
-uint32_t compaction_merge(compaction_master *cm, run *r1, run* r2, uint8_t version_idx);
+level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
+level* compaction_leveling(compaction_master *cm, level *src, level *des);
+level* compaction_tiering(compaction_master *cm, level *src, level *des);
+level* compaction_merge(compaction_master *cm, run *r1, run* r2, uint8_t version_idx);
 
 static inline compaction_req * alloc_comp_req(int8_t start, int8_t end, key_ptr_pair *target,
 		void (*end_req)(void*), void *params){

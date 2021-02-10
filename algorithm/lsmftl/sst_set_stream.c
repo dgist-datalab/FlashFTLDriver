@@ -5,6 +5,7 @@
 
 sst_out_stream* sst_os_init(sst_file *sst_set, comp_read_alreq_params *params, uint32_t set_number, bool(*check_done)(void*)){
 	sst_out_stream *res=(sst_out_stream*)calloc(1, sizeof(sst_out_stream));
+	res->type=KP_FILE_STREAM;
 	res->sst_file_set=new std::queue<sst_file*>();
 	res->check_flag_set=new std::queue<void*>();
 	for(uint32_t i=0; i<set_num; i++){
@@ -17,6 +18,14 @@ sst_out_stream* sst_os_init(sst_file *sst_set, comp_read_alreq_params *params, u
 	return res;
 }
 
+sst_out_stream *sst_os_init_kp(key_ptr_pair *data){
+	sst_out_stream *res=(sst_out_stream*)calloc(1, sizeof(sst_out_stream));
+	res->type=KP_PAIR_STREAM;
+	res->kp_data=data;
+	res->idx=0;
+	return res;
+}
+
 void sst_os_add(sst_out_stream *os, sst_file *sst_set, comp_read_alreq_params *params, uint32_t num){
 	for(uint32_t i=0; i<set_num; i++){
 		os->sst_file_set->push(&sst_set[i]);
@@ -25,6 +34,9 @@ void sst_os_add(sst_out_stream *os, sst_file *sst_set, comp_read_alreq_params *p
 }
 
 key_ptr_pair sst_os_pick(sst_out_stream *os){
+	if(os->type==KP_PAIR_STREAM){
+		return os->kp_data[os->idx];
+	}
 retry:
 	if(os->full){
 		if(os->sst_file_set->size()==0){

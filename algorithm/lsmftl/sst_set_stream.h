@@ -4,13 +4,19 @@
 #include "../../interface/interface.h"
 #include "compaction.h"
 #include <queue>
+enum {
+SST_FILE_STREAM, KP_PAIR_STREAM
+};
+
 typedef struct{
+	uint8_t type;
 	bool (*check_done)(void *check_flag);
 	std::queue<sst_file*> *sst_file_set;
 	std::queue<void*> *check_flag_set;
+	key_ptr_pair *kp_data;
 	sst_file *now;
 	uint32_t idx;
-	bool now_full;
+	bool full;
 }sst_out_stream;
 
 typedef struct{
@@ -22,6 +28,7 @@ typedef struct{
 
 sst_out_stream* sst_os_init(sst_file *, comp_read_alreq_params *,
 		uint32_t set_number, bool(*check_done)(void*));
+sst_out_stream *sst_os_init_kp(key_ptr_pair *data);
 void sst_os_add(sst_out_stream *os, sst_file *, 
 		comp_read_alreq_params *, uint32_t num);
 key_ptr_pair sst_os_pick(sst_out_stream *os);

@@ -1,9 +1,11 @@
 #include "level.h"
 #include "run.h"
 
-level *level_init(uint32_t max_sst_num){
+level *level_init(uint32_t max_sst_num, uint32_t run_num){
 	level *res=(level*)calloc(1,sizeof(level));
-	res->array=(run*)calloc(now_run_num, sizeof(run));
+	res->array=(run*)calloc(run_num, sizeof(run));
+	res->now_sst_num=0;
+	res->max_sst_num=max_sst_num;
 	return res;
 }
 
