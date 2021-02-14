@@ -2,11 +2,12 @@
 #include "run.h"
 #include "../../include/sem_lock.h"
 #include "../../interface/interface.h"
-
+extern lsmtree LSM;
 typedef struct{
 	level *des;
 	uint32_t from;
 	uint32_t to;
+	comp_read_alreq_params *params;
 }read_issue_arg;
 
 typedef struct{
@@ -15,20 +16,31 @@ typedef struct{
 }read_arg_container;
 
 void *comp_alreq_end_req(algo_req *req);
-static void comp_read_alreq_init(algo_req *req){
-	
-}
-
-static void comp_read_alreq_init(algo_req *req){
-
-}
 
 static void read_sst_job(void *arg, int th_num){
-
-}
-
-static void write_sst_job(/*??*/){
-
+	read_arg_container *thread_arg=(read_arg_container*)arg;
+	read_issue_arg **arg_set=thread_arg->arg_set;
+	uint32_t *idx_set=(uint32_t*)calloc(thread_arg->set_num, sizeof(uint32_t));
+	comp_read_alreq_params **params_set=(comp_read_alreq_params **)calloc(thread_arg->set_num, sizeof(comp_read_alreq_params*));
+	for(uint32_t i=0; i<thread_arg->set_num; i++){
+		param_sets[i]=arg_set[i]->params;
+	}
+	uint32_t remain_checker=0, target=(1<<(thread_arg->set_num+1))-1;
+	while(!(remain_checker==target)){
+		for(uint32_t i=0; i<thread_arg->set_num; i++){
+			if(remain_checker&=1<<i) continue;
+			comp_read_alreq_params *now=&params_set[i][idx_set[i]++];
+			algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
+			//read_req->ppa=now->target->piece_ppa;
+			read_req->type=MAPPINGR;
+			read_req->params=(void*)now;
+			LSM.li->read(PIECETOPPA(now->target->piece_ppa), PAGESIZE, 
+					now->data, ASYNC, read_req);
+			if(idx_set[i]==(arg_set[i]->to-arg_set[i]->from+1)){
+				remain_checker|=1<<i;
+			}
+		}
+	}
 }
 
 static void read_params_init(comp_read_qlreq_params *params, read_issue_arg *read_arg){
@@ -37,6 +49,7 @@ static void read_params_init(comp_read_qlreq_params *params, read_issue_arg *rea
 		params[i].data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&params[i].done_lock, 0);
 	}
+	read_arg->params=params;
 }
 
 
@@ -102,7 +115,7 @@ static void stream_sorting(level *des, uint32_t stream_num, sst_out_stream **os_
 }
 
 void write_sst_file(value_set *value, sst_file *file, level *des){
-
+	
 }
 
 level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, level *des){
@@ -232,12 +245,28 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 
 }
 
-level* compaction_tiering(compaction_master *cm, level *src, level *des){
+level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move to last level*/
 
+	ERPINTF("Not implemented");
+	/*
+	level *res=level_init(des->max_sst_num, des->run_num);
+	read_issue_arg read_arg;
+	read_arg.des=des;
+	read_arg_container thread_arg;
+	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg));
+	thread_arg.arg_set[0]=&read_arg;
+	thread_arg.set_num=1;
+
+	set_out_stream *os;
+	uint32_t round=src->now_sst_num/COMPACTION_TAGS + (des->now_sst_num/COMPACTION_TAGS?1:0);
+	comp_read_alreq_params *read_params=cm->read_parasm;
+	for(uint32_t i=0; i<round; i++){
+	
+	}*/
 }
 
 level* compaction_merge(compaction_master *cm, run *r1, run* r2, uint8_t version_idx){
-
+	ERPINTF("Not implemented");
 }
 
 void *comp_alreq_end_req(algo_req *req){

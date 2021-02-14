@@ -16,7 +16,8 @@ typedef struct lsmtree_parameter{
 
 typedef struct lsmtree{
 	uint32_t wb_num;
-	page_manager *pm;
+	page_manager *pm_data;
+	page_manager *pm_map;
 
 	uint32_t now_wb;
 	write_buffer **wb_array;
