@@ -13,14 +13,15 @@ enum READ_HELPERTYPE{
 };
 
 typedef struct read_helper{
-	uint32_t helper_type;
-	void *helper_body;
+	uint32_t type;
+	void *body;
 }read_helper;
 
 read_helper *read_helper_stream_init(uint32_t helper_type);
-uint32_t read_helper_stream_insert(uint32_t helper_type, uint32_t lba, uint32_t ppa);
+uint32_t read_helper_stream_insert(read_helper *, uint32_t helper_type, uint32_t lba, uint32_t ppa);
+
 read_helper *read_helper_init(uint32_t helper_type, key_ptr_pair *kpp_array);
-uint32_t read_helper_find_ppa(read_helper *, uint32_t lba);
+bool read_helper_check(read_helper *, uint32_t lba);
 uint32_t read_helper_memory_usage(read_helper *);
 void read_helper_print(read_helper *);
 void read_helper_free(read_helper *);

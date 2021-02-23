@@ -21,7 +21,9 @@ typedef struct _page_manager{
 page_manager* page_manager_init(struct blockmanager *bm);
 void page_manager_free(page_manager* pm);
 bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page);
-uint32_t page_manager_get_new_ppa(page_manager *pm);
+uint32_t page_manager_get_new_ppa(page_manager *pm, bool ismap);
 void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t* piece_ppa, uint32_t *lba);
+void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa);
+void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa);
 void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa);
 #endif

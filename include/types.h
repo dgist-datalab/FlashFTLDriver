@@ -21,7 +21,7 @@
 #define FS_BUSE_W 18
 #define FS_FLUSH_T 19
 
-#define LREQ_TYPE_NUM 11
+#define LREQ_TYPE_NUM 12
 #define TRIM 0
 #define MAPPINGR 1
 #define MAPPINGW 2
@@ -33,6 +33,7 @@
 #define GCDW 8
 #define GCMR_DGC 9
 #define GCMW_DGC 10
+#define TEST_IO 11
 
 #define FS_MALLOC_W 1
 #define FS_MALLOC_R 2

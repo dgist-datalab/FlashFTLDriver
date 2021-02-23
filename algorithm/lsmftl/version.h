@@ -14,7 +14,7 @@ typedef struct{
 
 version *version_init(uint8_t max_valid_version_num, uint32_t LBA_num);
 
-uint8_t version_get_oldest_run_idx(version *v){
+static inline uint8_t version_get_oldest_run_idx(version *v){
 	return v->start_hand;
 }
 
@@ -26,7 +26,7 @@ static inline void version_insert_key_version(version *v, uint32_t lba, uint8_t 
 	v->key_version[lba]=version_idx;
 }
 
-static inline uint8_t version_get_run_index(uint8_t version_number){	
+static inline uint8_t version_get_run_index(version *v, uint8_t version_number){	
 	return v->run_version_list[version_number];
 }
 

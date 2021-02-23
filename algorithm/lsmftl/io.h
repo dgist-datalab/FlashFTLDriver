@@ -6,7 +6,7 @@
 #include "../../include/utils/tag_q.h"
 
 typedef struct sync_wrapper{
-	void* params;
+	void* param;
 	void *(*end_req)(algo_req*);
 	uint32_t tag;
 }sync_wrapper;
@@ -24,4 +24,6 @@ void io_manager_issue_internal_read(uint32_t ppa, value_set *value, algo_req *, 
 void io_manager_issue_write(uint32_t ppa, value_set *value, algo_req *req, bool sync);
 void io_manager_issue_read(uint32_t ppa, value_set *value, algo_req *req, bool sync);
 void io_manager_free();
+
+void io_manager_test_read(uint32_t ppa, char *data, uint32_t type);
 #endif

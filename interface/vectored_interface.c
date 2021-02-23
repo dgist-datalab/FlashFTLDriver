@@ -52,7 +52,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		temp->parents=txn;
 		temp->type=*(uint8_t*)buf_parser(buf, &idx, sizeof(uint8_t));
 		temp->end_req=vectored_end_req;
-		temp->params=NULL;
+		temp->param=NULL;
 		temp->value=NULL;
 		temp->isAsync=ASYNC;
 		temp->seq=seq++;

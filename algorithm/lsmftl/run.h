@@ -10,18 +10,17 @@
  */
 typedef struct run{
 	uint32_t type;
-	uint32_t pair_num;
 	uint32_t sst_file_num;
 	uint32_t start_lba;
 	uint32_t end_lba;
 	uint32_t start_data_physical_address;
 	sst_file *sst_set;
 }run;
-
+/*
 static inline uint32_t run_file_size(run *r){
 	return r->pair_num*LPAGESIZE+r->map_num*PAGESIZE;
 }
-
+*/
 #define LAST_SST_PTR(run_ptr) (&run_ptr->sst_set[run_ptr->sst_file_num-1])
 #define FIRST_SST_PTR(run_ptr) (&run_ptr->sst_set[0])
 
@@ -33,9 +32,10 @@ static inline uint32_t run_file_size(run *r){
 	for((sst_ptr)=&(run_ptr)->sst_set[idx]; idx<(run_ptr)->sst_file_num; \
 			idx++, (sst_ptr)=&(run_ptr)->sst_set[idx])
 
-run *run_init(uint32_t pair_num, uint32_t map_num, uint32_t start_lba, uint32_t end_lba);
+run *run_init(uint32_t map_num, uint32_t start_lba, uint32_t end_lba);
+void run_space_init(run *,uint32_t map_num, uint32_t start_lba, uint32_t end_lba);
 void run_append_sstfile(run *_run, sst_file *sstfile);
-void run_deep_append_sstfile(run *_run, sst_file *sstfile)
+void run_deep_append_sstfile(run *_run, sst_file *sstfile);
 void run_free(run *_run);
 
 static inline void run_deep_copy(run *des, run *src){

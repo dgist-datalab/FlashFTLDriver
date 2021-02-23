@@ -1,16 +1,26 @@
 #include "level.h"
 #include "run.h"
+#include "../../include/settings.h"
 
-level *level_init(uint32_t max_sst_num, uint32_t run_num){
+level *level_init(uint32_t max_sst_num, uint32_t max_run_num, bool istier, uint32_t idx){
 	level *res=(level*)calloc(1,sizeof(level));
-	res->array=(run*)calloc(run_num, sizeof(run));
+	res->idx=idx;
+	res->array=(run*)calloc(max_run_num, sizeof(run));
+	for(uint32_t i=0; i<max_run_num; i++){
+		run_space_init(&res->array[i], max_sst_num/max_run_num, -1, 0);
+	}
+	res->istier=istier;
+	if(!istier){
+		res->run_num=1;
+	}
 	res->now_sst_num=0;
 	res->max_sst_num=max_sst_num;
+	res->max_run_num=max_run_num;
 	return res;
 }
 
 run *level_find_run(level *lev, uint32_t lba){
-	uint32_t s=0,e=lev->now_run_num,mid;
+	uint32_t s=0,e=lev->run_num-1,mid;
 	while(s<e){
 		mid=(s+e)/2;
 		if(lev->array[mid].start_lba < lba){
@@ -20,22 +30,28 @@ run *level_find_run(level *lev, uint32_t lba){
 			e=mid;
 		}
 	}
-	return &lev->array[e+1];
+	return &lev->array[e];
 }
 
 uint32_t level_append_sstfile(level *lev, sst_file *sptr){
+	if(lev->now_sst_num >=lev->max_sst_num){
+		return 1;
+	}
 	lev->now_sst_num++;
-	return run_append_sstfile(LAST_RUN_PTR(lev), sptr);
+	run_append_sstfile(LAST_RUN_PTR(lev), sptr);
+	return 0;
 }
 
 uint32_t level_deep_append_sstfile(level *lev, sst_file *sptr){
+	if(lev->now_sst_num >=lev->max_sst_num){
+		return 1;
+	}
 	lev->now_sst_num++;
-	return run_deep_append_sstfile(LAST_RUN_PTR(lev), sptr);
+	run_deep_append_sstfile(LAST_RUN_PTR(lev), sptr);
+	return 0;
 }
 
 void level_trivial_move_sstfile(level *des, run *src, uint32_t from, uint32_t to){
-	uint32_t start=from;
-	uint32_t run_idx=0;
 	sst_file *sst_ptr;
 	for_each_sst_at(src, sst_ptr, from){
 		if(from>to) break;
@@ -46,7 +62,7 @@ void level_trivial_move_sstfile(level *des, run *src, uint32_t from, uint32_t to
 
 void level_trivial_move_run(level *des, level *src, uint32_t from, uint32_t to, uint32_t num){
 	if(level_is_full(des) || level_is_appendable(des, src->now_sst_num)){
-		EPRINTF("no space to insert run", true);
+		EPRINT("no space to insert run", true);
 	}
 	run *run_ptr;
 	uint32_t idx=0;
@@ -60,7 +76,7 @@ void level_reinit(level *lev){
 	run *run_ptr;
 	uint32_t idx;
 	for_each_run(lev, run_ptr, idx){
-		free_run(run_ptr);
+		run_free(run_ptr);
 	}
 }
 

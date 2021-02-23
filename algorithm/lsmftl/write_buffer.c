@@ -27,23 +27,23 @@ write_buffer *write_buffer_init(uint32_t max_buffered_entry_num, page_manager *p
 	return res;
 }
 
-typedef struct flush_req_params{
+typedef struct flush_req_param{
 	value_set *value;
 	uint32_t *cnt;
 	fdriver_lock_t *cnt_lock;
 	fdriver_lock_t *sync_lock;
-}flush_req_params;
+}flush_req_param;
 
 static void *flush_end_req(algo_req *req){
-	flush_req_params *params=(flush_req_params*)req->params;
-	value_set *value=(value_set*)params->value;
-	if(params->sync_lock){
-		fdriver_lock(params->sync_lock);
-		(*params->cnt)--;
-		if(!(*params->cnt)){
-			fdriver_unlock(params->sync_lock);
+	flush_req_param *param=(flush_req_param*)req->param;
+	value_set *value=(value_set*)param->value;
+	if(param->sync_lock){
+		fdriver_lock(param->sync_lock);
+		(*param->cnt)--;
+		if(!(*param->cnt)){
+			fdriver_unlock(param->sync_lock);
 		}
-		fdriver_unlock(params->sync_lock);
+		fdriver_unlock(param->sync_lock);
 	}
 	inf_free_valueset(value, FS_MALLOC_W);
 	free(req);
@@ -52,24 +52,24 @@ static void *flush_end_req(algo_req *req){
 
 static algo_req *make_flush_algo_req(write_buffer *wb,uint32_t ppa, value_set *value, bool sync){
 	algo_req *res=(algo_req*)malloc(sizeof(algo_req));
-	flush_req_params *params=(flush_req_params*)malloc(sizeof(flush_req_params));
+	flush_req_param *param=(flush_req_param*)malloc(sizeof(flush_req_param));
 	res->type=DATAW;
 	res->ppa=ppa;
 	res->end_req=flush_end_req;
-	params->value=value;
+	param->value=value;
 	if(sync){
-		params->cnt_lock=&wb->cnt_lock;
-		params->sync_lock=&wb->sync_lock;
-		fdriver_lock(params->cnt_lock);
-		params->cnt=&wb->flushed_req_cnt;
+		param->cnt_lock=&wb->cnt_lock;
+		param->sync_lock=&wb->sync_lock;
+		fdriver_lock(param->cnt_lock);
+		param->cnt=&wb->flushed_req_cnt;
 		wb->flushed_req_cnt++;	
-		fdriver_unlock(params->cnt_lock);
+		fdriver_unlock(param->cnt_lock);
 	}
 	else{
-		params->cnt_lock=params->sync_lock=NULL;
+		param->cnt_lock=param->sync_lock=NULL;
 	}
 
-	res->params=(void*)params;
+	res->param=(void*)param;
 	return res;
 }
 
@@ -86,7 +86,7 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 	for(uint32_t i=0; it!=wb->data->end(); i++, it++){
 		uint8_t inter_idx=i%L2PGAP;
 		if(inter_idx==0){
-			ppa=page_manager_get_new_ppa(wb->pm);
+			ppa=page_manager_get_new_ppa(wb->pm, false);
 			target_value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 			target_value->ppa=ppa;
 			oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);

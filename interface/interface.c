@@ -399,7 +399,7 @@ static request* inf_get_req_common(request *req, bool fromApp, int mark){
 	static uint32_t seq_num=0;
 	req->end_req=inf_end_req;
 	req->isAsync=ASYNC;
-	req->params=NULL;
+	req->param=NULL;
 	req->type_ftl = 0;
 	req->type_lower = 0;
 	req->before_type_lower=0;

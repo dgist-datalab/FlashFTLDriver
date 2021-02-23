@@ -14,38 +14,38 @@ fdriver_lock_t bb_lock;
 //#define STARTBLOCKCHUNK 3
 char *data_checker_data;
 
-typedef struct temp_params{
+typedef struct temp_param{
 	uint32_t ppa;
 	value_set *v;
 }tp;
 void *temp_end_req(algo_req *temp){
 	static int cnt=0;
-	tp *params=(tp*)temp->params;
+	tp *param=(tp*)temp->param;
 	uint32_t print_value=0;
 	switch(temp->type){
 		case FS_GET_T:
-			memcpy(&print_value,params->v->value,sizeof(print_value));
+			memcpy(&print_value,param->v->value,sizeof(print_value));
 			printf("read data:%u\n",print_value);
-			inf_free_valueset(params->v,FS_GET_T);
+			inf_free_valueset(param->v,FS_GET_T);
 			if(++cnt%10==0){
 				fflush(stdout);
 			}
 			break;
 		case FS_SET_T:
-			inf_free_valueset(params->v,FS_SET_T);
+			inf_free_valueset(param->v,FS_SET_T);
 			break;
 	}
 	if(cnt==TESTPAGE){
 		fdriver_unlock(&bb_lock);
 	}
 	free(temp);
-	free(params);
+	free(param);
 	return NULL;
 }
 
 void bb_write_bb_checker(lower_info *li,uint32_t testing_page){
 	algo_req *temp;
-	tp *params;
+	tp *param;
 	char *temp_test=(char*)malloc(PAGESIZE);
 	for(uint32_t i=0; i<testing_page; i++){
 		memcpy(temp_test,&i,sizeof(i));
@@ -53,27 +53,27 @@ void bb_write_bb_checker(lower_info *li,uint32_t testing_page){
 		temp->type=FS_SET_T;
 		temp->end_req=temp_end_req;
 
-		params=(tp*)calloc(sizeof(tp),1);
-		params->ppa=i;
-		params->v=inf_get_valueset(temp_test,FS_SET_T,PAGESIZE);
-		temp->params=(void*)params;
-		li->write(i,PAGESIZE,params->v,ASYNC,temp);
+		param=(tp*)calloc(sizeof(tp),1);
+		param->ppa=i;
+		param->v=inf_get_valueset(temp_test,FS_SET_T,PAGESIZE);
+		temp->param=(void*)param;
+		li->write(i,PAGESIZE,param->v,ASYNC,temp);
 	}
 }
 
 void bb_read_bb_checker(lower_info *li,uint32_t testing_page){
 	algo_req *temp;
-	tp *params;
+	tp *param;
 	for(uint32_t i=0; i<testing_page; i++){
 		temp=(algo_req*)calloc(sizeof(algo_req),1);
 		temp->type=FS_GET_T;
 		temp->end_req=temp_end_req;
 
-		params=(tp*)calloc(sizeof(tp),1);
-		params->ppa=i;
-		params->v=inf_get_valueset(NULL,FS_GET_T,PAGESIZE);
-		temp->params=(void*)params;
-		li->read(i,PAGESIZE,params->v,ASYNC,temp);
+		param=(tp*)calloc(sizeof(tp),1);
+		param->ppa=i;
+		param->v=inf_get_valueset(NULL,FS_GET_T,PAGESIZE);
+		temp->param=(void*)param;
+		li->read(i,PAGESIZE,param->v,ASYNC,temp);
 	}
 }
 

@@ -71,7 +71,7 @@ struct request {
 	bool (*added_end_req)(struct request *const);
 	bool isAsync;
 	uint8_t magic;
-	void *params;
+	void *param;
 	void *__hash_node;
 	//pthread_mutex_t async_mutex;
 	//fdriver_lock_t sync_lock;
@@ -93,7 +93,7 @@ e:for application req*/
 
 	/* HASH_KVSSD */
 #ifdef hash_dftl
-	void *hash_params;
+	void *hash_param;
 #endif
 	struct vectored_request *parents;
 };
@@ -108,7 +108,7 @@ struct algo_req{
 	uint8_t type_lower;
 	//0: normal, 1 : no tag, 2: read delay 4:write delay
 	void *(*end_req)(struct algo_req *const);
-	void *params;
+	void *param;
 };
 
 struct lower_info {

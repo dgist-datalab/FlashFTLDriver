@@ -3,14 +3,14 @@
 #include <stdio.h>
 #include <stdint.h>
 
-sst_out_stream* sst_os_init(sst_file *sst_set, comp_read_alreq_params *params, uint32_t set_number, bool(*check_done)(void*)){
+sst_out_stream* sst_os_init(sst_file *sst_set, inter_read_alreq_param *param, uint32_t set_num, bool(*check_done)(void*)){
 	sst_out_stream *res=(sst_out_stream*)calloc(1, sizeof(sst_out_stream));
-	res->type=KP_FILE_STREAM;
+	res->type=SST_FILE_STREAM;
 	res->sst_file_set=new std::queue<sst_file*>();
 	res->check_flag_set=new std::queue<void*>();
 	for(uint32_t i=0; i<set_num; i++){
 		res->sst_file_set->push(&sst_set[i]);
-		res->check_flag_set->push((void*)&params[i]);
+		res->check_flag_set->push((void*)&param[i]);
 	}
 	res->now=NULL;
 	res->idx=0;
@@ -26,10 +26,10 @@ sst_out_stream *sst_os_init_kp(key_ptr_pair *data){
 	return res;
 }
 
-void sst_os_add(sst_out_stream *os, sst_file *sst_set, comp_read_alreq_params *params, uint32_t num){
+void sst_os_add(sst_out_stream *os, sst_file *sst_set, inter_read_alreq_param *param, uint32_t set_num){
 	for(uint32_t i=0; i<set_num; i++){
 		os->sst_file_set->push(&sst_set[i]);
-		os->check_flag_set->push((void*)&params[i]);
+		os->check_flag_set->push((void*)&param[i]);
 	}
 }
 
@@ -38,9 +38,11 @@ key_ptr_pair sst_os_pick(sst_out_stream *os){
 		return os->kp_data[os->idx];
 	}
 retry:
+	key_ptr_pair temp_res;
 	if(os->full){
 		if(os->sst_file_set->size()==0){
-			return UINT32_MAX;
+			temp_res.lba=UINT32_MAX;
+			return temp_res;
 		}
 
 		os->now=os->sst_file_set->front();
@@ -88,30 +90,31 @@ void sst_os_free(sst_out_stream *os){
 	free(os);
 }
 
-sst_is_stream* sst_is_init(char*(*get_resut)()){
-	sst_in_stream *res=(sst_is_stream)calloc(1,sizeof(sst_in_stream));
+sst_in_stream* sst_is_init(){
+	sst_in_stream *res=(sst_in_stream*)calloc(1,sizeof(sst_in_stream));
 	res->now=NULL;
+	return res;
 }
 
-void sst_is_set_space(sst_in_strea *is, value_set *data){
+bool sst_os_is_empty(sst_out_stream *os){
+	return !os->full;
+}
+
+void sst_is_set_space(sst_in_stream *is, value_set *data){
 	is->now=sst_init_empty();
-	is->now->data=(void*)data->value;
+	is->now->data=data->value;
 	is->idx=0;
 	is->vs=data;
 }
 
-value_set *sst_is_insert(sst_in_stream *is, key_ptr_pair kp, sst_file **result_ptr){
-	((key_ptr_pair*)is->data)[is->idx++]=kp;
+bool sst_is_insert(sst_in_stream *is, key_ptr_pair kp){
+	((key_ptr_pair*)is->vs->value)[is->idx++]=kp;
 	if(is->idx * sizeof(key_ptr_pair)==PAGESIZE){
-		value_set *res=is->vs;
-		*result_ptr=is->now;
-		is->vs=NULL;
-		is->now=NULL;
-		return res;
+		return true;
 	}
-	return NULL;
+	return false;
 }
 
-void sst_is_free(sst_is_stream *is){
+void sst_is_free(sst_in_stream *is){
 	free(is);
 }

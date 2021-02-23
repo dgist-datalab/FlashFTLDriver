@@ -178,7 +178,7 @@ uint64_t bf_bits(int entry, float fpr){
 }
 
 extern MeasureTime write_opt_time[10];
-void bf_set(BF *input, KEYT key){
+void bf_set(BF *input, uint32_t key){
 	if(input==NULL){
 		abort();
 	}
@@ -206,7 +206,7 @@ void bf_set(BF *input, KEYT key){
 	}
 }
 
-bool bf_check(BF* input, KEYT key){
+bool bf_check(BF* input, uint32_t key){
 	uint32_t h, th;
 	int block,offset;
 	if(input==NULL) return true;

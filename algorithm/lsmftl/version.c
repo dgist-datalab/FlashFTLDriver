@@ -1,4 +1,5 @@
 #include "version.h"
+#include "../../include/settings.h"
 
 version *version_init(uint8_t max_valid_version_num, uint32_t LBA_num){
 	version *res=(version*)malloc(sizeof(version));

@@ -2,6 +2,7 @@
 #define __KEY_VALUE_PAIR_H__
 #include <stdint.h>
 #include "../../include/settings.h"
+#define LAST_KP_IDX (PAGESIZE/sizeof(key_ptr_pair)-1)
 typedef struct key_ptr_pair{
 	uint32_t lba;
 	uint32_t piece_ppa;

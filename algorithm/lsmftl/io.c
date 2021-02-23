@@ -1,4 +1,5 @@
 #include "io.h"
+#include "../../interface/interface.h"
 io_manager io_m;
 void io_manager_init(lower_info *li){
 	io_m.li=li;
@@ -12,9 +13,9 @@ void io_manager_init(lower_info *li){
 }
 
 static inline void *io_sync_end_req(algo_req* al_req){
-	sync_wrapper *wrapper=(sync_wrapper*)al_req->params;
+	sync_wrapper *wrapper=(sync_wrapper*)al_req->param;
 	al_req->end_req=wrapper->end_req;
-	al_req->params=wrapper->params;
+	al_req->param=wrapper->param;
 	uint32_t tag=wrapper->tag;
 	
 	al_req->end_req(al_req);
@@ -26,7 +27,7 @@ static inline void *io_sync_end_req(algo_req* al_req){
 static inline void set_wrapper(sync_wrapper *wrapper, algo_req *al_req, uint32_t tag){
 	wrapper->tag=tag;
 	wrapper->end_req=al_req->end_req;
-	wrapper->params=al_req->params;
+	wrapper->param=al_req->param;
 	al_req->end_req=io_sync_end_req;
 }
 
@@ -65,4 +66,18 @@ void io_manager_issue_read(uint32_t ppa, value_set *value, algo_req *al_req, boo
 
 void io_manager_free(){
 	tag_manager_free_manager(io_m.tm);
+}
+
+static void *temp_end_req(algo_req *req){
+	free(req);
+	return NULL;
+}
+
+void io_manager_test_read(uint32_t ppa, char *data, uint32_t type){
+	algo_req *test_req=(algo_req*)malloc(sizeof(algo_req));
+	test_req->type=type;
+	value_set *vs=inf_get_valueset(NULL,FS_MALLOC_R, PAGESIZE);
+	io_manager_issue_internal_write(ppa, vs, test_req, true);
+	memcpy(data, vs->value, PAGESIZE);
+	inf_free_valueset(vs, FS_MALLOC_R);
 }
