@@ -20,7 +20,7 @@ void LSM_traversal(lsmtree *lsm){
 				printf("\t\tsstfile #%d:\n", s_idx);
 				char map_data[PAGESIZE], value_data[PAGESIZE];
 				key_ptr_pair *kp_ptr; uint32_t kp_idx;
-				io_manager_test_read(sptr->ppa, map_data, TEST_IO);
+				io_manager_test_read(sptr->file_addr.map_ppa, map_data, TEST_IO);
 				for_each_kp(map_data, kp_ptr, kp_idx){
 					printf("\t\t\tkp #%d: %u->%u\n", kp_idx, kp_ptr->lba, kp_ptr->piece_ppa);
 

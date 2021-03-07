@@ -69,8 +69,11 @@
 #endif
 
 #define PUNIT (64)
-
 #endif
+
+#define MIN(a,b) ((a)<(b)?(a):(b))
+#define MAX(a,b) ((a)<(b)?(b):(a))
+
 
 #define interface_vector
 #define LPAGESIZE 4096

@@ -13,7 +13,8 @@ SRCS +=\
 	   function_test.c\
 	   version.c\
 	   write_buffer.c\
-	   sst_set_stream.c\
+	   sst_page_file_stream.c\
+	   sst_block_file_stream.c\
 	   sst_file.c\
 	   gc.c\
 

@@ -12,14 +12,27 @@
 #include "lsmtree_param_module.h"
 
 typedef struct lsmtree_monitor{
-
+	uint32_t trivial_move_cnt;
+	uint32_t *compaction_cnt;
 }lsmtree_monitor;
 
 typedef struct lsmtree_parameter{
 	uint32_t LEVELN;
 	uint32_t mapping_num;
 	uint32_t size_factor;
+	void *private_data_for_readhelper;
 }lsmtree_parameter;
+
+enum{
+	NOCHECK, K2VMAP, DATA, PLR,
+};
+
+typedef struct lsmtree_read_param{
+	uint32_t check_type;
+	int32_t prev_level;
+	int32_t prev_run;
+	int32_t sst_map_idx;
+}lsmtree_read_param;
 
 typedef struct lsmtree{
 	uint32_t wb_num;
@@ -34,6 +47,8 @@ typedef struct lsmtree{
 	level **disk;
 	fdriver_lock_t *level_lock;
 	lsmtree_parameter param;
+	lsmtree_monitor monitor;
+	bool global_debug_flag;
 }lsmtree;
 
 

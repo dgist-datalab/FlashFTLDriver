@@ -26,6 +26,9 @@ page_manager* page_manager_init(struct blockmanager *_bm){
 }
 
 void page_manager_free(page_manager* pm){
+	free(pm->current_segment[DATA_S]);
+	free(pm->current_segment[MAP_S]);
+	free(pm->reserve_segment);
 	free(pm);
 }
 
@@ -40,11 +43,28 @@ retry:
 			EPRINT("before get ppa, try to gc!!\n", true);
 			do_gc();
 		}
+		free(seg);
 		pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
 		goto retry;
 	}
 	res=bm->get_page_num(bm, seg);
 	return res;
+}
+
+uint32_t page_manager_pick_new_ppa(page_manager *pm, bool is_map){
+	blockmanager *bm=pm->bm;
+retry:
+	__segment *seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
+	if(bm->check_full(bm, seg, MASTER_PAGE)){
+		if(bm->is_gc_needed(bm)){
+			EPRINT("before get ppa, try to gc!!\n", true);
+			do_gc();
+		}
+		free(seg);
+		pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+		goto retry;
+	}
+	return bm->pick_page_num(bm, seg);
 }
 
 bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page, 
@@ -53,4 +73,14 @@ bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page,
 	__segment *seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
 	if(seg->used_page_num + needed_page>= _PPS) return true;
 	return bm->check_full(bm, seg, MASTER_PAGE) && bm->is_gc_needed(bm); 
+}
+
+
+uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
+	if(ismap){
+		return _PPS-pm->current_segment[MAP_S]->used_page_num;
+	}
+	else{
+		return _PPS-pm->current_segment[DATA_S]->used_page_num;
+	}
 }

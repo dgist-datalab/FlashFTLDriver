@@ -46,6 +46,7 @@ static void *flush_end_req(algo_req *req){
 		fdriver_unlock(param->sync_lock);
 	}
 	inf_free_valueset(value, FS_MALLOC_W);
+	free(param);
 	free(req);
 	return NULL;
 }
@@ -97,6 +98,8 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
+		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba);
+		inf_free_valueset(it->second->data, FS_MALLOC_W);
 
 		if(inter_idx==(L2PGAP-1)){//issue data
 			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
@@ -153,6 +156,11 @@ char *write_buffer_get(write_buffer *wb, uint32_t lba){
 }
 
 void write_buffer_free(write_buffer* wb){
+	std::map<uint32_t, buffer_entry*>::iterator it;
+	for(it=wb->data->begin(); it!=wb->data->end(); it++){
+		inf_free_valueset(it->second->data,FS_MALLOC_W);
+	}
+
 	delete wb->data;
 	slab_master_free(wb->sm);
 	fdriver_destroy(&wb->cnt_lock);

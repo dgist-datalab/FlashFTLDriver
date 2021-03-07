@@ -1,0 +1,69 @@
+#ifndef __SST_PAGE_FILE_STREAM_H__
+#define __SST_PAGE_FILE_STREAM_H__
+#include "key_value_pair.h"
+#include "../../interface/interface.h"
+#include "compaction.h"
+#include <queue>
+enum {
+SST_PAGE_FILE_STREAM, KP_PAIR_STREAM
+};
+
+typedef struct{
+	uint8_t type;
+	bool (*check_done)(struct inter_read_alreq_param *check_flag, bool check_file_sst);
+	bool (*file_done)(struct inter_read_alreq_param* check_flag);
+	std::queue<sst_file*> *sst_file_set;
+	std::queue<struct inter_read_alreq_param*> *check_flag_set;
+	key_ptr_pair *kp_data;
+	sst_file *now;
+	uint32_t idx;
+	bool now_file_empty;
+	bool file_set_empty;
+#ifdef DEBUG
+	bool isstart;
+	uint32_t prev_lba;
+#endif
+}sst_pf_out_stream;
+
+typedef struct{
+	//std::queue<sst_file*> sst_file_set;
+	sst_file *now;
+	value_set *vs;
+	uint32_t idx;
+}sst_pf_in_stream;
+
+sst_pf_out_stream* sst_pos_init(sst_file *, struct inter_read_alreq_param **,
+		uint32_t set_number, bool(*check_done)( struct inter_read_alreq_param*, bool), 
+		bool (*file_done)(struct inter_read_alreq_param *));
+sst_pf_out_stream *sst_pos_init_kp(key_ptr_pair *data);
+void sst_pos_add(sst_pf_out_stream *os, sst_file *, 
+		inter_read_alreq_param **, uint32_t num);
+key_ptr_pair sst_pos_pick(sst_pf_out_stream *os);
+void sst_pos_pop(sst_pf_out_stream *os);
+void sst_pos_free(sst_pf_out_stream *os);
+bool sst_pos_is_empty(sst_pf_out_stream *os);
+
+sst_pf_in_stream* sst_pis_init();
+void sst_pis_set_space(sst_pf_in_stream *is, value_set *data, uint8_t type);
+bool sst_pis_insert(sst_pf_in_stream *is, key_ptr_pair kp);
+
+static inline value_set *sst_pis_get_result(sst_pf_in_stream *is, 
+		sst_file **result_ptr){
+	value_set *res=is->vs;
+	is->now->start_lba=((key_ptr_pair*)is->now->data)[0].lba;
+	is->now->end_lba=((key_ptr_pair*)is->now->data)[is->idx-1].lba;
+	*result_ptr=is->now;
+	is->vs=NULL;
+	is->now=NULL;
+	is->idx=0;
+	return res;
+}
+
+static inline bool sst_pis_remain_data(sst_pf_in_stream *is){
+	return !(is->idx==0);
+}
+
+//char *sst_in_get_result(sst_file **result_ptr);
+void sst_pis_free(sst_pf_in_stream *is);
+
+#endif

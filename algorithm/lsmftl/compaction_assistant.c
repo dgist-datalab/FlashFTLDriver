@@ -12,7 +12,15 @@ compaction_master* compaction_init(uint32_t compaction_queue_num){
 	cm->issue_worker=thpool_init(1);
 	pthread_create(&cm->tid, NULL, compaction_main, (void*)cm);
 	compaction_stop_flag=false;
+
+
 	cm->read_param=(inter_read_alreq_param*)calloc(COMPACTION_TAGS, sizeof(inter_read_alreq_param));
+
+	cm->read_param_queue=new std::queue<inter_read_alreq_param*>();
+	for(uint32_t i=0; i<COMPACTION_TAGS; i++){
+		cm->read_param_queue->push(&cm->read_param[i]);
+	}
+	//cm->kv_wrapper_slab=slab_master_init(sizeof(key_value_wrapper), COMPACTION_TAGS);
 	return cm;
 }
 
@@ -20,6 +28,10 @@ void compaction_free(compaction_master *cm){
 	compaction_stop_flag=true;
 	pthread_join(cm->tid, NULL);
 	tag_manager_free_manager(cm->tm);
+
+	free(cm->read_param);
+	delete cm->read_param_queue;
+
 	q_free(cm->req_q);
 	free(cm);
 }
@@ -32,16 +44,18 @@ void compaction_issue_req(compaction_master *cm, compaction_req *req){
 }
 
 static inline void disk_change(level **up, level *src, level** des){
-	level *new_up=level_init((*up)->max_sst_num, (*up)->max_run_num, (*up)->istier, (*up)->idx);
-	fdriver_lock(&LSM.level_lock[(*up)->idx]);
-	level_free(*up);
-	*up=new_up;
-	fdriver_unlock(&LSM.level_lock[(*up)->idx]);
+	if(up!=NULL){
+		level *new_up=level_init((*up)->max_sst_num, (*up)->max_run_num, (*up)->istier, (*up)->idx);
+		fdriver_lock(&LSM.level_lock[(*up)->idx]);
+		level_free(*up);
+		*up=new_up;
+		fdriver_unlock(&LSM.level_lock[(*up)->idx]);
+	}
 
 	level *delete_target_level=*des;
-	fdriver_lock(&LSM.level_lock[(*up)->idx]);
+	fdriver_lock(&LSM.level_lock[(*des)->idx]);
 	(*des)=src;
-	fdriver_unlock(&LSM.level_lock[(*up)->idx]);
+	fdriver_unlock(&LSM.level_lock[(*des)->idx]);
 	level_free(delete_target_level);
 }
 
@@ -64,9 +78,17 @@ again:
 			src=compaction_leveling(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
 		}
 
-		disk_change(&LSM.disk[req->start_level], src, &LSM.disk[req->end_level]);
+		if(req->start_level==-1){
+			disk_change(NULL, src, &LSM.disk[req->end_level]);
+		}
+		else{
+			disk_change(&LSM.disk[req->start_level], src, &LSM.disk[req->end_level]);
+		}
 
-		if(req->end_level != LSM.param.LEVELN-1 && level_is_full(LSM.disk[req->end_level])){
+		if(req->end_level != LSM.param.LEVELN-1 && (
+				(req->end_level==0 && level_is_full(LSM.disk[req->end_level])) ||
+				(req->end_level!=0 && !level_is_appendable(LSM.disk[req->end_level], LSM.disk[req->end_level-1]->max_sst_num)))
+				){
 			req->start_level=req->end_level;
 			req->end_level++;
 			goto again;
@@ -83,8 +105,26 @@ again:
 
 		version_enqueue(LSM.last_run_version, LSM.version_num++);*/
 		}
-		req->end_req(req);
 		tag_manager_free_tag(cm->tm,req->tag);
+		req->end_req(req);
 	}
 	return NULL;
+}
+
+uint32_t compaction_read_param_remain_num(compaction_master *cm){
+	return cm->read_param_queue->size();
+}
+
+inter_read_alreq_param *compaction_get_read_param(compaction_master *cm){
+	if(cm->read_param_queue->size()==0){
+		EPRINT("plz check size before get param", true);
+	}
+	inter_read_alreq_param *res=cm->read_param_queue->front();
+	cm->read_param_queue->pop();
+	return res;
+}
+
+void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *target){
+	cm->read_param_queue->push(target);
+	return;
 }

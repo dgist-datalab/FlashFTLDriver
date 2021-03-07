@@ -29,6 +29,7 @@ void slab_master_free(slab_master* sm){
 	for(uint32_t i=0; i<sm->entry_max_num; i++){
 		free(sm->slab_body[i]);
 	}
+	tag_manager_free_manager(sm->tag_q);
 	free(sm->slab_body);
 	free(sm);
 }

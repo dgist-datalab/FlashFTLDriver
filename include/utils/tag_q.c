@@ -38,4 +38,5 @@ void tag_manager_free_tag(tag_manager *tm, uint32_t tag_num){
 void tag_manager_free_manager(tag_manager *tm){
 	pthread_mutex_destroy(&tm->tag_lock);
 	delete tm->tagQ;
+	free(tm);
 }

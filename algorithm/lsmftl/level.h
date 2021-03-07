@@ -18,14 +18,20 @@ typedef struct level{
 #define LAST_RUN_PTR(lev_ptr) (&(lev_ptr)->array[(lev_ptr)->run_num-1])
 #define FIRST_RUN_PTR(lev_ptr) (&(lev_ptr)->array[0])
 #define LEVELING_SST_AT_PTR(lev_ptr, idx) &(((lev_ptr)->array[0]).sst_set[idx]) 
+#define GET_SST_IDX(lev, sptr) ((sptr)-(lev)->array[0].sst_set)
+#define GET_LEV_START_LBA(lev) ((lev)->array[0].start_lba)
+#define GET_LEV_END_LBA(lev) ((lev)->array[0].end_lba)
 
 level *level_init(uint32_t max_sst_num, uint32_t run_num, bool istier, uint32_t idx);
-run *level_find_run(level *, uint32_t lba);
 uint32_t level_append_sstfile(level *, sst_file *sptr);
 uint32_t level_deep_append_sstfile(level *, run *);
+uint32_t level_append_run(level *, run *);
+uint32_t level_deep_append_run(level *, run *);
+
 void level_trivial_move_sstfile(level *src, level *des,  uint32_t from, uint32_t to);
 void level_trivial_move_run(level *, uint32_t from, uint32_t to);
-void level_reinit(level *);
+sst_file* level_retrieve_sst(level *, uint32_t lba);
+sst_file* level_retrieve_close_sst(level *, uint32_t lba);
 void level_free(level *);
 
 static inline bool level_check_overlap(level *a, level *b){
@@ -41,16 +47,23 @@ static inline bool level_check_overlap_keyrange(uint32_t start, uint32_t end, le
 	if(LAST_RUN_PTR(lev)->start_lba > end || LAST_RUN_PTR(lev)->end_lba < start){
 		return false;
 	}
-	return false;
+	return true;
 }
 
 static inline bool level_is_full(level *lev){
-	return !(lev->now_sst_num < lev->max_sst_num);
+	if(lev->istier){
+		return !(lev->run_num<lev->max_run_num);
+	}
+	else{
+		return !(lev->now_sst_num<lev->max_sst_num);
+	}
 }
 
 static inline bool level_is_appendable(level *lev, uint32_t append_target_num){
-	return lev->now_sst_num+append_target_num < lev->max_sst_num;
+	return lev->now_sst_num+append_target_num <= lev->max_sst_num;
 }
+
+void level_print(level *lev);
 
 #define for_each_run(level_ptr, run_ptr, idx)\
 	for(idx=0, (run_ptr)=&(level_ptr)->array[0]; idx<(level_ptr)->run_num; \
