@@ -3,7 +3,7 @@
 #include <stdlib.h>
 lsmtree LSM;
 char all_set_page[PAGESIZE];
-void *lsmtree_read_end_req(request *req);
+void *lsmtree_read_end_req(algo_req *req);
 
 struct algorithm lsm_ftl={
 	.argument_set=lsmtree_argument_set,
@@ -68,9 +68,10 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	compaction_free(LSM.cm);
 }
 
-static inline algo_req *get_read_alreq(request *const req, bool type, 
-		lsmtree_read_param *r_param){
+static inline algo_req *get_read_alreq(request *const req, uint8_t type, 
+		uint32_t physical_address, lsmtree_read_param *r_param){
 	algo_req *res=(algo_req *)calloc(1,sizeof(algo_req));
+	res->ppa=physical_address;
 	res->type=type;
 	res->param=(void*)r_param;
 	res->end_req=lsmtree_read_end_req;
@@ -79,17 +80,19 @@ static inline algo_req *get_read_alreq(request *const req, bool type,
 }
 
 uint32_t lsmtree_read(request *const req){
-	/*find data from write_buffer*/
-	for(uint32_t i=0; i<2; i++){
-		char *target;
-		if((target=write_buffer_get(LSM.wb_array[i], req->key))){
-			printf("find in write_buffer");
-			memcpy(req->value->value, target, LPAGESIZE);
-			goto hit_end;
-		}
-	}
 	lsmtree_read_param *r_param;
 	if(!req->param){
+		/*find data from write_buffer*/
+		for(uint32_t i=0; i<2; i++){
+			char *target;
+			if((target=write_buffer_get(LSM.wb_array[i], req->key))){
+			//	printf("find in write_buffer");
+				memcpy(req->value->value, target, LPAGESIZE);
+				req->end_req(req);
+				return 1;
+			}
+		}
+
 		r_param=(lsmtree_read_param*)calloc(1, sizeof(lsmtree_read_param));
 		req->param=(void*)r_param;
 		r_param->prev_level=-1;
@@ -99,17 +102,25 @@ uint32_t lsmtree_read(request *const req){
 		r_param=(lsmtree_read_param*)req->param;
 	}
 	
+	if(req->key==790339 && r_param->prev_level==LSM.param.LEVELN-1){
+		printf("break!\n");
+	}
+
 	algo_req *al_req;
-	uint32_t piece_ppa=UINT32_MAX;
-	switch(r_param->check_map){
+	level *target=NULL;
+	run *rptr=NULL;
+	sst_file *sptr;
+	uint32_t read_target_ppa=UINT32_MAX; //map_ppa && map_piece_ppa
+
+	switch(r_param->check_type){
 		case K2VMAP:
-			piece_ppa=kp_find_piece_ppa(req->key, req->value->value);
-			if(piece_ppa==UINT32_MAX){//not found
-				r_param->check_map=NOCHECK;
+			read_target_ppa=kp_find_piece_ppa(req->key, req->value->value);
+			if(read_target_ppa==UINT32_MAX){//not found
+				r_param->check_type=NOCHECK;
 			}
 			else{//FOUND
-				al_req=get_read_alreq(req, DATAR, r_param);
-				io_manager_issue_read(PIECETOPPA(piece_ppa), req->value, al_req, false);
+				al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
+				io_manager_issue_read(PIECETOPPA(read_target_ppa), req->value, al_req, false);
 				goto normal_end;
 			}
 			break;
@@ -121,41 +132,48 @@ uint32_t lsmtree_read(request *const req){
 			break;
 	}
 	
-	level *target=NULL;
-	run *rptr=NULL;
+
 retry:
 	if((target && rptr) &&
-		(r_param->prev_lev==LSM.param.LEVELN-1)&& 
-		(target->array[target->run_num]==rptr)){
-
+		(r_param->prev_level==LSM.param.LEVELN-1)&& 
+		(&target->array[target->run_num]==rptr)){
 		goto notfound;
 	}
 
 
-	if(r_param->prev_lev==LSM.param.LEVELN-1){
-		target=LSM.disk[r_param->prev_lev];
+	if(r_param->prev_level==LSM.param.LEVELN-1){
+		target=LSM.disk[r_param->prev_level];
 		rptr=&target->array[++r_param->prev_run];
 	}
 	else{
-		target=LSM.disk[++r_param->prev_lev];
+		target=LSM.disk[++r_param->prev_level];
 		rptr=&target->array[0];
 	}
 
-	sst_file *sptr;
-	if(target->istier){
+	if(!target->istier){
 		sptr=level_retrieve_sst(target, req->key);
 	}
 	else{
 		sptr=run_retrieve_sst(rptr, req->key);
 	}
 
+	if(!sptr) goto retry;
+
 	if(sptr->_read_helper){
+		/*issue data read!*/
 		EPRINT("no implemented", true);
+		goto retry;
 	}
 	else{
+		/*issue map read!*/
+		read_target_ppa=target->istier?
+			sst_find_map_addr(sptr, req->key):sptr->file_addr.map_ppa;
+		if(read_target_ppa==UINT32_MAX){
+			goto notfound;
+		}
 		r_param->check_type=K2VMAP;
-		al_req=get_read_alreq(req, MAPPINGR, r_param);
-		io_manager_issue_read(sptr.file_addr.map_ppa, req->value, al_req, false);
+		al_req=get_read_alreq(req, MAPPINGR, read_target_ppa, r_param);
+		io_manager_issue_read(read_target_ppa, req->value, al_req, false);
 		goto normal_end;
 	}
 
@@ -163,9 +181,8 @@ notfound:
 	printf("req->key: %u-", req->key);
 	EPRINT("not found key", false);
 	req->type=FS_NOTFOUND_T;
-
-hit_end:
 	req->end_req(req);
+	return 0;
 
 normal_end:
 	return 1;
@@ -212,6 +229,47 @@ uint32_t lsmtree_remove(request *const req){
 	return 1;
 }
 
-void *lsmtree_read_end_req(request *req){
+void *lsmtree_read_end_req(algo_req *req){
+	request *parents=req->parents;
+	lsmtree_read_param *r_param=(lsmtree_read_param*)req->param;
+	uint32_t piece_ppa;
+	uint32_t idx;
+	bool read_done=false;
+	switch(req->type){
+		case MAPPINGR:
+			if(!inf_assign_try(parents)){
+				EPRINT("why cannot retry?", true);
+			}
+			break;
+		case DATAR:
+			piece_ppa=req->ppa;
+			if(page_manager_oob_lba_checker(LSM.pm, piece_ppa, parents->key, &idx)){
+				if(idx>=L2PGAP){
+					EPRINT("can't be plz checking oob_lba_checker", true);
+				}
+				if(idx){
+					memcpy(parents->value->value, &parents->value->value[idx*LPAGESIZE], LPAGESIZE);
+				}
+				read_done=true;
+			}
+			else{
+				if(!inf_assign_try(parents)){
+					EPRINT("why cannot retry?", true);
+				}	
+			}
+			break;
+	}
+	if(read_done){
+		parents->end_req(parents);
+		free(r_param);
+	}
+	free(req);
+	return NULL;
+}
 
+
+void lsmtree_level_summary(lsmtree *lsm){
+	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
+		printf("ptr:%p ", lsm->disk[i]); level_print(lsm->disk[i]);
+	}
 }

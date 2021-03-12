@@ -12,6 +12,19 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 	}
 }
 
+
+bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t lba, uint32_t *idx){
+	char *oob=pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa));
+	for(uint32_t i=0; i<L2PGAP; i++){
+		if((*(uint32_t*)&oob[i*sizeof(uint32_t)])==lba){
+			*idx=i;
+			return true;
+		}
+	}
+	*idx=L2PGAP;
+	return false;
+}
+
 void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa){
 	bm->unpopulate_bit(bm, piece_ppa);
 }
@@ -84,3 +97,4 @@ uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 		return _PPS-pm->current_segment[DATA_S]->used_page_num;
 	}
 }
+

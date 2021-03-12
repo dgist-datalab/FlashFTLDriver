@@ -151,10 +151,17 @@ void level_free(level *lev){
 }
 
 void level_print(level *lev){
-	printf("level idx:%d sst:%u/%u start lba:%u~end lba:%u\n", 
+	if(lev->now_sst_num){
+		printf("level idx:%d sst:%u/%u start lba:%u~end lba:%u\n", 
+				lev->idx,
+				lev->now_sst_num, lev->max_sst_num,
+				FIRST_RUN_PTR(lev)->start_lba,
+				LAST_RUN_PTR(lev)->end_lba
+			  );
+	}
+	else{
+		printf("level idx:%d sst:%u/%u\n", 
 			lev->idx,
-			lev->now_sst_num, lev->max_sst_num,
-			FIRST_RUN_PTR(lev)->start_lba,
-			LAST_RUN_PTR(lev)->end_lba
-			);
+			lev->now_sst_num, lev->max_sst_num);
+	}
 }

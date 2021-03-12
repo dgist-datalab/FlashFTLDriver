@@ -254,6 +254,7 @@ void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 		seg_table[PPA].storage = (PTR)malloc(PAGESIZE);
 	}
 	else{
+		printf("cannot write! plz write before erase!\n");
 		abort();
 	}
 	memcpy(seg_table[PPA].storage,value->value,size);

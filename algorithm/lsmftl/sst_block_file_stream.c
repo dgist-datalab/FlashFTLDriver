@@ -205,6 +205,8 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last){
 		key_ptr_pair *map_pair=&((key_ptr_pair*)(bis->now_map_data->value))[bis->now_map_data_idx++];
 		map_pair->lba=bis->buffer[i].kv_ptr.lba;
 		map_pair->piece_ppa=ppa*L2PGAP+(i%L2PGAP);
+
+		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba);
 		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i].kv_ptr.data, LPAGESIZE);
 		bis->write_issued_kv_num++;
 		//free(bis->buffer[i]);

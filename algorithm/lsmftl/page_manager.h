@@ -21,6 +21,7 @@ typedef struct _page_manager{
 page_manager* page_manager_init(struct blockmanager *bm);
 void page_manager_free(page_manager* pm);
 bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page);
+bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t lba, uint32_t *idx);
 uint32_t page_manager_get_new_ppa(page_manager *pm, bool ismap);
 uint32_t page_manager_pick_new_ppa(page_manager *pm, bool ismap);
 uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap);

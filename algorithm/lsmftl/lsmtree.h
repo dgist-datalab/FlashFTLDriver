@@ -60,6 +60,7 @@ uint32_t lsmtree_write(request *const req);
 uint32_t lsmtree_flush(request *const req);
 uint32_t lsmtree_remove(request *const req);
 void lsmtree_compaction_end_req(struct compaction_req*);
+void lsmtree_level_summary(lsmtree *lsm);
 
 #define MAKE_L0COMP_REQ(kp_set, param)\
 	alloc_comp_req(-1,0,(kp_set), lsmtree_compaction_end_req, (void*)(param))

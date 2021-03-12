@@ -17,8 +17,9 @@ static inline void *io_sync_end_req(algo_req* al_req){
 	al_req->end_req=wrapper->end_req;
 	al_req->param=wrapper->param;
 	uint32_t tag=wrapper->tag;
-	
-	al_req->end_req(al_req);
+	if(al_req->end_req){
+		al_req->end_req(al_req);
+	}
 	fdriver_unlock(&io_m.sync_mutex[tag]);
 	tag_manager_free_tag(io_m.tm, tag);
 	return NULL;
@@ -28,6 +29,7 @@ static inline void set_wrapper(sync_wrapper *wrapper, algo_req *al_req, uint32_t
 	wrapper->tag=tag;
 	wrapper->end_req=al_req->end_req;
 	wrapper->param=al_req->param;
+	al_req->param=(void*)wrapper;
 	al_req->end_req=io_sync_end_req;
 }
 
@@ -76,8 +78,10 @@ static void *temp_end_req(algo_req *req){
 void io_manager_test_read(uint32_t ppa, char *data, uint32_t type){
 	algo_req *test_req=(algo_req*)malloc(sizeof(algo_req));
 	test_req->type=type;
+	test_req->end_req=NULL;
 	value_set *vs=inf_get_valueset(NULL,FS_MALLOC_R, PAGESIZE);
-	io_manager_issue_internal_write(ppa, vs, test_req, true);
+	io_manager_issue_internal_read(ppa, vs, test_req, true);
 	memcpy(data, vs->value, PAGESIZE);
 	inf_free_valueset(vs, FS_MALLOC_R);
+	free(test_req);
 }

@@ -28,11 +28,55 @@ sst_file *sst_bf_init(uint32_t ppa, uint32_t end_ppa, uint32_t start_lba, uint32
 
 void sst_destroy_content(sst_file* sstfile){
 	//free_sstfile_ readhelper...
+	if(sstfile->type==BLOCK_FILE)
+		free(sstfile->block_file_map);
 	return;
+}
+
+void sst_set_file_map(sst_file *sstfile, uint32_t map_num, map_range *map_range){
+	if(sstfile->type!=BLOCK_FILE){
+		EPRINT("cannot have map!", true);
+	}
+	sstfile->block_file_map=map_range;
+	/*
+	for(uint32_t i=0; i<map_num; i++){
+		printf("[%p]s:%u e:%u p:%u\n", sstfile,
+				sstfile->block_file_map[i].start_lba,
+				sstfile->block_file_map[i].end_lba,
+				sstfile->block_file_map[i].ppa);
+	}*/
+}
+
+uint32_t sst_find_map_addr(sst_file *sstfile, uint32_t lba){
+	if(sstfile->type!=BLOCK_FILE){
+		EPRINT("cannot have map!", true);
+	}
+	uint32_t res=UINT32_MAX;
+
+	int s=0, e=sstfile->map_num;
+	while(s<=e){
+		int mid=(s+e)/2;
+		map_range *mr=&sstfile->block_file_map[mid];
+		if(mr->start_lba<=lba && mr->end_lba>=lba){
+			res=mr->ppa;
+			break;
+		}
+		if(mr->start_lba > lba){
+			e=mid-1;
+		}
+		else if(mr->end_lba<lba){
+			s=mid+1;
+		}
+	}
+
+	return res;
 }
 
 void sst_free(sst_file* sstfile){
 	//free_sstfile
+	if(sstfile->block_file_map){
+		free(sstfile->block_file_map);
+	}
 	if(sstfile->data){
 		EPRINT("data not free", true);
 	}

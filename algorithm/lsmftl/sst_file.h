@@ -13,6 +13,13 @@ typedef union physcial_addr{
 	uint32_t map_ppa; //for page_file
 }p_addr;
 
+
+typedef struct map_range{
+	uint32_t start_lba;
+	uint32_t end_lba;
+	uint32_t ppa;
+}map_range;
+
 typedef struct sst_file{
 	uint8_t type;
 
@@ -23,6 +30,8 @@ typedef struct sst_file{
 	uint32_t start_lba;
 	uint32_t end_lba;
 	read_helper *_read_helper;
+	
+	map_range *block_file_map;
 	char *data;
 }sst_file;
 
@@ -35,6 +44,7 @@ void sst_free(sst_file*);
 static inline void sst_deep_copy(sst_file *des, sst_file *src){
 	read_helper *temp_helper=des->_read_helper;
 	*des=*src;
+	src->block_file_map=NULL;
 	//read_helper_copy(temp_helper, src->_read_helper);
 	des->_read_helper=temp_helper;
 }
@@ -42,6 +52,9 @@ static inline void sst_deep_copy(sst_file *des, sst_file *src){
 static inline void sst_copy(sst_file *des, sst_file *src){
 	*des=*src;
 }
+
+void sst_set_file_map(sst_file *, uint32_t, map_range*);
+uint32_t sst_find_map_addr(sst_file *, uint32_t lba);
 
 #define for_each_kp(data_ptr, kp_ptr, kp_idx)\
 	for(kp_idx=0, kp_ptr=(key_ptr_pair*)&data_ptr[kp_idx*sizeof(key_ptr_pair)];\
