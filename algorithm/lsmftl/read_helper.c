@@ -1,120 +1,244 @@
 #include "read_helper.h"
-read_helper *read_helper_stream_init(uint32_t helper_type){
+#include "helper_algorithm/bf_set.h"
+#include "helper_algorithm/guard_bf_set.h"
+#include "key_value_pair.h"
+extern uint32_t debug_lba;
+read_helper *read_helper_init(read_helper_param rhp){
 	read_helper *res=(read_helper*)malloc(sizeof(read_helper));
-	res->type=helper_type;
-	switch(helper_type){
-		case HELPER_BF:
-			EPINRT("now_testing fpr 0.1", false);
-			res->body=(void*)bf_init(PAGESIZE/sizeof(key_ptr_pair), fpr);
-//			bf_set((BF*)helper->body, lba);
+	res->type=rhp.type;
+	switch(rhp.type){
+		case HELPER_BF_PTR:
+			res->body=(void*)bf_set_init(rhp.target_prob, rhp.member_num, BLOOM_PTR_PAIR);
 			break;
-		case HELPER_GUARD:
-		case HELPER_PLR:
-		case HELPER_BF_PLR:
-		case HELPER_BF_GUARD:
-		case HELPER_ALL:
-			EPINRT("no implement\n",true);
+		case HELPER_BF_ONLY:
+			res->body=(void*)bf_set_init(rhp.target_prob, rhp.member_num, BLOOM_ONLY);
 			break;
-		case HELPER_NONE:
+		case HELPER_BF_PTR_GUARD:
+			res->body=(void*)gbf_set_init(rhp.target_prob, rhp.member_num, BLOOM_PTR_PAIR);
+			break;
+		case HELPER_BF_ONLY_GUARD:
+			res->body=(void*)gbf_set_init(rhp.target_prob, rhp.member_num, BLOOM_ONLY);
+			break;
+		default:
+			EPRINT("not collect type",true);
 			break;
 	}
+		
 	return res;
 }
 
-uint32_t read_helper_stream_insert(read_helper *helper, uint32_t helper_type, uint32_t lba, uint32_t ppa){
-	if(helper->type!=HELPER_NONE && !helper->body){
-		EPINRT("allocate body before insert", true);
+read_helper *read_helper_kpset_to_rh(read_helper_param rhp, key_ptr_pair *kp_set){
+	read_helper *res=(read_helper*)malloc(sizeof(read_helper));
+	res->type=rhp.type;
+
+	uint32_t i=0;
+	switch(rhp.type){
+		case HELPER_BF_PTR:
+			res->body=(void*)bf_set_init(rhp.target_prob, rhp.member_num, BLOOM_PTR_PAIR);
+			for(;i<KP_IN_PAGE; i++){
+				bf_set_insert((bf_set*)res->body, kp_set[i].lba, kp_set[i].piece_ppa);
+			}
+			break;
+		case HELPER_BF_PTR_GUARD:
+			res->body=(void*)gbf_set_init(rhp.target_prob, rhp.member_num, BLOOM_PTR_PAIR);
+			for(;i<KP_IN_PAGE; i++){
+				gbf_set_insert((guard_bf_set*)res->body, kp_set[i].lba, kp_set[i].piece_ppa);
+			}
+			break;
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_BF_ONLY:
+			EPRINT("cannot",true);
+			break;
+		default:
+			EPRINT("not collect type",true);
+			break;
 	}
 
-	switch(helper->type){
-		case HELPER_BF:
-			bf_set((BF*)helper->body, lba);
+	return res;
+}
+uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece_ppa){
+	switch(rh->type){
+		case HELPER_BF_PTR:
+		case HELPER_BF_ONLY:
+			bf_set_insert((bf_set*)rh->body,lba,piece_ppa);
 			break;
-		case HELPER_GUARD:
-		case HELPER_PLR:
-		case HELPER_BF_PLR:
-		case HELPER_BF_GUARD:
-		case HELPER_ALL:
-			EPINRT("no implement\n",true);
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_BF_PTR_GUARD:
+			gbf_set_insert((guard_bf_set*)rh->body, lba, piece_ppa);
 			break;
-		case HELPER_NONE:
+		default:
+			EPRINT("not collect type",true);
 			break;
 	}
 	return 1;
 }
-/*
-read_helper *read_helper_init(uint32_t helper_type, key_ptr_pair *kpp_array){
-	read_helper *res=(read_helper*)malloc(sizeof(read_helper));
-	res->type=helper_type;
-	switch(helper_type){
-		case HELPER_BF:
-			EPINRT("now_testing fpr 0.1", false);
-			res->body=(void*)bf_init(PAGESIZE/sizeof(key_ptr_pair), fpr);
-//			bf_set((BF*)helper->body, lba);
-			break;
-		case HELPER_GUARD:
-		case HELPER_PLR:
-		case HELPER_BF_PLR:
-		case HELPER_BF_GUARD:
-		case HELPER_ALL:
-			EPINRT("no implement\n",true);
-			break;
-		case HELPER_NONE:
+
+uint32_t read_helper_memory_usage(read_helper *rh){
+	switch(rh->type){
+		case HELPER_BF_PTR:
+		case HELPER_BF_ONLY:
+			return ((bf_set*)rh->body)->memory_usage_bit;
+		case HELPER_BF_PTR_GUARD:
+		case HELPER_BF_ONLY_GUARD:
+			return gbf_get_memory_usage_bit((guard_bf_set*)rh->body);
+		default:
+			EPRINT("not collect type",true);
 			break;
 	}
-	return res;
-}*/
 
-bool read_helper_check(read_helper *helper, uint32_t lba){
-	switch(helper->helper_type){
-		case HELPER_BF;
-			return bf_check((BF*)helper->body, lba);
-		case HELPER_GUARD:
-		case HELPER_PLR:
-		case HELPER_BF_PLR:
-		case HELPER_BF_GUARD:
-		case HELPER_ALL:
-			EPINRT("no implement\n",true);
-			break;
-		case HELPER_NONE:
+	return UINT32_MAX;
+}
+
+bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result, 
+		sst_file *sptr, uint32_t *idx){
+	if((*idx)==UINT32_MAX) 
+		return false;
+	switch(rh->type){
+		case HELPER_BF_PTR:
+			*piece_ppa_result=bf_set_get_piece_ppa((bf_set*)rh->body, 
+					idx, lba);
+			if(*piece_ppa_result==UINT32_MAX){
+				return false;
+			}
+			else{
+				(*idx)--;
+				return true;
+			}
+		case HELPER_BF_ONLY:
+			*piece_ppa_result=bf_set_get_piece_ppa((bf_set*)rh->body, 
+					idx, lba);
+			if(*piece_ppa_result==UINT32_MAX){
+				return false;
+			}
+			else{
+				if(sptr->type!=BLOCK_FILE){
+					EPRINT("read_helper miss match", true);
+				}
+				*piece_ppa_result=*piece_ppa_result+sptr->file_addr.piece_ppa;
+				(*idx)--;
+				return true;
+			}
+		case HELPER_BF_PTR_GUARD:
+			*piece_ppa_result=gbf_set_get_piece_ppa((guard_bf_set*)rh->body,
+					idx, lba);
+			if(*piece_ppa_result==UINT32_MAX){
+				return false;
+			}
+			else{
+				(*idx)--;
+				return true;
+			}
+		case HELPER_BF_ONLY_GUARD:
+			if(lba==debug_lba){
+				printf("debug_break!\n");
+			}
+			*piece_ppa_result=gbf_set_get_piece_ppa((guard_bf_set*)rh->body,
+					idx, lba);
+			if(*piece_ppa_result==UINT32_MAX){
+				return false;
+			}
+			else{
+				if(sptr->type!=BLOCK_FILE){
+					EPRINT("read_helper miss match", true);
+				}
+				*piece_ppa_result=*piece_ppa_result+sptr->file_addr.piece_ppa;
+				(*idx)--;
+				return true;
+			}
+		default:
+			EPRINT("not collect type",true);
 			break;
 	}
 	return true;
 }
 
-uint32_t read_helper_memory_usage(read_helper *helper){
-	switch(helper->helper_type){
-		case HELPER_BF;
-			return bf_check((BF*)helper->body, lba);
-		case HELPER_GUARD:
-		case HELPER_PLR:
-		case HELPER_BF_PLR:
-		case HELPER_BF_GUARD:
-		case HELPER_ALL:
-			EPINRT("no implement\n",true);
+void read_helper_print(read_helper *rh){
+	EPRINT("not implemented!", true);
+}
+
+void read_helper_free(read_helper *rh){
+	switch(rh->type){
+		case HELPER_BF_ONLY:
+		case HELPER_BF_PTR:
+			bf_set_free((bf_set*)rh->body);
 			break;
-		case HELPER_NONE:
+		case HELPER_BF_PTR_GUARD:
+		case HELPER_BF_ONLY_GUARD:
+			gbf_set_free((guard_bf_set*)rh->body);
+			break;
+		default:
+			EPRINT("not collect type",true);
 			break;
 	}
-	return true;
-}
-
-void read_helper_print(read_helper *helper){
-	EPINRT("not implemented", false);
-	return;
-}
-
-void read_helper_free(read_helper *){
-	EPINRT("not implemented", false);
-	return;
-}
-
-read_helper *read_helper_copy(read_helper *){
-	EPINRT("not implemented", false);
-	return;
-}
+	free(rh);
+}	
 
 void read_helper_copy(read_helper *des, read_helper *src){
-	EPINRT("not implemented", false);
-	return;
+	void *temp_body=des->body;
+	*des=*src;
+	des->body=temp_body;
+	switch(des->type){
+		case HELPER_BF_PTR:
+		case HELPER_BF_ONLY:
+			bf_set_copy((bf_set*)des->body, (bf_set*)src->body);
+			//bf_set_free((bf_set*)rh->body);
+			break;
+		case HELPER_BF_PTR_GUARD:
+		case HELPER_BF_ONLY_GUARD:
+			gbf_set_copy((guard_bf_set*)des->body, (guard_bf_set*)src->body);
+			break;
+		default:
+			EPRINT("not collect type",true);
+			break;
+	}
+}
+
+void read_helper_move(read_helper *des, read_helper *src){
+	void *temp_body=des->body;
+	*des=*src;
+	des->body=temp_body;
+	switch(des->type){
+		case HELPER_BF_PTR:
+		case HELPER_BF_ONLY:
+			bf_set_move((bf_set*)des->body, (bf_set*)src->body);
+			//bf_set_free((bf_set*)rh->body);
+			break;
+		case HELPER_BF_PTR_GUARD:
+		case HELPER_BF_ONLY_GUARD:
+			gbf_set_move((guard_bf_set*)des->body, (guard_bf_set*)src->body);
+			break;
+		default:
+			EPRINT("not collect type",true);
+			break;
+	}
+}
+
+bool read_helper_last(read_helper *rh, uint32_t idx){
+	switch(rh->type){
+		case HELPER_BF_ONLY:
+		case HELPER_BF_PTR:
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_BF_PTR_GUARD:
+			if((int32_t)idx==-1) return true;
+			break;
+		default:
+			EPRINT("not collect type",true);
+			break;
+	}
+	return false;
+}
+
+uint32_t read_helper_idx_init(read_helper *rh, uint32_t lba){ 
+	switch(rh->type){
+		case HELPER_BF_ONLY:
+		case HELPER_BF_PTR:
+			return ((bf_set*)rh->body)->now-1; //number to idx
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_BF_PTR_GUARD:
+			return gbf_get_start_idx((guard_bf_set*)rh->body, lba);
+		default:
+			EPRINT("not collect type",true);
+			break;
+	}
+	return UINT32_MAX;
 }

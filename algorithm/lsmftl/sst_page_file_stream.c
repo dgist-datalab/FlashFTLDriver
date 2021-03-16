@@ -145,8 +145,14 @@ void sst_pos_free(sst_pf_out_stream *os){
 	free(os);
 }
 
-sst_pf_in_stream* sst_pis_init(){
+sst_pf_in_stream* sst_pis_init(bool make_read_helper, read_helper_param rhp){
 	sst_pf_in_stream *res=(sst_pf_in_stream*)calloc(1,sizeof(sst_pf_in_stream));
+	res->make_read_helper=make_read_helper;
+	res->rhp=rhp;
+	/*
+	if(make_read_helper){
+		res->rh=read_helper_init(rhp);
+	}*/
 	res->now=NULL;
 	return res;
 }
@@ -168,6 +174,10 @@ void sst_pis_set_space(sst_pf_in_stream *is, value_set *data, uint8_t type){
 	memset(data->value, -1, PAGESIZE);
 	is->idx=0;
 	is->vs=data;
+
+	if(is->make_read_helper){
+		is->rh=read_helper_init(is->rhp);
+	}
 }
 
 bool sst_pis_insert(sst_pf_in_stream *is, key_ptr_pair kp){
@@ -179,6 +189,11 @@ bool sst_pis_insert(sst_pf_in_stream *is, key_ptr_pair kp){
 		sst_pis_set_space(is, inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE), PAGE_FILE);
 	}
 	((key_ptr_pair*)is->vs->value)[is->idx++]=kp;
+
+	if(is->rh){
+		read_helper_stream_insert(is->rh, kp.lba, kp.piece_ppa);
+	}
+
 	if(is->idx * sizeof(key_ptr_pair)==PAGESIZE){
 		return true;
 	}

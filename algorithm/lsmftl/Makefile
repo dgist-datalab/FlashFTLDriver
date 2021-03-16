@@ -1,5 +1,4 @@
 SRCS +=\
-	   bloomfilter.c\
 	   io.c\
 	   level.c\
 	   lftl_slab.c\
@@ -17,6 +16,10 @@ SRCS +=\
 	   sst_block_file_stream.c\
 	   sst_file.c\
 	   gc.c\
+	   read_helper.c\
+#	   helper_algorithm/bf_set.c\
+#	   helper_algorithm/compressed_bloomfilter.c
+#	   helper_algorithm/bloomfilter.c\
 
 
 DIRS := $(shell find ./caching/ -type d)
@@ -32,7 +35,7 @@ TARGETOBJ:=\
 
 
 LEAK: all
-all: $(TARGETOBJ)
+all: $(TARGETOBJ) HelperAlgorithm
 
 libnom.a : $(TARGETOBJ)
 	$(AR) r $(@) $(TARGETOBJ)
@@ -43,6 +46,11 @@ libnom.a : $(TARGETOBJ)
 ../../object/%.o:%.c
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
 
+HelperAlgorithm:
+	cd helper_algorithm && make 
+	cp helper_algorithm/*.o ../../object/
+
 clean : 
+	@$(RM) ./helper_algorithm/*.o
 	@$(RM) libnom.a
 	@$(RM) *.o

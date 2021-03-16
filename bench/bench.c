@@ -353,7 +353,7 @@ void bench_print(){
 #endif
 		printf("\n----summary----\n");
 		if(_m->type==RANDRW || _m->type==SEQRW || _m->type==VECTOREDRW){
-			uint64_t total_data=(PAGESIZE * _m->m_num/2)/1024;
+			uint64_t total_data=(LPAGESIZE * _m->m_num/2)/1024;
 			double total_time2=_m->benchTime.adding.tv_sec+(double)_m->benchTime.adding.tv_usec/1000000;
 			double total_time1=_m->benchTime2.adding.tv_sec+(double)_m->benchTime2.adding.tv_usec/1000000;
 			double throughput1=(double)total_data/total_time1;
@@ -380,7 +380,7 @@ void bench_print(){
 			_m->benchTime.adding.tv_sec+=_m->benchTime.adding.tv_usec/1000000;
 			_m->benchTime.adding.tv_usec%=1000000;
 			printf("[all_time]: %ld.%ld\n",_m->benchTime.adding.tv_sec,_m->benchTime.adding.tv_usec);
-			uint64_t total_data=(PAGESIZE * _m->m_num)/1024;
+			uint64_t total_data=(LPAGESIZE * _m->m_num)/1024;
 			printf("[size]: %lf(mb)\n",(double)total_data/1024);
 			double total_time=_m->benchTime.adding.tv_sec+(double)_m->benchTime.adding.tv_usec/1000000;
 			double throughput=(double)total_data/total_time;
@@ -1067,6 +1067,10 @@ char *bench_lower_type(int a){
 		case 8:return "GCDW";
 		case 9:return "GCMR_DGC";
 		case 10:return "GCMW_DGC";
+		case 11:return "COMPACTIONDATA-R";
+		case 12:return "COMPACTIONDATA-W";
+		case 13:return "MISSDATAR";
+		case 14:return "TESTIO";
 	}
 	return NULL;
 }

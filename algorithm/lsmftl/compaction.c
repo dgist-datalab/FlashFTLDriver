@@ -21,7 +21,7 @@ typedef struct{
 static compaction_master *_cm;
 void *comp_alreq_end_req(algo_req *req);
 
-static uint32_t debug_lba=UINT32_MAX;
+uint32_t debug_lba=UINT32_MAX;
 
 static inline void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, level *des){
 	static int cnt=0;
@@ -144,6 +144,7 @@ bool read_done_check(inter_read_alreq_param *param, bool check_page_sst){
 }
 
 bool file_done(inter_read_alreq_param *param){
+	param->target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);
 	compaction_free_read_param(_cm, param);
@@ -249,6 +250,7 @@ static void trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des
 	run *rptr; sst_file *sptr; 
 	if(kp_set){ // L0
 		sst_file *file=key_ptr_to_sst_file(kp_set, true);
+		file->_read_helper=read_helper_kpset_to_rh(LSM.param.leveling_rhp, kp_set);
 		if(down->now_sst_num==0){
 			level_append_sstfile(des,file);
 		}
@@ -327,6 +329,7 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 	level *res=level_init(des->max_sst_num, des->run_num, des->istier, des->idx);
 
 	if(!level_check_overlap_keyrange(kp_set[0].lba, kp_set[LAST_KP_IDX].lba, des)){
+
 		trivial_move(kp_set,NULL,  des, res);
 		//level_print(res);
 		return res;
@@ -343,7 +346,7 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 
 	sst_pf_out_stream *os_set[2]={NULL,};
 	sst_pf_out_stream *os;
-	sst_pf_in_stream *is=sst_pis_init();
+	sst_pf_in_stream *is=sst_pis_init(true, LSM.param.leveling_rhp);
 
 	uint32_t start_idx=0;
 	compaction_move_unoverlapped_sst(kp_set, NULL, des, res, &start_idx);
@@ -359,12 +362,6 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 		else{
 			read_arg.to=des->now_sst_num-1;	
 		}
-/*
-		if(first_level_cnt==2){
-			printf("break!\n");
-		}
-		printf("FL[%d]: read_arg param %d~%d\n", first_level_cnt, read_arg.from, read_arg.to);
-*/
 		read_param_init(&read_arg);
 
 		if(i==0){
@@ -423,7 +420,7 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 	thread_arg.set_num=2;
 
 	sst_pf_out_stream *os_set[2];
-	sst_pf_in_stream *is=sst_pis_init();
+	sst_pf_in_stream *is=sst_pis_init(true, LSM.param.leveling_rhp);
 	
 	uint32_t des_start_idx=0;
 	uint32_t des_end_idx=0;
@@ -530,7 +527,7 @@ static int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 				EPRINT("can't be",true);
 			}
 			algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
-			read_req->type=DATAR;
+			read_req->type=COMPACTIONDATAR;
 			read_req->param=(void*)read_target;
 			read_req->end_req=comp_alreq_end_req;
 			io_manager_issue_read(PIECETOPPA(read_target->piece_ppa),
@@ -572,8 +569,6 @@ static sst_file *bis_to_sst_file(sst_bf_in_stream *bis){
 
 		map_num++;
 
-
-
 		ppa=page_manager_get_new_ppa(LSM.pm, false);
 		if(bis->start_piece_ppa/2/_PPS!=ppa/_PPS){
 			EPRINT("map data should same sgement", true);
@@ -596,6 +591,8 @@ static sst_file *bis_to_sst_file(sst_bf_in_stream *bis){
 	res->map_num=map_num;
 	res->start_lba=bis->start_lba;
 	res->end_lba=bis->end_lba;
+	res->_read_helper=bis->rh;
+	bis->rh=NULL;
 	return res;
 }
 
@@ -626,7 +623,7 @@ static void issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bo
 				(final && sst_bos_kv_q_size(bos)==1)){
 			value_set *result=sst_bis_get_result(*bis, final);
 			algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
-			write_req->type=DATAW;
+			write_req->type=COMPACTIONDATAW;
 			write_req->param=(void*)result;
 			write_req->end_req=comp_alreq_end_req;
 			io_manager_issue_write(result->ppa, result, write_req, false);
@@ -641,7 +638,9 @@ static void issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bo
 			sst_bis_free(*bis);
 			uint32_t start_piece_ppa=page_manager_pick_new_ppa(LSM.pm, false)*L2PGAP;
 			uint32_t piece_ppa_length=page_manager_get_remain_page(LSM.pm, false)*L2PGAP;
-			*bis=sst_bis_init(start_piece_ppa, piece_ppa_length, LSM.pm);
+			read_helper_param temp_rhp=LSM.param.tiering_rhp;
+			temp_rhp.member_num=piece_ppa_length;
+			*bis=sst_bis_init(start_piece_ppa, piece_ppa_length, LSM.pm, true, temp_rhp);
 		}
 		inserted_entry_num++;
 	}
@@ -670,7 +669,9 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	sst_bf_out_stream *bos=sst_bos_init(read_done_check);
 	uint32_t start_piece_ppa=page_manager_pick_new_ppa(LSM.pm, false)*L2PGAP;
 	uint32_t piece_ppa_length=page_manager_get_remain_page(LSM.pm, false)*L2PGAP;
-	sst_bf_in_stream *bis=sst_bis_init(start_piece_ppa, piece_ppa_length, LSM.pm);
+	read_helper_param temp_rhp=LSM.param.tiering_rhp;
+	temp_rhp.member_num=piece_ppa_length;
+	sst_bf_in_stream *bis=sst_bis_init(start_piece_ppa, piece_ppa_length, LSM.pm,true, temp_rhp);
 	uint32_t start_idx=0;
 	uint32_t total_num=src->now_sst_num;
 	uint32_t tier_compaction_tags=COMPACTION_TAGS/2;
@@ -750,10 +751,12 @@ void *comp_alreq_end_req(algo_req *req){
 			r_param=(inter_read_alreq_param*)req->param;
 			fdriver_unlock(&r_param->done_lock);
 			break;
+		case COMPACTIONDATAR:
 		case DATAR:
 			kv_wrapper=(key_value_wrapper*)req->param;
 			fdriver_unlock(&kv_wrapper->param->done_lock);
 			break;
+		case COMPACTIONDATAW:
 		case DATAW:
 			vs=(value_set*)req->param;
 			inf_free_valueset(vs, FS_MALLOC_W);

@@ -29,6 +29,9 @@ typedef struct{
 	//std::queue<sst_file*> sst_file_set;
 	sst_file *now;
 	value_set *vs;
+	bool make_read_helper;
+	read_helper *rh;
+	read_helper_param rhp;
 	uint32_t idx;
 }sst_pf_in_stream;
 
@@ -43,7 +46,7 @@ void sst_pos_pop(sst_pf_out_stream *os);
 void sst_pos_free(sst_pf_out_stream *os);
 bool sst_pos_is_empty(sst_pf_out_stream *os);
 
-sst_pf_in_stream* sst_pis_init();
+sst_pf_in_stream* sst_pis_init(bool make_read_helper, read_helper_param rhp);
 void sst_pis_set_space(sst_pf_in_stream *is, value_set *data, uint8_t type);
 bool sst_pis_insert(sst_pf_in_stream *is, key_ptr_pair kp);
 
@@ -53,6 +56,8 @@ static inline value_set *sst_pis_get_result(sst_pf_in_stream *is,
 	is->now->start_lba=((key_ptr_pair*)is->now->data)[0].lba;
 	is->now->end_lba=((key_ptr_pair*)is->now->data)[is->idx-1].lba;
 	*result_ptr=is->now;
+	is->now->_read_helper=is->rh;
+	is->rh=NULL;
 	is->vs=NULL;
 	is->now=NULL;
 	is->idx=0;

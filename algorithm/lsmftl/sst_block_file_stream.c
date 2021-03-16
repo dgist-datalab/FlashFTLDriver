@@ -1,5 +1,6 @@
 #include "sst_block_file_stream.h"
 #include <stdlib.h>
+extern uint32_t debug_lba;
 sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(inter_read_alreq_param *, bool)){
 	sst_bf_out_stream *res=(sst_bf_out_stream*)calloc(1, sizeof(sst_bf_out_stream));
 	res->kv_read_check_done=r_check_done;
@@ -132,7 +133,8 @@ void sst_bos_free(sst_bf_out_stream *bos, compaction_master *cm){
 	free(bos);
 }
 
-sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_length, page_manager*pm){
+sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_length, page_manager*pm,
+		bool make_read_helper, read_helper_param rhp){
 	sst_bf_in_stream *res=(sst_bf_in_stream*)calloc(1, sizeof(sst_bf_in_stream));
 	res->start_lba=UINT32_MAX;
 	res->start_piece_ppa=start_piece_ppa;
@@ -140,6 +142,13 @@ sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_len
 	res->map_data=new std::queue<value_set*>();
 	res->pm=pm;
 	res->buffer=(key_value_wrapper*)malloc(L2PGAP*sizeof(key_value_wrapper));
+
+	
+	res->make_read_helper=make_read_helper;
+	if(make_read_helper){	
+		res->rh=read_helper_init(rhp);
+		res->rhp=rhp;
+	}
 	return res;
 }
 
@@ -202,12 +211,21 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last){
 			bis->now_map_data_idx=0;
 		}
 
+
 		key_ptr_pair *map_pair=&((key_ptr_pair*)(bis->now_map_data->value))[bis->now_map_data_idx++];
 		map_pair->lba=bis->buffer[i].kv_ptr.lba;
 		map_pair->piece_ppa=ppa*L2PGAP+(i%L2PGAP);
 
+		if(map_pair->lba==debug_lba){
+			printf("tiering %u->%u\n", debug_lba, map_pair->piece_ppa);
+		}
 		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba);
 		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i].kv_ptr.data, LPAGESIZE);
+
+		if(bis->make_read_helper){
+			read_helper_stream_insert(bis->rh, map_pair->lba, map_pair->piece_ppa);
+		}
+
 		bis->write_issued_kv_num++;
 		//free(bis->buffer[i]);
 	}
@@ -228,6 +246,10 @@ bool sst_bis_ppa_empty(sst_bf_in_stream *bis){
 }
 
 void sst_bis_free(sst_bf_in_stream *bis){
+	if(bis->rh){
+		EPRINT("make rh null before free", true);
+	}
+
 	if(!bis->map_data->empty()){
 		EPRINT("not flush map data", true);	
 	}

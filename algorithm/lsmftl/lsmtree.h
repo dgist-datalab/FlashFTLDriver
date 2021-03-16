@@ -3,6 +3,7 @@
 
 #include "../../include/sem_lock.h"
 #include "../../include/container.h"
+#include "../../include/utils/rwlock.h"
 #include "page_manager.h"
 #include "write_buffer.h"
 #include "version.h"
@@ -10,6 +11,9 @@
 #include "gc.h"
 #include "compaction.h"
 #include "lsmtree_param_module.h"
+#include "read_helper.h"
+
+#define TARGETFPR 0.1f
 
 typedef struct lsmtree_monitor{
 	uint32_t trivial_move_cnt;
@@ -19,8 +23,9 @@ typedef struct lsmtree_monitor{
 typedef struct lsmtree_parameter{
 	uint32_t LEVELN;
 	uint32_t mapping_num;
-	uint32_t size_factor;
-	void *private_data_for_readhelper;
+	uint32_t size_factor;	
+	read_helper_param leveling_rhp;
+	read_helper_param tiering_rhp;
 }lsmtree_parameter;
 
 enum{
@@ -31,7 +36,10 @@ typedef struct lsmtree_read_param{
 	uint32_t check_type;
 	int32_t prev_level;
 	int32_t prev_run;
-	int32_t sst_map_idx;
+	sst_file *prev_sf;
+	bool use_read_helper;
+	uint32_t read_helper_idx;
+	rwlock *target_level_rw_lock;
 }lsmtree_read_param;
 
 typedef struct lsmtree{
@@ -45,10 +53,13 @@ typedef struct lsmtree{
 	uint32_t version_num;
 	version *last_run_version;
 	level **disk;
-	fdriver_lock_t *level_lock;
+	
+	rwlock *level_rwlock;
+
 	lsmtree_parameter param;
 	lsmtree_monitor monitor;
 	bool global_debug_flag;
+	lower_info *li;
 }lsmtree;
 
 

@@ -56,6 +56,8 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		temp->value=NULL;
 		temp->isAsync=ASYNC;
 		temp->seq=seq++;
+		temp->type_ftl=0;
+		temp->type_lower=0;
 		switch(temp->type){
 #ifdef KVSSD
 			case FS_TRANS_COMMIT:

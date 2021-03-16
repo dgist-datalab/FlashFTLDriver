@@ -29,7 +29,7 @@ typedef struct sst_file{
 
 	uint32_t start_lba;
 	uint32_t end_lba;
-	read_helper *_read_helper;
+	struct read_helper *_read_helper;
 	
 	map_range *block_file_map;
 	char *data;
@@ -41,13 +41,7 @@ sst_file *sst_bf_init(uint32_t ppa, uint32_t end_ppa,uint32_t start_lba, uint32_
 void sst_destroy_content(sst_file*);
 void sst_free(sst_file*);
 
-static inline void sst_deep_copy(sst_file *des, sst_file *src){
-	read_helper *temp_helper=des->_read_helper;
-	*des=*src;
-	src->block_file_map=NULL;
-	//read_helper_copy(temp_helper, src->_read_helper);
-	des->_read_helper=temp_helper;
-}
+void sst_deep_copy(sst_file *des, sst_file *src);
 
 static inline void sst_copy(sst_file *des, sst_file *src){
 	*des=*src;

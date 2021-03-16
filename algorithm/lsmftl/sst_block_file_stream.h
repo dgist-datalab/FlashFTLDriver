@@ -4,6 +4,7 @@
 #include "sst_page_file_stream.h"
 #include "compaction.h"
 #include "page_manager.h"
+#include "read_helper.h"
 #include <queue>
 
 #define REMAIN_DATA_PPA(bis) \
@@ -39,6 +40,10 @@ typedef struct{
 	value_set *now_map_data;
 	uint32_t now_map_data_idx;
 
+	bool make_read_helper;
+	read_helper *rh;
+	read_helper_param rhp;
+
 	uint8_t buffer_idx;
 	key_value_wrapper *buffer;//assigned L2PGAP * key_value_wrapper;
 
@@ -58,7 +63,8 @@ static inline uint32_t sst_bos_kv_q_size(sst_bf_out_stream *bos){
 	return bos->kv_wrapper_q->size();
 }
 
-sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_length, page_manager *pm);
+sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_length, page_manager *pm, 
+		bool make_read_helper, read_helper_param rhp);
 bool sst_bis_insert(sst_bf_in_stream *bis, key_value_wrapper *);
 value_set* sst_bis_finish(sst_bf_in_stream*);
 value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last); //it should return unaligned value when it no space

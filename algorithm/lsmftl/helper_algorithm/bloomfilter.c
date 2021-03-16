@@ -1,5 +1,5 @@
 #include"bloomfilter.h"
-#include"../../bench/bench.h"
+#include"../../../bench/bench.h"
 //#include "../../include/sha256-arm.h"
 #include<math.h>
 #include<stdio.h>
@@ -178,7 +178,7 @@ uint64_t bf_bits(int entry, float fpr){
 }
 
 extern MeasureTime write_opt_time[10];
-void bf_set(BF *input, uint32_t key){
+void bf_put(BF *input, uint32_t key){
 	if(input==NULL){
 		abort();
 	}

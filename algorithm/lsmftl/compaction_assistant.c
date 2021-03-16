@@ -46,16 +46,18 @@ void compaction_issue_req(compaction_master *cm, compaction_req *req){
 static inline void disk_change(level **up, level *src, level** des){
 	if(up!=NULL){
 		level *new_up=level_init((*up)->max_sst_num, (*up)->max_run_num, (*up)->istier, (*up)->idx);
-		fdriver_lock(&LSM.level_lock[(*up)->idx]);
+		rwlock_write_lock(&LSM.level_rwlock[(*up)->idx]);
 		level_free(*up);
 		*up=new_up;
-		fdriver_unlock(&LSM.level_lock[(*up)->idx]);
+		rwlock_write_unlock(&LSM.level_rwlock[(*up)->idx]);
 	}
 
 	level *delete_target_level=*des;
-	fdriver_lock(&LSM.level_lock[(*des)->idx]);
+	//fdriver_lock(&LSM.level_lock[(*des)->idx]);
+	rwlock_write_lock(&LSM.level_rwlock[(*des)->idx]);
 	(*des)=src;
-	fdriver_unlock(&LSM.level_lock[(*des)->idx]);
+	rwlock_write_unlock(&LSM.level_rwlock[(*des)->idx]);
+	//fdriver_unlock(&LSM.level_lock[(*des)->idx]);
 	level_free(delete_target_level);
 }
 

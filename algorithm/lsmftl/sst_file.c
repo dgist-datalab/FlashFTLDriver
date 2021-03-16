@@ -28,8 +28,17 @@ sst_file *sst_bf_init(uint32_t ppa, uint32_t end_ppa, uint32_t start_lba, uint32
 
 void sst_destroy_content(sst_file* sstfile){
 	//free_sstfile_ readhelper...
-	if(sstfile->type==BLOCK_FILE)
+	
+	if(sstfile->type==BLOCK_FILE){
 		free(sstfile->block_file_map);
+	}
+	if(sstfile->data){
+		EPRINT("data not free", true);
+	}
+	if(sstfile->_read_helper){
+		read_helper_free(sstfile->_read_helper);
+	}
+
 	return;
 }
 
@@ -80,6 +89,18 @@ void sst_free(sst_file* sstfile){
 	if(sstfile->data){
 		EPRINT("data not free", true);
 	}
+	if(sstfile->_read_helper){
+		read_helper_free(sstfile->_read_helper);
+	}
 	free(sstfile);
+}
 
+void sst_deep_copy(sst_file *des, sst_file *src){
+//	read_helper *temp_helper=des->_read_helper;
+	*des=*src;
+	src->block_file_map=NULL;
+	//read_helper_copy(temp_helper, src->_read_helper)
+	des->_read_helper=src->_read_helper;
+	//read_helper_move(des->_read_helper, src->_read_helper);
+	src->_read_helper=NULL;
 }

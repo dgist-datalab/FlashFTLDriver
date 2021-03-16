@@ -1,5 +1,6 @@
 1. read logic
 	- add read helper
+	-- fix compaction while making read helper
 2. memory leack
 3. gc
 	-
