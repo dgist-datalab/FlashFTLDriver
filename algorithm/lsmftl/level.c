@@ -131,12 +131,12 @@ sst_file* level_retrieve_close_sst(level *lev, uint32_t lba){
 	return run_retrieve_close_sst(&lev->array[0], lba);
 }
 
-static inline void level_destroy_content(level *lev){
+static inline void level_destroy_content(level *lev, page_manager *pm){
 	run *run_ptr;
 	uint32_t idx;
 	/*assigned level*/
 	for_each_run(lev, run_ptr, idx){
-		run_destroy_content(run_ptr);
+		run_destroy_content(run_ptr, pm);
 	}
 	/*unassigned level*/
 	for(uint32_t i=lev->run_num; i<lev->max_run_num; i++){
@@ -144,8 +144,8 @@ static inline void level_destroy_content(level *lev){
 	}
 }
 
-void level_free(level *lev){
-	level_destroy_content(lev);
+void level_free(level *lev, page_manager *pm){
+	level_destroy_content(lev, pm);
 	free(lev->array);
 	free(lev);
 }

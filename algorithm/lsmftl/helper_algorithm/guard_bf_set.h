@@ -33,6 +33,7 @@ static inline uint32_t gbf_get_memory_usage_bit(guard_bf_set *gbf_set){
 		}
 		else break;
 	}
+	return res;
 }
 
 #endif

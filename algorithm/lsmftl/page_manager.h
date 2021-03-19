@@ -9,6 +9,9 @@
 #define BLOCK_PER_MAP_NUM (BLOCK_MAP_SIZE/PAGESIZE+(BLOCK_MAP_SIZE%PAGESIZE?1:0))
 #define PIECETOPPA(a) ((a)>>1)
 
+enum{
+	DATASEG, MAPSEG
+};
 
 typedef struct _page_manager{
 	bool seg_type_checker[_NOS];
@@ -27,5 +30,9 @@ uint32_t page_manager_pick_new_ppa(page_manager *pm, bool ismap);
 uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap);
 void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t* piece_ppa, uint32_t *lba);
 void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa);
+void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t lba);
+void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa);
+uint32_t page_manager_get_reserve_new_ppa(page_manager *pm, bool ismap);
+uint32_t page_manager_change_reserve(page_manager *pm, bool ismap);
 
 #endif

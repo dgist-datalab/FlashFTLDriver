@@ -26,10 +26,13 @@ sst_file *sst_bf_init(uint32_t ppa, uint32_t end_ppa, uint32_t start_lba, uint32
 	return res;
 }
 
-void sst_destroy_content(sst_file* sstfile){
+void sst_destroy_content(sst_file* sstfile, page_manager *pm){
 	//free_sstfile_ readhelper...
 	
 	if(sstfile->type==BLOCK_FILE){
+		for(uint32_t i=0; i<sstfile->map_num; i++){
+			invalidate_map_ppa(pm->bm, sstfile->block_file_map[i].ppa);
+		}
 		free(sstfile->block_file_map);
 	}
 	if(sstfile->data){
@@ -81,9 +84,12 @@ uint32_t sst_find_map_addr(sst_file *sstfile, uint32_t lba){
 	return res;
 }
 
-void sst_free(sst_file* sstfile){
+void sst_free(sst_file* sstfile, page_manager *pm){
 	//free_sstfile
 	if(sstfile->block_file_map){
+		for(uint32_t i=0; i<sstfile->map_num; i++){
+			invalidate_map_ppa(pm->bm, sstfile->block_file_map[i].ppa);
+		}
 		free(sstfile->block_file_map);
 	}
 	if(sstfile->data){

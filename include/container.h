@@ -200,6 +200,7 @@ typedef struct mastersegment{
 
 typedef struct ghostsegment{ //for gc
 	__block* blocks[BPS];
+	uint32_t seg_idx;
 	uint16_t now;
 	uint16_t max;
 	uint32_t invalidate_number;

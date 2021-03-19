@@ -14,7 +14,7 @@ write_buffer *write_buffer_reinit(write_buffer *wb){
 	return wb;
 }
 
-write_buffer *write_buffer_init(uint32_t max_buffered_entry_num, page_manager *pm){
+write_buffer *write_buffer_init(uint32_t max_buffered_entry_num, page_manager *pm, uint32_t type){
 	write_buffer *res=(write_buffer*)calloc(1, sizeof(write_buffer));
 	res->data=new std::map<uint32_t, buffer_entry*>();
 	res->max_buffer_entry_num=max_buffered_entry_num;
@@ -24,6 +24,7 @@ write_buffer *write_buffer_init(uint32_t max_buffered_entry_num, page_manager *p
 	fdriver_mutex_init(&res->cnt_lock);
 	fdriver_mutex_init(&res->sync_lock);
 	res->flushed_req_cnt=0;
+	res->type=type;
 	return res;
 }
 
@@ -94,12 +95,12 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 		}	
 
 		//page_manager_insert_lba(wb->pm, it->first);
-		memcpy(&target_value->value[inter_idx*LPAGESIZE], it->second->data->value, LPAGESIZE);//copy value
+		memcpy(&target_value->value[inter_idx*LPAGESIZE], it->second->data.data->value, LPAGESIZE);//copy value
 		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba);
-		inf_free_valueset(it->second->data, FS_MALLOC_W);
+		inf_free_valueset(it->second->data.data, FS_MALLOC_W);
 
 		if(inter_idx==(L2PGAP-1)){//issue data
 			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
@@ -126,14 +127,14 @@ uint32_t write_buffer_insert(write_buffer *wb, uint32_t lba, value_set* value){
 	if(!wb->data->size() || it==wb->data->end()){/*new data*/
 		buffer_entry *ent=(buffer_entry*)slab_alloc(wb->sm);
 		ent->lba=lba;
-		ent->data=value;
+		ent->data.data=value;
 		wb->data->insert(std::pair<uint32_t, buffer_entry*>(lba, ent));
 		wb->buffered_entry_num++;
 	}
 	else{/*update data*/
 		buffer_entry *obsolete=wb->data->at(lba);
-		inf_free_valueset(obsolete->data, FS_MALLOC_W);
-		obsolete->data=value;
+		inf_free_valueset(obsolete->data.data, FS_MALLOC_W);
+		obsolete->data.data=value;
 		wb->data->at(lba)=obsolete;
 	}
 
@@ -145,20 +146,26 @@ uint32_t write_buffer_insert(write_buffer *wb, uint32_t lba, value_set* value){
 	}
 }
 
+
 char *write_buffer_get(write_buffer *wb, uint32_t lba){
 	std::map<uint32_t, buffer_entry*>::iterator it=wb->data->find(lba);
 	if(it==wb->data->end()){
 		return NULL;
 	}
 	else{
-		return it->second->data->value;
+		if(wb->type==NORMAL_WB)
+			return it->second->data.data->value;
+		else
+			return it->second->data.gc_data;
 	}
 }
 
 void write_buffer_free(write_buffer* wb){
 	std::map<uint32_t, buffer_entry*>::iterator it;
-	for(it=wb->data->begin(); it!=wb->data->end(); it++){
-		inf_free_valueset(it->second->data,FS_MALLOC_W);
+	if(wb->type==NORMAL_WB){
+		for(it=wb->data->begin(); it!=wb->data->end(); it++){
+			inf_free_valueset(it->second->data.data,FS_MALLOC_W);
+		}
 	}
 
 	delete wb->data;
@@ -167,3 +174,80 @@ void write_buffer_free(write_buffer* wb){
 	fdriver_destroy(&wb->sync_lock);
 	free(wb);
 }
+
+uint32_t write_buffer_insert_for_gc(write_buffer *wb, uint32_t lba, char *gc_data){
+	if(wb->is_immutable){
+		return encode_return_code(FAILED, WB_IS_IMMUTABLE);
+	}
+
+	std::map<uint32_t, buffer_entry*>::iterator it;
+	it=wb->data->find(lba);
+	if(!wb->data->size() || it==wb->data->end()){/*new data*/
+		buffer_entry *ent=(buffer_entry*)slab_alloc(wb->sm);
+		ent->lba=lba;
+		ent->data.gc_data=gc_data;
+		wb->data->insert(std::pair<uint32_t, buffer_entry*>(lba, ent));
+		wb->buffered_entry_num++;
+	}
+	else{/*update data*/
+		EPRINT("not allowed!", true);
+	}
+
+	return encode_return_code(SUCCESSED, WB_NONE);
+}
+
+key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync){
+	if(wb->buffered_entry_num==0) return NULL;
+	else if((int)wb->buffered_entry_num<0){
+		EPRINT("minus number not allowed!", true);
+	}
+	std::map<uint32_t, buffer_entry*>::iterator it=wb->data->begin();
+	value_set* target_value=NULL;
+	uint32_t ppa=-1;
+	char *oob=NULL;
+	key_ptr_pair *res=(key_ptr_pair*)malloc(sizeof(key_ptr_pair)*KP_IN_PAGE);
+	memset(res, 1, PAGESIZE);
+	uint8_t inter_idx;
+	for(uint32_t i=0; it!=wb->data->end() && i<KP_IN_PAGE; i++, it++){
+		inter_idx=i%L2PGAP;
+		if(inter_idx==0){
+			ppa=page_manager_get_reserve_new_ppa(wb->pm, false);
+			target_value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+			target_value->ppa=ppa;
+			oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);
+		}	
+
+		//page_manager_insert_lba(wb->pm, it->first);
+		memcpy(&target_value->value[inter_idx*LPAGESIZE], it->second->data.gc_data, LPAGESIZE);
+		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
+		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
+		res[i].lba=it->first;
+		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba);
+
+		if(inter_idx==(L2PGAP-1)){//issue data
+			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
+			ppa=-1;
+			oob=NULL;
+			target_value=NULL;
+		}
+		wb->buffered_entry_num--;
+	}
+
+	if(inter_idx!=(L2PGAP-1)){
+		if(ppa==UINT32_MAX){
+			EPRINT("it can't be", true);
+		}
+		uint32_t temp_ppa=ppa*L2PGAP+inter_idx;
+		uint32_t temp_lba=UINT32_MAX;
+		validate_piece_ppa(wb->pm->bm, 1, &temp_ppa, &temp_lba);
+		io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
+		ppa=-1;
+	}
+
+	if(sync){
+		fdriver_lock(&wb->sync_lock);
+	}	
+
+	return res;
+}
+

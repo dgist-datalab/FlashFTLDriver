@@ -32,7 +32,7 @@ void level_trivial_move_sstfile(level *src, level *des,  uint32_t from, uint32_t
 void level_trivial_move_run(level *, uint32_t from, uint32_t to);
 sst_file* level_retrieve_sst(level *, uint32_t lba);
 sst_file* level_retrieve_close_sst(level *, uint32_t lba);
-void level_free(level *);
+void level_free(level *, page_manager *);
 
 static inline bool level_check_overlap(level *a, level *b){
 	if(b->now_sst_num==0 || a->now_sst_num==0) return false;

@@ -48,6 +48,8 @@ typedef struct lsmtree{
 	struct compaction_master *cm;
 	//page_manager *pm_map;
 
+	std::queue<key_ptr_pair*>* moved_kp_set;
+
 	uint32_t now_wb;
 	write_buffer **wb_array;
 	uint32_t version_num;
@@ -72,6 +74,8 @@ uint32_t lsmtree_flush(request *const req);
 uint32_t lsmtree_remove(request *const req);
 void lsmtree_compaction_end_req(struct compaction_req*);
 void lsmtree_level_summary(lsmtree *lsm);
+sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
+//sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 
 #define MAKE_L0COMP_REQ(kp_set, param)\
 	alloc_comp_req(-1,0,(kp_set), lsmtree_compaction_end_req, (void*)(param))

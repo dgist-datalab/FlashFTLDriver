@@ -1,8 +1,8 @@
 SRCS +=\
-	   bloomfilter.c\
 	   bf_set.c\
 	   compressed_bloomfilter.c\
 	   guard_bf_set.c\
+# bloomfilter.c\
 
 	
 OBJS :=\

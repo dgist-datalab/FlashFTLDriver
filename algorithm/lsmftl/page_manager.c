@@ -33,7 +33,9 @@ page_manager* page_manager_init(struct blockmanager *_bm){
 	page_manager *pm=(page_manager*)calloc(1,sizeof(page_manager));
 	pm->bm=_bm;
 	pm->current_segment[DATA_S]=_bm->get_segment(_bm, false);
+	pm->seg_type_checker[pm->current_segment[DATA_S]->seg_idx]=DATASEG;
 	pm->current_segment[MAP_S]=_bm->get_segment(_bm, false);
+	pm->seg_type_checker[pm->current_segment[MAP_S]->seg_idx]=MAPSEG;
 	pm->reserve_segment=_bm->get_segment(_bm, true);
 	return pm;
 }
@@ -45,6 +47,16 @@ void page_manager_free(page_manager* pm){
 	free(pm);
 }
 
+void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t lba){
+	char *oob=bm->get_oob(bm, map_ppa);
+	*(uint32_t*)oob=lba;
+	bm->populate_bit(bm, map_ppa*L2PGAP);
+}
+
+void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa){
+	bm->unpopulate_bit(bm, map_ppa*L2PGAP);
+}
+
 uint32_t page_manager_get_new_ppa(page_manager *pm, bool is_map){
 	uint32_t res;
 	blockmanager *bm=pm->bm;
@@ -54,10 +66,11 @@ retry:
 	if(bm->check_full(bm, seg, MASTER_PAGE)){
 		if(bm->is_gc_needed(bm)){
 			EPRINT("before get ppa, try to gc!!\n", true);
-			do_gc();
+			do_gc(pm);
 		}
 		free(seg);
 		pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+		pm->seg_type_checker[pm->current_segment[is_map?MAP_S:DATA_S]->seg_idx]=is_map?MAPSEG:DATASEG;
 		goto retry;
 	}
 	res=bm->get_page_num(bm, seg);
@@ -71,10 +84,11 @@ retry:
 	if(bm->check_full(bm, seg, MASTER_PAGE)){
 		if(bm->is_gc_needed(bm)){
 			EPRINT("before get ppa, try to gc!!\n", true);
-			do_gc();
+			do_gc(pm);
 		}
 		free(seg);
 		pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+		pm->seg_type_checker[pm->current_segment[is_map?MAP_S:DATA_S]->seg_idx]=is_map?MAPSEG:DATASEG;
 		goto retry;
 	}
 	return bm->pick_page_num(bm, seg);
@@ -98,3 +112,25 @@ uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 	}
 }
 
+uint32_t page_manager_get_reserve_new_ppa(page_manager *pm, bool ismap){
+	blockmanager *bm=pm->bm;
+retry:
+	__segment *seg=ismap?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
+	if(bm->check_full(bm, seg, MASTER_PAGE)){
+		free(seg);
+		pm->current_segment[ismap?MAP_S:DATA_S]=pm->reserve_segment;
+		pm->reserve_segment=NULL;
+		//pm->current_segment[ismap?MAP_S:DATA_S]=bm->get_segment(bm,false);
+		//pm->seg_type_checker[pm->current_segment[is_map?MAP_S:DATA_S]->seg_idx]=is_map?MAPSEG:DATASEG;
+		goto retry;
+	}
+	return bm->pick_page_num(bm, seg);
+}
+
+uint32_t page_manager_change_reserve(page_manager *pm, bool ismap){
+	blockmanager *bm=pm->bm;
+	if(pm->reserve_segment==NULL){
+		pm->reserve_segment=bm->change_reserve(bm, pm->current_segment[ismap?MAP_S:DATA_S]);
+	}
+	return 1;
+}

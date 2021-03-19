@@ -27,11 +27,12 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * 2);
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<2; i++){
-		LSM.wb_array[i]=write_buffer_init(1024, LSM.pm);
+		LSM.wb_array[i]=write_buffer_init(1024, LSM.pm, NORMAL_WB);
 	}
 
 	LSM.param.LEVELN=5;
 	LSM.param.mapping_num=SHOWINGSIZE/LPAGESIZE/(PAGESIZE/sizeof(key_ptr_pair));
+	LSM.moved_kp_set=new std::queue<key_ptr_pair*>();
 
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
@@ -73,11 +74,12 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 		write_buffer_free(LSM.wb_array[i]);
 	}
 	for(uint32_t  i=0; i<LSM.param.LEVELN; i++){
-		level_free(LSM.disk[i]);
+		level_free(LSM.disk[i], LSM.pm);
 		rwlock_destroy(&LSM.level_rwlock[i]);
 	}	
 	page_manager_free(LSM.pm);
 	compaction_free(LSM.cm);
+	delete LSM.moved_kp_set;
 }
 
 static inline algo_req *get_read_alreq(request *const req, uint8_t type, 
@@ -258,6 +260,12 @@ uint32_t lsmtree_write(request *const req){
 	write_buffer_insert(wb, req->key, req->value);
 //	printf("write lba:%u\n", req->key);
 
+	while(!LSM.moved_kp_set->empty()){
+		key_ptr_pair *kp_set=LSM.moved_kp_set->front();
+		compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(kp_set, NULL));
+		LSM.moved_kp_set->pop();
+	}
+
 	if(write_buffer_isfull(wb)){
 		key_ptr_pair *kp_set=write_buffer_flush(wb,false);
 		/*
@@ -270,6 +278,7 @@ uint32_t lsmtree_write(request *const req){
 		}
 		compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(kp_set, NULL));
 	}
+
 	req->value=NULL;
 	req->end_req(req);
 	return 1;
@@ -337,4 +346,17 @@ void lsmtree_level_summary(lsmtree *lsm){
 	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
 		printf("ptr:%p ", lsm->disk[i]); level_print(lsm->disk[i]);
 	}
+}
+
+sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa){
+	sst_file *res=NULL;
+	for(uint32_t i=0; i<LSM.param.LEVELN-1; i++){
+		level *lev=LSM.disk[i];
+		res=level_retrieve_sst(lev, lba);
+		if(lba==res->start_lba && res->file_addr.map_ppa==map_ppa){
+			return res;
+		}
+	}
+	EPRINT("not found target", true);
+	return res;
 }

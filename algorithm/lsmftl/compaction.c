@@ -147,6 +147,7 @@ bool file_done(inter_read_alreq_param *param){
 	param->target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);
+	invalidate_map_ppa(LSM.pm->bm, param->target->file_addr.map_ppa);
 	compaction_free_read_param(_cm, param);
 	return true;
 }
@@ -216,6 +217,7 @@ static void write_sst_file(sst_pf_in_stream *is, level *des){ //for page file
 	sst_file *sptr;
 	value_set *vs=sst_pis_get_result(is, &sptr);
 	sptr->file_addr.map_ppa=page_manager_get_new_ppa(LSM.pm,true);
+	validate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, sptr->start_lba);
 	
 	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 	write_req->type=MAPPINGW;
@@ -225,7 +227,7 @@ static void write_sst_file(sst_pf_in_stream *is, level *des){ //for page file
 	io_manager_issue_internal_write(sptr->file_addr.map_ppa, vs, write_req, false);
 	sptr->data=NULL;
 	level_append_sstfile(des, sptr);
-	sst_free(sptr);
+	sst_free(sptr, LSM.pm);
 }
 
 
@@ -234,6 +236,7 @@ static sst_file *key_ptr_to_sst_file(key_ptr_pair *kp_set, bool should_flush){
 	if(should_flush){
 		value_set *vs=inf_get_valueset((char*)kp_set, FS_MALLOC_W, PAGESIZE);
 		ppa=page_manager_get_new_ppa(LSM.pm, true);
+		validate_map_ppa(LSM.pm->bm, ppa, kp_set[0].lba);
 		algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 		write_req->type=MAPPINGW;
 		write_req->param=(void*)vs;
@@ -267,7 +270,7 @@ static void trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des
 				}
 			}
 		}
-		sst_free(file);
+		sst_free(file, LSM.pm);
 	}
 	else{ //L1~LN-1
 		if(down->now_sst_num==0){
@@ -563,7 +566,7 @@ static sst_file *bis_to_sst_file(sst_bf_in_stream *bis){
 	while(bis->map_data->size()){
 		value_set *data=bis->map_data->front();
 		algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
-		write_req->type=DATAW;
+		write_req->type=COMPACTIONDATAW;
 		write_req->param=(void*)data;
 		write_req->end_req=comp_alreq_end_req;
 
@@ -577,6 +580,9 @@ static sst_file *bis_to_sst_file(sst_bf_in_stream *bis){
 		mr_set[mr_idx].start_lba=((key_ptr_pair*)data->value)[0].lba;
 		mr_set[mr_idx].end_lba=kp_get_end_lba(data->value);
 		mr_set[mr_idx].ppa=ppa;
+
+		uint32_t temp_ppa=ppa*L2PGAP;
+		validate_piece_ppa(LSM.pm->bm,1, &temp_ppa, &mr_set[mr_idx].start_lba);
 
 		io_manager_issue_write(ppa, data, write_req, false);
 
@@ -611,11 +617,6 @@ static void issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bo
 			}
 		}
 
-		if(target){
-			invalidate_piece_ppa((*bis)->pm->bm, target->piece_ppa);
-		}
-
-
 		compaction_debug_func(target->kv_ptr.lba, target->piece_ppa,
 				LSM.disk[LSM.param.LEVELN-1]);
 
@@ -629,12 +630,16 @@ static void issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bo
 			io_manager_issue_write(result->ppa, result, write_req, false);
 		}
 
+		if(target){
+			invalidate_piece_ppa((*bis)->pm->bm, target->piece_ppa);
+		}
+
 		sst_bos_pop(bos, _cm);
 	//	if(!final & sst_bis_ppa_empty(*bis)){
 		if(sst_bis_ppa_empty(*bis)){
 			sst_file *sptr=bis_to_sst_file(*bis);
 			run_append_sstfile(new_run, sptr);
-			sst_free(sptr);
+			sst_free(sptr, LSM.pm);
 			sst_bis_free(*bis);
 			uint32_t start_piece_ppa=page_manager_pick_new_ppa(LSM.pm, false)*L2PGAP;
 			uint32_t piece_ppa_length=page_manager_get_remain_page(LSM.pm, false)*L2PGAP;
@@ -717,7 +722,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
 		run_append_sstfile(new_run, last_file);
-		sst_free(last_file);
+		sst_free(last_file, LSM.pm);
 	}
 	
 	sst_pos_free(pos);

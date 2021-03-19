@@ -139,9 +139,11 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	res->max=BPS;
 	res->invalid_blocks=0;
 	res->used_page_num=0;
+	res->seg_idx=res->blocks[0]->block_num/BPS;
 	
 	p->assigned_block++;
 	p->free_block--;
+
 
 	if(p->assigned_block+p->free_block!=_NOS){
 		printf("missing segment error\n");
@@ -188,6 +190,7 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 		abort();
 	}
 	res->now=res->max=0;
+	res->seg_idx=res->blocks[0]->block_num/BPS;
 	return res;
 }
 

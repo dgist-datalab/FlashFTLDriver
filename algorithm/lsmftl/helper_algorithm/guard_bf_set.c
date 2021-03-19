@@ -142,7 +142,7 @@ uint32_t gbf_get_start_idx(guard_bf_set *gbf, uint32_t lba){
 
 void gbf_set_copy(guard_bf_set *des, guard_bf_set *src){
 	*des=*src;
-	uint32_t type=((bf_set*)src->body[0].array)->type;
+	//uint32_t type=((bf_set*)src->body[0].array)->type;
 	uint32_t i=0;
 	for(;i<src->max;i++){
 		bf_set_copy((bf_set*)des->body[i].array, (bf_set*)src->body[i].array);

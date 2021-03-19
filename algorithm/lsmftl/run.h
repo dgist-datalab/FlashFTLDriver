@@ -3,6 +3,7 @@
 #include "../../include/settings.h"
 #include "sst_file.h"
 #include <stdlib.h>
+#include "page_manager.h"
 /*
  d=data
  m=map
@@ -39,10 +40,10 @@ void run_space_init(run *,uint32_t map_num, uint32_t start_lba, uint32_t end_lba
 void run_append_sstfile(run *_run, sst_file *sstfile);
 void run_deep_append_sstfile(run *_run, sst_file *sstfile);
 void run_free(run *_run);
-static inline void run_destroy_content(run *_run){
+static inline void run_destroy_content(run *_run, struct _page_manager *pm){
 	sst_file *sptr; uint32_t sidx;
 	for_each_sst(_run, sptr, sidx){
-		sst_destroy_content(sptr);
+		sst_destroy_content(sptr, pm);
 	}
 	free(_run->sst_set);
 }
