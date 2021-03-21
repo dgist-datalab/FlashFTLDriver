@@ -33,12 +33,14 @@ static inline uint32_t run_file_size(run *r){
 	for((sst_ptr)=&(run_ptr)->sst_set[idx]; idx<(run_ptr)->now_sst_file_num; \
 			idx++, (sst_ptr)=&(run_ptr)->sst_set[idx])
 
+
 run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba);
 sst_file *run_retrieve_sst(run *r, uint32_t lba);
 sst_file *run_retrieve_close_sst(run *r, uint32_t lba);
 void run_space_init(run *,uint32_t map_num, uint32_t start_lba, uint32_t end_lba);
 void run_append_sstfile(run *_run, sst_file *sstfile);
 void run_deep_append_sstfile(run *_run, sst_file *sstfile);
+
 void run_free(run *_run);
 static inline void run_destroy_content(run *_run, struct _page_manager *pm){
 	sst_file *sptr; uint32_t sidx;
@@ -71,4 +73,5 @@ static inline void run_copy_src_empty(run *des ,run *src){
 	src->now_sst_file_num=0;
 	des->sst_set=temp_file;
 }
+
 #endif

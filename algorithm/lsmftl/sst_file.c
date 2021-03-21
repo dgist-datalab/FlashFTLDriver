@@ -110,3 +110,12 @@ void sst_deep_copy(sst_file *des, sst_file *src){
 	//read_helper_move(des->_read_helper, src->_read_helper);
 	src->_read_helper=NULL;
 }
+
+sst_file *sst_MR_to_sst_file(map_range *mr){
+	sst_file *res=(sst_file*)calloc(1, sizeof(sst_file));
+	res->file_addr.map_ppa=mr->ppa;
+	res->start_lba=mr->start_lba;
+	res->end_lba=mr->end_lba;
+	res->type=PAGE_FILE;
+	return res;
+}

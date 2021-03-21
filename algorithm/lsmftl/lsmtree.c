@@ -34,6 +34,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.param.mapping_num=SHOWINGSIZE/LPAGESIZE/(PAGESIZE/sizeof(key_ptr_pair));
 	LSM.moved_kp_set=new std::queue<key_ptr_pair*>();
 
+
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
 
@@ -51,10 +52,12 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	}
 	printf("target mapping num:%u - real_mapping_num:%u\n", LSM.param.mapping_num, real_mapping_num);
 
+	LSM.last_run_version=version_init(LSM.disk[LSM.param.LEVELN-1]->max_run_num, RANGE);
 
 	memset(all_set_page, 1, PAGESIZE);
 
-	LSM.monitor.compaction_cnt=(uint32_t*)calloc(LSM.param.LEVELN, sizeof(uint32_t));
+	LSM.monitor.compaction_cnt=(uint32_t*)calloc(LSM.param.LEVELN+1, sizeof(uint32_t));
+
 
 	/*rhp setting*/
 	LSM.param.leveling_rhp.type=HELPER_BF_PTR_GUARD;
@@ -77,6 +80,9 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 		level_free(LSM.disk[i], LSM.pm);
 		rwlock_destroy(&LSM.level_rwlock[i]);
 	}	
+
+	version_free(LSM.last_run_version);
+
 	page_manager_free(LSM.pm);
 	compaction_free(LSM.cm);
 	delete LSM.moved_kp_set;
@@ -260,6 +266,8 @@ uint32_t lsmtree_write(request *const req){
 	write_buffer_insert(wb, req->key, req->value);
 //	printf("write lba:%u\n", req->key);
 
+	version_coupling_lba_ridx(LSM.last_run_version, req->key, UINT8_MAX);
+	
 	while(!LSM.moved_kp_set->empty()){
 		key_ptr_pair *kp_set=LSM.moved_kp_set->front();
 		compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(kp_set, NULL));

@@ -96,16 +96,7 @@ again:
 			goto again;
 		}
 		else if(req->end_level==LSM.param.LEVELN-1 && level_is_full(LSM.disk[req->end_level])){
-			EPRINT("not implemented", true);
-			uint8_t start_run=version_get_oldest_run_idx(LSM.last_run_version);
-		/*	version_dequeue(LSM.last_run_version);
-			version_dequeue(LSM.last_run_version);
-
-			compaction_merge(cm, LSM.disk[req->end_level]->array[start_run],
-					LSM.disk[req->end_level]->array[start_run+1], 
-					0);
-
-		version_enqueue(LSM.last_run_version, LSM.version_num++);*/
+			compaction_merge(cm, LSM.disk[req->end_level]);
 		}
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);

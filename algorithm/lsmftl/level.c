@@ -47,6 +47,22 @@ uint32_t level_append_sstfile(level *lev, sst_file *sptr){
 	return 0;
 }
 
+level *level_convert_run_to_lev(run *r, page_manager *pm){
+	level *res=level_init(r->max_sst_file_num, 1, false, UINT32_MAX);
+	sst_file *sptr, *new_sptr;
+	map_range *map_ptr;
+	uint32_t sidx, midx;
+	for_each_sst(r, sptr, sidx){
+		for_each_map_range(sptr, map_ptr, midx){
+			new_sptr=sst_MR_to_sst_file(map_ptr);
+			level_append_sstfile(res, new_sptr);
+			sst_free(new_sptr, pm);
+		}
+	}
+	return res;
+}
+
+
 uint32_t level_deep_append_sstfile(level *lev, sst_file *sptr){
 
 	if(lev->istier){
@@ -150,6 +166,19 @@ void level_free(level *lev, page_manager *pm){
 	free(lev);
 }
 
+uint32_t level_update_run_at(level *lev, uint32_t idx, run *r, bool new_run){
+	if(!lev->istier){
+		EPRINT("it must be tiering level", true);
+	}
+	if(lev->run_num > lev->max_run_num){
+		EPRINT("over run in level", true);
+	}
+	run_deep_copy(&lev->array[idx], r);
+	if(new_run){
+		lev->now_sst_num+=r->now_sst_file_num;
+	}
+}
+
 void level_print(level *lev){
 	if(lev->now_sst_num){
 		printf("level idx:%d sst:%u/%u start lba:%u~end lba:%u\n", 
@@ -165,3 +194,4 @@ void level_print(level *lev){
 			lev->now_sst_num, lev->max_sst_num);
 	}
 }
+

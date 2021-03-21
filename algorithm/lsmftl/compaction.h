@@ -51,13 +51,14 @@ typedef struct compaction_master{
 	//slab_master *kv_wrapper_slab;
 }compaction_master;
 
+
 compaction_master *compaction_init(uint32_t compaction_queue_num);
 void compaction_free(compaction_master *cm);
 void compaction_issue_req(compaction_master *cm, compaction_req *);
 level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
 level* compaction_leveling(compaction_master *cm, level *src, level *des);
 level* compaction_tiering(compaction_master *cm, level *src, level *des);
-level* compaction_merge(compaction_master *cm, run *r1, run* r2, uint8_t version_idx);
+level* compaction_merge(compaction_master *cm, level *tiered_level);
 
 uint32_t compaction_read_param_remain_num(compaction_master *cm);
 inter_read_alreq_param *compaction_get_read_param(compaction_master *cm);

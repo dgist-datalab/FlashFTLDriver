@@ -12,6 +12,7 @@
 #include "compaction.h"
 #include "lsmtree_param_module.h"
 #include "read_helper.h"
+#include "version.h"
 
 #define TARGETFPR 0.1f
 
@@ -52,8 +53,7 @@ typedef struct lsmtree{
 
 	uint32_t now_wb;
 	write_buffer **wb_array;
-	uint32_t version_num;
-	version *last_run_version;
+	struct version *last_run_version;
 	level **disk;
 	
 	rwlock *level_rwlock;

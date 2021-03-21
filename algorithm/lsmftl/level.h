@@ -1,6 +1,7 @@
 #ifndef __LEVEL_H__
 #define __LEVEL_H__
 #include "run.h"
+#include "page_manager.h"
 
 enum {LEVELING, TIERING};
 
@@ -27,12 +28,14 @@ uint32_t level_append_sstfile(level *, sst_file *sptr);
 uint32_t level_deep_append_sstfile(level *, run *);
 uint32_t level_append_run(level *, run *);
 uint32_t level_deep_append_run(level *, run *);
+uint32_t level_update_run_at(level *, uint32_t idx, run *r, bool new_run);
 
 void level_trivial_move_sstfile(level *src, level *des,  uint32_t from, uint32_t to);
 void level_trivial_move_run(level *, uint32_t from, uint32_t to);
 sst_file* level_retrieve_sst(level *, uint32_t lba);
 sst_file* level_retrieve_close_sst(level *, uint32_t lba);
 void level_free(level *, page_manager *);
+level *level_convert_run_to_lev(run *r, page_manager *pm);
 
 static inline bool level_check_overlap(level *a, level *b){
 	if(b->now_sst_num==0 || a->now_sst_num==0) return false;
