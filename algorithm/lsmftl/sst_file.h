@@ -23,6 +23,7 @@ typedef struct map_range{
 
 typedef struct sst_file{
 	uint8_t type;
+	bool already_invalidate_file;
 
 	p_addr file_addr;
 	uint32_t end_ppa;

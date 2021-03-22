@@ -8,11 +8,11 @@
 #include "write_buffer.h"
 #include "version.h"
 #include "level.h"
-#include "gc.h"
 #include "compaction.h"
 #include "lsmtree_param_module.h"
 #include "read_helper.h"
 #include "version.h"
+#include "helper_algorithm/bf_set.h"
 
 #define TARGETFPR 0.1f
 
@@ -24,9 +24,13 @@ typedef struct lsmtree_monitor{
 typedef struct lsmtree_parameter{
 	uint32_t LEVELN;
 	uint32_t mapping_num;
-	uint32_t size_factor;	
+	uint32_t last_size_factor;
+	uint32_t normal_size_factor;
+	uint32_t read_helper_type;
+	float read_amplification;
 	read_helper_param leveling_rhp;
 	read_helper_param tiering_rhp;
+	bool version_enable;
 }lsmtree_parameter;
 
 enum{

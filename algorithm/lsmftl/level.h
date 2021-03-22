@@ -19,6 +19,7 @@ typedef struct level{
 #define LAST_RUN_PTR(lev_ptr) (&(lev_ptr)->array[(lev_ptr)->run_num-1])
 #define FIRST_RUN_PTR(lev_ptr) (&(lev_ptr)->array[0])
 #define LEVELING_SST_AT_PTR(lev_ptr, idx) &(((lev_ptr)->array[0]).sst_set[idx]) 
+#define LEVELING_SST_AT(lev_ptr, idx) (((lev_ptr)->array[0]).sst_set[idx]) 
 #define GET_SST_IDX(lev, sptr) ((sptr)-(lev)->array[0].sst_set)
 #define GET_LEV_START_LBA(lev) ((lev)->array[0].start_lba)
 #define GET_LEV_END_LBA(lev) ((lev)->array[0].end_lba)
@@ -36,6 +37,7 @@ sst_file* level_retrieve_sst(level *, uint32_t lba);
 sst_file* level_retrieve_close_sst(level *, uint32_t lba);
 void level_free(level *, page_manager *);
 level *level_convert_run_to_lev(run *r, page_manager *pm);
+sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t ppa, uint32_t *version);
 
 static inline bool level_check_overlap(level *a, level *b){
 	if(b->now_sst_num==0 || a->now_sst_num==0) return false;

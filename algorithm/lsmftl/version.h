@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <queue>
+#include "../../include/settings.h"
+#define TOTALRUNIDX 31
 
 typedef struct version{
 	uint8_t start_hand;
@@ -24,12 +26,14 @@ void version_sanity_checker(version *v);
 void version_free(version *v);
 
 static inline void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx){
+	if(ridx>TOTALRUNIDX){
+		EPRINT("over version num", true);
+	}
 	v->key_version[lba]=ridx;
 }
 
 static inline uint32_t version_map_lba(version *v, uint32_t lba){
 	return v->key_version[lba];
 }
-
 
 #endif

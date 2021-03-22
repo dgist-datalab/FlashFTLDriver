@@ -28,6 +28,19 @@ static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32
 	}
 }
 
+void gbf_set_prepare(float target_fpr, uint32_t member, uint32_t type){
+	if(type==BLOOM_PTR_PAIR){
+		if(BP_sub_member_num==UINT32_MAX){
+			find_sub_member_num(target_fpr, member,type);
+		}
+	}
+	if(type==BLOOM_ONLY){
+		if(BO_sub_member_num==UINT32_MAX){
+			find_sub_member_num(target_fpr, member,type);
+		}
+	}
+}
+
 guard_bf_set *gbf_set_init(float target_fpr, uint32_t member, uint32_t type){
 	guard_bf_set *res=(guard_bf_set*)malloc(sizeof(guard_bf_set));
 	res->now=res->max=0;

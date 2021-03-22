@@ -16,6 +16,8 @@ typedef struct guard_bf_set{
 	guard_bp_pair *body;
 }guard_bf_set;
 
+void gbf_set_prepare(float target_fpr, uint32_t member, uint32_t type);
+
 guard_bf_set *gbf_set_init(float target_fpr, uint32_t member, uint32_t type);
 bool gbf_set_insert(guard_bf_set *, uint32_t lba, uint32_t piece_ppa);
 uint32_t gbf_set_get_piece_ppa(guard_bf_set *, uint32_t *last_idx, uint32_t lba);

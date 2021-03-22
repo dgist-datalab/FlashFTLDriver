@@ -22,6 +22,8 @@ typedef struct bf_set{
 	uint32_t memory_usage_bit;
 }bf_set;
 
+void bf_set_prepare(float target_fpr, uint32_t member, uint32_t type);
+
 bf_set* bf_set_init(float target_fpr, uint32_t member, uint32_t type);
 bool bf_set_insert(bf_set*, uint32_t lba, uint32_t piece_ppa);
 uint32_t bf_set_get_piece_ppa(bf_set *, uint32_t* last_idx, uint32_t lba);

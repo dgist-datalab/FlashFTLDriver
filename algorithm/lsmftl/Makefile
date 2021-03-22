@@ -15,8 +15,8 @@ SRCS +=\
 	   sst_page_file_stream.c\
 	   sst_block_file_stream.c\
 	   sst_file.c\
-	   gc.c\
 	   read_helper.c\
+#	   gc.c\
 #	   helper_algorithm/bf_set.c\
 #	   helper_algorithm/compressed_bloomfilter.c
 #	   helper_algorithm/bloomfilter.c\

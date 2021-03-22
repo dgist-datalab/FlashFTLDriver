@@ -88,7 +88,7 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 	for(uint32_t i=0; it!=wb->data->end(); i++, it++){
 		uint8_t inter_idx=i%L2PGAP;
 		if(inter_idx==0){
-			ppa=page_manager_get_new_ppa(wb->pm, false);
+			ppa=page_manager_get_new_ppa(wb->pm, false, SEPDATASEG);
 			target_value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 			target_value->ppa=ppa;
 			oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);

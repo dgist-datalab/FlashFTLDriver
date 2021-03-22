@@ -195,7 +195,7 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last){
 
 
 	value_set *res=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
-	uint32_t ppa=page_manager_get_new_ppa(bis->pm, false);
+	uint32_t ppa=page_manager_get_new_ppa(bis->pm, false, DATASEG);
 	if(ppa/_PPS != bis->start_piece_ppa/2/_PPS){
 		EPRINT("new data should same segment", true);
 	}

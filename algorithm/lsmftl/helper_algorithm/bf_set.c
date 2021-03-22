@@ -42,6 +42,14 @@ uint32_t get_number_of_bits(float target_fpr){
 	return pow(2,tt) < t ? tt+1: tt;
 }
 
+void bf_set_prepare(float target_fpr, uint32_t member_num, uint32_t type){
+	if(prev_target_fpr==0.0f || prev_target_fpr!=target_fpr){
+		prev_bf_target_fpr=get_target_each_fpr(target_fpr, member_num);
+		prev_target_fpr=target_fpr;
+		prev_bits=get_number_of_bits(prev_bf_target_fpr);
+	}
+}
+
 bf_set* bf_set_init(float target_fpr, uint32_t member_num, uint32_t type){
 	bf_set *res=(bf_set*)malloc(sizeof(bf_set));
 	if(prev_target_fpr==0.0f || prev_target_fpr!=target_fpr){

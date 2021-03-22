@@ -30,10 +30,13 @@ void sst_destroy_content(sst_file* sstfile, page_manager *pm){
 	//free_sstfile_ readhelper...
 	
 	if(sstfile->type==BLOCK_FILE){
-		for(uint32_t i=0; i<sstfile->map_num; i++){
-			invalidate_map_ppa(pm->bm, sstfile->block_file_map[i].ppa);
+		if(sstfile->block_file_map){
+			for(uint32_t i=0; i<sstfile->map_num; i++){
+				invalidate_map_ppa(pm->bm, sstfile->block_file_map[i].ppa);
+			}
+
+			free(sstfile->block_file_map);
 		}
-		free(sstfile->block_file_map);
 	}
 	if(sstfile->data){
 		EPRINT("data not free", true);

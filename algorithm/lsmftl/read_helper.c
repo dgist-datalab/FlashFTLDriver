@@ -3,7 +3,14 @@
 #include "helper_algorithm/guard_bf_set.h"
 #include "key_value_pair.h"
 extern uint32_t debug_lba;
+
+void read_helper_prepare(float target_fpr, uint32_t member, uint32_t type){
+	bf_set_prepare(target_fpr, member, type);
+	gbf_set_prepare(target_fpr, member, type);
+}
+
 read_helper *read_helper_init(read_helper_param rhp){
+	if(rhp.type==HELPER_NONE) return NULL;
 	read_helper *res=(read_helper*)malloc(sizeof(read_helper));
 	res->type=rhp.type;
 	switch(rhp.type){
@@ -28,6 +35,8 @@ read_helper *read_helper_init(read_helper_param rhp){
 }
 
 read_helper *read_helper_kpset_to_rh(read_helper_param rhp, key_ptr_pair *kp_set){
+	if(rhp.type==HELPER_NONE) return NULL;
+
 	read_helper *res=(read_helper*)malloc(sizeof(read_helper));
 	res->type=rhp.type;
 
@@ -57,6 +66,7 @@ read_helper *read_helper_kpset_to_rh(read_helper_param rhp, key_ptr_pair *kp_set
 	return res;
 }
 uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece_ppa){
+	if(!rh) return 1;
 	switch(rh->type){
 		case HELPER_BF_PTR:
 		case HELPER_BF_ONLY:
@@ -74,6 +84,8 @@ uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece
 }
 
 uint32_t read_helper_memory_usage(read_helper *rh){
+	if(!rh) return 0;
+	
 	switch(rh->type){
 		case HELPER_BF_PTR:
 		case HELPER_BF_ONLY:
@@ -91,6 +103,11 @@ uint32_t read_helper_memory_usage(read_helper *rh){
 
 bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result, 
 		sst_file *sptr, uint32_t *idx){
+	if(!rh){
+		EPRINT("no rh", true);
+		return true;
+	}
+
 	if((*idx)==UINT32_MAX) 
 		return false;
 	switch(rh->type){
@@ -157,6 +174,7 @@ void read_helper_print(read_helper *rh){
 }
 
 void read_helper_free(read_helper *rh){
+	if(!rh) return;
 	switch(rh->type){
 		case HELPER_BF_ONLY:
 		case HELPER_BF_PTR:
@@ -174,6 +192,7 @@ void read_helper_free(read_helper *rh){
 }	
 
 void read_helper_copy(read_helper *des, read_helper *src){
+	if(!src) return ;
 	void *temp_body=des->body;
 	*des=*src;
 	des->body=temp_body;
@@ -194,6 +213,7 @@ void read_helper_copy(read_helper *des, read_helper *src){
 }
 
 void read_helper_move(read_helper *des, read_helper *src){
+	if(!src) return ;
 	void *temp_body=des->body;
 	*des=*src;
 	des->body=temp_body;
@@ -214,6 +234,7 @@ void read_helper_move(read_helper *des, read_helper *src){
 }
 
 bool read_helper_last(read_helper *rh, uint32_t idx){
+	if(!rh) return true;
 	switch(rh->type){
 		case HELPER_BF_ONLY:
 		case HELPER_BF_PTR:
@@ -229,6 +250,7 @@ bool read_helper_last(read_helper *rh, uint32_t idx){
 }
 
 uint32_t read_helper_idx_init(read_helper *rh, uint32_t lba){ 
+	if(!rh) return UINT32_MAX;
 	switch(rh->type){
 		case HELPER_BF_ONLY:
 		case HELPER_BF_PTR:

@@ -10,6 +10,7 @@ version *version_init(uint8_t max_valid_version_num, uint32_t LBA_num){
 	res->max_valid_version_num=max_valid_version_num;
 
 	res->ridx_empty_queue=new std::queue<uint32_t>();
+	printf("max_version idx:%u\n", max_valid_version_num-1);
 	for(uint32_t i=0; i<max_valid_version_num; i++){
 		res->ridx_empty_queue->push(i);
 	}
@@ -47,6 +48,7 @@ void version_sanity_checker(version *v){
 	uint32_t remain_empty_size=v->ridx_empty_queue->size();
 	uint32_t populate_size=v->ridx_populate_queue->size();
 	if(remain_empty_size+populate_size!=v->max_valid_version_num){
+		printf("error log : empty-size(%d) populate-size(%d)\n", remain_empty_size, populate_size);
 		EPRINT("version sanity error", true);
 	}
 }
