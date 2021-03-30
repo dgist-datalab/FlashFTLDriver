@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 extern lsmtree LSM;
-uint32_t debug_piece_ppa=1668250;
+uint32_t debug_piece_ppa=195759;
 extern uint32_t debug_lba;
 static int test_cnt;
 
@@ -15,7 +15,10 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 		char *oob=bm->get_oob(bm, PIECETOPPA(piece_ppa[i]));
 		memcpy(&oob[(piece_ppa[i]%2)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 		if(piece_ppa[i]==debug_piece_ppa){
-			EPRINT("validate here!\n", false);
+			EPRINT("validate piece here!\n", false);
+		}
+		if(piece_ppa[i]==debug_piece_ppa && debug_lba==lba[i]){
+			printf("debug_point\n");
 		}
 		if(!bm->populate_bit(bm, piece_ppa[i]) && should_abort){
 			EPRINT("bit error", true);
@@ -37,10 +40,15 @@ bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t
 
 void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abort){
 	if(piece_ppa==debug_piece_ppa){
-		EPRINT("invalidate here!\n", false);
+		EPRINT("invalidate piece here!\n", false);
 	}
-	if(!bm->unpopulate_bit(bm, piece_ppa) && should_abort){
-		EPRINT("bit error", true);
+	if(!bm->unpopulate_bit(bm, piece_ppa)){
+		if(should_abort){
+			EPRINT("bit error", true);
+		}
+		else{
+			bm->invalidate_number_decrease(bm, piece_ppa);
+		}
 	}
 }
 
@@ -84,12 +92,22 @@ void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
 			EPRINT("invalidate map here!\n", false);
 	}
-	if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP) && should_abort){
-		EPRINT("bit error", true);
-	} 
+	if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP)){
+		if(should_abort){
+			EPRINT("bit error", true);
+		} 
+		else{
+			bm->invalidate_number_decrease(bm, map_ppa*L2PGAP);
+		}
+	}
 
-	if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP+1) && should_abort){
-		EPRINT("bit error", true);
+	if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP+1)){
+		if(should_abort){
+			EPRINT("bit error", true);
+		} 
+		else{
+			bm->invalidate_number_decrease(bm, map_ppa*L2PGAP+1);
+		}
 	}
 }
 
@@ -119,6 +137,17 @@ retry:
 	}
 	res=bm->get_page_num(bm, seg);
 	return res;
+}
+
+uint32_t page_manager_get_new_ppa_from_seg(page_manager *pm, __segment *seg){
+	uint32_t res;
+	blockmanager *bm=pm->bm;
+	if(bm->check_full(bm, seg, MASTER_PAGE)){
+		EPRINT("plz check gc before get new_ppa", true);
+	}
+	res=bm->get_page_num(bm, seg);
+	return res;
+
 }
 
 uint32_t page_manager_pick_new_ppa(page_manager *pm, bool is_map, uint32_t type){
@@ -214,8 +243,6 @@ uint32_t page_manager_change_reserve(page_manager *pm, bool ismap){
 	return 1;
 }
 
-
-
 uint32_t page_manager_move_next_seg(page_manager *pm, bool ismap, bool isreserve, uint32_t type){
 	if(isreserve){
 		pm->current_segment[ismap?MAP_S:DATA_S]=pm->reserve_segment[ismap?MAP_S:DATA_S];
@@ -225,6 +252,7 @@ uint32_t page_manager_move_next_seg(page_manager *pm, bool ismap, bool isreserve
 		pm->current_segment[ismap?MAP_S:DATA_S]=pm->bm->get_segment(pm->bm, false);
 		pm->seg_type_checker[pm->current_segment[ismap?MAP_S:DATA_S]->seg_idx]=type;
 	}
+	return 1;
 }
 
 
@@ -327,6 +355,11 @@ retry:
 	}
 	else if(!ismap && (pm->seg_type_checker[seg_idx]!=DATASEG &&
 					pm->seg_type_checker[seg_idx]!=SEPDATASEG)){
+		temp_queue.push(seg_idx);
+		goto retry;
+	}
+
+	if(LSM.gc_unavailable_seg[seg_idx]){
 		temp_queue.push(seg_idx);
 		goto retry;
 	}
@@ -505,15 +538,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		EPRINT("????", true);
 	}
 
-	if(LSM.disk[2]->array[2].sst_set[3].end_ppa/16384==1){
-		printf("break!\n");
-	}
-	/*
-	if(cnt==5){
-		LSM.global_debug_flag=true;
-		printf("break!\n");
-	}*/
-	if(cnt==60){
+	if(cnt==74){
 		printf("break!\n");
 	}
 
@@ -600,6 +625,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					sptr=level_find_target_run_idx(LSM.disk[LSM.param.LEVELN-1], oob_lba[i], piece_ppa, &target_version, &sptr_idx);
 				}
 				if(sptr==NULL || !(sptr && sptr->file_addr.piece_ppa<=piece_ppa && sptr->end_ppa*L2PGAP>=piece_ppa)){
+					invalidate_piece_ppa(pm->bm, gn->piece_ppa, true);
 					/*checking other level*/
 					gmc=(gc_mapping_check_node*)malloc(sizeof(gc_mapping_check_node));
 					gmc->mapping_data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
@@ -607,7 +633,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					gmc->piece_ppa=piece_ppa;
 					gmc->lba=oob_lba[i];
 					gmc->map_ppa=UINT32_MAX;
-					gmc->type=MAP_READ_ISSUE;
+					gmc->type=MAP_CHECK_FLUSHED_KP;
 					gmc->level=LSM.param.LEVELN-2;
 					fdriver_lock_init(&gmc->done_lock, 0);
 					gc_mapping_queue->push(gmc);
@@ -639,7 +665,10 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 						insert_target_sptr(gsn, gn->lba, &gn->data->value[LPAGESIZE*i]);
 					}
-					else continue; //already invalidate
+					else{
+						invalidate_piece_ppa(pm->bm, gn->piece_ppa, true);
+						continue; //already invalidate
+					}
 				}
 			}
 		}
@@ -654,6 +683,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 	sst_file *map_ptr;
 	uint32_t found_piece_ppa;
+	bool kp_set_check_start=false;
+	uint32_t kp_set_iter=0;
+	write_buffer *flushed_kp_set_update=NULL;
 	while(!gc_mapping_queue->empty()){
 		gmc=gc_mapping_queue->front();
 		if(gmc->piece_ppa==debug_piece_ppa && gmc->lba==debug_lba){
@@ -661,6 +693,25 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		}
 retry:
 		switch(gmc->type){
+			case MAP_CHECK_FLUSHED_KP:
+				for(;kp_set_iter<COMPACTION_REQ_MAX_NUM; kp_set_iter++){
+					found_piece_ppa=kp_find_piece_ppa(gmc->lba, (char*)LSM.flushed_kp_set);
+					if(found_piece_ppa!=UINT32_MAX){break;}
+				}
+				if(found_piece_ppa==gmc->piece_ppa){
+					if(!kp_set_check_start){
+						kp_set_check_start=true;
+						rwlock_write_lock(&LSM.flushed_kp_set_lock);
+						flushed_kp_set_update=write_buffer_init(_PPS*L2PGAP, pm, GC_WB);
+					}
+					write_buffer_insert_for_gc(flushed_kp_set_update, gmc->lba, gmc->data_ptr);
+				}
+				else{
+					gmc->type==MAP_READ_ISSUE;
+					goto retry;
+				}
+				//asdfasdf
+				break;
 			case MAP_READ_ISSUE:
 				if((int)gmc->level<0){
 					printf("gmc->lba:%u piece_ppa:%u\n", gmc->lba, gmc->piece_ppa);
@@ -708,10 +759,32 @@ out:
 		gc_mapping_queue->pop();
 	}
 
+
 	key_ptr_pair *kp_set;
+	if(flushed_kp_set_update){
+		while((kp_set=write_buffer_flush_for_gc(flushed_kp_set_update, false, victim->seg_idx, NULL, UINT32_MAX))){
+			for(uint32_t j=0; j<COMPACTION_REQ_MAX_NUM; j++){
+				bool check=false;
+				key_ptr_pair *target_kp_set=LSM.flushed_kp_set[j];
+				for(uint32_t i=0; kp_set[i].lba!=UINT32_MAX; i++){
+					uint32_t idx=kp_find_idx(kp_set[i].lba, (char*)target_kp_set);
+					if(idx==UINT32_MAX) break;
+					check=true;
+					target_kp_set[idx].piece_ppa=kp_set[i].piece_ppa;
+				}
+				if(!check){
+					EPRINT("the pair should be in flushed_kp_set", true);
+				}
+			}
+			free(kp_set);
+		}
+		write_buffer_free(flushed_kp_set_update);
+		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
+	}
 	while((kp_set=write_buffer_flush_for_gc(gc_wb, false, victim->seg_idx, NULL,UINT32_MAX))){
 		LSM.moved_kp_set->push(kp_set);
 	}
+	write_buffer_free(gc_wb);
 
 	bm->trim_segment(bm, victim, bm->li);
 	page_manager_change_reserve(pm, false);

@@ -31,7 +31,7 @@ typedef struct gc_read_node{
 }gc_read_node;
 
 enum{
-	MAP_READ_ISSUE, MAP_READ_DONE
+	MAP_CHECK_FLUSHED_KP, MAP_READ_ISSUE, MAP_READ_DONE
 };
 
 typedef struct gc_mapping_check_node{
@@ -63,4 +63,5 @@ uint32_t page_manager_get_reserve_new_ppa(page_manager *pm, bool ismap, uint32_t
 uint32_t page_manager_change_reserve(page_manager *pm, bool ismap);
 uint32_t page_manager_get_reserve_remain_ppa(page_manager *pm, bool ismap, uint32_t seg_idx);
 uint32_t page_manager_move_next_seg(page_manager *pm, bool ismap, bool isreserve, uint32_t type);
+uint32_t page_manager_get_new_ppa_from_seg(page_manager *pm, __segment *seg);
 #endif

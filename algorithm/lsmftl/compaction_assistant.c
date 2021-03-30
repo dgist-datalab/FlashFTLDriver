@@ -71,16 +71,42 @@ void* compaction_main(void *_cm){
 again:
 		level *src;
 		if(req->start_level==-1 && req->end_level==0){
-			uint32_t last_piece_ppa=req->target[kp_end_idx((char*)req->target)].piece_ppa;
-			uint32_t first_piece_ppa=req->target[0].piece_ppa;
-			src=compaction_first_leveling(cm, req->target, LSM.disk[0]);
-			if(SEGNUM(first_piece_ppa)==SEGNUM(last_piece_ppa)){
-				slm_coupling_level_seg(0, SEGNUM(first_piece_ppa), SEGPIECEOFFSET(last_piece_ppa));
+			key_ptr_pair *kp_set;
+
+			if(req->wb){
+				if(page_manager_get_total_remain_page(LSM.pm, false) < KP_IN_PAGE){
+					__do_gc(LSM.pm, false, KP_IN_PAGE);
+				}
+
+				rwlock_write_lock(&LSM.flushed_kp_set_lock);
+				rwlock_write_lock(&LSM.flush_wait_wb_lock);
+				kp_set=write_buffer_flush(req->wb, false);
+				write_buffer_free(req->wb);
+
+				LSM.flushed_kp_set[req->tag]=kp_set;
+				LSM.flush_wait_wb=NULL;
+				rwlock_write_unlock(&LSM.flush_wait_wb_lock);
+				rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 			}
 			else{
-				slm_coupling_level_seg(0, SEGNUM(first_piece_ppa), _PPS*L2PGAP-1);
-				slm_coupling_level_seg(0, SEGNUM(last_piece_ppa), SEGPIECEOFFSET(last_piece_ppa));
+				kp_set=req->target;
 			}
+
+			uint32_t last_piece_ppa=kp_set[kp_end_idx((char*)kp_set)].piece_ppa;
+			uint32_t first_piece_ppa=kp_set[0].piece_ppa;
+			src=compaction_first_leveling(cm, kp_set, LSM.disk[0]);
+			if(SEGNUM(first_piece_ppa)==SEGNUM(last_piece_ppa)){
+				slm_coupling_level_seg(0, SEGNUM(first_piece_ppa), SEGPIECEOFFSET(last_piece_ppa), req->gc_data);
+			}
+			else{
+				slm_coupling_level_seg(0, SEGNUM(first_piece_ppa), _PPS*L2PGAP-1, req->gc_data);
+				slm_coupling_level_seg(0, SEGNUM(last_piece_ppa), SEGPIECEOFFSET(last_piece_ppa), req->gc_data);
+			}
+
+			rwlock_write_lock(&LSM.flushed_kp_set_lock);
+			free(kp_set);
+			LSM.flushed_kp_set[req->tag]=NULL;
+			rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 		}
 		else if(req->end_level==LSM.param.LEVELN-1){
 			src=compaction_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);

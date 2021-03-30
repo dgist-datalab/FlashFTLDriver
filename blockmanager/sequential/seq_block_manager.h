@@ -52,6 +52,7 @@ uint32_t seq_remain_free_page(struct blockmanager *, __segment *);
 
 uint32_t seq_map_ppa(struct blockmanager* , uint32_t lpa);
 void seq_free_segment(struct blockmanager *, __segment *);
+void seq_invalidate_number_decrease(struct blockmanager *bm, uint32_t ppa);
 
 
 uint32_t seq_pt_create(struct blockmanager *, int, int*, lower_info *);

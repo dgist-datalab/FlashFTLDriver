@@ -16,6 +16,7 @@
 #include "segment_level_manager.h"
 
 #define TARGETFPR 0.1f
+#define COMPACTION_REQ_MAX_NUM 1
 
 typedef struct lsmtree_monitor{
 	uint32_t trivial_move_cnt;
@@ -67,6 +68,15 @@ typedef struct lsmtree{
 	lsmtree_parameter param;
 	lsmtree_monitor monitor;
 	bool global_debug_flag;
+
+	rwlock flush_wait_wb_lock;
+	write_buffer *flush_wait_wb;
+
+	rwlock flushed_kp_set_lock;
+	key_ptr_pair **flushed_kp_set;
+
+	uint8_t* gc_unavailable_seg;
+
 	lower_info *li;
 }lsmtree;
 
@@ -83,7 +93,7 @@ void lsmtree_level_summary(lsmtree *lsm);
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 
-#define MAKE_L0COMP_REQ(kp_set, param)\
-	alloc_comp_req(-1,0,(kp_set), lsmtree_compaction_end_req, (void*)(param))
+#define MAKE_L0COMP_REQ(wb, kp_set, param, is_gc_data)\
+	alloc_comp_req(-1,0,(wb), (kp_set),lsmtree_compaction_end_req, (void*)(param), (is_gc_data))
 
 #endif

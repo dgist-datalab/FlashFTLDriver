@@ -253,7 +253,7 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 		debug_kp[i].piece_ppa=map_pair->piece_ppa;
 
 		if(map_pair->lba==debug_lba){
-			printf("tiering %u->%u\n", debug_lba, map_pair->piece_ppa);
+			printf("tiering lba:%u map to %u\n", debug_lba, map_pair->piece_ppa);
 		}
 		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, true);
 		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i].kv_ptr.data, LPAGESIZE);

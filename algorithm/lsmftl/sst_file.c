@@ -54,7 +54,7 @@ void sst_destroy_content(sst_file* sstfile, page_manager *pm){
 
 void sst_reinit(sst_file *sptr){
 	sst_destroy_content(sptr, LSM.pm);
-	memset(sptr, 0, sizeof(sptr));
+	memset(sptr, 0, sizeof(sst_file));
 }
 
 void sst_set_file_map(sst_file *sstfile, uint32_t map_num, map_range *map_range){

@@ -123,11 +123,11 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	io_manager_init(li);
 	LSM.pm=page_manager_init(bm);
-	LSM.cm=compaction_init(1);
+	LSM.cm=compaction_init(COMPACTION_REQ_MAX_NUM);
 	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * 2);
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<2; i++){
-		LSM.wb_array[i]=write_buffer_init(1024, LSM.pm, NORMAL_WB);
+		LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE, LSM.pm, NORMAL_WB);
 	}
 	LSM.moved_kp_set=new std::queue<key_ptr_pair*>();
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
@@ -164,6 +164,15 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 			LSM.param.tiering_rhp.target_prob,
 			LSM.param.tiering_rhp.member_num,
 			BLOOM_ONLY);
+
+	rwlock_init(&LSM.flushed_kp_set_lock);
+	LSM.flushed_kp_set=(key_ptr_pair**)malloc(sizeof(key_ptr_pair*)*COMPACTION_REQ_MAX_NUM);
+
+	rwlock_init(&LSM.flush_wait_wb_lock);
+	LSM.flush_wait_wb=NULL;
+
+	LSM.gc_unavailable_seg=(uint8_t*)calloc(_NOS, sizeof(uint8_t));
+
 	LSM.li=li;
 	return 1;
 }
@@ -182,6 +191,12 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	page_manager_free(LSM.pm);
 	compaction_free(LSM.cm);
 	delete LSM.moved_kp_set;
+	
+	rwlock_destroy(&LSM.flushed_kp_set_lock);
+	rwlock_destroy(&LSM.flush_wait_wb_lock);
+	free(LSM.flushed_kp_set);
+
+	free(LSM.gc_unavailable_seg);
 }
 
 static inline algo_req *get_read_alreq(request *const req, uint8_t type, 
@@ -271,8 +286,8 @@ uint32_t lsmtree_read(request *const req){
 	if(!req->param){
 		//printf("read key:%u\n", req->key);
 		/*find data from write_buffer*/
+		char *target;
 		for(uint32_t i=0; i<2; i++){
-			char *target;
 			if((target=write_buffer_get(LSM.wb_array[i], req->key))){
 			//	printf("find in write_buffer");
 				memcpy(req->value->value, target, LPAGESIZE);
@@ -281,11 +296,42 @@ uint32_t lsmtree_read(request *const req){
 			}
 		}
 
+		rwlock_read_lock(&LSM.flush_wait_wb_lock);
+		if(LSM.flush_wait_wb && (target=write_buffer_get(LSM.flush_wait_wb, req->key))){
+			//	printf("find in write_buffer");
+			memcpy(req->value->value, target, LPAGESIZE);
+			req->end_req(req);
+			rwlock_read_unlock(&LSM.flush_wait_wb_lock);
+			return 1;
+		}
+		rwlock_read_unlock(&LSM.flush_wait_wb_lock);
+
 		r_param=(lsmtree_read_param*)calloc(1, sizeof(lsmtree_read_param));
 		req->param=(void*)r_param;
 		r_param->prev_level=-1;
 		r_param->prev_run=UINT32_MAX;
 		r_param->target_level_rw_lock=NULL;
+
+
+		uint32_t target_piece_ppa=UINT32_MAX;
+		rwlock_read_lock(&LSM.flushed_kp_set_lock);
+		for(uint32_t i=0; i<COMPACTION_REQ_MAX_NUM; i++){
+			if(LSM.flushed_kp_set[i]){
+				if((target_piece_ppa=kp_find_piece_ppa(req->key, (char*)LSM.flushed_kp_set[i]))!=UINT32_MAX){
+					break;
+				}
+			}
+		}
+
+		if(target_piece_ppa==UINT32_MAX){
+			rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+		}
+		else{
+			r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
+			algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
+			io_manager_issue_read(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+		}
+
 	}
 	else{
 		r_param=(lsmtree_read_param*)req->param;
@@ -392,24 +438,32 @@ uint32_t lsmtree_write(request *const req){
 	version_coupling_lba_ridx(LSM.last_run_version, req->key, TOTALRUNIDX);
 
 	if(write_buffer_isfull(wb)){
-		if(page_manager_get_total_remain_page(LSM.pm, false) < KP_IN_PAGE){
-			__do_gc(LSM.pm, false, KP_IN_PAGE);
-			while(!LSM.moved_kp_set->empty()){
-				key_ptr_pair *kp_set=LSM.moved_kp_set->front();
-				compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(kp_set, NULL));
-				LSM.moved_kp_set->pop();
-			}
+
+		while(!LSM.moved_kp_set->empty()){
+			key_ptr_pair *kp_set=LSM.moved_kp_set->front();
+			compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(NULL, kp_set, NULL, true));
+			LSM.moved_kp_set->pop();
 		}
-		key_ptr_pair *kp_set=write_buffer_flush(wb,false);
-		/*
-		for(int32_t i=0; i<wb->buffered_entry_num; i++){
-			printf("%u -> %u\n", kp_set[i].lba, kp_set[i].piece_ppa);	
-		}*/
-		write_buffer_reinit(wb);
+	
+	
+retry:
+		rwlock_write_lock(&LSM.flush_wait_wb_lock);
+		if(LSM.flush_wait_wb){
+			//EPRINT("compactino not done!", false);
+			rwlock_write_unlock(&LSM.flush_wait_wb_lock);
+			goto retry;
+		}
+		LSM.flush_wait_wb=LSM.wb_array[LSM.now_wb];
+		rwlock_write_unlock(&LSM.flush_wait_wb_lock);
+
+		compaction_req *temp_req=MAKE_L0COMP_REQ(wb, NULL, NULL, false);
+		compaction_issue_req(LSM.cm, temp_req);
+
+
+		LSM.wb_array[LSM.now_wb]=write_buffer_init(KP_IN_PAGE, LSM.pm, NORMAL_WB);
 		if(++LSM.now_wb==2){
 			LSM.now_wb=0;
 		}
-		compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(kp_set, NULL));
 	}
 
 	req->value=NULL;

@@ -120,11 +120,9 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
-		if(LSM.global_debug_flag && res[i].piece_ppa==592701){
-			printf("break!\n");	
-		}
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
 		inf_free_valueset(it->second->data.data, FS_MALLOC_W);
+		it->second->data.data=NULL;
 
 		if(inter_idx==(L2PGAP-1)){//issue data
 			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
@@ -132,6 +130,8 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 			oob=NULL;
 			target_value=NULL;
 		}
+	//	wb->buffered_entry_num--;
+	//	wb->data->erase(it++);
 	}
 
 	if(sync){
@@ -189,7 +189,9 @@ void write_buffer_free(write_buffer* wb){
 	std::map<uint32_t, buffer_entry*>::iterator it;
 	if(wb->type==NORMAL_WB){
 		for(it=wb->data->begin(); it!=wb->data->end(); it++){
-			inf_free_valueset(it->second->data.data,FS_MALLOC_W);
+			if(it->second->data.data){
+				inf_free_valueset(it->second->data.data,FS_MALLOC_W);
+			}
 		}
 	}
 

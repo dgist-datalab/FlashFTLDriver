@@ -26,7 +26,7 @@ static void map_print(map *m){
 	printf("\n");
 }
 
-void slm_coupling_level_seg(uint32_t level_idx, uint32_t seg_idx, uint32_t seg_piece_offset){
+void slm_coupling_level_seg(uint32_t level_idx, uint32_t seg_idx, uint32_t seg_piece_offset, bool is_gc_data){
 	if(level_idx > slm_manager.level_num-1){
 		EPRINT("overflow!", true);
 	}
@@ -36,8 +36,10 @@ void slm_coupling_level_seg(uint32_t level_idx, uint32_t seg_idx, uint32_t seg_p
 	if(it!=target->end()){
 		//update
 		if(it->second->piece_offset >= seg_piece_offset){
-			map_print(target);
-			EPRINT("append only error", true);
+			if(!is_gc_data){
+				map_print(target);
+				EPRINT("append only error", true);
+			}
 		}
 		it->second->piece_offset=seg_piece_offset;
 	}

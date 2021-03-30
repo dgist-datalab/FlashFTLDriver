@@ -25,6 +25,7 @@ struct blockmanager seq_bm={
 	.change_reserve=seq_change_reserve,
 	.reinsert_segment=seq_reinsert_segment,
 	.remain_free_page=seq_remain_free_page,
+	.invalidate_number_decrease=seq_invalidate_number_decrease,
 
 	.pt_create=seq_pt_create,
 	.pt_destroy=seq_pt_destroy,
@@ -287,7 +288,7 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 
 	if(!(p->seq_block[bn].bitset[bt]&(1<<of))){
 		res=0;
-		abort();
+		//abort();
 	}
 
 	b->bitset[bt]&=~(1<<of);
@@ -298,9 +299,27 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 	seg->total_invalid_number++;
 
 	if(b->invalidate_number>_PPB * L2PGAP){
+	//	printf("????\n");
 		//abort();
 	}
 	return res;
+}
+
+
+void seq_invalidate_number_decrease(struct blockmanager *bm, uint32_t ppa){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	uint32_t bn=ppa/(_PPB * L2PGAP);
+	uint32_t pn=ppa%(_PPB * L2PGAP);
+	uint32_t bt=pn/8;
+	uint32_t of=pn%8;
+	__block *b=&p->seq_block[bn];
+	b->invalidate_number--;
+
+
+	uint32_t segment_idx=b->block_num/BPS;
+	block_set *seg=&p->logical_segment[segment_idx];
+	seg->total_invalid_number--;
+
 }
 
 int seq_erase_bit (struct blockmanager* bm, uint32_t ppa){
@@ -343,6 +362,8 @@ void seq_set_oob(struct blockmanager* bm, char *data,int len, uint32_t ppa){
 	__block *b=&p->seq_block[ppa/_PPB];
 	memcpy(b->oob_list[ppa%_PPB].d,data,len);
 }
+
+
 
 char *seq_get_oob(struct blockmanager*bm,  uint32_t ppa){
 	sbm_pri *p=(sbm_pri*)bm->private_data;

@@ -32,6 +32,24 @@ static inline uint32_t kp_find_piece_ppa(uint32_t lba, char *page_data){
 	return UINT32_MAX;
 }
 
+static inline uint32_t kp_find_idx(uint32_t lba, char *page_data){
+	uint16_t s=0, e=LAST_KP_IDX, mid;
+	key_ptr_pair* map_set=(key_ptr_pair*)page_data;
+	while(s<=e){
+		mid=(s+e)/2;
+		if(map_set[mid].lba==lba){
+			return mid;
+		}
+		if(map_set[mid].lba<lba){
+			s=mid+1;
+		}
+		else{
+			e=mid-1;
+		}
+	}
+	return UINT32_MAX;
+}
+
 static inline uint32_t kp_end_idx(char *data){
 	key_ptr_pair* map_set=(key_ptr_pair*)data;
 	if(map_set[LAST_KP_IDX].lba!=UINT32_MAX){

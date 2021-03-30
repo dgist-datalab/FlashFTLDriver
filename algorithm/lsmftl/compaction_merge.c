@@ -4,6 +4,7 @@
 #include "page_manager.h"
 #include "io.h"
 #include <queue>
+#include <list>
 #include <stdlib.h>
 #define TARGETREADNUM(read_arg) (read_arg.to-read_arg.from+1)
 extern compaction_master *_cm;
@@ -15,6 +16,7 @@ static void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 		//param=compaction_get_read_param(_cm);
 		param=(inter_read_alreq_param*)calloc(1,sizeof(inter_read_alreq_param));
 		param->map_target=&mr[i];
+		mr[i].data=NULL;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&param->done_lock, 0);
 		read_arg->param[i]=param;
@@ -83,15 +85,17 @@ static map_range * make_mr_set(sst_file *set, uint32_t start_idx, uint32_t end_i
 
 static void  bulk_invalidation(run *r, uint32_t* border_idx, uint32_t border_lba){
 	uint32_t i=0;
+
 	for(i=(*border_idx); i<r->now_sst_file_num; i++){
 		sst_file *sptr=&r->sst_set[i];
 		if(sptr->end_lba<=border_lba){
 			for(uint32_t j=sptr->file_addr.piece_ppa; j<(sptr->end_ppa-sptr->map_num)*2; j++){
 				invalidate_piece_ppa(LSM.pm->bm, j, false);
 			}
+			/* invalidate in map_done
 			for(uint32_t j=sptr->end_ppa-sptr->map_num; j<sptr->end_ppa; j++){
 				invalidate_map_ppa(LSM.pm->bm, j, true);
-			}
+			}*/
 		}
 		else{
 			break;
@@ -158,6 +162,29 @@ static bool merge_invalidation_function(level *des, uint32_t stream_id, uint32_t
 	return true;
 }
 
+
+typedef struct mr_free_set{
+	map_range *mr_set;
+	uint32_t map_num;
+}mr_free_set;
+
+void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_lba){
+	std::list<mr_free_set>::iterator mr_iter=mr_list->begin();
+	for(;mr_iter!=mr_list->end(); ){
+		mr_free_set now=*mr_iter;
+		if(now.mr_set[now.map_num].end_lba <= bound_lba){
+			LSM.gc_unavailable_seg[now.mr_set[now.map_num].ppa/_PPS]=false;
+			free(now.mr_set);
+			mr_list->erase(mr_iter++);
+		}
+		else{
+			break;
+		}
+		mr_iter++;
+	}
+}
+
+
 level* compaction_merge(compaction_master *cm, level *des){
 	_cm=cm;
 
@@ -171,7 +198,6 @@ level* compaction_merge(compaction_master *cm, level *des){
 	for(uint32_t i=0; i<2; i++){
 		version_unpopulate_run(LSM.last_run_version, idx_set[i]);
 	}
-
 
 	read_issue_arg read_arg1={0,}, read_arg2={0,};
 	read_arg_container thread_arg;
@@ -197,6 +223,8 @@ level* compaction_merge(compaction_master *cm, level *des){
 	bool init=true;
 	uint32_t max_target_piece_num;
 	std::queue<key_ptr_pair> *kpq=new std::queue<key_ptr_pair>();
+	std::list<mr_free_set> *new_range_set=new std::list<mr_free_set>();
+	std::list<mr_free_set> *old_range_set=new std::list<mr_free_set>();
 	while(!(older_sst_idx==older->now_sst_file_num && 
 				newer_sst_idx==newer->now_sst_file_num)){
 		max_target_piece_num=0;
@@ -221,13 +249,17 @@ level* compaction_merge(compaction_master *cm, level *des){
 		map_range *newer_mr=make_mr_set(newer->sst_set, newer_sst_idx, newer_sst_idx_end, now_newer_map_num);
 		map_range *older_mr=make_mr_set(older->sst_set, older_sst_idx, older_sst_idx_end, now_older_map_num);
 
-
 		bool last_round_check=((newer_sst_idx_end+1==newer->now_sst_file_num) && (older_sst_idx_end+1==older->now_sst_file_num));
 		uint32_t total_map_num=now_newer_map_num+now_older_map_num;
 		uint32_t read_done=0;
 		uint32_t older_prev=0, newer_prev=0;
 		read_arg1={0,}; read_arg2={0,};
 		while(read_done!=total_map_num){
+			printf("round info - o_idx:%u n_idx%u read_done:%u\n", older_sst_idx, newer_sst_idx, read_done);
+			
+			if(older_sst_idx==1 && newer_sst_idx==1){
+				LSM.global_debug_flag=true;
+			}
 			uint32_t shard=LOWQDEPTH/2;
 
 			if(newer_mr){
@@ -295,11 +327,23 @@ level* compaction_merge(compaction_master *cm, level *des){
 		border_lba=issue_write_kv_for_bis(&bis, bos, new_run, entry_num, 
 				target_ridx, last_round_check);
 
+		/*check end*/
 		bulk_invalidation(newer, &newer_borderline, border_lba);
 		bulk_invalidation(older, &older_borderline, border_lba);
 
-		free(newer_mr);
-		free(older_mr);
+		mr_free_set temp_mr_free_set;
+		temp_mr_free_set.mr_set=newer_mr;
+		temp_mr_free_set.map_num=now_newer_map_num-1;
+		LSM.gc_unavailable_seg[newer_mr[now_newer_map_num-1].ppa/_PPS]=true;
+		new_range_set->push_back(temp_mr_free_set);
+
+		temp_mr_free_set.mr_set=older_mr;
+		temp_mr_free_set.map_num=now_older_map_num-1;
+		LSM.gc_unavailable_seg[older_mr[now_older_map_num-1].ppa/_PPS]=true;
+		old_range_set->push_back(temp_mr_free_set);
+
+		map_range_postprocessing(new_range_set, border_lba);
+		map_range_postprocessing(old_range_set, border_lba);
 
 		newer_sst_idx=newer_sst_idx_end+1;
 		older_sst_idx=older_sst_idx_end+1;
@@ -330,7 +374,10 @@ level* compaction_merge(compaction_master *cm, level *des){
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
 	version_populate_run(LSM.last_run_version, target_ridx);
 	run_free(new_run);
-	level_print(res);
+//	level_print(res);
+	level_contents_print(res, true);
+	version_poped_update(LSM.last_run_version);
+	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], idx_set[0]);
 	return res;
 }
 

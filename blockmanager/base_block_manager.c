@@ -25,6 +25,7 @@ struct blockmanager base_bm={
 	.change_reserve=base_change_reserve,
 	.reinsert_segment=NULL,
 	.remain_free_page=NULL,
+	.invalidate_number_decrease=NULL,
 
 	.pt_create=NULL,
 	.pt_destroy=NULL,

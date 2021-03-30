@@ -232,6 +232,7 @@ struct blockmanager{
 	__segment* (*change_reserve)(struct blockmanager *, __segment *reserve);
 	void (*reinsert_segment)(struct blockmanager *, uint32_t seg_idx);
 	uint32_t (*remain_free_page)(struct blockmanager *, __segment *active);
+	void (*invalidate_number_decrease)(struct blockmanager *, uint32_t ppa);
 
 	uint32_t (*pt_create) (struct blockmanager*, int part_num, int *each_part_seg_num, lower_info *);
 	uint32_t (*pt_destroy) (struct blockmanager*);

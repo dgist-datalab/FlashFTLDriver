@@ -66,7 +66,7 @@ void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx){
 		EPRINT("over version num", true);
 	}
 	if(lba==debug_lba){
-		printf("version_map:%u->%u\n",lba, ridx);
+		printf("[version_map] lba:%u->%u\n",lba, ridx);
 	}
 	v->key_version[lba]=ridx;
 }
