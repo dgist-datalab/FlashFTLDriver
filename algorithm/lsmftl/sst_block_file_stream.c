@@ -1,22 +1,29 @@
 #include "sst_block_file_stream.h"
 #include <stdlib.h>
 extern uint32_t debug_lba;
-sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(inter_read_alreq_param *, bool)){
+sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(inter_read_alreq_param *, bool), bool no_inter_param_alloc){
 	sst_bf_out_stream *res=(sst_bf_out_stream*)calloc(1, sizeof(sst_bf_out_stream));
 	res->kv_read_check_done=r_check_done;
 	res->kv_wrapper_q=new std::queue<key_value_wrapper*>();
 	res->prev_ppa=UINT32_MAX;
+	res->prev_lba=UINT32_MAX;
+	res->no_inter_param_alloc=no_inter_param_alloc;
 	return res;
 }
 
-static key_value_wrapper *kv_wrapper_setting(key_value_wrapper **kv_wrap_buf, 
+static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_wrapper **kv_wrap_buf, 
 		uint8_t num, compaction_master *cm){
 	key_value_wrapper *res;
 	char *value;
 	for(uint32_t i=0; i<num; i++){
 		if(i==0){
 			res=kv_wrap_buf[i];
-			res->param=compaction_get_read_param(cm);
+			if(!bos->no_inter_param_alloc){
+				res->param=compaction_get_read_param(cm);
+			}
+			else{
+				res->param=(inter_read_alreq_param*)calloc(1, sizeof(inter_read_alreq_param));
+			}
 	//		printf("after size:%u\n", cm->read_param_queue->size());
 			res->param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 			fdriver_lock_init(&res->param->done_lock, 0);
@@ -30,13 +37,23 @@ static key_value_wrapper *kv_wrapper_setting(key_value_wrapper **kv_wrap_buf,
 key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos, 
 		key_value_wrapper *kv_wrapper, compaction_master *cm){
 
+	if(bos->prev_lba==UINT32_MAX){
+		bos->prev_lba=kv_wrapper->kv_ptr.lba;
+	}
+	else{
+		if(bos->prev_lba>=kv_wrapper->kv_ptr.lba){
+			EPRINT("lba shoud be inserted by increasing order", true);
+		}
+		bos->prev_lba=kv_wrapper->kv_ptr.lba;
+	}
+
 	key_value_wrapper *res=NULL;
 	bos->kv_wrapper_q->push(kv_wrapper);
 
 	if(bos->prev_ppa!=UINT32_MAX && bos->prev_ppa==PIECETOPPA(kv_wrapper->piece_ppa)){
 		bos->kv_wrap_buffer[bos->kv_buf_idx++]=kv_wrapper;
 		if(bos->kv_buf_idx==L2PGAP){
-			res=kv_wrapper_setting(bos->kv_wrap_buffer, bos->kv_buf_idx, cm);
+			res=kv_wrapper_setting(bos, bos->kv_wrap_buffer, bos->kv_buf_idx, cm);
 			bos->kv_buf_idx=0;
 			bos->prev_ppa=UINT32_MAX;
 			return res;
@@ -44,7 +61,7 @@ key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos,
 	}
 	else{
 		if(bos->prev_ppa!=UINT32_MAX){
-			res=kv_wrapper_setting(bos->kv_wrap_buffer, bos->kv_buf_idx, cm);
+			res=kv_wrapper_setting(bos ,bos->kv_wrap_buffer, bos->kv_buf_idx, cm);
 		}
 		bos->kv_buf_idx=0;
 		bos->prev_ppa=PIECETOPPA(kv_wrapper->piece_ppa);
@@ -58,7 +75,7 @@ key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos,
 key_value_wrapper *sst_bos_get_pending(sst_bf_out_stream *bos, 
 		compaction_master *cm){
 	if(bos->kv_buf_idx){
-		key_value_wrapper *res=kv_wrapper_setting(bos->kv_wrap_buffer, bos->kv_buf_idx, cm);
+		key_value_wrapper *res=kv_wrapper_setting(bos, bos->kv_wrap_buffer, bos->kv_buf_idx, cm);
 		bos->kv_buf_idx=0;
 		return res;
 	}
@@ -84,6 +101,7 @@ key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool should_buffer_chec
 			}
 		}
 	}
+
 	if(target->kv_ptr.data==NULL){
 		EPRINT("over entry pick!", true);
 	}
@@ -94,7 +112,12 @@ void sst_bos_pop(sst_bf_out_stream *bos, compaction_master *cm){
 	key_value_wrapper *target=bos->kv_wrapper_q->front();
 	if(PIECETOPPA(bos->now_kv_wrap->piece_ppa)!=PIECETOPPA(target->piece_ppa)){
 		inf_free_valueset(bos->now_kv_wrap->param->data, FS_MALLOC_R);
-		compaction_free_read_param(cm, bos->now_kv_wrap->param);
+		if(!bos->no_inter_param_alloc){
+			compaction_free_read_param(cm, bos->now_kv_wrap->param);
+		}
+		else{
+			free(bos->now_kv_wrap->param);
+		}
 		if(!target->param){
 			EPRINT("can't be", true);
 		}
@@ -136,6 +159,7 @@ void sst_bos_free(sst_bf_out_stream *bos, compaction_master *cm){
 sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_length, page_manager*pm,
 		bool make_read_helper, read_helper_param rhp){
 	sst_bf_in_stream *res=(sst_bf_in_stream*)calloc(1, sizeof(sst_bf_in_stream));
+	res->prev_lba=UINT32_MAX;
 	res->start_lba=UINT32_MAX;
 	res->start_piece_ppa=start_piece_ppa;
 	res->piece_ppa_length=piece_ppa_length;
@@ -143,8 +167,8 @@ sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_len
 	res->pm=pm;
 	res->buffer=(key_value_wrapper*)malloc(L2PGAP*sizeof(key_value_wrapper));
 
-	
 	res->make_read_helper=make_read_helper;
+
 	if(make_read_helper){	
 		res->rh=read_helper_init(rhp);
 		res->rhp=rhp;
@@ -165,6 +189,16 @@ bool sst_bis_insert(sst_bf_in_stream *bis, key_value_wrapper *kv_wrapper){
 		bis->end_lba=kv_wrapper->kv_ptr.lba;
 	}
 
+	if(bis->prev_lba==UINT32_MAX){
+		bis->prev_lba=kv_wrapper->kv_ptr.lba;
+	}
+	else{
+		if(bis->prev_lba>=kv_wrapper->kv_ptr.lba){
+			EPRINT("lba shoud be inserted by increasing order", true);
+		}
+		bis->prev_lba=kv_wrapper->kv_ptr.lba;
+	}
+
 	if(bis->buffer_idx==L2PGAP){
 		 return true;
 	}
@@ -178,11 +212,11 @@ value_set* sst_bis_finish(sst_bf_in_stream*){
 
 extern char all_set_page[PAGESIZE];
 
-value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last){ 
+value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_idx, key_ptr_pair *debug_kp){ 
 	//it should return unaligned value when it no space
 
 	if(!last && REMAIN_DATA_PPA(bis)==bis->buffer_idx){
-		EPRINT("change bis", false);
+		//EPRINT("change bis", false);
 	}
 	else if(bis->buffer_idx!=L2PGAP && !sst_bis_ppa_empty(bis) && !last){
 		EPRINT("wtf??", true);
@@ -211,15 +245,17 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last){
 			bis->now_map_data_idx=0;
 		}
 
-
 		key_ptr_pair *map_pair=&((key_ptr_pair*)(bis->now_map_data->value))[bis->now_map_data_idx++];
 		map_pair->lba=bis->buffer[i].kv_ptr.lba;
 		map_pair->piece_ppa=ppa*L2PGAP+(i%L2PGAP);
 
+		debug_kp[i].lba=map_pair->lba;
+		debug_kp[i].piece_ppa=map_pair->piece_ppa;
+
 		if(map_pair->lba==debug_lba){
 			printf("tiering %u->%u\n", debug_lba, map_pair->piece_ppa);
 		}
-		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba);
+		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, true);
 		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i].kv_ptr.data, LPAGESIZE);
 
 		if(bis->make_read_helper){
@@ -230,6 +266,7 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last){
 		//free(bis->buffer[i]);
 	}
 
+	(*debug_idx)=bis->buffer_idx;
 	bis->buffer_idx=0;
 	return res;
 }

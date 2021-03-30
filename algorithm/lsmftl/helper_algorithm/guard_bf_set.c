@@ -46,6 +46,7 @@ guard_bf_set *gbf_set_init(float target_fpr, uint32_t member, uint32_t type){
 	res->now=res->max=0;
 	res->max=member;
 	res->memory_usage_bit=0;
+	res->type=type;
 	uint32_t set_num;
 	uint32_t i=0;
 	switch(type){
@@ -153,13 +154,18 @@ uint32_t gbf_get_start_idx(guard_bf_set *gbf, uint32_t lba){
 	return ((bf_set*)gbf->body[idx].array)->now-1;
 }
 
-void gbf_set_copy(guard_bf_set *des, guard_bf_set *src){
-	*des=*src;
-	//uint32_t type=((bf_set*)src->body[0].array)->type;
+guard_bf_set* gbf_set_copy(guard_bf_set *src){
+	guard_bf_set *res=(guard_bf_set*)malloc(sizeof(guard_bf_set));
+	guard_bp_pair *temp_body=src->body;
+	*res=*src;
 	uint32_t i=0;
-	for(;i<src->max;i++){
-		bf_set_copy((bf_set*)des->body[i].array, (bf_set*)src->body[i].array);
+	temp_body=(guard_bp_pair*)malloc(sizeof(guard_bp_pair)*res->set_num);
+	for(;i<res->set_num; i++){
+		temp_body[i]=src->body[i];
+		temp_body[i].array=(void*)bf_set_copy((bf_set*)src->body[i].array);
 	}
+	res->body=temp_body;
+	return res;
 }	
 
 void gbf_set_move(guard_bf_set *des, guard_bf_set *src){

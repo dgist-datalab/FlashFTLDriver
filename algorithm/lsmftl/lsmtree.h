@@ -13,6 +13,7 @@
 #include "read_helper.h"
 #include "version.h"
 #include "helper_algorithm/bf_set.h"
+#include "segment_level_manager.h"
 
 #define TARGETFPR 0.1f
 
@@ -62,6 +63,7 @@ typedef struct lsmtree{
 	
 	rwlock *level_rwlock;
 
+	fdriver_lock_t flush_lock;
 	lsmtree_parameter param;
 	lsmtree_monitor monitor;
 	bool global_debug_flag;

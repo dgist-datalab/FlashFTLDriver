@@ -8,6 +8,8 @@
 
 typedef struct block_set{
 	uint32_t total_invalid_number;
+	uint32_t total_valid_number;
+	uint32_t used_page_num;
 	uint8_t type;
 	__block *blocks[BPS];
 	void *hptr;
@@ -45,6 +47,8 @@ void seq_release_segment(struct blockmanager*, __segment *);
 __segment* seq_change_reserve(struct blockmanager* ,__segment *reserve);
 int seq_get_page_num(struct blockmanager* ,__segment *);
 int seq_pick_page_num(struct blockmanager* ,__segment *);
+void seq_reinsert_segment(struct blockmanager *, uint32_t seg_idx);
+uint32_t seq_remain_free_page(struct blockmanager *, __segment *);
 
 uint32_t seq_map_ppa(struct blockmanager* , uint32_t lpa);
 void seq_free_segment(struct blockmanager *, __segment *);

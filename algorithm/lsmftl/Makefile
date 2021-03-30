@@ -16,6 +16,8 @@ SRCS +=\
 	   sst_block_file_stream.c\
 	   sst_file.c\
 	   read_helper.c\
+	   segment_level_manager.c\
+	   compaction_merge.c\
 #	   gc.c\
 #	   helper_algorithm/bf_set.c\
 #	   helper_algorithm/compressed_bloomfilter.c

@@ -15,6 +15,7 @@
 #include "sst_file.h"
 #include "lsmtree.h"
 #include "sst_block_file_stream.h"
+#include "sst_page_file_stream.h"
 #include <queue>
 
 #define COMPACTION_TAGS ((QDEPTH)*2)
@@ -23,7 +24,21 @@ typedef struct inter_read_alreq_param{
 	fdriver_lock_t done_lock;
 	value_set *data;
 	sst_file *target;
+	map_range *map_target;
 }inter_read_alreq_param;
+
+typedef struct{
+	level *des;
+	int32_t from;
+	uint32_t to;
+	inter_read_alreq_param *param[COMPACTION_TAGS];
+}read_issue_arg;
+
+typedef struct{
+	read_issue_arg **arg_set;
+	void *(*end_req)(algo_req*);
+	uint32_t set_num;
+}read_arg_container;
 
 typedef struct key_value_wrapper{ //for data read!
 	uint32_t piece_ppa;
@@ -51,7 +66,6 @@ typedef struct compaction_master{
 	//slab_master *kv_wrapper_slab;
 }compaction_master;
 
-
 compaction_master *compaction_init(uint32_t compaction_queue_num);
 void compaction_free(compaction_master *cm);
 void compaction_issue_req(compaction_master *cm, compaction_req *);
@@ -65,6 +79,22 @@ inter_read_alreq_param *compaction_get_read_param(compaction_master *cm);
 void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *);
 key_value_wrapper *compaction_get_kv_wrapper(uint32_t ppa);
 void compaction_free_kv_wrapper(key_value_wrapper *kv_wrap);
+void read_sst_job(void *arg, int th_num);
+
+void stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_stream **os_set, 
+		struct sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
+		bool all_empty_stop, uint32_t limit, uint32_t version,
+		bool (*invalidate_function)(level *des, uint32_t taget_idx, uint32_t target_ridx, key_ptr_pair kp));
+
+
+sst_file *bis_to_sst_file(struct sst_bf_in_stream *bis);
+struct sst_bf_in_stream *tiering_new_bis();
+
+int issue_read_kv_for_bos(struct sst_bf_out_stream *bos, struct sst_pf_out_stream *pos, 
+		uint32_t target_num, uint32_t version, bool round_final);
+uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, struct sst_bf_out_stream *bos, run *new_run,
+		int32_t entry_num, uint32_t target_ridx, bool final);
+void *comp_alreq_end_req(algo_req *req);
 
 static inline compaction_req * alloc_comp_req(int8_t start, int8_t end, key_ptr_pair *target,
 		void (*end_req)(compaction_req *), void *param){

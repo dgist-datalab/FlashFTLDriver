@@ -8,29 +8,23 @@
 #include <algorithm>
 extern lsmtree LSM;
 
-static compaction_master *_cm;
-void *comp_alreq_end_req(algo_req *req);
+compaction_master *_cm;
 
-uint32_t debug_lba=UINT32_MAX;
+uint32_t debug_lba=6738;
 
-typedef struct{
-	level *des;
-	int32_t from;
-	uint32_t to;
-	inter_read_alreq_param *param[COMPACTION_TAGS];
-}read_issue_arg;
-
-typedef struct{
-	read_issue_arg **arg_set;
-	uint32_t set_num;
-}read_arg_container;
-
-static inline void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, level *des){
+static inline void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des){
 	static int cnt=0;
 	if(lba==debug_lba){
-		printf("[%d]%u,%u (l,p) -> %u\n",++cnt, lba,piece_ppa, des->idx);
-		if(cnt==17){
-			printf("break!\n");
+		if(des){
+			if(des->idx==LSM.param.LEVELN-1){
+				printf("[%d]%u,%u (l,p) -> %u(%u)\n",++cnt, lba,piece_ppa, des->idx, target_ridx);
+			}
+			else{
+				printf("[%d]%u,%u (l,p) -> %u\n",++cnt, lba,piece_ppa, des->idx);
+			}
+		}
+		else{
+			printf("[%d]%u,%u (l,p) -> merging to %u\n",++cnt, lba,piece_ppa, target_ridx);
 		}
 	}
 }
@@ -42,24 +36,47 @@ static inline void compaction_error_check
 		MIN(GET_LEV_START_LBA(des), GET_LEV_START_LBA(src));
 
 	uint32_t max_lba=kp_set?
-		MAX(kp_set[LAST_KP_IDX].lba, GET_LEV_END_LBA(des)):
+		MAX(kp_get_end_lba((char*)kp_set), GET_LEV_END_LBA(des)):
 		MAX(GET_LEV_END_LBA(des), GET_LEV_END_LBA(src));
 
-	if(!(GET_LEV_START_LBA(res) <= min_lba
-				&& GET_LEV_END_LBA(res)>=max_lba)){
-		printf("src\n");
-		level_print(src);
-		printf("des\n");
-		level_print(des);
-		printf("res\n");
-		level_print(res);
-		if(kp_set){
-			printf("first_compaction_cnt:%u\n", compaction_num);
+	if(max_lba==UINT32_MAX){
+		kp_get_end_lba((char*)kp_set);
+	}
+
+	uint32_t target_version=version_level_idx_to_version(LSM.last_run_version, des->idx, LSM.param.LEVELN);
+	if(!(GET_LEV_START_LBA(res) <= min_lba)){
+		if(target_version==version_map_lba(LSM.last_run_version, min_lba)){
+			printf("src\n");
+			level_print(src);
+			printf("des\n");
+			level_print(des);
+			printf("res\n");
+			level_print(res);
+			if(kp_set){
+				printf("first_compaction_cnt:%u\n", compaction_num);
+			}
+			else{
+				printf("leveling_compaction_cnt:%u\n", compaction_num);
+			}
+			EPRINT("range error", true);
 		}
-		else{
-			printf("leveling_compaction_cnt:%u\n", compaction_num);
+	}
+	if(!(GET_LEV_END_LBA(res)>=max_lba)){
+		if(target_version==version_map_lba(LSM.last_run_version,max_lba)){
+			printf("src\n");
+			level_print(src);
+			printf("des\n");
+			level_print(des);
+			printf("res\n");
+			level_print(res);
+			if(kp_set){
+				printf("first_compaction_cnt:%u\n", compaction_num);
+			}
+			else{
+				printf("leveling_compaction_cnt:%u\n", compaction_num);
+			}
+			EPRINT("range error", true);
 		}
-		EPRINT("range error", true);
 	}
 
 	//if(res->idx==2 || res->idx==3){
@@ -93,7 +110,7 @@ static inline void tiering_compaction_error_check(level *src, run *r1, run *r2, 
 	version_sanity_checker(LSM.last_run_version);
 }
 
-static void read_sst_job(void *arg, int th_num){
+void read_sst_job(void *arg, int th_num){
 	read_arg_container *thread_arg=(read_arg_container*)arg;
 	read_issue_arg **arg_set=thread_arg->arg_set;
 	uint32_t *idx_set=(uint32_t*)calloc(thread_arg->set_num, sizeof(uint32_t));
@@ -108,19 +125,30 @@ static void read_sst_job(void *arg, int th_num){
 	uint32_t remain_checker=0, target=(1<<(thread_arg->set_num))-1;
 	while(!(remain_checker==target)){
 		for(uint32_t i=0; i<thread_arg->set_num; i++){
+
+			if(idx_set[i]>(arg_set[i]->to)){
+				remain_checker|=1<<i;
+			}
+
 			if(remain_checker&1<<i) continue;
 			inter_read_alreq_param *now=param_set[i][idx_set[i]-arg_set[i]->from];
 			algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
 			//read_req->ppa=now->target->piece_ppa;
 			read_req->type=MAPPINGR;
 			read_req->param=(void*)now;
-			read_req->end_req=comp_alreq_end_req;
-			io_manager_issue_read(now->target->file_addr.map_ppa, 
+			read_req->end_req=thread_arg->end_req;
+			if(now->target){
+				io_manager_issue_read(now->target->file_addr.map_ppa, 
 					now->data, read_req, false);
-
-			if(idx_set[i]==(arg_set[i]->to)){
-				remain_checker|=1<<i;
 			}
+			else if(now->map_target){
+				io_manager_issue_read(now->map_target->ppa, 
+					now->data, read_req, false);
+			}
+			else{
+				EPRINT("should_check target!", true);
+			}	
+
 			idx_set[i]++;
 		}
 	}
@@ -140,6 +168,7 @@ static void read_param_init(read_issue_arg *read_arg){
 }
 
 bool read_done_check(inter_read_alreq_param *param, bool check_page_sst){
+	static int cnt=0;
 	if(check_page_sst){
 		param->target->data=param->data->value;
 	}
@@ -151,7 +180,7 @@ bool file_done(inter_read_alreq_param *param){
 	param->target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);
-	invalidate_map_ppa(LSM.pm->bm, param->target->file_addr.map_ppa);
+	invalidate_map_ppa(LSM.pm->bm, param->target->file_addr.map_ppa, true);
 	compaction_free_read_param(_cm, param);
 	return true;
 }
@@ -160,7 +189,7 @@ static void write_sst_file(sst_pf_in_stream *is, level *des){ //for page file
 	sst_file *sptr;
 	value_set *vs=sst_pis_get_result(is, &sptr);
 	sptr->file_addr.map_ppa=page_manager_get_new_ppa(LSM.pm,true,MAPSEG);
-	validate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, sptr->start_lba);
+	validate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, sptr->start_lba, true);
 	
 	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 	write_req->type=MAPPINGW;
@@ -173,7 +202,37 @@ static void write_sst_file(sst_pf_in_stream *is, level *des){ //for page file
 	sst_free(sptr, LSM.pm);
 }
 
-static void stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_set, sst_pf_in_stream *is, bool all_empty_stop, uint32_t limit){
+static bool leveling_invalidation_function(level *des, uint32_t stream_id, uint32_t version, 
+		key_ptr_pair kp){
+	if(stream_id==UINT32_MAX){
+		if(slm_invalidate_enable(des->idx, kp.piece_ppa)){
+			invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, true);
+			return false;
+		}
+	}
+	else{
+		/*
+		   latest -> above_src
+		   target_version+1 -> src
+		   target_version  ->des
+		 */
+		if(version_map_lba(LSM.last_run_version, kp.lba)> version+1){
+			if(stream_id==0 && des->idx!=0 && slm_invalidate_enable(des->idx-1, kp.piece_ppa)){
+				invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, true);
+			}
+			else if(stream_id==1 && slm_invalidate_enable(des->idx, kp.piece_ppa)){
+				invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa , true);
+			}
+			return false;
+		}
+	}
+	return true;
+}
+
+void stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_set, 
+		sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
+		bool all_empty_stop, uint32_t limit, uint32_t target_version,
+		bool (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_ridx, key_ptr_pair kp)){
 	bool one_empty=false;
 	if(stream_num >= 32){
 		EPRINT("too many stream!!", true);
@@ -181,9 +240,9 @@ static void stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **
 	
 	uint32_t all_empty_check=0;
 	uint32_t sorting_idx=0;
-	uint32_t target_version=LSM.param.LEVELN-1-des->idx+LSM.disk[LSM.param.LEVELN-1]->max_run_num-1;
-	if(des->idx==1){
-		printf("break!\n");
+	//uint32_t target_version=UINT32_MAX;
+	if(des){
+		//version_level_idx_to_version(LSM.last_run_version, des->idx, LSM.param.LEVELN);
 	}
 
 	while(!((all_empty_stop && all_empty_check==((1<<stream_num)-1)) || (!all_empty_stop && one_empty))){
@@ -204,7 +263,9 @@ static void stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **
 					target_idx=i;
 				}
 				else if(target_pair.lba!=UINT32_MAX && target_pair.lba==now.lba){
-					invalidate_piece_ppa(LSM.pm->bm,now.piece_ppa);
+					if(invalidate_function){
+						invalidate_function(des,-1, target_version, now);
+					}
 					sst_pos_pop(os_set[i]);
 					continue;
 				}
@@ -219,20 +280,24 @@ static void stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **
 		}
 
 		if(target_pair.lba!=UINT32_MAX){
-			if(version_map_lba(LSM.last_run_version, target_pair.lba)> target_version+1){
-				invalidate_piece_ppa(LSM.pm->bm, target_pair.piece_ppa);
-				continue;
-			}
-			else{
-				version_coupling_lba_ridx(LSM.last_run_version, target_pair.lba, target_version);
-			}
-		}
-
-		if(target_pair.lba!=UINT32_MAX){
 			sorting_idx++;
-			compaction_debug_func(target_pair.lba, target_pair.piece_ppa, des);
-			if(sst_pis_insert(is, target_pair)){
-				write_sst_file(is, des);
+			compaction_debug_func(target_pair.lba, target_pair.piece_ppa, target_version, des);
+
+			if(kpq){
+				if(invalidate_function && 
+						invalidate_function(des, target_idx, os_set[target_idx]->version_idx, target_pair))
+				kpq->push(target_pair);
+			}
+			else if(is){
+				if(invalidate_function && 
+						invalidate_function(des, target_idx, target_version, target_pair)){
+					version_coupling_lba_ridx(LSM.last_run_version, target_pair.lba, target_version);	
+					if(sst_pis_insert(is, target_pair)){
+						write_sst_file(is, des);
+					}
+				}
+			}else{
+				EPRINT("plz set one of two(kpq or is)", true);
 			}
 
 			sst_pos_pop(os_set[target_idx]);
@@ -244,7 +309,8 @@ static void stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **
 
 	}
 
-	if(all_empty_stop && sst_pis_remain_data(is)){
+
+	if(is && all_empty_stop && sst_pis_remain_data(is)){
 		write_sst_file(is,des);
 	}
 
@@ -255,14 +321,14 @@ static sst_file *key_ptr_to_sst_file(key_ptr_pair *kp_set, bool should_flush){
 	if(should_flush){
 		value_set *vs=inf_get_valueset((char*)kp_set, FS_MALLOC_W, PAGESIZE);
 		ppa=page_manager_get_new_ppa(LSM.pm, true, MAPSEG);
-		validate_map_ppa(LSM.pm->bm, ppa, kp_set[0].lba);
+		validate_map_ppa(LSM.pm->bm, ppa, kp_set[0].lba, true);
 		algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 		write_req->type=MAPPINGW;
 		write_req->param=(void*)vs;
 		write_req->end_req=comp_alreq_end_req;
 		io_manager_issue_internal_write(ppa, vs, write_req, false);
 	}
-	sst_file *sstfile=sst_pf_init(ppa, kp_set[0].lba, kp_set[LAST_KP_IDX].lba);
+	sst_file *sstfile=sst_pf_init(ppa, kp_set[0].lba, kp_get_end_lba((char*)kp_set));
 	return sstfile;
 }
 
@@ -356,12 +422,21 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 		//level_print(res);
 		return res;
 	}
+
+	if(page_manager_is_gc_needed(LSM.pm, des->now_sst_num+1, true)){
+		__do_gc(LSM.pm, true, des->now_sst_num+1);
+	}
+
 	LSM.monitor.compaction_cnt[0]++;
+	if(LSM.monitor.compaction_cnt[0]==1489){
+		printf("break!\n");
+	}
 	/*each round read/write 128 data*/
 	/*we need to have rate limiter!!*/
 	read_issue_arg read_arg;
 	read_arg.des=des;
 	read_arg_container thread_arg;
+	thread_arg.end_req=comp_alreq_end_req;
 	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg));
 	thread_arg.arg_set[0]=&read_arg;
 	thread_arg.set_num=1;
@@ -387,20 +462,22 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 		read_param_init(&read_arg);
 
 		if(i==0){
-			os=sst_pos_init(LEVELING_SST_AT_PTR(des, read_arg.from), read_arg.param, 
+			os=sst_pos_init_sst(LEVELING_SST_AT_PTR(des, read_arg.from), read_arg.param, 
 					read_arg.to-read_arg.from+1, read_done_check, file_done);
 			os_set[0]=sst_pos_init_kp(kp_set);
 			os_set[1]=os;
 		}
 		else{
-			sst_pos_add(os_set[1], LEVELING_SST_AT_PTR(des, read_arg.from), read_arg.param,
+			sst_pos_add_sst(os_set[1], LEVELING_SST_AT_PTR(des, read_arg.from), read_arg.param,
 					read_arg.to-read_arg.from+1);
 		}
 		/*send read I/O*/
 		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
 
-		stream_sorting(res, 2, os_set, is, i==round-1, 
-				MIN(LEVELING_SST_AT(des,read_arg.to).end_lba, kp_set[LAST_KP_IDX].lba));
+		stream_sorting(res, 2, os_set, is, NULL, i==round-1, 
+				MIN(LEVELING_SST_AT(des,read_arg.to).end_lba, kp_set[LAST_KP_IDX].lba),
+				version_level_idx_to_version(LSM.last_run_version, res->idx, LSM.param.LEVELN),
+				leveling_invalidation_function);
 
 	}
 	
@@ -461,16 +538,15 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 		trivial_move(NULL,src, des, res);
 		return res;
 	}
+
 	LSM.monitor.compaction_cnt[des->idx]++;
-	if(LSM.monitor.compaction_cnt[des->idx]==15){
-		LSM.global_debug_flag=true;
-	}
 
 	read_issue_arg read_arg1, read_arg2;
 	read_arg1.des=src;
 	read_arg2.des=des;
 
 	read_arg_container thread_arg;
+	thread_arg.end_req=comp_alreq_end_req;
 	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg*)*2);
 	thread_arg.arg_set[0]=&read_arg1;
 	thread_arg.arg_set[1]=&read_arg2;
@@ -483,6 +559,11 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 	uint32_t des_end_idx=0;
 	compaction_move_unoverlapped_sst(NULL,src, des, res, &des_start_idx);
 
+	uint32_t target_map_page_num=src->now_sst_num+(des->now_sst_num-des_start_idx);
+	if(page_manager_is_gc_needed(LSM.pm, target_map_page_num, true)){
+		__do_gc(LSM.pm, true, target_map_page_num);
+	}
+
 	run *rptr; sst_file *sptr;
 	uint32_t ridx, sidx;
 	bool isstart=true;
@@ -494,19 +575,18 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 		sidx=read_arg1.to;
 
 		if(isstart){
-			os_set[0]=sst_pos_init(LEVELING_SST_AT_PTR(src, read_arg1.from), read_arg1.param, 
+			os_set[0]=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg1.from), read_arg1.param, 
 					read_arg1.to-read_arg1.from+1, read_done_check, file_done);
-			os_set[1]=sst_pos_init(LEVELING_SST_AT_PTR(des, read_arg2.from), read_arg2.param, 
+			os_set[1]=sst_pos_init_sst(LEVELING_SST_AT_PTR(des, read_arg2.from), read_arg2.param, 
 					read_arg2.to-read_arg2.from+1, read_done_check, file_done);
 		}
 		else{
-			sst_pos_add(os_set[0], LEVELING_SST_AT_PTR(src, read_arg1.from), read_arg1.param,
+			sst_pos_add_sst(os_set[0], LEVELING_SST_AT_PTR(src, read_arg1.from), read_arg1.param,
 					read_arg1.to-read_arg1.from+1);
-			sst_pos_add(os_set[1], LEVELING_SST_AT_PTR(des, read_arg2.from), read_arg2.param,
+			sst_pos_add_sst(os_set[1], LEVELING_SST_AT_PTR(des, read_arg2.from), read_arg2.param,
 					read_arg2.to-read_arg2.from+1);
 		}
 
-		if(LSM.global_debug_flag){
 			/*
 			printf("%u ~ %u && %u~%u\n",
 					LEVELING_SST_AT(src,read_arg1.from).start_lba,
@@ -515,13 +595,14 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 					LEVELING_SST_AT(des,read_arg2.to).end_lba
 					);	
 			*/
-		}
 
 		/*send read I/O*/
 		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
 
-		stream_sorting(res, 2, os_set, is, sidx==src->now_sst_num-1, 
-				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba)
+		stream_sorting(res, 2, os_set, is, NULL, sidx==src->now_sst_num-1, 
+				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba),
+				version_level_idx_to_version(LSM.last_run_version, res->idx, LSM.param.LEVELN),
+				leveling_invalidation_function
 				);
 
 		isstart=false;
@@ -550,8 +631,8 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 
 }
 
-static int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos, 
-		uint32_t target_num, bool round_final){
+int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos, 
+		uint32_t target_num, uint32_t version, bool round_final){
 	key_value_wrapper *read_target;
 	uint32_t res=0;
 	for(uint32_t i=0; i<target_num  && !sst_pos_is_empty(pos); i++){
@@ -561,6 +642,20 @@ static int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
+
+		if(slm_invalidate_enable(LSM.param.LEVELN-2, kv_wrapper->piece_ppa)){
+			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
+		}
+
+		if(version_map_lba(LSM.last_run_version, target_pair.lba) > version_level_idx_to_version(LSM.last_run_version, LSM.param.LEVELN-2, LSM.param.LEVELN)){
+			/*	
+				above level
+				LSM.param.LEVELN-2 (last leveling)
+				LSM.param.LEVELN-1 (tierine)
+			 */
+			sst_pos_pop(pos);
+			continue;
+		}
 
 		if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){
 			if(!read_target->param){
@@ -575,7 +670,7 @@ static int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 		}
 
 		sst_pos_pop(pos);
-		res=i;
+		res++;
 	}
 
 	if(sst_pos_is_empty(pos) && round_final){
@@ -592,7 +687,7 @@ static int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 }
 
 
-static sst_file *bis_to_sst_file(sst_bf_in_stream *bis){
+ sst_file *bis_to_sst_file(sst_bf_in_stream *bis){
 	if(bis->map_data->size()==0) return NULL;
 	sst_file *res=sst_init_empty(BLOCK_FILE);
 	uint32_t map_num=0;
@@ -618,8 +713,9 @@ static sst_file *bis_to_sst_file(sst_bf_in_stream *bis){
 		mr_set[mr_idx].end_lba=kp_get_end_lba(data->value);
 		mr_set[mr_idx].ppa=ppa;
 
-		uint32_t temp_ppa=ppa*L2PGAP;
-		validate_piece_ppa(LSM.pm->bm,1, &temp_ppa, &mr_set[mr_idx].start_lba);
+		//uint32_t temp_ppa=ppa*L2PGAP;
+		validate_map_ppa(LSM.pm->bm, ppa, mr_set[mr_idx].start_lba, true);
+		//validate_piece_ppa(LSM.pm->bm,1, &temp_ppa, &mr_set[mr_idx].start_lba);
 
 		io_manager_issue_write(ppa, data, write_req, false);
 
@@ -639,9 +735,31 @@ static sst_file *bis_to_sst_file(sst_bf_in_stream *bis){
 	return res;
 }
 
-static void issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, run *new_run,
+sst_bf_in_stream *tiering_new_bis(){
+	uint32_t start_piece_ppa, piece_ppa_length;
+retry:
+	start_piece_ppa=page_manager_pick_new_ppa(LSM.pm, false, DATASEG)*L2PGAP;
+	piece_ppa_length=page_manager_get_remain_page(LSM.pm, false)*L2PGAP;
+	/*if piece_ppa_length<=1, */
+	if(piece_ppa_length<=2){
+		//should change next ppa;
+		page_manager_move_next_seg(LSM.pm, false, false, DATASEG);
+		goto retry;
+	}
+	read_helper_param temp_rhp=LSM.param.tiering_rhp;
+	temp_rhp.member_num=piece_ppa_length;
+	sst_bf_in_stream *bis=sst_bis_init(start_piece_ppa, piece_ppa_length, LSM.pm, true, temp_rhp);
+	return bis;
+}
+
+uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, run *new_run,
 		int32_t entry_num, uint32_t target_ridx, bool final){
 	int32_t inserted_entry_num=0;
+	uint32_t debug_idx=0;
+	key_ptr_pair debug_kp[L2PGAP];
+	uint32_t last_lba=UINT32_MAX;
+
+	fdriver_lock(&LSM.flush_lock);
 	while(!sst_bos_is_empty(bos)){
 		key_value_wrapper *target=NULL;
 		if(!final && !(target=sst_bos_pick(bos, entry_num-inserted_entry_num <=L2PGAP))){
@@ -654,20 +772,20 @@ static void issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bo
 			}
 		}
 
-		compaction_debug_func(target->kv_ptr.lba, target->piece_ppa,
-				LSM.disk[LSM.param.LEVELN-1]);
-
 		if(target){
+			last_lba=target->kv_ptr.lba;
 			version_coupling_lba_ridx(LSM.last_run_version, target->kv_ptr.lba, target_ridx);
-		}
-
-		if(target){
-			invalidate_piece_ppa((*bis)->pm->bm, target->piece_ppa);
 		}
 
 		if((target && sst_bis_insert(*bis, target)) ||
 				(final && sst_bos_kv_q_size(bos)==1)){
-			value_set *result=sst_bis_get_result(*bis, final);
+
+			value_set *result=sst_bis_get_result(*bis, final, &debug_idx, debug_kp);
+			for(uint32_t i=0; i<debug_idx; i++){
+				compaction_debug_func(debug_kp[i].lba, debug_kp[i].piece_ppa, target_ridx,
+					LSM.disk[LSM.param.LEVELN-1]);
+			}
+
 			algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 			write_req->type=COMPACTIONDATAW;
 			write_req->param=(void*)result;
@@ -675,50 +793,73 @@ static void issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bo
 			io_manager_issue_write(result->ppa, result, write_req, false);
 		}
 
-
 		sst_bos_pop(bos, _cm);
 	//	if(!final & sst_bis_ppa_empty(*bis)){
 		if(sst_bis_ppa_empty(*bis)){
 			sst_file *sptr=bis_to_sst_file(*bis);
-			run_append_sstfile(new_run, sptr);
+			run_append_sstfile_move_originality(new_run, sptr);
 			sst_free(sptr, LSM.pm);
 			sst_bis_free(*bis);
-			uint32_t start_piece_ppa=page_manager_pick_new_ppa(LSM.pm, false, DATASEG)*L2PGAP;
-			uint32_t piece_ppa_length=page_manager_get_remain_page(LSM.pm, false)*L2PGAP;
-			read_helper_param temp_rhp=LSM.param.tiering_rhp;
-			temp_rhp.member_num=piece_ppa_length;
-			*bis=sst_bis_init(start_piece_ppa, piece_ppa_length, LSM.pm, true, temp_rhp);
+			*bis=tiering_new_bis();
 		}
 		inserted_entry_num++;
 	}
+	
+	if(final && sst_bos_kv_q_size(bos)==0 && (*bis)->buffer_idx){
+
+		value_set *result=sst_bis_get_result(*bis, final, &debug_idx, debug_kp);
+		for(uint32_t i=0; i<debug_idx; i++){
+			compaction_debug_func(debug_kp[i].lba, debug_kp[i].piece_ppa, target_ridx,
+				LSM.disk[LSM.param.LEVELN-1]);
+		}
+
+		algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
+		write_req->type=COMPACTIONDATAW;
+		write_req->param=(void*)result;
+		write_req->end_req=comp_alreq_end_req;
+		io_manager_issue_write(result->ppa, result, write_req, false);	
+	}
+	fdriver_unlock(&LSM.flush_lock);
+	return last_lba;
 }
 
 level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move to last level*/
 	_cm=cm;
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
 
-	run *rptr; uint32_t ridx;
-	for_each_run(des, rptr, ridx){
-		level_deep_append_run(res, rptr);
-	}
 	LSM.monitor.compaction_cnt[des->idx]++;
+	/*printf("%u LSM.disk[2].array[2].sst_set[3]->end_ppa:%u\n", 
+			LSM.monitor.compaction_cnt[des->idx],
+			LSM.disk[2]->array[2].sst_set[3].end_ppa);*/
+
+	if(page_manager_get_total_remain_page(LSM.pm, false) < src->now_sst_num*KP_IN_PAGE+src->now_sst_num){
+		__do_gc(LSM.pm, false, src->now_sst_num*KP_IN_PAGE+src->now_sst_num);
+	}
+
+/*	printf("%u LSM.disk[2].array[2].sst_set[3]->end_ppa:%u\n", 
+			LSM.monitor.compaction_cnt[des->idx],
+			LSM.disk[2]->array[2].sst_set[3].end_ppa);*/
+	run *rptr; uint32_t ridx;
+	for_each_run_max(des, rptr, ridx){
+		if(rptr->now_sst_file_num){
+			level_append_run_copy_move_originality(res, rptr, ridx);
+		}
+	}
 
 	run *new_run=run_init(des->max_sst_num/des->max_run_num, UINT32_MAX, 0);
 
 	read_issue_arg read_arg;
 	read_arg.des=src;
 	read_arg_container thread_arg;
+	thread_arg.end_req=comp_alreq_end_req;
 	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg));
 	thread_arg.arg_set[0]=&read_arg;
 	thread_arg.set_num=1;
 
 	sst_pf_out_stream *pos;
-	sst_bf_out_stream *bos=sst_bos_init(read_done_check);
-	uint32_t start_piece_ppa=page_manager_pick_new_ppa(LSM.pm, false, DATASEG)*L2PGAP;
-	uint32_t piece_ppa_length=page_manager_get_remain_page(LSM.pm, false)*L2PGAP;
-	read_helper_param temp_rhp=LSM.param.tiering_rhp;
-	temp_rhp.member_num=piece_ppa_length;
-	sst_bf_in_stream *bis=sst_bis_init(start_piece_ppa, piece_ppa_length, LSM.pm,true, temp_rhp);
+	sst_bf_out_stream *bos=sst_bos_init(read_done_check, false);
+	sst_bf_in_stream *bis=tiering_new_bis();
+
 	uint32_t start_idx=0;
 	uint32_t total_num=src->now_sst_num;
 	uint32_t tier_compaction_tags=COMPACTION_TAGS/2;
@@ -736,11 +877,11 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		read_param_init(&read_arg);
 
 		if(i==0){
-			pos=sst_pos_init(LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param, 
+			pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param, 
 					read_arg.to-read_arg.from+1, read_done_check, file_done);
 		}
 		else{
-			sst_pos_add(pos, LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
+			sst_pos_add_sst(pos, LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
 					read_arg.to-read_arg.from+1);
 		}
 		read_sst_job((void*)&thread_arg,-1);
@@ -751,7 +892,8 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 
 		do{ 
 			round2_tier_compaction_tags=cm->read_param_queue->size();
-			picked_kv_num=issue_read_kv_for_bos(bos, pos, round2_tier_compaction_tags, i==round-1);
+			picked_kv_num=issue_read_kv_for_bos(bos, pos, round2_tier_compaction_tags, target_ridx, 
+					i==round-1);
 			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
 			issue_write_kv_for_bis(&bis, bos, new_run, round2_tier_compaction_tags, target_ridx, 
 					i==round-1 && sst_pos_is_empty(pos));
@@ -763,7 +905,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	//finishing bis
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
-		run_append_sstfile(new_run, last_file);
+		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
 	
@@ -773,7 +915,10 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	
 
 	//level_append_run(res, new_run);
-	level_update_run_at(res, target_ridx, new_run, true);
+	if(target_ridx==28){
+		run_print(new_run);
+	}
+	level_update_run_at_move_originality(res, target_ridx, new_run, true);
 	version_populate_run(LSM.last_run_version, target_ridx);
 	free(thread_arg.arg_set);
 
@@ -783,7 +928,34 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	/*finish logic*/
 	return res;
 }
-
+void *comp_alreq_end_req(algo_req *req){
+	inter_read_alreq_param *r_param;
+	value_set *vs;
+	key_value_wrapper *kv_wrapper;
+	switch(req->type){
+		case MAPPINGW:
+			vs=(value_set*)req->param;
+			inf_free_valueset(vs, FS_MALLOC_W);
+			break;
+		case MAPPINGR:
+			r_param=(inter_read_alreq_param*)req->param;
+			fdriver_unlock(&r_param->done_lock);
+			break;
+		case COMPACTIONDATAR:
+		case DATAR:
+			kv_wrapper=(key_value_wrapper*)req->param;
+			fdriver_unlock(&kv_wrapper->param->done_lock);
+			break;
+		case COMPACTIONDATAW:
+		case DATAW:
+			vs=(value_set*)req->param;
+			inf_free_valueset(vs, FS_MALLOC_W);
+			break;
+	}
+	free(req);
+	return NULL;
+}
+#if 0
 static uint32_t stream_merge_sorting(uint32_t stream_num, sst_pf_out_stream **os_set,
 		sst_bf_out_stream *bos, uint32_t target_num, bool round_final, uint32_t limit){
 	bool one_empty=false;
@@ -795,6 +967,7 @@ static uint32_t stream_merge_sorting(uint32_t stream_num, sst_pf_out_stream **os
 	uint32_t sorting_idx=0;
 	key_value_wrapper *read_target;
 	uint32_t res=0;
+	int a, b;
 	while(!((round_final && all_empty_check==((1<<stream_num)-1)) || (!round_final && one_empty)) 
 			&& res<target_num){
 		key_ptr_pair target_pair;
@@ -825,33 +998,43 @@ static uint32_t stream_merge_sorting(uint32_t stream_num, sst_pf_out_stream **os
 		}
 
 		if(!round_final && target_pair.lba>limit) break;
-		if(target_pair.lba==UINT32_MAX) continue;
+		if(target_pair.lba==UINT32_MAX) goto final_check;
+
 		if(os_set[target_idx]->now->already_invalidate_file){
-			continue;	
+			/*trimed data in gc logic*/
 		}
-		if(version_map_lba(LSM.last_run_version, target_pair.lba) >
-				LSM.last_run_version->max_valid_version_num-1){
+		if(os_set[target_idx]->version_idx==UINT32_MAX){
+			EPRINT("setting version idx error!", true);
+		}
+		a=version_map_lba(LSM.last_run_version, target_pair.lba);
+		b=os_set[target_idx]->version_idx;
+		if(version_compare(LSM.last_run_version, a, b) > 0){
 			invalidate_piece_ppa(LSM.pm->bm, target_pair.piece_ppa);
-			continue;
 		}
+		else{
+			key_value_wrapper *kv_wrapper=(key_value_wrapper*)calloc(1, sizeof(key_value_wrapper));
+			kv_wrapper->piece_ppa=target_pair.piece_ppa;
+			kv_wrapper->kv_ptr.lba=target_pair.lba;
 
-		key_value_wrapper *kv_wrapper=(key_value_wrapper*)calloc(1, sizeof(key_value_wrapper));
-		kv_wrapper->piece_ppa=target_pair.piece_ppa;
-		kv_wrapper->kv_ptr.lba=target_pair.lba;
-
-		if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){
-			if(!read_target->param){
-				EPRINT("can't be", true);
+			if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){
+				if(!read_target->param){
+					EPRINT("can't be", true);
+				}
+				algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
+				read_req->type=COMPACTIONDATAR;
+				read_req->param=(void*)read_target;
+				read_req->end_req=comp_alreq_end_req;
+				io_manager_issue_read(PIECETOPPA(read_target->piece_ppa),
+						read_target->param->data, read_req, false);
 			}
-			algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
-			read_req->type=COMPACTIONDATAR;
-			read_req->param=(void*)read_target;
-			read_req->end_req=comp_alreq_end_req;
-			io_manager_issue_read(PIECETOPPA(read_target->piece_ppa),
-					read_target->param->data, read_req, false);
+			res++;
 		}
-
-		res++;
+		sst_pos_pop(os_set[target_idx]);
+final_check:
+		if(sst_pos_is_empty(os_set[target_idx])){
+			one_empty=true;
+			all_empty_check|=1<<target_idx;
+		}
 	}
 
 	if(res==0 && round_final){
@@ -867,16 +1050,18 @@ static uint32_t stream_merge_sorting(uint32_t stream_num, sst_pf_out_stream **os
 
 	return res;
 }
-
+/*
 level* compaction_merge(compaction_master *cm, level *des){
 	_cm=cm;
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
 
 	run *rptr; uint32_t ridx;
 	for_each_run(des, rptr, ridx){
-		level_deep_append_run(res, rptr);
+		level_append_run_copy_move_originality(res, rptr, ridx);
 	}
+
 	LSM.monitor.compaction_cnt[des->idx+1]++;
+//	printf("\n------merge count:%u\n", LSM.monitor.compaction_cnt[des->idx+1]);
 
 	uint32_t idx_set[2];
 	version_get_merge_target(LSM.last_run_version, idx_set);
@@ -929,8 +1114,10 @@ level* compaction_merge(compaction_master *cm, level *des){
 		if(isstart){
 			os_set[0]=sst_pos_init(LEVELING_SST_AT_PTR(newer_level, read_arg1.from), read_arg1.param, 
 					read_arg1.to-read_arg1.from+1, read_done_check, file_done);
+			os_set[0]->version_idx=idx_set[1];
 			os_set[1]=sst_pos_init(LEVELING_SST_AT_PTR(older_level, read_arg2.from), read_arg2.param, 
 					read_arg2.to-read_arg2.from+1, read_done_check, file_done);
+			os_set[1]->version_idx=idx_set[0];
 		}
 		else{
 			sst_pos_add(os_set[0], LEVELING_SST_AT_PTR(newer_level, read_arg1.from), read_arg1.param,
@@ -947,11 +1134,13 @@ level* compaction_merge(compaction_master *cm, level *des){
 			picked_kv_num=stream_merge_sorting(2, os_set, bos, 
 					round2_tier_compaction_tags, isfinal,
 					MIN(LEVELING_SST_AT(newer_level,read_arg1.to).end_lba, LEVELING_SST_AT(older_level,read_arg2.to).end_lba));
-			if(picked_kv_num)
-				round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
+
+			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
 			issue_write_kv_for_bis(&bis, bos, new_run, round2_tier_compaction_tags, target_ridx, 
 					picked_kv_num==0 && isfinal);
-			if(!picked_kv_num) break;
+
+			if(picked_kv_num==0) break;
+
 		}while(1);
 
 		isstart=false;
@@ -961,11 +1150,12 @@ level* compaction_merge(compaction_master *cm, level *des){
 
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
-		run_append_sstfile(new_run, last_file);
+		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
 	
-	level_update_run_at(res, target_ridx, new_run, false);
+	level_update_run_at_move_originality(res, target_ridx, new_run, false);
+	version_populate_run(LSM.last_run_version, target_ridx);
 
 	thpool_wait(cm->issue_worker);
 	sst_pos_free(os_set[0]);
@@ -978,35 +1168,17 @@ level* compaction_merge(compaction_master *cm, level *des){
 
 	free(thread_arg.arg_set);
 	_cm=NULL;
-	tiering_compaction_error_check(NULL, newer, older, new_run, LSM.monitor.compaction_cnt[des->idx]);
-	level_print(res);
+	//tiering_compaction_error_check(NULL, newer, older, new_run, LSM.monitor.compaction_cnt[des->idx]);
+	run_free(new_run);
+	
+	//level_print(res);
+	run_reinit(&res->array[idx_set[1]]);
+	level_run_reinit(res, idx_set[1]);
+	version_poped_update(LSM.last_run_version);
+	//printf("test:%u\n", version_compare(LSM.last_run_version,10, 0));
+	//level_contents_print(res, true);
+	printf("merge done\n");
 	return res;
 }
-
-void *comp_alreq_end_req(algo_req *req){
-	inter_read_alreq_param *r_param;
-	value_set *vs;
-	key_value_wrapper *kv_wrapper;
-	switch(req->type){
-		case MAPPINGW:
-			vs=(value_set*)req->param;
-			inf_free_valueset(vs, FS_MALLOC_W);
-			break;
-		case MAPPINGR:
-			r_param=(inter_read_alreq_param*)req->param;
-			fdriver_unlock(&r_param->done_lock);
-			break;
-		case COMPACTIONDATAR:
-		case DATAR:
-			kv_wrapper=(key_value_wrapper*)req->param;
-			fdriver_unlock(&kv_wrapper->param->done_lock);
-			break;
-		case COMPACTIONDATAW:
-		case DATAW:
-			vs=(value_set*)req->param;
-			inf_free_valueset(vs, FS_MALLOC_W);
-			break;
-	}
-	free(req);
-	return NULL;
-}
+*/
+#endif

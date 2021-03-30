@@ -9,6 +9,7 @@ typedef struct guard_bp_pair{
 }guard_bp_pair;
 
 typedef struct guard_bf_set{
+	uint32_t type;
 	uint32_t memory_usage_bit;
 	uint32_t set_num;
 	uint32_t now;
@@ -22,7 +23,7 @@ guard_bf_set *gbf_set_init(float target_fpr, uint32_t member, uint32_t type);
 bool gbf_set_insert(guard_bf_set *, uint32_t lba, uint32_t piece_ppa);
 uint32_t gbf_set_get_piece_ppa(guard_bf_set *, uint32_t *last_idx, uint32_t lba);
 uint32_t gbf_get_start_idx(guard_bf_set *, uint32_t lba);
-void gbf_set_copy(guard_bf_set *des, guard_bf_set *src);
+guard_bf_set* gbf_set_copy(guard_bf_set *src);
 void gbf_set_move(guard_bf_set *des, guard_bf_set *src);
 void gbf_set_free(guard_bf_set*);
 

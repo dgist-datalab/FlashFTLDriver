@@ -2,6 +2,7 @@
 #define __PAGE_MANAGER_H__
 #include "../../include/settings.h"
 #include "../../include/container.h"
+#include "sst_file.h"
 #include <stdint.h>
 
 #define MAX_MAP (PAGESIZE/sizeof(uint32_t))
@@ -17,7 +18,7 @@ typedef struct _page_manager{
 	uint8_t seg_type_checker[_NOS];
 	bool is_master_page_manager;
 	__segment *current_segment[PARTNUM];
-	__segment *reserve_segment;
+	__segment *reserve_segment[PARTNUM];
 	struct blockmanager *bm;
 }page_manager;
 
@@ -29,20 +30,37 @@ typedef struct gc_read_node{
 	uint32_t lba;
 }gc_read_node;
 
-void __do_gc(page_manager *pm);
+enum{
+	MAP_READ_ISSUE, MAP_READ_DONE
+};
+
+typedef struct gc_mapping_check_node{
+	value_set *mapping_data;
+	char *data_ptr;
+	fdriver_lock_t done_lock;
+	uint32_t type;
+	uint32_t level;
+	uint32_t map_ppa;
+	uint32_t piece_ppa; 
+	uint32_t lba;
+}gc_mapping_check_node;
+
+bool __do_gc(page_manager *pm, bool is_map, uint32_t target_page_num);
 
 page_manager* page_manager_init(struct blockmanager *bm);
 void page_manager_free(page_manager* pm);
-bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page);
+bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page, bool is_map);
 bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t lba, uint32_t *idx);
 uint32_t page_manager_get_new_ppa(page_manager *pm, bool ismap, uint32_t type);
 uint32_t page_manager_pick_new_ppa(page_manager *pm, bool ismap, uint32_t type);
+uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap);
 uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap);
-void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t* piece_ppa, uint32_t *lba);
-void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa);
-void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t lba);
-void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa);
-uint32_t page_manager_get_reserve_new_ppa(page_manager *pm, bool ismap);
+void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t* piece_ppa, uint32_t *lba, bool);
+void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool);
+void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t lba, bool);
+void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool);
+uint32_t page_manager_get_reserve_new_ppa(page_manager *pm, bool ismap, uint32_t seg_idx);
 uint32_t page_manager_change_reserve(page_manager *pm, bool ismap);
-
+uint32_t page_manager_get_reserve_remain_ppa(page_manager *pm, bool ismap, uint32_t seg_idx);
+uint32_t page_manager_move_next_seg(page_manager *pm, bool ismap, bool isreserve, uint32_t type);
 #endif

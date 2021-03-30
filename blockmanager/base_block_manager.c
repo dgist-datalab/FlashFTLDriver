@@ -23,6 +23,8 @@ struct blockmanager base_bm={
 	.set_oob=base_set_oob,
 	.get_oob=base_get_oob,
 	.change_reserve=base_change_reserve,
+	.reinsert_segment=NULL,
+	.remain_free_page=NULL,
 
 	.pt_create=NULL,
 	.pt_destroy=NULL,
@@ -47,7 +49,7 @@ void base_mh_assign_hptr(void *a, void *hn){
 
 int base_get_cnt(void *a){
 	__block *aa=(__block*)a;
-	return aa->invalid_number;
+	return aa->invalidate_number;
 }
 
 uint32_t base_create (struct blockmanager* bm, lower_info *li){
@@ -160,7 +162,7 @@ __gsegment* base_get_gc_target (struct blockmanager* bm){
 		__block *b=(__block*)mh_get_max(p->base_channel[i].max_heap);
 		if(!b) abort();
 		res->blocks[i]=b;
-		res->invalidate_number+=b->invalid_number;
+		res->invalidate_number+=b->invalidate_number;
 	}
 	res->now=res->max=0;
 	return res;
@@ -173,7 +175,8 @@ void base_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_in
 	for(int i=0; i<BPS; i++){
 		__block *b=gs->blocks[i];
 		li->trim_a_block(GETBLOCKPPA(b),ASYNC);
-		b->invalid_number=0;
+		b->invalidate_number=0;
+		b->validate_number=0;
 		b->now=0;
 		memset(b->bitset,0,_PPB/8);
 
@@ -205,6 +208,8 @@ int base_populate_bit (struct blockmanager* bm, uint32_t ppa){
 		res=0;
 	}
 	p->base_block[bn].bitset[bt]|=(1<<of);
+	__block *b=&p->base_block[bn];
+	b->validate_number++;
 	return res;
 }
 
@@ -221,7 +226,7 @@ int base_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 		res=0;
 	}
 	b->bitset[bt]&=~(1<<of);
-	b->invalid_number++;
+	b->invalidate_number++;
 	/*
 	if(0<=ppa && ppa< _PPS*MAPPART_SEGS){
 		if(b->invalid_number>_PPB){
@@ -245,7 +250,7 @@ int base_erase_bit (struct blockmanager* bm, uint32_t ppa){
 	}
 	b->bitset[bt]&=~(1<<of);
 	if(0<=ppa && ppa< _PPS*MAPPART_SEGS){
-		if(b->invalid_number>_PPB){
+		if(b->invalidate_number>_PPB){
 			abort();
 		}
 	}

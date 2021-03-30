@@ -41,7 +41,7 @@ bool read_helper_check(read_helper *, uint32_t lba, uint32_t *piece_ppa_result, 
 uint32_t read_helper_memory_usage(read_helper *);
 void read_helper_print(read_helper *);
 void read_helper_free(read_helper *);
-void read_helper_copy(read_helper *des, read_helper *src);
+read_helper* read_helper_copy(read_helper *src);
 void read_helper_move(read_helper *des, read_helper *src);
 bool read_helper_last(read_helper *rh, uint32_t idx);
 uint32_t read_helper_idx_init(read_helper *rh, uint32_t lba);

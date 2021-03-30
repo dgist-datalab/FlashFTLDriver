@@ -94,7 +94,8 @@ void seq_pt_trim_segment(struct blockmanager* bm, int pt_num, __gsegment *gs, lo
 
 	for(int i=0; i<BPS; i++){
 		__block *b=gs->blocks[i];
-		b->invalid_number=0;
+		b->invalidate_number=0;
+		b->validate_number=0;
 		b->now=0;
 		memset(b->bitset,0,_PPB*L2PGAP/8);
 		memset(b->oob_list,0,sizeof(b->oob_list));
@@ -139,11 +140,12 @@ uint32_t seq_pt_reserve_to_free(struct blockmanager* bm, int pt_num, __segment *
 	__block *b=NULL;
 	uint32_t idx=0;
 	for_each_block(reserve, b, idx){
-		if(b->invalid_number){
+		if(b->invalidate_number){
 			printf("it can't have invalid_number\n");
 			abort();
 		}
-		b->invalid_number=0;
+		b->invalidate_number=0;
+		b->validate_number=0;
 		b->now=0;
 	}
 	uint32_t segment_idx=reserve->blocks[0]->block_num/BPS;

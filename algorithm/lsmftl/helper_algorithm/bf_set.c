@@ -144,29 +144,31 @@ uint32_t bf_set_get_piece_ppa(bf_set *bfs, uint32_t *last_idx, uint32_t lba)
 }
 
 
-void bf_set_copy(bf_set *des, bf_set *src){
-	*des=*src;
+bf_set* bf_set_copy(bf_set *src){
 	uint32_t i=0;
-	switch(des->type){
+	bf_set *res=(bf_set*)malloc(sizeof(bf_set));
+	*res=*src;
+	switch(src->type){
 		case BLOOM_PTR_PAIR:
-			des->array=malloc(sizeof(bp_pair)*src->max);
+			res->array=malloc(sizeof(bp_pair)*src->max);
 			for(; i<src->max; i++){
-				((bp_pair*)des->array)[i].bf->bits=((bp_pair*)src->array)[i].bf->bits;
-				((bp_pair*)des->array)[i].bf->compressed_data=((bp_pair*)src->array)[i].bf->compressed_data;
-				((bp_pair*)des->array)[i].piece_ppa=((bp_pair*)src->array)[i].piece_ppa;
+				((bp_pair*)res->array)[i].bf=cbf_init(src->bits);
+				*((bp_pair*)res->array)[i].bf=*((bp_pair*)src->array)[i].bf;
+				((bp_pair*)res->array)[i].piece_ppa=((bp_pair*)src->array)[i].piece_ppa;
 			}
 			break;
 		case BLOOM_ONLY:
-			des->array=malloc(sizeof(c_bf*)*des->max);
+			res->array=malloc(sizeof(c_bf*)*src->max);
 			for(;i<src->max; i++){
-				((c_bf**)des->array)[i]->bits=((c_bf**)src->array)[i]->bits;
-				((c_bf**)des->array)[i]->compressed_data=((c_bf**)src->array)[i]->compressed_data;
+				((c_bf**)res->array)[i]=cbf_init(src->bits);
+				*((c_bf**)res->array)[i]=*((c_bf**)src->array)[i];
 			}
 			break;
 		default:
 			EPRINT("no type!!", true);
 			break;
 	}
+	return res;
 }
 
 void bf_set_move(bf_set *des, bf_set *src){

@@ -27,7 +27,7 @@ void bf_set_prepare(float target_fpr, uint32_t member, uint32_t type);
 bf_set* bf_set_init(float target_fpr, uint32_t member, uint32_t type);
 bool bf_set_insert(bf_set*, uint32_t lba, uint32_t piece_ppa);
 uint32_t bf_set_get_piece_ppa(bf_set *, uint32_t* last_idx, uint32_t lba);
-void bf_set_copy(bf_set *des, bf_set *src);
+bf_set* bf_set_copy(bf_set *src);
 void bf_set_move(bf_set *des, bf_set *src);
 void bf_set_free(bf_set*);
 uint32_t get_number_of_bits(float target_fpr);

@@ -23,6 +23,8 @@ struct blockmanager seq_bm={
 	.set_oob=seq_set_oob,
 	.get_oob=seq_get_oob,
 	.change_reserve=seq_change_reserve,
+	.reinsert_segment=seq_reinsert_segment,
+	.remain_free_page=seq_remain_free_page,
 
 	.pt_create=seq_pt_create,
 	.pt_destroy=seq_pt_destroy,
@@ -85,6 +87,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 			glob_block_idx++;
 		}
 		p->logical_segment[i].total_invalid_number=0;
+		p->logical_segment[i].total_valid_number=0;
 	}
 
 	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt);
@@ -165,6 +168,14 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 	return seq_get_segment(bm,true);
 }
 
+
+void seq_reinsert_segment(struct blockmanager *bm, uint32_t seg_idx){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	block_set *bs=&p->logical_segment[seg_idx];
+	mh_insert_append(p->max_heap, (void*)bs);
+}
+
+
 bool seq_is_gc_needed (struct blockmanager* bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	if(p->free_logical_segment_q->size==0) return true;
@@ -181,16 +192,29 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 	block_set* target=(block_set*)mh_get_max(p->max_heap);
 
 	memcpy(res->blocks, target->blocks, sizeof(__block*)*BPS);
+	res->now=res->max=0;
+	res->seg_idx=res->blocks[0]->block_num/BPS;
+	if(res->seg_idx==69){
+		printf("break!\n");
+	}
 	res->invalidate_number=target->total_invalid_number;
-
+	res->validate_number=target->total_valid_number;
+	if(res->seg_idx==1){
+		printf("break!\n");
+	}
+	if(target->total_invalid_number==target->total_valid_number){
+		res->all_invalid=true;
+	}
+	else{
+		res->all_invalid=false;
+	}
 
 	if(res->invalidate_number==0){
 		printf("invalid!\n");	
 		mh_construct(p->max_heap);
 		abort();
 	}
-	res->now=res->max=0;
-	res->seg_idx=res->blocks[0]->block_num/BPS;
+
 	return res;
 }
 
@@ -200,7 +224,8 @@ void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_inf
 
 	for(int i=0; i<BPS; i++){
 		__block *b=gs->blocks[i];
-		b->invalid_number=0;
+		b->invalidate_number=0;
+		b->validate_number=0;
 		b->now=0;
 		memset(b->bitset,0,_PPB*L2PGAP/8);
 		memset(b->oob_list,0,sizeof(b->oob_list));
@@ -209,6 +234,7 @@ void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_inf
 	uint32_t segment_idx=segment_startblock_number/BPS;
 	block_set *bs=&p->logical_segment[segment_idx];
 	bs->total_invalid_number=0;
+	bs->total_valid_number=0;
 	/*
 	if(bs==&p->logical_segment[1228928/16384]){
 		bs->blocks[(1228928%16384)%256]
@@ -236,9 +262,15 @@ int seq_populate_bit (struct blockmanager* bm, uint32_t ppa){
 	uint32_t bt=pn/8;
 	uint32_t of=pn%8;
 
+	__block *b=&p->seq_block[bn];
+	b->validate_number++;
+	uint32_t segment_idx=b->block_num/BPS;
+	block_set *seg=&p->logical_segment[segment_idx];
+	seg->total_valid_number++;
+
 	if(p->seq_block[bn].bitset[bt]&(1<<of)){
 		res=0;
-		abort();
+	//	abort();
 	}
 	p->seq_block[bn].bitset[bt]|=(1<<of);
 	return res;
@@ -259,14 +291,14 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 	}
 
 	b->bitset[bt]&=~(1<<of);
-	b->invalid_number++;
+	b->invalidate_number++;
 
 	uint32_t segment_idx=b->block_num/BPS;
 	block_set *seg=&p->logical_segment[segment_idx];
 	seg->total_invalid_number++;
-	
-	if(b->invalid_number>_PPB * L2PGAP){
-		abort();
+
+	if(b->invalidate_number>_PPB * L2PGAP){
+		//abort();
 	}
 	return res;
 }
@@ -285,7 +317,7 @@ int seq_erase_bit (struct blockmanager* bm, uint32_t ppa){
 	}
 	b->bitset[bt]&=~(1<<of);
 	if(0<=ppa && ppa< _PPS*MAPPART_SEGS){
-		if(b->invalid_number>_PPB){
+		if(b->invalidate_number>_PPB){
 			abort();
 		}
 	}
@@ -390,3 +422,7 @@ void seq_free_segment(struct blockmanager *, __segment *seg){
 	free(seg);
 }
 
+uint32_t seq_remain_free_page(struct blockmanager *bm, __segment *active){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	return p->free_block*_PPS+(_PPS-active->used_page_num);
+}

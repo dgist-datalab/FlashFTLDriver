@@ -2,8 +2,11 @@
 #include "lftl_slab.h"
 #include "write_buffer.h"
 #include "io.h"
+#include "lsmtree.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+extern lsmtree LSM;
 write_buffer *write_buffer_reinit(write_buffer *wb){
 	std::map<uint32_t, buffer_entry*>::iterator it=wb->data->begin();
 	for(;it!=wb->data->end(); it++){
@@ -25,6 +28,23 @@ write_buffer *write_buffer_init(uint32_t max_buffered_entry_num, page_manager *p
 	fdriver_mutex_init(&res->sync_lock);
 	res->flushed_req_cnt=0;
 	res->type=type;
+	return res;
+}
+
+write_buffer *write_buffer_init_for_gc(uint32_t max_buffered_entry_num, page_manager *pm, uint32_t type, read_helper_param rhp){
+	write_buffer *res=(write_buffer*)calloc(1, sizeof(write_buffer));
+	res->data=new std::map<uint32_t, buffer_entry*>();
+	res->max_buffer_entry_num=max_buffered_entry_num;
+	//res->data=(buffer_entry**)calloc(max_buffered_entry_num,sizeof(buffer_entry));
+	res->sm=slab_master_init(sizeof(buffer_entry), max_buffered_entry_num);
+	res->pm=pm;
+	fdriver_mutex_init(&res->cnt_lock);
+	fdriver_mutex_init(&res->sync_lock);
+	res->flushed_req_cnt=0;
+	res->type=type;
+
+	res->rhp=rhp;
+	//res->rh=read_helper_init(rhp);
 	return res;
 }
 
@@ -85,6 +105,7 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 	uint32_t ppa=-1;
 	char *oob=NULL;
 	key_ptr_pair *res=(key_ptr_pair*)malloc(sizeof(key_ptr_pair)*wb->data->size());
+	fdriver_lock(&LSM.flush_lock);
 	for(uint32_t i=0; it!=wb->data->end(); i++, it++){
 		uint8_t inter_idx=i%L2PGAP;
 		if(inter_idx==0){
@@ -99,7 +120,10 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
-		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba);
+		if(LSM.global_debug_flag && res[i].piece_ppa==592701){
+			printf("break!\n");	
+		}
+		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
 		inf_free_valueset(it->second->data.data, FS_MALLOC_W);
 
 		if(inter_idx==(L2PGAP-1)){//issue data
@@ -113,6 +137,7 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 	if(sync){
 		fdriver_lock(&wb->sync_lock);
 	}	
+	fdriver_unlock(&LSM.flush_lock);
 
 	return res;
 }
@@ -196,7 +221,9 @@ uint32_t write_buffer_insert_for_gc(write_buffer *wb, uint32_t lba, char *gc_dat
 	return encode_return_code(SUCCESSED, WB_NONE);
 }
 
-key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync){
+extern uint32_t debug_lba;
+
+key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync, uint32_t seg_idx, bool *force_stop, uint32_t prev_map){
 	if(wb->buffered_entry_num==0) return NULL;
 	else if((int)wb->buffered_entry_num<0){
 		EPRINT("minus number not allowed!", true);
@@ -206,40 +233,71 @@ key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync){
 	uint32_t ppa=-1;
 	char *oob=NULL;
 	key_ptr_pair *res=(key_ptr_pair*)malloc(sizeof(key_ptr_pair)*KP_IN_PAGE);
-	memset(res, 1, PAGESIZE);
+	memset(res, -1, PAGESIZE);
+	uint32_t remain_page_num;
+	if(!wb->rh && wb->rhp.type!=HELPER_NONE){
+retry:
+		remain_page_num=page_manager_get_reserve_remain_ppa(LSM.pm, false, seg_idx);
+		if(remain_page_num==1){
+			//should change next ppa
+			page_manager_move_next_seg(LSM.pm, false, true, DATASEG);
+			goto retry;
+		}
+		else if(wb->buffered_entry_num+(1+prev_map)*L2PGAP <=remain_page_num*L2PGAP){
+			wb->rhp.member_num=wb->buffered_entry_num;
+		}
+		else{
+			wb->rhp.member_num=(remain_page_num-prev_map-1)*L2PGAP;
+		}
+		wb->rh=read_helper_init(wb->rhp);
+	}
+
 	uint8_t inter_idx;
-	for(uint32_t i=0; it!=wb->data->end() && i<KP_IN_PAGE; i++, it++){
+	for(uint32_t i=0; it!=wb->data->end() && i<KP_IN_PAGE; i++){
 		inter_idx=i%L2PGAP;
 		if(inter_idx==0){
-			ppa=page_manager_get_reserve_new_ppa(wb->pm, false);
+			ppa=page_manager_get_reserve_new_ppa(wb->pm, false, seg_idx);
 			target_value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 			target_value->ppa=ppa;
 			oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);
 		}	
-
+	
 		//page_manager_insert_lba(wb->pm, it->first);
 		memcpy(&target_value->value[inter_idx*LPAGESIZE], it->second->data.gc_data, LPAGESIZE);
 		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
-		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba);
+		if(debug_lba==res[i].lba){
+			static int cnt=0;
+			if(cnt==3){
+				printf("break!\n");
+			}
+			printf("[%u] gc %u -> %u\n", cnt++, res[i].lba, res[i].piece_ppa);
+		}
+		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
+		if(wb->rh){
+			read_helper_stream_insert(wb->rh, res[i].lba, res[i].piece_ppa);
+		}
 
 		if(inter_idx==(L2PGAP-1)){//issue data
 			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
+			if(force_stop && (ppa+prev_map+1)%_PPS==_PPS-1){
+				*force_stop=true;
+			}
 			ppa=-1;
 			oob=NULL;
 			target_value=NULL;
 		}
 		wb->buffered_entry_num--;
+		wb->data->erase(it++);
+
+		if(force_stop && (*force_stop)) break;
 	}
 
 	if(inter_idx!=(L2PGAP-1)){
 		if(ppa==UINT32_MAX){
 			EPRINT("it can't be", true);
 		}
-		uint32_t temp_ppa=ppa*L2PGAP+inter_idx;
-		uint32_t temp_lba=UINT32_MAX;
-		validate_piece_ppa(wb->pm->bm, 1, &temp_ppa, &temp_lba);
 		io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
 		ppa=-1;
 	}

@@ -1,5 +1,6 @@
 #include "compaction.h"
 #include "lsmtree.h"
+#include "segment_level_manager.h"
 extern lsmtree LSM;
 
 void* compaction_main(void *);
@@ -70,14 +71,25 @@ void* compaction_main(void *_cm){
 again:
 		level *src;
 		if(req->start_level==-1 && req->end_level==0){
+			uint32_t last_piece_ppa=req->target[kp_end_idx((char*)req->target)].piece_ppa;
+			uint32_t first_piece_ppa=req->target[0].piece_ppa;
 			src=compaction_first_leveling(cm, req->target, LSM.disk[0]);
+			if(SEGNUM(first_piece_ppa)==SEGNUM(last_piece_ppa)){
+				slm_coupling_level_seg(0, SEGNUM(first_piece_ppa), SEGPIECEOFFSET(last_piece_ppa));
+			}
+			else{
+				slm_coupling_level_seg(0, SEGNUM(first_piece_ppa), _PPS*L2PGAP-1);
+				slm_coupling_level_seg(0, SEGNUM(last_piece_ppa), SEGPIECEOFFSET(last_piece_ppa));
+			}
 		}
 		else if(req->end_level==LSM.param.LEVELN-1){
 			src=compaction_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
+			slm_empty_level(req->start_level);
 		//	version_enqueue(LSM.last_run_version, LSM.version_num++);
 		}
 		else{
 			src=compaction_leveling(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
+			slm_move(req->end_level, req->start_level);
 		}
 
 		if(req->start_level==-1){
@@ -86,6 +98,8 @@ again:
 		else{
 			disk_change(&LSM.disk[req->start_level], src, &LSM.disk[req->end_level]);
 		}
+	//	printf("%u -> %u\n", req->start_level, req->end_level);
+	//	printf("LSM.disk->end_ppa:%u\n", LSM.disk[2]->array[2].sst_set[3].end_ppa);
 
 		if(req->end_level != LSM.param.LEVELN-1 && (
 				(req->end_level==0 && level_is_full(LSM.disk[req->end_level])) ||
@@ -96,7 +110,8 @@ again:
 			goto again;
 		}
 		else if(req->end_level==LSM.param.LEVELN-1 && level_is_full(LSM.disk[req->end_level])){
-			compaction_merge(cm, LSM.disk[req->end_level]);
+			src=compaction_merge(cm, LSM.disk[req->end_level]);
+			disk_change(NULL, src, &LSM.disk[req->end_level]);
 		}
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);

@@ -35,7 +35,7 @@ uint32_t level_append_sstfile(level *lev, sst_file *sptr){
 		 */
 	}
 	else{
-		run_append_sstfile(LAST_RUN_PTR(lev), sptr);
+		run_append_sstfile_move_originality(LAST_RUN_PTR(lev), sptr);
 		lev->now_sst_num++;
 		if(lev->now_sst_num >lev->max_sst_num){
 			EPRINT("over sst file level", true);
@@ -46,15 +46,17 @@ uint32_t level_append_sstfile(level *lev, sst_file *sptr){
 }
 
 level *level_convert_run_to_lev(run *r, page_manager *pm){
-	level *res=level_init(r->max_sst_file_num, 1, false, UINT32_MAX);
 	sst_file *sptr, *new_sptr;
 	map_range *map_ptr;
 	uint32_t sidx, midx;
+	uint32_t target_sst_file_num=0;
+	for_each_sst(r, sptr, sidx){
+		target_sst_file_num+=sptr->map_num;
+	}
+	level *res=level_init(target_sst_file_num, 1, false, UINT32_MAX);
 	for_each_sst(r, sptr, sidx){
 		for_each_map_range(sptr, map_ptr, midx){
 			new_sptr=sst_MR_to_sst_file(map_ptr);
-			new_sptr->already_invalidate_file=sptr->already_invalidate_file;
-
 			level_append_sstfile(res, new_sptr);
 			sst_free(new_sptr, pm);
 		}
@@ -109,7 +111,7 @@ void level_trivial_move_run(level *des, level *src, uint32_t from, uint32_t to, 
 	}
 }
 
-uint32_t level_append_run(level *lev, run *r){
+uint32_t level_append_run_copy_move_originality(level *lev, run *r, uint32_t ridx){
 	if(!lev->istier){
 		EPRINT("it must be tiering level", true);
 	}
@@ -117,7 +119,9 @@ uint32_t level_append_run(level *lev, run *r){
 		EPRINT("over run in level", true);
 	}
 
-	run_copy_src_empty(&lev->array[lev->run_num++], r);
+	run_shallow_copy_move_originality(&lev->array[ridx], r);
+	lev->run_num++;
+	//run_copy_src_empty(&lev->array[lev->run_num++], r);
 	return 1;
 }
 
@@ -147,8 +151,25 @@ sst_file* level_retrieve_close_sst(level *lev, uint32_t lba){
 	return run_retrieve_close_sst(&lev->array[0], lba);
 }
 
+sst_file* level_retrieve_sst_with_check(level *lev, uint32_t lba){
+	if(lev->istier){
+		EPRINT("Tier level not allowed!", true);
+	}
+	sst_file *res=run_retrieve_sst(&lev->array[0], lba);
+	uint32_t temp;
+	if(!res) return NULL;
+	if(res->_read_helper){
+		uint32_t helper_idx=read_helper_idx_init(res->_read_helper, lba);
+		if(read_helper_check(res->_read_helper, lba, &temp, res, &helper_idx)){
+			return res;	
+		}
+		else
+			return NULL;
+	}
+	return res;
+}
 
-sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa, uint32_t *target_ridx){
+sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa, uint32_t *target_ridx, uint32_t *sptr_idx){
 	if(!lev->istier){
 		EPRINT("tiering only",true);
 	}
@@ -158,9 +179,10 @@ sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa
 	sst_file *sptr;
 	for_each_run(lev, run_ptr, ridx){
 		sptr=run_retrieve_sst(run_ptr, lba);
-		if(sptr->file_addr.piece_ppa<=piece_ppa &&
+		if(sptr && sptr->file_addr.piece_ppa<=piece_ppa &&
 				sptr->end_ppa*L2PGAP>=piece_ppa){
 			*target_ridx=ridx;
+			*sptr_idx=(sptr-run_ptr->sst_set);
 			return sptr;
 		}
 	}
@@ -186,14 +208,14 @@ void level_free(level *lev, page_manager *pm){
 	free(lev);
 }
 
-uint32_t level_update_run_at(level *lev, uint32_t idx, run *r, bool new_run){
+uint32_t level_update_run_at_move_originality(level *lev, uint32_t idx, run *r, bool new_run){
 	if(!lev->istier){
 		EPRINT("it must be tiering level", true);
 	}
 	if(lev->run_num > lev->max_run_num){
 		EPRINT("over run in level", true);
 	}
-	run_deep_copy(&lev->array[idx], r);
+	run_shallow_copy_move_originality(&lev->array[idx], r);
 	if(new_run){
 		lev->now_sst_num+=r->now_sst_file_num;
 		lev->run_num++;
@@ -225,3 +247,110 @@ void level_print(level *lev){
 	}
 }
 
+void level_contents_print(level *lev, bool print_sst){
+	run *rptr;
+	uint32_t ridx;
+	sst_file *sptr;
+	uint32_t sidx;
+	level_print(lev);
+	for_each_run(lev, rptr, ridx){
+		printf("\t[%u] ",ridx);
+		run_print(rptr);
+		if(print_sst){
+			for_each_sst(rptr, sptr, sidx){
+				printf("\t\t[%u] ",sidx);
+				sst_print(sptr);
+			}
+		}
+	}
+}
+
+void level_run_reinit(level *lev, uint32_t idx){
+	lev->run_num--;
+	run_reinit(&lev->array[idx]);
+}
+
+void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr){
+	if(!lev->istier){
+		EPRINT("only tier available", true);
+	}
+	sst_file *org_sptr=&lev->array[ridx].sst_set[sptr_idx];
+	free(org_sptr->block_file_map);
+	read_helper_free(org_sptr->_read_helper);
+	lev->array[ridx].sst_set[sptr_idx]=(*sptr);
+
+	sst_file *nxt_sstfile, *prev_sstfile;
+	if(sptr_idx==0){
+		if(lev->array[ridx].now_sst_file_num -1 >=sptr_idx+1){
+			nxt_sstfile=&lev->array[ridx].sst_set[sptr_idx+1];
+			if(sptr->end_lba < nxt_sstfile->start_lba){}
+			else{
+				EPRINT("range error", true);
+			}
+		}
+	}
+	else{
+		prev_sstfile=&lev->array[ridx].sst_set[sptr_idx-1];
+
+		if(lev->array[ridx].now_sst_file_num -1 >= sptr_idx+1){
+			nxt_sstfile=&lev->array[ridx].sst_set[sptr_idx+1];
+			if(sptr->end_lba < nxt_sstfile->start_lba){}
+			else{
+				EPRINT("range error", true);
+			}
+		}
+
+		if(prev_sstfile->end_lba < sptr->start_lba){}
+		else{
+			EPRINT("range error", true);
+		}
+	}
+}
+
+void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr){
+	if(!lev->istier){
+		EPRINT("only tier available", true);
+	}
+
+	/*range check*/
+	sst_file *nxt_sstfile, *prev_sstfile;
+	if(sptr_idx==0){
+		if(lev->array[ridx].now_sst_file_num -1 >= sptr_idx+1){
+			nxt_sstfile=&lev->array[ridx].sst_set[sptr_idx+1];
+			if(sptr->end_lba < nxt_sstfile->start_lba){}
+			else{
+				EPRINT("range error", true);
+			}
+		}
+	}
+	else{
+		prev_sstfile=&lev->array[ridx].sst_set[sptr_idx-1];
+
+		if(lev->array[ridx].now_sst_file_num-1 >= sptr_idx+1){
+			nxt_sstfile=&lev->array[ridx].sst_set[sptr_idx+1];
+			if(sptr->end_lba < nxt_sstfile->start_lba){}
+			else{
+				EPRINT("range error", true);
+			}
+		}
+
+		if(prev_sstfile->end_lba < sptr->start_lba){}
+		else{
+			EPRINT("range error", true);
+		}
+	}
+
+	sst_file *org_sptr;
+	if(lev->array[ridx].now_sst_file_num==sptr_idx){
+		org_sptr=&lev->array[ridx].sst_set[sptr_idx];
+	}
+	else{
+		uint32_t target_num=lev->array[ridx].now_sst_file_num-sptr_idx;
+		memmove(&lev->array[ridx].sst_set[sptr_idx+1],&lev->array[ridx].sst_set[sptr_idx], sizeof(sst_file) *target_num);
+		org_sptr=&lev->array[ridx].sst_set[sptr_idx];
+	}
+
+	//free(org_sptr->block_file_map);
+	lev->array[ridx].sst_set[sptr_idx]=(*sptr);
+	lev->array[ridx].now_sst_file_num++;
+}

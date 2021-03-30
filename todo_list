@@ -1,4 +1,7 @@
 1. gc
-	check block_file_piece_num for gc target
-	invalidateion check logic in gc_data
-
+	leveling invalidation
+		seg check befor invalidation
+	tiering invalidation
+		seg check before invalidation
+	merge invalidation
+		already trimed sstfile check before merge

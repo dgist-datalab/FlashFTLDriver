@@ -5,27 +5,30 @@
 #include "compaction.h"
 #include <queue>
 enum {
-SST_PAGE_FILE_STREAM, KP_PAIR_STREAM
+SST_PAGE_FILE_STREAM, KP_PAIR_STREAM, MAP_FILE_STREAM,
 };
 
-typedef struct{
+typedef struct sst_pf_out_stream{
 	uint8_t type;
 	bool (*check_done)(struct inter_read_alreq_param *check_flag, bool check_file_sst);
 	bool (*file_done)(struct inter_read_alreq_param* check_flag);
 	std::queue<sst_file*> *sst_file_set;
+	std::queue<map_range*> *mr_set;
 	std::queue<struct inter_read_alreq_param*> *check_flag_set;
 	key_ptr_pair *kp_data;
 	sst_file *now;
+	map_range *now_mr;
 	uint32_t idx;
 	bool now_file_empty;
 	bool file_set_empty;
+	uint32_t version_idx;
 #ifdef DEBUG
 	bool isstart;
 	uint32_t prev_lba;
 #endif
 }sst_pf_out_stream;
 
-typedef struct{
+typedef struct sst_pf_in_stream{
 	//std::queue<sst_file*> sst_file_set;
 	sst_file *now;
 	value_set *vs;
@@ -35,11 +38,18 @@ typedef struct{
 	uint32_t idx;
 }sst_pf_in_stream;
 
-sst_pf_out_stream* sst_pos_init(sst_file *, struct inter_read_alreq_param **,
+sst_pf_out_stream* sst_pos_init_sst(sst_file *, struct inter_read_alreq_param **,
 		uint32_t set_number, bool(*check_done)( struct inter_read_alreq_param*, bool), 
 		bool (*file_done)(struct inter_read_alreq_param *));
+
+sst_pf_out_stream* sst_pos_init_mr(map_range *, struct inter_read_alreq_param **,
+		uint32_t set_number, bool(*check_done)( struct inter_read_alreq_param*, bool), 
+		bool (*file_done)(struct inter_read_alreq_param *));
+
 sst_pf_out_stream *sst_pos_init_kp(key_ptr_pair *data);
-void sst_pos_add(sst_pf_out_stream *os, sst_file *, 
+void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *, 
+		inter_read_alreq_param **, uint32_t num);
+void sst_pos_add_mr(sst_pf_out_stream *os, map_range *, 
 		inter_read_alreq_param **, uint32_t num);
 key_ptr_pair sst_pos_pick(sst_pf_out_stream *os);
 void sst_pos_pop(sst_pf_out_stream *os);

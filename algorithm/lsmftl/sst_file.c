@@ -1,5 +1,8 @@
 #include "sst_file.h"
+#include "lsmtree.h"
 #include <stdlib.h>
+
+extern lsmtree LSM;
 
 sst_file *sst_init_empty(uint8_t type){
 	sst_file *res=(sst_file*)calloc(1,sizeof(sst_file));
@@ -29,11 +32,12 @@ sst_file *sst_bf_init(uint32_t ppa, uint32_t end_ppa, uint32_t start_lba, uint32
 void sst_destroy_content(sst_file* sstfile, page_manager *pm){
 	//free_sstfile_ readhelper...
 	
-	if(sstfile->type==BLOCK_FILE){
+	if(!sstfile->ismoved_originality && sstfile->type==BLOCK_FILE){
 		if(sstfile->block_file_map){
+			/* only invalidate in merge
 			for(uint32_t i=0; i<sstfile->map_num; i++){
-				invalidate_map_ppa(pm->bm, sstfile->block_file_map[i].ppa);
-			}
+				invalidate_map_ppa(pm->bm, sstfile->block_file_map[i].ppa, true);
+			}*/
 
 			free(sstfile->block_file_map);
 		}
@@ -41,11 +45,16 @@ void sst_destroy_content(sst_file* sstfile, page_manager *pm){
 	if(sstfile->data){
 		EPRINT("data not free", true);
 	}
-	if(sstfile->_read_helper){
+	if(!sstfile->ismoved_originality && sstfile->_read_helper){
 		read_helper_free(sstfile->_read_helper);
 	}
 
 	return;
+}
+
+void sst_reinit(sst_file *sptr){
+	sst_destroy_content(sptr, LSM.pm);
+	memset(sptr, 0, sizeof(sptr));
 }
 
 void sst_set_file_map(sst_file *sstfile, uint32_t map_num, map_range *map_range){
@@ -89,29 +98,40 @@ uint32_t sst_find_map_addr(sst_file *sstfile, uint32_t lba){
 
 void sst_free(sst_file* sstfile, page_manager *pm){
 	//free_sstfile
-	if(sstfile->block_file_map){
-		for(uint32_t i=0; i<sstfile->map_num; i++){
-			invalidate_map_ppa(pm->bm, sstfile->block_file_map[i].ppa);
-		}
+	if(!sstfile->ismoved_originality && sstfile->block_file_map){
+		/* only invalidate in merge
+		if(!sstfile->alread_invalidate){
+			for(uint32_t i=0; i<sstfile->map_num; i++){
+				invalidate_map_ppa(pm->bm, sstfile->block_file_map[i].ppa, true);
+			}
+		}*/
 		free(sstfile->block_file_map);
 	}
 	if(sstfile->data){
 		EPRINT("data not free", true);
 	}
-	if(sstfile->_read_helper){
+	if(!sstfile->ismoved_originality && sstfile->_read_helper){
 		read_helper_free(sstfile->_read_helper);
 	}
 	free(sstfile);
 }
 
 void sst_deep_copy(sst_file *des, sst_file *src){
-//	read_helper *temp_helper=des->_read_helper;
 	*des=*src;
+	if(src->block_file_map){
+		des->map_num=src->map_num;
+		des->block_file_map=(map_range*)malloc(sizeof(map_range) * des->map_num);
+		memcpy(des->block_file_map, src->block_file_map, sizeof(map_range) * des->map_num);
+	}
+
+	if(src->_read_helper){
+		des->_read_helper=read_helper_copy(src->_read_helper);
+	}
+	//des->_read_helper=src->_read_helper;
+	/*
 	src->block_file_map=NULL;
-	//read_helper_copy(temp_helper, src->_read_helper)
-	des->_read_helper=src->_read_helper;
-	//read_helper_move(des->_read_helper, src->_read_helper);
 	src->_read_helper=NULL;
+	 */
 }
 
 sst_file *sst_MR_to_sst_file(map_range *mr){
@@ -121,4 +141,16 @@ sst_file *sst_MR_to_sst_file(map_range *mr){
 	res->end_lba=mr->end_lba;
 	res->type=PAGE_FILE;
 	return res;
+}
+
+void sst_print(sst_file *sptr){
+	printf("%s range:%u~%u ", sptr->type==PAGE_FILE?"PAGE_FILE":"BLOCK_FILE",
+			sptr->start_lba, sptr->end_lba);
+	if(sptr->type==PAGE_FILE){
+		printf("map-ppa:%u\n",sptr->file_addr.map_ppa);
+	}
+	else{
+		printf("file-ppa:%u~%u map-num:%u\n", sptr->file_addr.piece_ppa, 
+				sptr->end_ppa*L2PGAP, sptr->map_num);
+	}
 }

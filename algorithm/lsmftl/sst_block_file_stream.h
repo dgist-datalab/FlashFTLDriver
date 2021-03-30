@@ -12,15 +12,17 @@
 	 (bis)->map_data->size()*2 - \
 	 (bis)->write_issued_kv_num))
 
-typedef struct{
+typedef struct sst_bf_out_stream{
 	bool (*kv_read_check_done)(struct inter_read_alreq_param*, bool check);
 	std::queue<struct key_value_wrapper *> *kv_wrapper_q;
 	uint32_t prev_ppa;
 	uint8_t kv_buf_idx;
+	uint8_t version_idx;
 	struct key_value_wrapper *kv_wrap_buffer[L2PGAP];
 	
 	/*for pop*/
 	struct key_value_wrapper* now_kv_wrap;
+	bool no_inter_param_alloc;
 
 #ifdef DEBUG
 	bool isstart;
@@ -28,7 +30,8 @@ typedef struct{
 #endif
 }sst_bf_out_stream;
 
-typedef struct{
+typedef struct sst_bf_in_stream{
+	uint32_t prev_lba;
 	uint32_t start_lba;
 	uint32_t end_lba;
 
@@ -50,7 +53,7 @@ typedef struct{
 	page_manager *pm;
 }sst_bf_in_stream;
 
-sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(struct inter_read_alreq_param *, bool));
+sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(struct inter_read_alreq_param *, bool), bool no_inter_param_alloc);
 struct key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos, struct key_value_wrapper *, struct compaction_master *cm);
 struct key_value_wrapper *sst_bos_get_pending(sst_bf_out_stream *bos, struct compaction_master *cm);
 key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool);
@@ -67,7 +70,7 @@ sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_len
 		bool make_read_helper, read_helper_param rhp);
 bool sst_bis_insert(sst_bf_in_stream *bis, key_value_wrapper *);
 value_set* sst_bis_finish(sst_bf_in_stream*);
-value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last); //it should return unaligned value when it no space
+value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *idx, key_ptr_pair *); //it should return unaligned value when it no space
 bool sst_bis_ppa_empty(sst_bf_in_stream *bis);
 void sst_bis_free(sst_bf_in_stream *bis);
 

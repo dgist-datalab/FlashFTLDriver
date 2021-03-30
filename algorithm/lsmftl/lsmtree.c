@@ -148,8 +148,10 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	}
 
 	LSM.last_run_version=version_init(LSM.disk[LSM.param.LEVELN-1]->max_run_num, RANGE);
-	memset(all_set_page, 1, PAGESIZE);
+	memset(all_set_page, -1, PAGESIZE);
 	LSM.monitor.compaction_cnt=(uint32_t*)calloc(LSM.param.LEVELN+1, sizeof(uint32_t));
+	slm_init(LSM.param.LEVELN);
+	fdriver_mutex_init(&LSM.flush_lock);
 
 
 	/*read helper prepair*/
@@ -195,7 +197,9 @@ static inline algo_req *get_read_alreq(request *const req, uint8_t type,
 
 static bool lsmtree_select_target_place(lsmtree_read_param *r_param, level **lptr, 
 		run **rptr, sst_file **sptr, uint32_t lba){
-
+	if(lba==3875782){
+		printf("break!\n");
+	}
 	rwlock *target;
 retry:
 	if(r_param->target_level_rw_lock){
@@ -203,6 +207,9 @@ retry:
 	}
 
 	r_param->prev_level++;
+	if(r_param->prev_level>=LSM.param.LEVELN){
+		return false;
+	}
 
 	if(r_param->prev_level==LSM.param.LEVELN-1){
 		if(LSM.param.version_enable){
@@ -260,6 +267,7 @@ retry:
 
 uint32_t lsmtree_read(request *const req){
 	lsmtree_read_param *r_param;
+	printf("req->key:%u\n", req->key);
 	if(!req->param){
 		//printf("read key:%u\n", req->key);
 		/*find data from write_buffer*/
@@ -310,11 +318,12 @@ uint32_t lsmtree_read(request *const req){
 	}
 	
 retry:
+	/*
 	if((target && rptr) &&
 		(r_param->prev_level==LSM.param.LEVELN-1)&& 
 		(&target->array[target->run_num]==rptr)){
 		goto notfound;
-	}
+	}*/
 
 	if(r_param->use_read_helper){
 		if(!read_helper_last(r_param->prev_sf->_read_helper, r_param->read_helper_idx)){
@@ -381,14 +390,16 @@ uint32_t lsmtree_write(request *const req){
 //	printf("write lba:%u\n", req->key);
 
 	version_coupling_lba_ridx(LSM.last_run_version, req->key, TOTALRUNIDX);
-	
-	while(!LSM.moved_kp_set->empty()){
-		key_ptr_pair *kp_set=LSM.moved_kp_set->front();
-		compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(kp_set, NULL));
-		LSM.moved_kp_set->pop();
-	}
 
 	if(write_buffer_isfull(wb)){
+		if(page_manager_get_total_remain_page(LSM.pm, false) < KP_IN_PAGE){
+			__do_gc(LSM.pm, false, KP_IN_PAGE);
+			while(!LSM.moved_kp_set->empty()){
+				key_ptr_pair *kp_set=LSM.moved_kp_set->front();
+				compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(kp_set, NULL));
+				LSM.moved_kp_set->pop();
+			}
+		}
 		key_ptr_pair *kp_set=write_buffer_flush(wb,false);
 		/*
 		for(int32_t i=0; i<wb->buffered_entry_num; i++){
@@ -475,6 +486,7 @@ sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa){
 	for(uint32_t i=0; i<LSM.param.LEVELN-1; i++){
 		level *lev=LSM.disk[i];
 		res=level_retrieve_sst(lev, lba);
+		if(!res) continue;
 		if(lba==res->start_lba && res->file_addr.map_ppa==map_ppa){
 			return res;
 		}

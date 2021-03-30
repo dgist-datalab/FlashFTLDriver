@@ -17,6 +17,7 @@ version *version_init(uint8_t max_valid_version_num, uint32_t LBA_num){
 
 	res->ridx_populate_queue=new std::queue<uint32_t>();
 	res->memory_usage_bit=ceil(log2(max_valid_version_num))*LBA_num;
+	res->poped_version_num=0;
 	return res;
 }
 
@@ -58,4 +59,14 @@ void version_free(version *v){
 	delete v->ridx_populate_queue;
 	free(v->key_version);
 	free(v);
+}
+extern uint32_t debug_lba;
+void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx){
+	if(ridx>TOTALRUNIDX){
+		EPRINT("over version num", true);
+	}
+	if(lba==debug_lba){
+		printf("version_map:%u->%u\n",lba, ridx);
+	}
+	v->key_version[lba]=ridx;
 }

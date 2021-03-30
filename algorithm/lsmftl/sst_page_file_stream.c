@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-sst_pf_out_stream* sst_pos_init(sst_file *sst_set, inter_read_alreq_param **param, uint32_t set_num, 
+sst_pf_out_stream* sst_pos_init_sst(sst_file *sst_set, inter_read_alreq_param **param, uint32_t set_num, 
 		bool(*check_done)(inter_read_alreq_param *, bool), bool (*file_done)(inter_read_alreq_param*)){
 	sst_pf_out_stream *res=(sst_pf_out_stream*)calloc(1, sizeof(sst_pf_out_stream));
 	res->type=SST_PAGE_FILE_STREAM;
@@ -19,6 +19,30 @@ sst_pf_out_stream* sst_pos_init(sst_file *sst_set, inter_read_alreq_param **para
 	res->idx=0;
 	res->now_file_empty=true;
 	res->file_set_empty=false;
+	res->version_idx=UINT32_MAX;
+	return res;
+}
+
+sst_pf_out_stream* sst_pos_init_mr(map_range *mr_set, 
+		inter_read_alreq_param **param, uint32_t set_num, 
+		bool(*check_done)(inter_read_alreq_param *, bool), 
+		bool (*file_done)(inter_read_alreq_param*)){
+	sst_pf_out_stream *res=(sst_pf_out_stream*)calloc(1, sizeof(sst_pf_out_stream));
+	res->type=MAP_FILE_STREAM;
+	//res->sst_file_set=new std::queue<sst_file*>();
+	res->mr_set=new std::queue<map_range*>();
+	res->check_flag_set=new std::queue<inter_read_alreq_param *>();
+	for(uint32_t i=0; i<set_num; i++){
+		res->mr_set->push(&mr_set[i]);
+		res->check_flag_set->push(param[i]);
+	}
+	res->check_done=check_done;
+	res->file_done=file_done;
+	res->now_mr=NULL;
+	res->idx=0;
+	res->now_file_empty=true;
+	res->file_set_empty=false;
+	res->version_idx=UINT32_MAX;
 	return res;
 }
 
@@ -32,7 +56,7 @@ sst_pf_out_stream *sst_pos_init_kp(key_ptr_pair *data){
 	return res;
 }
 
-void sst_pos_add(sst_pf_out_stream *os, sst_file *sst_set, inter_read_alreq_param **param, uint32_t set_num){
+void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *sst_set, inter_read_alreq_param **param, uint32_t set_num){
 	for(uint32_t i=0; i<set_num; i++){
 		os->sst_file_set->push(&sst_set[i]);
 		os->check_flag_set->push(param[i]);
@@ -40,12 +64,27 @@ void sst_pos_add(sst_pf_out_stream *os, sst_file *sst_set, inter_read_alreq_para
 	os->file_set_empty=os->sst_file_set->size()==0;
 }
 
+void sst_pos_add_mr(sst_pf_out_stream *os, map_range *mr_set, inter_read_alreq_param **param, uint32_t set_num){
+	for(uint32_t i=0; i<set_num; i++){
+		os->mr_set->push(&mr_set[i]);
+		os->check_flag_set->push(param[i]);
+	}
+	os->file_set_empty=os->mr_set->size()==0;
+}
+
 static inline void move_next_file(sst_pf_out_stream *os){
 	os->file_done(os->check_flag_set->front());
-	os->sst_file_set->pop();
+	switch(os->type){
+		case SST_PAGE_FILE_STREAM:
+			os->sst_file_set->pop();
+			os->file_set_empty=os->sst_file_set->size()==0;
+			break;
+		case MAP_FILE_STREAM:
+			os->mr_set->pop();
+			os->file_set_empty=os->mr_set->size()==0;
+			break;
+	}
 	os->check_flag_set->pop();
-
-	os->file_set_empty=os->sst_file_set->size()==0;
 }
 
 key_ptr_pair sst_pos_pick(sst_pf_out_stream *os){
@@ -55,21 +94,40 @@ key_ptr_pair sst_pos_pick(sst_pf_out_stream *os){
 	}*/
 	if(os->type==KP_PAIR_STREAM){
 	//	printf("kp_pair_stream(os->idx):%d\n", os->idx);
-		return os->kp_data[os->idx];
+		key_ptr_pair res=os->kp_data[os->idx];
+		if(res.lba==UINT32_MAX){
+			os->now_file_empty=true;
+		}
+		return res;	
 	}
 retry:
 	key_ptr_pair temp_res;
 	if(os->now_file_empty){
-		if(os->sst_file_set->size()==0){
-			temp_res.lba=UINT32_MAX;
-			os->file_set_empty=true;
-			return temp_res;
+	
+		switch(os->type){
+			case SST_PAGE_FILE_STREAM:
+				if(os->sst_file_set->size()==0){
+					temp_res.lba=UINT32_MAX;
+					os->file_set_empty=true;
+					return temp_res;
+				}
+				if(os->now==os->sst_file_set->front()){
+					EPRINT("please pop before get", true);
+				}
+				os->now=os->sst_file_set->front();
+				break;
+			case MAP_FILE_STREAM:
+				if(os->mr_set->size()==0){
+					temp_res.lba=UINT32_MAX;
+					os->file_set_empty=true;
+					return temp_res;
+				}
+				if(os->now_mr==os->mr_set->front()){
+					EPRINT("please pop before get", true);
+				}
+				os->now_mr=os->mr_set->front();
+				break;
 		}
-
-		if(os->now==os->sst_file_set->front()){
-			EPRINT("please pop before get", true);
-		}
-		os->now=os->sst_file_set->front();
 		os->check_done(os->check_flag_set->front(), true);
 /*
 		os->sst_file_set->pop();
@@ -79,28 +137,47 @@ retry:
 		os->idx=0;
 	}
 
-
-	if(os->now==NULL){
-		if(os->now==os->sst_file_set->front()){
-			EPRINT("please pop before get", true);
-		}
-		os->now=os->sst_file_set->front();
-		os->check_done(os->check_flag_set->front(), true);
-/*
-		os->sst_file_set->pop();
-		os->check_flag_set->pop();
- */
-		os->now_file_empty=false;
-		os->idx=0;
+	switch(os->type){
+		case SST_PAGE_FILE_STREAM:
+			if(os->now==NULL){
+				if(os->now==os->sst_file_set->front()){
+					EPRINT("please pop before get", true);
+				}
+				os->now=os->sst_file_set->front();
+				os->check_done(os->check_flag_set->front(), true);
+				os->now_file_empty=false;
+				os->idx=0;
+			}
+			break;
+		case MAP_FILE_STREAM:
+			if(os->now_mr==NULL){
+				if(os->now_mr==os->mr_set->front()){
+					EPRINT("please pop before get", true);
+				}
+				os->now_mr=os->mr_set->front();
+				os->check_done(os->check_flag_set->front(), true);
+				os->now_file_empty=false;
+				os->idx=0;
+			}
+			break;
 	}
 
-	key_ptr_pair res=*(key_ptr_pair*)&os->now->data[(os->idx)*sizeof(key_ptr_pair)];
+	key_ptr_pair res;
+	switch(os->type){
+		case SST_PAGE_FILE_STREAM:
+			res=*(key_ptr_pair*)&os->now->data[(os->idx)*sizeof(key_ptr_pair)];
+			break;
+		case MAP_FILE_STREAM:
+			res=*(key_ptr_pair*)&os->now_mr->data[(os->idx)*sizeof(key_ptr_pair)];
+			break;
+	}
+
 	if(os->idx*sizeof(key_ptr_pair) >=PAGESIZE){
 		os->now_file_empty=true;
 	}
 	else if(res.lba==UINT32_MAX){
 		os->now_file_empty=true;
-		if(os->type==SST_PAGE_FILE_STREAM){
+		if(os->type==SST_PAGE_FILE_STREAM || os->type==MAP_FILE_STREAM){
 			move_next_file(os);
 		}
 		goto retry;
@@ -124,22 +201,32 @@ void sst_pos_pop(sst_pf_out_stream *os){
 	os->idx++;
 	if(os->idx*sizeof(key_ptr_pair) >=PAGESIZE){
 		os->now_file_empty=true;
-		if(os->type==SST_PAGE_FILE_STREAM){
+		if(os->type==SST_PAGE_FILE_STREAM || os->type==MAP_FILE_STREAM){
 			move_next_file(os);
 		}
 	}
 }
 
 void sst_pos_free(sst_pf_out_stream *os){
-	if(os->type==SST_PAGE_FILE_STREAM){
-		if(os->sst_file_set->size()){
-			EPRINT("remain file exist!", true);
-		}
-		if(os->check_flag_set->size()){
-			EPRINT("remain param!", true);
-		}
+	switch(os->type){
+		case SST_PAGE_FILE_STREAM:
+			if(os->sst_file_set->size()){
+				EPRINT("remain file exist!", true);
+			}
+			break;
+		case MAP_FILE_STREAM:
+			if(os->mr_set->size()){
+				EPRINT("remain file exist!", true);
+			}
+			break;
 	}
 	if(!os) return;
+
+
+	if(os->type!=KP_PAIR_STREAM && os->check_flag_set->size()){
+		EPRINT("remain param!", true);
+	}
+	delete os->mr_set;
 	delete os->sst_file_set;
 	delete os->check_flag_set;
 	free(os);

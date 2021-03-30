@@ -180,7 +180,8 @@ typedef struct masterblock{
 	uint16_t now;
 	uint16_t max;
 	uint8_t* bitset;
-	uint16_t invalid_number;
+	uint16_t invalidate_number;
+	uint16_t validate_number;
 	int age;
 	uint32_t seg_idx;
 	void *hptr;
@@ -199,11 +200,13 @@ typedef struct mastersegment{
 }__segment;
 
 typedef struct ghostsegment{ //for gc
+	bool all_invalid;
 	__block* blocks[BPS];
 	uint32_t seg_idx;
 	uint16_t now;
 	uint16_t max;
 	uint32_t invalidate_number;
+	uint16_t validate_number;
 }__gsegment;
 
 struct blockmanager{
@@ -227,6 +230,8 @@ struct blockmanager{
 	void (*set_oob)(struct blockmanager*, char* data, int len, uint32_t ppa);
 	char *(*get_oob)(struct blockmanager*, uint32_t ppa);
 	__segment* (*change_reserve)(struct blockmanager *, __segment *reserve);
+	void (*reinsert_segment)(struct blockmanager *, uint32_t seg_idx);
+	uint32_t (*remain_free_page)(struct blockmanager *, __segment *active);
 
 	uint32_t (*pt_create) (struct blockmanager*, int part_num, int *each_part_seg_num, lower_info *);
 	uint32_t (*pt_destroy) (struct blockmanager*);
@@ -242,6 +247,11 @@ struct blockmanager{
 	void *private_data;
 	uint32_t assigned_page;
 };
+
+#define SEGNUM(ppa)  (((ppa)/L2PGAP)/_PPS)
+#define SEGOFFSET(ppa) (((ppa/L2PGAP))%_PPS)
+#define SEGPIECEOFFSET(ppa) (((ppa))%(_PPS*L2PGAP))
+#define BLOCKNUM(ppa)  ((((ppa)/L2PGAP)%_PPS)/_PPB)
 
 
 #define for_each_block(segs,block,idx)\

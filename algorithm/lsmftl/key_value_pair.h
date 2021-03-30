@@ -32,10 +32,10 @@ static inline uint32_t kp_find_piece_ppa(uint32_t lba, char *page_data){
 	return UINT32_MAX;
 }
 
-static inline uint32_t kp_get_end_lba(char *data){
+static inline uint32_t kp_end_idx(char *data){
 	key_ptr_pair* map_set=(key_ptr_pair*)data;
 	if(map_set[LAST_KP_IDX].lba!=UINT32_MAX){
-		return map_set[LAST_KP_IDX].lba;
+		return LAST_KP_IDX;
 	}
 	uint16_t s=0, e=LAST_KP_IDX, mid;
 	uint32_t target_lba=UINT32_MAX;
@@ -66,7 +66,13 @@ static inline uint32_t kp_get_end_lba(char *data){
 			mid++;
 		}
 	}
-	return map_set[mid].lba;
+	return mid;
+}
+
+static inline uint32_t kp_get_end_lba(char *data){
+	key_ptr_pair* map_set=(key_ptr_pair*)data;
+	uint32_t aa=kp_end_idx(data);
+	return map_set[aa].lba;
 }
 
 #define MAPINPAGE (PAGESIZE/sizeof(key_ptr_pair))

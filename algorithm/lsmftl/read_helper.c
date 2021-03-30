@@ -191,25 +191,25 @@ void read_helper_free(read_helper *rh){
 	free(rh);
 }	
 
-void read_helper_copy(read_helper *des, read_helper *src){
-	if(!src) return ;
-	void *temp_body=des->body;
-	*des=*src;
-	des->body=temp_body;
-	switch(des->type){
+read_helper* read_helper_copy(read_helper *src){
+	if(!src) return NULL;
+	read_helper *res=(read_helper*)malloc(sizeof(read_helper));
+	*res=*src;
+	switch(src->type){
 		case HELPER_BF_PTR:
 		case HELPER_BF_ONLY:
-			bf_set_copy((bf_set*)des->body, (bf_set*)src->body);
+			res->body=(void*)bf_set_copy( (bf_set*)src->body);
 			//bf_set_free((bf_set*)rh->body);
 			break;
 		case HELPER_BF_PTR_GUARD:
 		case HELPER_BF_ONLY_GUARD:
-			gbf_set_copy((guard_bf_set*)des->body, (guard_bf_set*)src->body);
+			res->body=(void*)gbf_set_copy((guard_bf_set*)src->body);
 			break;
 		default:
 			EPRINT("not collect type",true);
 			break;
 	}
+	return res;
 }
 
 void read_helper_move(read_helper *des, read_helper *src){
