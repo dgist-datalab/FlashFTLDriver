@@ -17,6 +17,7 @@ enum{
 typedef struct _page_manager{
 	uint8_t seg_type_checker[_NOS];
 	bool is_master_page_manager;
+	__segment *temp_data_segment;
 	__segment *current_segment[PARTNUM];
 	__segment *reserve_segment[PARTNUM];
 	struct blockmanager *bm;
@@ -64,4 +65,7 @@ uint32_t page_manager_change_reserve(page_manager *pm, bool ismap);
 uint32_t page_manager_get_reserve_remain_ppa(page_manager *pm, bool ismap, uint32_t seg_idx);
 uint32_t page_manager_move_next_seg(page_manager *pm, bool ismap, bool isreserve, uint32_t type);
 uint32_t page_manager_get_new_ppa_from_seg(page_manager *pm, __segment *seg);
+uint32_t page_manager_pick_new_ppa_from_seg(page_manager *pm, __segment *seg);
+__segment *page_manager_get_seg(page_manager *pm, bool ismap, uint32_t type);
+__segment *page_manager_get_seg_for_bis(page_manager *pm,  uint32_t type);
 #endif

@@ -445,5 +445,5 @@ void seq_free_segment(struct blockmanager *, __segment *seg){
 
 uint32_t seq_remain_free_page(struct blockmanager *bm, __segment *active){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
-	return p->free_block*_PPS+(_PPS-active->used_page_num);
+	return p->free_block*_PPS+(active?(_PPS-active->used_page_num):0);
 }

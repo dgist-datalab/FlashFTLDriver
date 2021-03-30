@@ -51,6 +51,8 @@ typedef struct sst_bf_in_stream{
 	key_value_wrapper *buffer;//assigned L2PGAP * key_value_wrapper;
 
 	page_manager *pm;
+	__segment *seg;
+
 }sst_bf_in_stream;
 
 sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(struct inter_read_alreq_param *, bool), bool no_inter_param_alloc);
@@ -66,8 +68,9 @@ static inline uint32_t sst_bos_kv_q_size(sst_bf_out_stream *bos){
 	return bos->kv_wrapper_q->size();
 }
 
-sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_length, page_manager *pm, 
-		bool make_read_helper, read_helper_param rhp);
+//sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_length, page_manager *pm, 
+//		bool make_read_helper, read_helper_param rhp);
+sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read_helper, read_helper_param rhp);
 bool sst_bis_insert(sst_bf_in_stream *bis, key_value_wrapper *);
 value_set* sst_bis_finish(sst_bf_in_stream*);
 value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *idx, key_ptr_pair *); //it should return unaligned value when it no space

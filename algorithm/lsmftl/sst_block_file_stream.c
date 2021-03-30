@@ -155,7 +155,7 @@ void sst_bos_free(sst_bf_out_stream *bos, compaction_master *cm){
 	delete bos->kv_wrapper_q;
 	free(bos);
 }
-
+/*
 sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_length, page_manager*pm,
 		bool make_read_helper, read_helper_param rhp){
 	sst_bf_in_stream *res=(sst_bf_in_stream*)calloc(1, sizeof(sst_bf_in_stream));
@@ -166,6 +166,27 @@ sst_bf_in_stream * sst_bis_init(uint32_t start_piece_ppa, uint32_t piece_ppa_len
 	res->map_data=new std::queue<value_set*>();
 	res->pm=pm;
 	res->buffer=(key_value_wrapper*)malloc(L2PGAP*sizeof(key_value_wrapper));
+
+	res->make_read_helper=make_read_helper;
+
+	if(make_read_helper){	
+		res->rh=read_helper_init(rhp);
+		res->rhp=rhp;
+	}
+	return res;
+}
+*/
+sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read_helper, read_helper_param rhp){
+	sst_bf_in_stream *res=(sst_bf_in_stream*)calloc(1, sizeof(sst_bf_in_stream));
+	res->prev_lba=UINT32_MAX;
+	res->start_lba=UINT32_MAX;
+
+	res->start_piece_ppa=pm->bm->pick_page_num(pm->bm, seg)*L2PGAP;
+	res->piece_ppa_length=(_PPS-seg->used_page_num)*L2PGAP;
+	res->map_data=new std::queue<value_set*>();
+	res->pm=pm;
+	res->buffer=(key_value_wrapper*)malloc(L2PGAP*sizeof(key_value_wrapper));
+	res->seg=seg;
 
 	res->make_read_helper=make_read_helper;
 
@@ -229,7 +250,8 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 
 
 	value_set *res=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
-	uint32_t ppa=page_manager_get_new_ppa(bis->pm, false, DATASEG);
+//	uint32_t ppa=page_manager_get_new_ppa(bis->pm, false, DATASEG);
+	uint32_t ppa=page_manager_get_new_ppa_from_seg(bis->pm, bis->seg);
 	if(ppa/_PPS != bis->start_piece_ppa/2/_PPS){
 		EPRINT("new data should same segment", true);
 	}

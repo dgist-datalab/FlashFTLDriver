@@ -351,6 +351,12 @@ level* compaction_merge(compaction_master *cm, level *des){
 
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
+		if(bis->seg->used_page_num!=_PPS){
+			if(LSM.pm->temp_data_segment){
+				EPRINT("should be NULL", true);
+			}
+			LSM.pm->temp_data_segment=bis->seg;
+		}
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
@@ -363,6 +369,7 @@ level* compaction_merge(compaction_master *cm, level *des){
 	free(thread_arg.arg_set);
 
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
+	level_run_reinit(des, idx_set[1]);
 
 	run *rptr; uint32_t ridx;
 	for_each_run_max(des, rptr, ridx){

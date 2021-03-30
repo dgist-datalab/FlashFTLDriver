@@ -79,11 +79,6 @@ static inline void compaction_error_check
 		}
 	}
 
-	//if(res->idx==2 || res->idx==3){
-	//	printf("lev 2,3\n");
-	
-	//}
-
 }
 
 static inline void tiering_compaction_error_check(level *src, run *r1, run *r2, run *res,
@@ -713,7 +708,7 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 
 		map_num++;
 
-		ppa=page_manager_get_new_ppa(LSM.pm, false, DATASEG);
+		ppa=page_manager_get_new_ppa_from_seg(LSM.pm, bis->seg);
 		if(bis->start_piece_ppa/2/_PPS!=ppa/_PPS){
 			EPRINT("map data should same sgement", true);
 		}
@@ -745,19 +740,10 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 }
 
 sst_bf_in_stream *tiering_new_bis(){
-	uint32_t start_piece_ppa, piece_ppa_length;
-retry:
-	start_piece_ppa=page_manager_pick_new_ppa(LSM.pm, false, DATASEG)*L2PGAP;
-	piece_ppa_length=page_manager_get_remain_page(LSM.pm, false)*L2PGAP;
-	/*if piece_ppa_length<=1, */
-	if(piece_ppa_length<=2){
-		//should change next ppa;
-		page_manager_move_next_seg(LSM.pm, false, false, DATASEG);
-		goto retry;
-	}
+	__segment *seg=page_manager_get_seg_for_bis(LSM.pm, DATASEG);
 	read_helper_param temp_rhp=LSM.param.tiering_rhp;
-	temp_rhp.member_num=piece_ppa_length;
-	sst_bf_in_stream *bis=sst_bis_init(start_piece_ppa, piece_ppa_length, LSM.pm, true, temp_rhp);
+	temp_rhp.member_num=(_PPS-seg->used_page_num)*L2PGAP;
+	sst_bf_in_stream *bis=sst_bis_init(seg, LSM.pm, true, temp_rhp);
 	return bis;
 }
 
@@ -771,12 +757,6 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 	fdriver_lock(&LSM.flush_lock);
 	while(!sst_bos_is_empty(bos)){
 		key_value_wrapper *target=NULL;
-		if(LSM.global_debug_flag){
-			printf("inserted_entry_num:%u\n", inserted_entry_num);
-			if(inserted_entry_num>=20430){
-				printf("break!\n");	
-			}
-		}
 		if(!final && !(target=sst_bos_pick(bos, entry_num-inserted_entry_num <=L2PGAP))){
 			break;
 		}
@@ -920,6 +900,12 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	//finishing bis
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
+		if(bis->seg->used_page_num!=_PPS){
+			if(LSM.pm->temp_data_segment){
+				EPRINT("should be NULL", true);
+			}
+			LSM.pm->temp_data_segment=bis->seg;
+		}
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
@@ -930,9 +916,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	
 
 	//level_append_run(res, new_run);
-	if(target_ridx==28){
-		run_print(new_run);
-	}
+	
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
 	version_populate_run(LSM.last_run_version, target_ridx);
 	free(thread_arg.arg_set);
