@@ -271,9 +271,6 @@ retry:
 		res[i].lba=it->first;
 		if(debug_lba==res[i].lba){
 			static int cnt=0;
-			if(cnt==3){
-				printf("break!\n");
-			}
 			printf("[%u] gc %u -> %u\n", cnt++, res[i].lba, res[i].piece_ppa);
 		}
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);

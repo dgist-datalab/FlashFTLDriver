@@ -212,9 +212,6 @@ static inline algo_req *get_read_alreq(request *const req, uint8_t type,
 
 static bool lsmtree_select_target_place(lsmtree_read_param *r_param, level **lptr, 
 		run **rptr, sst_file **sptr, uint32_t lba){
-	if(lba==3875782){
-		printf("break!\n");
-	}
 	rwlock *target;
 retry:
 	if(r_param->target_level_rw_lock){
@@ -282,8 +279,8 @@ retry:
 
 uint32_t lsmtree_read(request *const req){
 	lsmtree_read_param *r_param;
-	printf("req->key:%u\n", req->key);
 	if(!req->param){
+
 		//printf("read key:%u\n", req->key);
 		/*find data from write_buffer*/
 		char *target;
@@ -330,6 +327,7 @@ uint32_t lsmtree_read(request *const req){
 			r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
 			algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
 			io_manager_issue_read(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+			return 1;
 		}
 
 	}

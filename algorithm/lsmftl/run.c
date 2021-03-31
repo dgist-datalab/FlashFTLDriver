@@ -32,9 +32,6 @@ void run_reinit(run *res){
 static inline void update_range(run *_run, uint32_t start, uint32_t end){
 	if(_run->start_lba > start) _run->start_lba=start;
 	if(_run->end_lba < end) _run->end_lba=end;
-	if(end==UINT32_MAX){
-		printf("???break!\n");
-	}
 }
 
 

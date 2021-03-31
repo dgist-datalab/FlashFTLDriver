@@ -9,6 +9,7 @@
 #define TARGETREADNUM(read_arg) (read_arg.to-read_arg.from+1)
 extern compaction_master *_cm;
 extern lsmtree LSM;
+extern uint32_t debug_lba;
 void *merge_end_req(algo_req *);
 static void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 	inter_read_alreq_param *param;
@@ -71,6 +72,7 @@ static inline uint32_t coherence_sst_kp_pair_num(run *r, uint32_t start_idx, uin
 }
 
 static map_range * make_mr_set(sst_file *set, uint32_t start_idx, uint32_t end_idx, uint32_t map_num){
+	if(!map_num) return NULL;
 	map_range *mr=(map_range*)calloc(map_num,sizeof(map_range));
 	map_range *mptr;
 	uint32_t idx=0;
@@ -116,6 +118,9 @@ static uint32_t issue_read_kv_for_bos_merge(sst_bf_out_stream *bos, std::queue<k
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
+		invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
+		/*version alread check in stream sorting logci*/
+
 		if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){
 			if(!read_target->param){
 				EPRINT("can't be",true);
@@ -135,7 +140,7 @@ static uint32_t issue_read_kv_for_bos_merge(sst_bf_out_stream *bos, std::queue<k
 	if(kpq->empty() && round_final){
 		if((read_target=sst_bos_get_pending(bos, _cm))){
 			algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
-			read_req->type=DATAR;
+			read_req->type=COMPACTIONDATAR;
 			read_req->param=(void*)read_target;
 			read_req->end_req=merge_end_req;		
 			io_manager_issue_read(PIECETOPPA(read_target->piece_ppa),
@@ -168,11 +173,11 @@ typedef struct mr_free_set{
 	uint32_t map_num;
 }mr_free_set;
 
-void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_lba){
+void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_lba, bool last){
 	std::list<mr_free_set>::iterator mr_iter=mr_list->begin();
 	for(;mr_iter!=mr_list->end(); ){
 		mr_free_set now=*mr_iter;
-		if(now.mr_set[now.map_num].end_lba <= bound_lba){
+		if(last || now.mr_set[now.map_num].end_lba <= bound_lba){
 			LSM.gc_unavailable_seg[now.mr_set[now.map_num].ppa/_PPS]=false;
 			free(now.mr_set);
 			mr_list->erase(mr_iter++);
@@ -180,7 +185,7 @@ void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_l
 		else{
 			break;
 		}
-		mr_iter++;
+		//mr_iter++;
 	}
 }
 
@@ -194,6 +199,7 @@ level* compaction_merge(compaction_master *cm, level *des){
 
 	run *older=&des->array[idx_set[0]];
 	run	*newer=&des->array[idx_set[1]];
+	LSM.monitor.compaction_cnt[des->idx+1]++;
 
 	for(uint32_t i=0; i<2; i++){
 		version_unpopulate_run(LSM.last_run_version, idx_set[i]);
@@ -219,7 +225,12 @@ level* compaction_merge(compaction_master *cm, level *des){
 
 	sst_bf_out_stream *bos=NULL;
 	sst_bf_in_stream *bis=NULL;
-
+/*
+	if(LSM.monitor.compaction_cnt[des->idx+1]==7){
+	//	EPRINT("break!", false);
+		LSM.global_debug_flag=true;
+	}
+*/
 	bool init=true;
 	uint32_t max_target_piece_num;
 	std::queue<key_ptr_pair> *kpq=new std::queue<key_ptr_pair>();
@@ -227,11 +238,13 @@ level* compaction_merge(compaction_master *cm, level *des){
 	std::list<mr_free_set> *old_range_set=new std::list<mr_free_set>();
 	while(!(older_sst_idx==older->now_sst_file_num && 
 				newer_sst_idx==newer->now_sst_file_num)){
+		now_newer_map_num=now_older_map_num=0;
 		max_target_piece_num=0;
 		max_target_piece_num+=
 			newer_sst_idx<newer->now_sst_file_num?coherence_sst_kp_pair_num(newer,newer_sst_idx, &newer_sst_idx_end, &now_newer_map_num):0;
 		max_target_piece_num+=
 			older_sst_idx<older->now_sst_file_num?coherence_sst_kp_pair_num(older,older_sst_idx, &older_sst_idx_end, &now_older_map_num):0;
+
 
 		if(page_manager_get_total_remain_page(LSM.pm, false) < max_target_piece_num){
 			__do_gc(LSM.pm, false, max_target_piece_num);
@@ -255,11 +268,8 @@ level* compaction_merge(compaction_master *cm, level *des){
 		uint32_t older_prev=0, newer_prev=0;
 		read_arg1={0,}; read_arg2={0,};
 		while(read_done!=total_map_num){
-			printf("round info - o_idx:%u n_idx%u read_done:%u\n", older_sst_idx, newer_sst_idx, read_done);
+		//	printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
 			
-			if(older_sst_idx==1 && newer_sst_idx==1){
-				LSM.global_debug_flag=true;
-			}
 			uint32_t shard=LOWQDEPTH/2;
 
 			if(newer_mr){
@@ -269,6 +279,10 @@ level* compaction_merge(compaction_master *cm, level *des){
 					read_map_param_init(&read_arg1, newer_mr);
 				}
 			}
+			else{
+				read_arg1.from=1;
+				read_arg1.to=0;
+			}
 			
 			if(older_mr){
 				read_arg2.from=older_prev;
@@ -276,6 +290,10 @@ level* compaction_merge(compaction_master *cm, level *des){
 				if(TARGETREADNUM(read_arg2)){
 					read_map_param_init(&read_arg2, older_mr);
 				}
+			}
+			else{
+				read_arg2.from=1;
+				read_arg2.to=0;
 			}
 
 			//pos setting
@@ -289,22 +307,33 @@ level* compaction_merge(compaction_master *cm, level *des){
 				os_set[1]->version_idx=idx_set[0];
 			}
 			else{
-				sst_pos_add_mr(os_set[0], &newer_mr[read_arg1.from], read_arg1.param,
-						TARGETREADNUM(read_arg1));
-				sst_pos_add_mr(os_set[1], &older_mr[read_arg2.from], read_arg2.param,
-						TARGETREADNUM(read_arg2));
+				if(newer_mr){
+					sst_pos_add_mr(os_set[0], &newer_mr[read_arg1.from], read_arg1.param,
+							TARGETREADNUM(read_arg1));
+				}
+				if(older_mr){
+					sst_pos_add_mr(os_set[1], &older_mr[read_arg2.from], read_arg2.param,
+							TARGETREADNUM(read_arg2));
+				}
 			}
 
 			thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);//read work
 			
-			border_lba=MIN(newer_mr[read_arg1.to].end_lba, 
+			if(newer_mr && older_mr){
+				border_lba=MIN(newer_mr[read_arg1.to].end_lba, 
 					older_mr[read_arg2.to].end_lba);
+			}
+			else{
+				border_lba=(newer_mr?newer_mr[read_arg1.to].end_lba:
+						older_mr[read_arg2.to].end_lba);
+			}
 
 			//sorting
 			stream_sorting(NULL, 2, os_set, NULL, kpq, 
 				last_round_check,
 				border_lba,/*limit*/
 				target_ridx, 
+				true,
 				merge_invalidation_function);
 
 			if(newer_mr){
@@ -332,21 +361,31 @@ level* compaction_merge(compaction_master *cm, level *des){
 		bulk_invalidation(older, &older_borderline, border_lba);
 
 		mr_free_set temp_mr_free_set;
-		temp_mr_free_set.mr_set=newer_mr;
-		temp_mr_free_set.map_num=now_newer_map_num-1;
-		LSM.gc_unavailable_seg[newer_mr[now_newer_map_num-1].ppa/_PPS]=true;
-		new_range_set->push_back(temp_mr_free_set);
+		if(newer_mr){
+			temp_mr_free_set.mr_set=newer_mr;
+			temp_mr_free_set.map_num=now_newer_map_num-1;
+			LSM.gc_unavailable_seg[newer_mr[now_newer_map_num-1].ppa/_PPS]=true;
+			new_range_set->push_back(temp_mr_free_set);
+		}
 
-		temp_mr_free_set.mr_set=older_mr;
-		temp_mr_free_set.map_num=now_older_map_num-1;
-		LSM.gc_unavailable_seg[older_mr[now_older_map_num-1].ppa/_PPS]=true;
-		old_range_set->push_back(temp_mr_free_set);
+		if(older_mr){
+			temp_mr_free_set.mr_set=older_mr;
+			temp_mr_free_set.map_num=now_older_map_num-1;
+			LSM.gc_unavailable_seg[older_mr[now_older_map_num-1].ppa/_PPS]=true;
+			old_range_set->push_back(temp_mr_free_set);
+		}
 
-		map_range_postprocessing(new_range_set, border_lba);
-		map_range_postprocessing(old_range_set, border_lba);
+		map_range_postprocessing(new_range_set, border_lba, last_round_check);
+		map_range_postprocessing(old_range_set, border_lba, last_round_check);
 
 		newer_sst_idx=newer_sst_idx_end+1;
 		older_sst_idx=older_sst_idx_end+1;
+	}
+
+	for(uint32_t i=0; i<_NOS; i++){
+		if(LSM.gc_unavailable_seg[i]){
+			EPRINT("why??\n", true);	
+		}
 	}
 
 	sst_file *last_file;
@@ -382,7 +421,7 @@ level* compaction_merge(compaction_master *cm, level *des){
 	version_populate_run(LSM.last_run_version, target_ridx);
 	run_free(new_run);
 //	level_print(res);
-	level_contents_print(res, true);
+//	level_contents_print(res, true);
 	version_poped_update(LSM.last_run_version);
 	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], idx_set[0]);
 	return res;
@@ -398,6 +437,9 @@ void *merge_end_req(algo_req *req){
 			break;
 		case COMPACTIONDATAR:
 			kv_wrapper=(key_value_wrapper*)req->param;
+			if(LSM.global_debug_flag && kv_wrapper->kv_ptr.lba==debug_lba){
+				EPRINT("break!", false);
+			}
 			fdriver_unlock(&kv_wrapper->param->done_lock);
 			break;
 

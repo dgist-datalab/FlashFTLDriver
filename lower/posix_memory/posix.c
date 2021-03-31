@@ -225,10 +225,10 @@ inline uint32_t convert_ppa(uint32_t PPA){
 void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
-	/*
-	if(PPA==test_ppa/2){
-		printf("%u populate!\n", test_ppa);
-	}*/
+	
+	if(PPA==60928){
+		printf("%u populate in push_data! (org:%u)\n", PPA,_PPA);
+	}
 
 	if(PPA>_NOP){
 		printf("address error!\n");

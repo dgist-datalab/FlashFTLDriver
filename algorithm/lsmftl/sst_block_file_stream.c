@@ -1,5 +1,8 @@
 #include "sst_block_file_stream.h"
+#include "lsmtree.h"
 #include <stdlib.h>
+
+extern lsmtree LSM;
 extern uint32_t debug_lba;
 sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(inter_read_alreq_param *, bool), bool no_inter_param_alloc){
 	sst_bf_out_stream *res=(sst_bf_out_stream*)calloc(1, sizeof(sst_bf_out_stream));
@@ -48,6 +51,7 @@ key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos,
 	}
 
 	key_value_wrapper *res=NULL;
+
 	bos->kv_wrapper_q->push(kv_wrapper);
 
 	if(bos->prev_ppa!=UINT32_MAX && bos->prev_ppa==PIECETOPPA(kv_wrapper->piece_ppa)){
@@ -188,6 +192,10 @@ sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read
 	res->buffer=(key_value_wrapper*)malloc(L2PGAP*sizeof(key_value_wrapper));
 	res->seg=seg;
 
+	if(seg->seg_idx==3){
+		EPRINT("break!\n", false);
+	}
+
 	res->make_read_helper=make_read_helper;
 
 	if(make_read_helper){	
@@ -235,7 +243,6 @@ extern char all_set_page[PAGESIZE];
 
 value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_idx, key_ptr_pair *debug_kp){ 
 	//it should return unaligned value when it no space
-
 	if(!last && REMAIN_DATA_PPA(bis)==bis->buffer_idx){
 		//EPRINT("change bis", false);
 	}
@@ -273,10 +280,10 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 
 		debug_kp[i].lba=map_pair->lba;
 		debug_kp[i].piece_ppa=map_pair->piece_ppa;
-
+/*
 		if(map_pair->lba==debug_lba){
 			printf("tiering lba:%u map to %u\n", debug_lba, map_pair->piece_ppa);
-		}
+		}*/
 		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, true);
 		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i].kv_ptr.data, LPAGESIZE);
 

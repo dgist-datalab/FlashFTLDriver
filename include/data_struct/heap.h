@@ -26,4 +26,5 @@ void mh_insert_append(mh *, void *data);
 void mh_construct(mh *);
 void* mh_get_max(mh*);
 void mh_update(mh*,int number, void *hptr);
+void mh_print(mh *, void (*print_func)(void *blk));
 #endif

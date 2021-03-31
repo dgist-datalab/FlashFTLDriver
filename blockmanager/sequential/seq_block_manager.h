@@ -24,6 +24,7 @@ typedef struct seq_bm_private{
 	uint32_t free_block;
 	int pnum;
 	queue **free_logical_seg_q_pt;
+	uint8_t *seg_populate_bit;
 	mh **max_heap_pt;
 }sbm_pri;
 

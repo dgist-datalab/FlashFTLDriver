@@ -140,12 +140,17 @@ void mh_construct(mh *h){
 	int depth=1;
 	while(all_size/=2){depth++;}
 
-
 	for(int i=depth-1; i>=1; i--){
 		int depth_start=(1<<(i-1));
 		int depth_end=(1<<i);
 		for(int j=depth_start; j<depth_end; j++){
 			mh_internal_downdate(h,&h->body[j]);
 		}
+	}
+}
+
+void mh_print(mh *h, void(*print_func)(void*blk)){
+	for(uint32_t i=0; i<h->size; i++){
+		print_func(h->body[i].data);
 	}
 }

@@ -15,7 +15,7 @@ typedef struct key_value_pair{
 } key_value_pair;
 
 static inline uint32_t kp_find_piece_ppa(uint32_t lba, char *page_data){
-	uint16_t s=0, e=LAST_KP_IDX, mid;
+	int16_t s=0, e=LAST_KP_IDX, mid;
 	key_ptr_pair* map_set=(key_ptr_pair*)page_data;
 	while(s<=e){
 		mid=(s+e)/2;
@@ -33,7 +33,7 @@ static inline uint32_t kp_find_piece_ppa(uint32_t lba, char *page_data){
 }
 
 static inline uint32_t kp_find_idx(uint32_t lba, char *page_data){
-	uint16_t s=0, e=LAST_KP_IDX, mid;
+	int16_t s=0, e=LAST_KP_IDX, mid;
 	key_ptr_pair* map_set=(key_ptr_pair*)page_data;
 	while(s<=e){
 		mid=(s+e)/2;
@@ -55,7 +55,7 @@ static inline uint32_t kp_end_idx(char *data){
 	if(map_set[LAST_KP_IDX].lba!=UINT32_MAX){
 		return LAST_KP_IDX;
 	}
-	uint16_t s=0, e=LAST_KP_IDX, mid;
+	int16_t s=0, e=LAST_KP_IDX, mid;
 	uint32_t target_lba=UINT32_MAX;
 	while(s<=e){
 		mid=(s+e)/2;
