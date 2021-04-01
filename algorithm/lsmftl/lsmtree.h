@@ -20,6 +20,8 @@
 
 typedef struct lsmtree_monitor{
 	uint32_t trivial_move_cnt;
+	uint32_t gc_data;
+	uint32_t gc_mapping;
 	uint32_t *compaction_cnt;
 }lsmtree_monitor;
 

@@ -46,7 +46,16 @@ static inline void version_poped_update(version *v){
 	v->poped_version_num+=2;
 	v->poped_version_num%=v->max_valid_version_num;
 }
+
 static inline uint32_t version_level_idx_to_version(version *v, uint32_t lev_idx, uint32_t level_num){
 	return level_num-1-lev_idx+v->max_valid_version_num-1;
+}
+
+static inline uint32_t version_to_level_idx(version *v, uint32_t version, uint32_t level_num){
+	if(version<v->max_valid_version_num){
+		return level_num-1;
+	}
+	else
+		return level_num-1-version+v->max_valid_version_num-1;
 }
 #endif

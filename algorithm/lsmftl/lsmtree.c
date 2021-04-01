@@ -177,19 +177,34 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	return 1;
 }
 
+static void lsmtree_monitor_print(){
+	printf("----LSMtree monitor log----\n");
+	printf("TRIVIAL MOVE cnt:%u\n", LSM.monitor.trivial_move_cnt);
+	for(uint32_t i=0; i<=LSM.param.LEVELN; i++){
+		printf("COMPACTION %u cnt: %u\n", i, LSM.monitor.compaction_cnt[i]);
+	}
+	printf("DATA GC cnt:%u\n", LSM.monitor.gc_data);
+	printf("MAPPING GC cnt:%u\n", LSM.monitor.gc_mapping);
+	printf("---------------------------\n");
+}
+
 void lsmtree_destroy(lower_info *li, algorithm *){
+	lsmtree_monitor_print();
+	compaction_free(LSM.cm);
 	for(uint32_t i=0; i<2; i++){
 		write_buffer_free(LSM.wb_array[i]);
 	}
 	for(uint32_t  i=0; i<LSM.param.LEVELN; i++){
-		level_free(LSM.disk[i], LSM.pm);
+		if(LSM.disk[i]){
+			printf("%u free\n",i);
+			level_free(LSM.disk[i], LSM.pm);
+		}
 		rwlock_destroy(&LSM.level_rwlock[i]);
 	}	
 
 	version_free(LSM.last_run_version);
 
 	page_manager_free(LSM.pm);
-	compaction_free(LSM.cm);
 	delete LSM.moved_kp_set;
 	
 	rwlock_destroy(&LSM.flushed_kp_set_lock);
@@ -218,7 +233,12 @@ retry:
 		rwlock_read_unlock(r_param->target_level_rw_lock);
 	}
 
-	r_param->prev_level++;
+	//r_param->prev_level++;
+	if(r_param->prev_level==-1){
+		r_param->prev_level=version_to_level_idx(LSM.last_run_version, 
+				version_map_lba(LSM.last_run_version, lba),
+				LSM.param.LEVELN);
+	}
 	if(r_param->prev_level>=LSM.param.LEVELN){
 		return false;
 	}
@@ -283,25 +303,28 @@ uint32_t lsmtree_read(request *const req){
 
 		//printf("read key:%u\n", req->key);
 		/*find data from write_buffer*/
-		char *target;
-		for(uint32_t i=0; i<2; i++){
-			if((target=write_buffer_get(LSM.wb_array[i], req->key))){
-			//	printf("find in write_buffer");
+		uint32_t target_version=version_map_lba(LSM.last_run_version, req->key);
+		if(target_version==TOTALRUNIDX){
+			char *target;
+			for(uint32_t i=0; i<2; i++){
+				if((target=write_buffer_get(LSM.wb_array[i], req->key))){
+					//	printf("find in write_buffer");
+					memcpy(req->value->value, target, LPAGESIZE);
+					req->end_req(req);
+					return 1;
+				}
+			}
+
+			rwlock_read_lock(&LSM.flush_wait_wb_lock);
+			if(LSM.flush_wait_wb && (target=write_buffer_get(LSM.flush_wait_wb, req->key))){
+				//	printf("find in write_buffer");
 				memcpy(req->value->value, target, LPAGESIZE);
 				req->end_req(req);
+				rwlock_read_unlock(&LSM.flush_wait_wb_lock);
 				return 1;
 			}
-		}
-
-		rwlock_read_lock(&LSM.flush_wait_wb_lock);
-		if(LSM.flush_wait_wb && (target=write_buffer_get(LSM.flush_wait_wb, req->key))){
-			//	printf("find in write_buffer");
-			memcpy(req->value->value, target, LPAGESIZE);
-			req->end_req(req);
 			rwlock_read_unlock(&LSM.flush_wait_wb_lock);
-			return 1;
 		}
-		rwlock_read_unlock(&LSM.flush_wait_wb_lock);
 
 		r_param=(lsmtree_read_param*)calloc(1, sizeof(lsmtree_read_param));
 		req->param=(void*)r_param;
@@ -310,26 +333,27 @@ uint32_t lsmtree_read(request *const req){
 		r_param->target_level_rw_lock=NULL;
 
 
-		uint32_t target_piece_ppa=UINT32_MAX;
-		rwlock_read_lock(&LSM.flushed_kp_set_lock);
-		for(uint32_t i=0; i<COMPACTION_REQ_MAX_NUM; i++){
-			if(LSM.flushed_kp_set[i]){
-				if((target_piece_ppa=kp_find_piece_ppa(req->key, (char*)LSM.flushed_kp_set[i]))!=UINT32_MAX){
-					break;
+		if(target_version==TOTALRUNIDX){
+			uint32_t target_piece_ppa=UINT32_MAX;
+			rwlock_read_lock(&LSM.flushed_kp_set_lock);
+			for(uint32_t i=0; i<COMPACTION_REQ_MAX_NUM; i++){
+				if(LSM.flushed_kp_set[i]){
+					if((target_piece_ppa=kp_find_piece_ppa(req->key, (char*)LSM.flushed_kp_set[i]))!=UINT32_MAX){
+						break;
+					}
 				}
 			}
-		}
 
-		if(target_piece_ppa==UINT32_MAX){
-			rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+			if(target_piece_ppa==UINT32_MAX){
+				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+			}
+			else{
+				r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
+				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
+				io_manager_issue_read(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+				return 1;
+			}
 		}
-		else{
-			r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
-			algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
-			io_manager_issue_read(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
-			return 1;
-		}
-
 	}
 	else{
 		r_param=(lsmtree_read_param*)req->param;

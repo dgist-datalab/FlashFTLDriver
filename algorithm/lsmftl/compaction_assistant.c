@@ -44,7 +44,7 @@ void compaction_issue_req(compaction_master *cm, compaction_req *req){
 	return;
 }
 
-static inline void disk_change(level **up, level *src, level** des){
+static inline void disk_change(level **up, level *src, level** des, uint32_t* idx_set){
 	if(up!=NULL){
 		level *new_up=level_init((*up)->max_sst_num, (*up)->max_run_num, (*up)->istier, (*up)->idx);
 		rwlock_write_lock(&LSM.level_rwlock[(*up)->idx]);
@@ -54,10 +54,11 @@ static inline void disk_change(level **up, level *src, level** des){
 	}
 
 	level *delete_target_level=*des;
+	uint32_t des_idx=(*des)->idx;
 	//fdriver_lock(&LSM.level_lock[(*des)->idx]);
-	rwlock_write_lock(&LSM.level_rwlock[(*des)->idx]);
+	rwlock_write_lock(&LSM.level_rwlock[des_idx]);
 	(*des)=src;
-	rwlock_write_unlock(&LSM.level_rwlock[(*des)->idx]);
+	rwlock_write_unlock(&LSM.level_rwlock[des_idx]);
 	//fdriver_unlock(&LSM.level_lock[(*des)->idx]);
 	level_free(delete_target_level, LSM.pm);
 }
@@ -109,7 +110,6 @@ again:
 		else if(req->end_level==LSM.param.LEVELN-1){
 			src=compaction_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
 			slm_empty_level(req->start_level);
-		//	version_enqueue(LSM.last_run_version, LSM.version_num++);
 		}
 		else{
 			src=compaction_leveling(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
@@ -117,19 +117,16 @@ again:
 		}
 
 		if(req->start_level==-1){
-			disk_change(NULL, src, &LSM.disk[req->end_level]);
+			disk_change(NULL, src, &LSM.disk[req->end_level], NULL);
 
 			rwlock_write_lock(&LSM.flushed_kp_set_lock);
-			//printf("kp_set unset\n");
 			LSM.flushed_kp_set[req->tag]=NULL;
 			free(req->target);
 			rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 		}
 		else{
-			disk_change(&LSM.disk[req->start_level], src, &LSM.disk[req->end_level]);
+			disk_change(&LSM.disk[req->start_level], src, &LSM.disk[req->end_level], NULL);
 		}
-	//	printf("%u -> %u\n", req->start_level, req->end_level);
-	//	printf("LSM.disk->end_ppa:%u\n", LSM.disk[2]->array[2].sst_set[3].end_ppa);
 
 		if(req->end_level != LSM.param.LEVELN-1 && (
 				(req->end_level==0 && level_is_full(LSM.disk[req->end_level])) ||
@@ -140,8 +137,9 @@ again:
 			goto again;
 		}
 		else if(req->end_level==LSM.param.LEVELN-1 && level_is_full(LSM.disk[req->end_level])){
-			src=compaction_merge(cm, LSM.disk[req->end_level]);
-			disk_change(NULL, src, &LSM.disk[req->end_level]);
+			uint32_t merged_idx_set[2];
+			src=compaction_merge(cm, LSM.disk[req->end_level], merged_idx_set);
+			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
 		}
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);

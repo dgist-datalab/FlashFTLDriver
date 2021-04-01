@@ -324,6 +324,10 @@ void sst_bis_free(sst_bf_in_stream *bis){
 		EPRINT("remain data", true);	
 	}
 	
+	if(bis->seg->used_page_num==_PPS){
+		free(bis->seg);
+	}
+
 	delete bis->map_data;
 	free(bis->buffer);
 	free(bis);

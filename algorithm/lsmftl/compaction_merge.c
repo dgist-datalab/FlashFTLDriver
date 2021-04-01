@@ -190,10 +190,9 @@ void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_l
 }
 
 
-level* compaction_merge(compaction_master *cm, level *des){
+level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	_cm=cm;
 
-	uint32_t idx_set[2];
 	version_get_merge_target(LSM.last_run_version, idx_set);
 	run *new_run=run_init(des->max_sst_num/des->max_run_num, UINT32_MAX, 0);
 
@@ -225,6 +224,7 @@ level* compaction_merge(compaction_master *cm, level *des){
 
 	sst_bf_out_stream *bos=NULL;
 	sst_bf_in_stream *bis=NULL;
+
 /*
 	if(LSM.monitor.compaction_cnt[des->idx+1]==7){
 	//	EPRINT("break!", false);
@@ -268,7 +268,7 @@ level* compaction_merge(compaction_master *cm, level *des){
 		uint32_t older_prev=0, newer_prev=0;
 		read_arg1={0,}; read_arg2={0,};
 		while(read_done!=total_map_num){
-		//	printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
+			//printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
 			
 			uint32_t shard=LOWQDEPTH/2;
 
@@ -380,6 +380,11 @@ level* compaction_merge(compaction_master *cm, level *des){
 
 		newer_sst_idx=newer_sst_idx_end+1;
 		older_sst_idx=older_sst_idx_end+1;
+	
+	//	EPRINT("should delete before run", false);
+
+	//	EPRINT("should delete before run", false);
+		//return NULL;
 	}
 
 	for(uint32_t i=0; i<_NOS; i++){
@@ -408,12 +413,14 @@ level* compaction_merge(compaction_master *cm, level *des){
 	free(thread_arg.arg_set);
 
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
-	level_run_reinit(des, idx_set[1]);
+	//level_run_reinit(des, idx_set[1]);
 
 	run *rptr; uint32_t ridx;
 	for_each_run_max(des, rptr, ridx){
-		if(rptr->now_sst_file_num){
-			level_append_run_copy_move_originality(res, rptr, ridx);
+		if(ridx!=idx_set[0] && ridx!=idx_set[1]){
+			if(rptr->now_sst_file_num){
+				level_append_run_copy_move_originality(res, rptr, ridx);
+			}
 		}
 	}
 
@@ -424,6 +431,8 @@ level* compaction_merge(compaction_master *cm, level *des){
 //	level_contents_print(res, true);
 	version_poped_update(LSM.last_run_version);
 	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], idx_set[0]);
+	delete new_range_set;
+	delete old_range_set;
 	return res;
 }
 
@@ -437,9 +446,7 @@ void *merge_end_req(algo_req *req){
 			break;
 		case COMPACTIONDATAR:
 			kv_wrapper=(key_value_wrapper*)req->param;
-			if(LSM.global_debug_flag && kv_wrapper->kv_ptr.lba==debug_lba){
-				EPRINT("break!", false);
-			}
+
 			fdriver_unlock(&kv_wrapper->param->done_lock);
 			break;
 

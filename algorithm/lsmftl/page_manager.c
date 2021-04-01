@@ -5,8 +5,8 @@
 #include <stdio.h>
 
 extern lsmtree LSM;
-//uint32_t debug_piece_ppa=(60928*2);
-uint32_t debug_piece_ppa=UINT32_MAX;
+uint32_t debug_piece_ppa=1909326;
+//uint32_t debug_piece_ppa=UINT32_MAX;
 extern uint32_t debug_lba;
 static int test_cnt;
 
@@ -69,7 +69,8 @@ page_manager* page_manager_init(struct blockmanager *_bm){
 void page_manager_free(page_manager* pm){
 	free(pm->current_segment[DATA_S]);
 	free(pm->current_segment[MAP_S]);
-	//free(pm->reserve_segment);
+	free(pm->reserve_segment[DATA_S]);
+	free(pm->reserve_segment[MAP_S]);
 	free(pm);
 }
 
@@ -435,12 +436,10 @@ void *gc_end_req(algo_req *req){
 			gn=(gc_read_node*)req->param;
 			fdriver_unlock(&gn->done_lock);
 			break;
+		case GCDW:
 		case GCMW:
 			v=(value_set*)req->param;
 			inf_free_valueset(v, FS_MALLOC_R);
-			break;
-		case GCDW:
-
 			break;
 	}
 	free(req);
@@ -461,16 +460,19 @@ retry:
 	}
 	seg_idx=victim_target->seg_idx;
 	if(ismap && pm->seg_type_checker[seg_idx]!=MAPSEG){
+		free(victim_target);
 		temp_queue.push(seg_idx);
 		goto retry;
 	}
 	else if(!ismap && (pm->seg_type_checker[seg_idx]!=DATASEG &&
 					pm->seg_type_checker[seg_idx]!=SEPDATASEG)){
+		free(victim_target);
 		temp_queue.push(seg_idx);
 		goto retry;
 	}
 
 	if(LSM.gc_unavailable_seg[seg_idx]){
+		free(victim_target);
 		temp_queue.push(seg_idx);
 		goto retry;
 	}
@@ -499,6 +501,7 @@ retry:
 }
 
 bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
+	LSM.monitor.gc_mapping++;
 	if(victim->invalidate_number==_PPS*2 || victim->all_invalid){
 		bm->trim_segment(bm, victim, bm->li);
 		page_manager_change_reserve(pm, true);
@@ -591,15 +594,14 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 				if(force_stop) break;
 			}
 
-
 			uint32_t map_ppa;
 			map_range *mr_set=(map_range*)malloc(sizeof(map_range) * kp_set_idx);
 			for(uint32_t i=0; i<kp_set_idx; i++){
 				algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 				value_set *data=inf_get_valueset((char*)kp_set[i], FS_MALLOC_W, PAGESIZE);
-				write_req->type=COMPACTIONDATAW;
+				write_req->type=GCDW;
 				write_req->param=data;
-				write_req->end_req=comp_alreq_end_req;
+				write_req->end_req=gc_end_req;
 				map_ppa=page_manager_get_reserve_new_ppa(LSM.pm, false, seg_idx);
 
 				mr_set[i].start_lba=kp_set[i][0].lba;
@@ -618,11 +620,17 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 			sptr->start_lba=kp_set[0][0].lba;
 			sptr->end_lba=mr_set[kp_set_idx-1].end_lba;
 			sptr->_read_helper=gsn->wb->rh;
+			rwlock_write_lock(&LSM.level_rwlock[LSM.param.LEVELN-1]);
 			if(round==0){
-				level_sptr_update_in_gc(LSM.disk[2], ridx, sidx, sptr);
+				level_sptr_update_in_gc(LSM.disk[LSM.param.LEVELN-1], ridx, sidx, sptr);
 			}
 			else{
-				level_sptr_add_at_in_gc(LSM.disk[2], ridx, sidx+round, sptr);
+				level_sptr_add_at_in_gc(LSM.disk[LSM.param.LEVELN-1], ridx, sidx+round, sptr);
+			}
+			rwlock_write_unlock(&LSM.level_rwlock[LSM.param.LEVELN-1]);
+
+			for(uint32_t i=0; i<kp_set_idx; i++){
+				free(kp_set[i]);
 			}
 
 			gsn->wb->rh=NULL;
@@ -638,8 +646,7 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 }
 
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
-	static int cnt=0;
-	//printf("data gc:%u segidx:%u\n", ++cnt, victim->seg_idx);
+	LSM.monitor.gc_data++;
 	if(victim->invalidate_number==_PPS*2){
 		bm->trim_segment(bm, victim, bm->li);
 		page_manager_change_reserve(pm, false);
@@ -647,6 +654,12 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	}
 	else if(victim->invalidate_number>_PPS*2){
 		EPRINT("????", true);
+	}
+
+	printf("gc_data_cnt:%u\n", LSM.monitor.gc_data);
+	if(LSM.monitor.gc_data==250){
+		LSM.global_debug_flag=true;
+		EPRINT("debug point",false);
 	}
 
 	std::queue<gc_read_node*> *gc_target_queue=new std::queue<gc_read_node*>();
@@ -793,9 +806,6 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	uint32_t kp_set_iter=0;
 	write_buffer *flushed_kp_set_update=NULL;
 
-	if(cnt==89){
-		EPRINT("break!\n", false);
-	}
 	while(!gc_mapping_queue->empty()){
 		gmc=gc_mapping_queue->front();
 		/*
@@ -908,6 +918,7 @@ out:
 	}
 	free(free_target);
 	delete gc_target_queue;
+	delete gc_mapping_queue;
 
 	return false;
 }

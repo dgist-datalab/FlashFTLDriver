@@ -72,10 +72,10 @@ static void *flush_end_req(algo_req *req){
 	return NULL;
 }
 
-static algo_req *make_flush_algo_req(write_buffer *wb,uint32_t ppa, value_set *value, bool sync){
+static algo_req *make_flush_algo_req(write_buffer *wb,uint32_t ppa, value_set *value, bool sync, bool isgc){
 	algo_req *res=(algo_req*)malloc(sizeof(algo_req));
 	flush_req_param *param=(flush_req_param*)malloc(sizeof(flush_req_param));
-	res->type=DATAW;
+	res->type=isgc?GCDW:DATAW;
 	res->ppa=ppa;
 	res->end_req=flush_end_req;
 	param->value=value;
@@ -125,7 +125,7 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 		it->second->data.data=NULL;
 
 		if(inter_idx==(L2PGAP-1)){//issue data
-			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
+			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync, false), false);
 			ppa=-1;
 			oob=NULL;
 			target_value=NULL;
@@ -279,7 +279,7 @@ retry:
 		}
 
 		if(inter_idx==(L2PGAP-1)){//issue data
-			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
+			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync, true), false);
 			if(force_stop && (ppa+prev_map+1)%_PPS==_PPS-1){
 				*force_stop=true;
 			}
@@ -297,7 +297,7 @@ retry:
 		if(ppa==UINT32_MAX){
 			EPRINT("it can't be", true);
 		}
-		io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync), false);
+		io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync,true), false);
 		ppa=-1;
 	}
 

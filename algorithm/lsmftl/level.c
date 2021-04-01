@@ -190,15 +190,19 @@ sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa
 }
 
 static inline void level_destroy_content(level *lev, page_manager *pm){
+	if(!lev) return;
 	run *run_ptr;
 	uint32_t idx;
 	/*assigned level*/
-	for_each_run(lev, run_ptr, idx){
-		run_destroy_content(run_ptr, pm);
+	for_each_run_max(lev, run_ptr, idx){
+		if(run_ptr->now_sst_file_num){
+			run_destroy_content(run_ptr, pm);
+		}
 	}
-	/*unassigned level*/
-	for(uint32_t i=lev->run_num; i<lev->max_run_num; i++){
-		free(lev->array[i].sst_set);
+	for_each_run_max(lev, run_ptr, idx){
+		if(!run_ptr->now_sst_file_num){
+			free(run_ptr->sst_set);
+		}
 	}
 }
 
@@ -274,9 +278,12 @@ void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	if(!lev->istier){
 		EPRINT("only tier available", true);
 	}
+	
 	sst_file *org_sptr=&lev->array[ridx].sst_set[sptr_idx];
-	free(org_sptr->block_file_map);
-	read_helper_free(org_sptr->_read_helper);
+	/*free(org_sptr->block_file_map);
+	read_helper_free(org_sptr->_read_helper);*/
+	sst_reinit(org_sptr);
+
 	lev->array[ridx].sst_set[sptr_idx]=(*sptr);
 
 	sst_file *nxt_sstfile, *prev_sstfile;

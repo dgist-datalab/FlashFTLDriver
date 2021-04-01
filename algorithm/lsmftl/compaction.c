@@ -10,12 +10,15 @@ extern lsmtree LSM;
 
 compaction_master *_cm;
 
-//uint32_t debug_lba=1287233;
-uint32_t debug_lba=UINT32_MAX;
+uint32_t debug_lba=1332251;
+//uint32_t debug_lba=UINT32_MAX;
 
 static inline void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des){
 	static int cnt=0;
 	if(lba==debug_lba){
+		if(cnt==37){
+			EPRINT("debug point", false);
+		}
 		if(des){
 			if(des->idx==LSM.param.LEVELN-1){
 				printf("[%d]%u,%u (l,p) -> %u(%u)\n",++cnt, lba,piece_ppa, des->idx, target_ridx);
@@ -793,6 +796,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 	//	if(!final & sst_bis_ppa_empty(*bis)){
 		if(sst_bis_ppa_empty(*bis)){
 			sst_file *sptr=bis_to_sst_file(*bis);
+
 			run_append_sstfile_move_originality(new_run, sptr);
 			sst_free(sptr, LSM.pm);
 			sst_bis_free(*bis);
@@ -824,17 +828,12 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
 
 	LSM.monitor.compaction_cnt[des->idx]++;
-	/*printf("%u LSM.disk[2].array[2].sst_set[3]->end_ppa:%u\n", 
-			LSM.monitor.compaction_cnt[des->idx],
-			LSM.disk[2]->array[2].sst_set[3].end_ppa);*/
+
 
 	if(page_manager_get_total_remain_page(LSM.pm, false) < src->now_sst_num*KP_IN_PAGE+src->now_sst_num){
 		__do_gc(LSM.pm, false, src->now_sst_num*KP_IN_PAGE+src->now_sst_num);
 	}
 
-/*	printf("%u LSM.disk[2].array[2].sst_set[3]->end_ppa:%u\n", 
-			LSM.monitor.compaction_cnt[des->idx],
-			LSM.disk[2]->array[2].sst_set[3].end_ppa);*/
 	run *rptr; uint32_t ridx;
 	for_each_run_max(des, rptr, ridx){
 		if(rptr->now_sst_file_num){
@@ -862,6 +861,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	uint32_t round=total_num/tier_compaction_tags+(total_num%tier_compaction_tags?1:0);
 
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
+
 	for(uint32_t i=0; i<round; i++){
 		read_arg.from=start_idx+i*tier_compaction_tags;
 		if(i!=round-1){
@@ -921,10 +921,6 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
 	version_populate_run(LSM.last_run_version, target_ridx);
 	free(thread_arg.arg_set);
-
-	if(target_ridx==29){
-		level_contents_print(res, true);
-	}
 
 	tiering_compaction_error_check(src, NULL, NULL, new_run, LSM.monitor.compaction_cnt[des->idx]);
 	run_free(new_run);
