@@ -231,6 +231,7 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 	}
 
 	if(res->invalidate_number==0){
+		/*
 		printf("_NOS*_PPS*L2PGAP:%lu validate:%lu ivnalidate:%lu\n", 
 			(uint64_t)_NOS*_PPS*L2PGAP, total_validate_piece_ppa, total_invalidate_piece_ppa);
 
@@ -240,7 +241,7 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 					p->logical_segment[i].total_valid_number,
 					p->logical_segment[i].total_invalid_number);	
 		}
-		EPRINT("dev full", true);
+		EPRINT("dev full", false);*/
 		mh_construct(p->max_heap);
 	}
 
@@ -338,9 +339,9 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 void seq_invalidate_number_decrease(struct blockmanager *bm, uint32_t ppa){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	uint32_t bn=ppa/(_PPB * L2PGAP);
-	uint32_t pn=ppa%(_PPB * L2PGAP);
-	uint32_t bt=pn/8;
-	uint32_t of=pn%8;
+	//uint32_t pn=ppa%(_PPB * L2PGAP);
+	//uint32_t bt=pn/8;
+	//uint32_t of=pn%8;
 	__block *b=&p->seq_block[bn];
 	b->invalidate_number--;
 

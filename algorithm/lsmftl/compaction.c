@@ -10,15 +10,12 @@ extern lsmtree LSM;
 
 compaction_master *_cm;
 
-uint32_t debug_lba=1332251;
-//uint32_t debug_lba=UINT32_MAX;
+//uint32_t debug_lba=3668;
+uint32_t debug_lba=UINT32_MAX;
 
 static inline void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des){
 	static int cnt=0;
 	if(lba==debug_lba){
-		if(cnt==37){
-			EPRINT("debug point", false);
-		}
 		if(des){
 			if(des->idx==LSM.param.LEVELN-1){
 				printf("[%d]%u,%u (l,p) -> %u(%u)\n",++cnt, lba,piece_ppa, des->idx, target_ridx);
@@ -167,7 +164,6 @@ static void read_param_init(read_issue_arg *read_arg){
 }
 
 bool read_done_check(inter_read_alreq_param *param, bool check_page_sst){
-	static int cnt=0;
 	if(check_page_sst){
 		param->target->data=param->data->value;
 	}
@@ -843,6 +839,10 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 
 	run *new_run=run_init(des->max_sst_num/des->max_run_num, UINT32_MAX, 0);
 
+	if(LSM.monitor.compaction_cnt[des->idx]==57){
+		EPRINT("debug point", false);
+	}
+
 	read_issue_arg read_arg;
 	read_arg.des=src;
 	read_arg_container thread_arg;
@@ -861,6 +861,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	uint32_t round=total_num/tier_compaction_tags+(total_num%tier_compaction_tags?1:0);
 
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
+	uint32_t total_moved_num=0;
 
 	for(uint32_t i=0; i<round; i++){
 		read_arg.from=start_idx+i*tier_compaction_tags;
@@ -891,6 +892,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 			picked_kv_num=issue_read_kv_for_bos(bos, pos, round2_tier_compaction_tags, target_ridx, 
 					i==round-1);
 			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
+			total_moved_num+=picked_kv_num;
 			issue_write_kv_for_bis(&bis, bos, new_run, round2_tier_compaction_tags, target_ridx, 
 					i==round-1 && sst_pos_is_empty(pos));
 			j++;
@@ -901,21 +903,25 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	//finishing bis
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
-		if(bis->seg->used_page_num!=_PPS){
-			if(LSM.pm->temp_data_segment){
-				EPRINT("should be NULL", true);
-			}
-			LSM.pm->temp_data_segment=bis->seg;
-		}
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
 	
+	if(bis->seg->used_page_num!=_PPS){
+		if(LSM.pm->temp_data_segment){
+			EPRINT("should be NULL", true);
+		}
+		LSM.pm->temp_data_segment=bis->seg;
+	}
+
+	if(!total_moved_num){
+		EPRINT("no data moved", false);
+	}
+
 	sst_pos_free(pos);
 	sst_bis_free(bis);
 	sst_bos_free(bos, _cm);
 	
-
 	//level_append_run(res, new_run);
 	
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);

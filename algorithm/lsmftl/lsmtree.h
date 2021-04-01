@@ -23,6 +23,7 @@ typedef struct lsmtree_monitor{
 	uint32_t gc_data;
 	uint32_t gc_mapping;
 	uint32_t *compaction_cnt;
+	uint32_t compaction_early_invalidation_cnt;
 }lsmtree_monitor;
 
 typedef struct lsmtree_parameter{
@@ -77,7 +78,7 @@ typedef struct lsmtree{
 	rwlock flushed_kp_set_lock;
 	key_ptr_pair **flushed_kp_set;
 
-	uint8_t* gc_unavailable_seg;
+	uint32_t* gc_unavailable_seg;
 
 	lower_info *li;
 }lsmtree;
@@ -92,7 +93,11 @@ uint32_t lsmtree_flush(request *const req);
 uint32_t lsmtree_remove(request *const req);
 void lsmtree_compaction_end_req(struct compaction_req*);
 void lsmtree_level_summary(lsmtree *lsm);
+void lsmtree_content_print(lsmtree *lsm);
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
+void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr);
+void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr);
+void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm);
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 
 #define MAKE_L0COMP_REQ(wb, kp_set, param, is_gc_data)\

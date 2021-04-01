@@ -177,7 +177,8 @@ sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa
 	run *run_ptr;
 	uint32_t ridx;
 	sst_file *sptr;
-	for_each_run(lev, run_ptr, ridx){
+	for_each_run_max(lev, run_ptr, ridx){
+		if(run_ptr->now_sst_file_num==0) continue;
 		sptr=run_retrieve_sst(run_ptr, lba);
 		if(sptr && sptr->file_addr.piece_ppa<=piece_ppa &&
 				sptr->end_ppa*L2PGAP>=piece_ppa){
@@ -251,7 +252,7 @@ void level_print(level *lev){
 	}
 }
 
-void level_contents_print(level *lev, bool print_sst){
+void level_content_print(level *lev, bool print_sst){
 	run *rptr;
 	uint32_t ridx;
 	sst_file *sptr;

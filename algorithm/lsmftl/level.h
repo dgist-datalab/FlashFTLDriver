@@ -106,6 +106,6 @@ static inline bool level_is_appendable(level *lev, uint32_t append_target_num){
 }
 
 void level_print(level *lev);
-void level_contents_print(level *lev, bool print_sst);
+void level_content_print(level *lev, bool print_sst);
 
 #endif

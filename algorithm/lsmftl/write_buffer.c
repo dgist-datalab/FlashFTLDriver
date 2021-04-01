@@ -236,7 +236,7 @@ key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync, uint32_t se
 	char *oob=NULL;
 	key_ptr_pair *res=(key_ptr_pair*)malloc(sizeof(key_ptr_pair)*KP_IN_PAGE);
 	memset(res, -1, PAGESIZE);
-	uint32_t remain_page_num;
+	uint32_t remain_page_num=0;
 	if(!wb->rh && wb->rhp.type!=HELPER_NONE){
 retry:
 		remain_page_num=page_manager_get_reserve_remain_ppa(LSM.pm, false, seg_idx);

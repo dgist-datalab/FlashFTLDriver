@@ -153,8 +153,10 @@ void sst_bos_free(sst_bf_out_stream *bos, compaction_master *cm){
 	if(bos->kv_buf_idx){
 		EPRINT("free after processing pending req", true);
 	}
-	inf_free_valueset(bos->now_kv_wrap->param->data, FS_MALLOC_R);
-	compaction_free_read_param(cm, bos->now_kv_wrap->param);
+	if(bos->now_kv_wrap){
+		inf_free_valueset(bos->now_kv_wrap->param->data, FS_MALLOC_R);
+		compaction_free_read_param(cm, bos->now_kv_wrap->param);
+	}
 	free(bos->now_kv_wrap);
 	delete bos->kv_wrapper_q;
 	free(bos);
@@ -312,7 +314,7 @@ bool sst_bis_ppa_empty(sst_bf_in_stream *bis){
 }
 
 void sst_bis_free(sst_bf_in_stream *bis){
-	if(bis->rh){
+	if(!bis->map_data->empty() && bis->rh){
 		EPRINT("make rh null before free", true);
 	}
 

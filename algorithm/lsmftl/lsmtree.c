@@ -171,7 +171,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	rwlock_init(&LSM.flush_wait_wb_lock);
 	LSM.flush_wait_wb=NULL;
 
-	LSM.gc_unavailable_seg=(uint8_t*)calloc(_NOS, sizeof(uint8_t));
+	LSM.gc_unavailable_seg=(uint32_t*)calloc(_NOS, sizeof(uint32_t));
 
 	LSM.li=li;
 	return 1;
@@ -183,6 +183,7 @@ static void lsmtree_monitor_print(){
 	for(uint32_t i=0; i<=LSM.param.LEVELN; i++){
 		printf("COMPACTION %u cnt: %u\n", i, LSM.monitor.compaction_cnt[i]);
 	}
+	printf("COMPACTION_EARLY_INVALIDATION: %u\n", LSM.monitor.compaction_early_invalidation_cnt);
 	printf("DATA GC cnt:%u\n", LSM.monitor.gc_data);
 	printf("MAPPING GC cnt:%u\n", LSM.monitor.gc_mapping);
 	printf("---------------------------\n");
@@ -557,6 +558,11 @@ void lsmtree_level_summary(lsmtree *lsm){
 	}
 }
 
+void lsmtree_content_print(lsmtree *lsm){
+	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
+		level_content_print(lsm->disk[i], true);
+	}
+}
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa){
 	sst_file *res=NULL;
 	for(uint32_t i=0; i<LSM.param.LEVELN-1; i++){
@@ -569,4 +575,21 @@ sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa){
 	}
 	EPRINT("not found target", true);
 	return res;
+}
+
+void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr){
+	lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]++;
+}
+
+void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr){
+	lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]--;
+}
+
+void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
+	EPRINT("remove this code for exp", false);
+	for(uint32_t i=0; i<_NOS; i++){
+		if(lsm->gc_unavailable_seg[i]){
+			EPRINT("should be zero", true);
+		}
+	}
 }

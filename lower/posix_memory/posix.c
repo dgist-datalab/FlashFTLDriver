@@ -313,8 +313,8 @@ void *posix_trim_block(uint32_t _PPA, bool async){
 	for(uint32_t i=PPA; i<PPA+my_posix.PPS; i++){
 		free(seg_table[i].storage);
 		/*
-		if(i==test_ppa/2){
-			printf("%u trim!\n", test_ppa/2);
+		if(i==753631){
+			printf("%u trim!\n", i/2);
 		}*/
 		seg_table[i].storage=NULL;
 	}
@@ -337,7 +337,6 @@ void* posix_trim_a_block(uint32_t _PPA, bool async){
 		abort();
 	}
 	my_posix.req_type_cnt[TRIM]++;
-	static int cnt=0;
 	for(int i=0; i<_PPB; i++){
 		uint32_t t=PPA+i*PUNIT;
 		if(!seg_table[t].storage){

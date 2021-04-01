@@ -108,7 +108,6 @@ uint32_t get_sparse_sorted_head(uint32_t level, uint32_t size_factor){
 static inline uint32_t get_total_bn(uint32_t level, uint32_t size_factor, uint32_t *array){
 	uint32_t res=0;
 	uint32_t start=1;
-	uint32_t sf=size_factor;
 	for(uint32_t i=0; i<level; i++){
 		if(array){
 			array[i]=(start*size_factor);

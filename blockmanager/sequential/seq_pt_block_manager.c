@@ -1,5 +1,5 @@
 #include "seq_block_manager.h"
-static uint32_t age=UINT_MAX;
+//static uint32_t age=UINT_MAX;
 uint32_t seq_pt_create(struct blockmanager *bm, int pnum, int *epn, lower_info *li){
 	bm->li=li;
 	sbm_pri *p=(sbm_pri*)malloc(sizeof(sbm_pri));

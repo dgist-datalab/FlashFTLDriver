@@ -1,26 +1,26 @@
 #include "page_manager.h"
 #include "io.h"
 #include "lsmtree.h"
+#include "compaction.h"
 #include <stdlib.h>
 #include <stdio.h>
 
 extern lsmtree LSM;
-uint32_t debug_piece_ppa=1909326;
-//uint32_t debug_piece_ppa=UINT32_MAX;
+//uint32_t debug_piece_ppa=(1059559*2);
+uint32_t debug_piece_ppa=UINT32_MAX;
 extern uint32_t debug_lba;
-static int test_cnt;
 
 void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_ppa,
 		uint32_t *lba, bool should_abort){
+	static int cnt=0;
 	for(uint32_t i=0; i<piece_num; i++){
 		char *oob=bm->get_oob(bm, PIECETOPPA(piece_ppa[i]));
 		memcpy(&oob[(piece_ppa[i]%2)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 		if(piece_ppa[i]==debug_piece_ppa){
+			printf("%u ", should_abort?++cnt:cnt);
 			EPRINT("validate piece here!\n", false);
 		}
-		if(piece_ppa[i]==debug_piece_ppa && debug_lba==lba[i]){
-			printf("debug_point\n");
-		}
+
 		if(!bm->populate_bit(bm, piece_ppa[i]) && should_abort){
 			EPRINT("bit error", true);
 		}
@@ -41,7 +41,12 @@ bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t
 
 void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abort){
 	if(piece_ppa==debug_piece_ppa){
-		EPRINT("invalidate piece here!\n", false);
+		static int cnt=0;
+		printf("%u ", should_abort?++cnt:cnt);
+		if(cnt==4){
+			EPRINT("debug point",false);
+		}
+		EPRINT("invalidate piece here!\n",false);
 	}
 	if(!bm->unpopulate_bit(bm, piece_ppa)){
 		if(should_abort){
@@ -79,7 +84,9 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t lba, bool sho
 	((uint32_t*)oob)[0]=lba;
 	((uint32_t*)oob)[1]=UINT32_MAX;
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
-			EPRINT("validate map here!\n",false);
+		static int cnt=0;
+		printf("%u ", should_abort?++cnt:cnt);
+		EPRINT("validate map here!\n", false);
 	}
 	if(!bm->populate_bit(bm, map_ppa*L2PGAP) && should_abort){
 		EPRINT("bit error", true);
@@ -92,7 +99,12 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t lba, bool sho
 
 void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
-			EPRINT("invalidate map here!\n", false);
+		static int cnt=0;
+		if(cnt==4){
+	//		EPRINT("debug point", false);
+		}
+		printf("%u ", should_abort?++cnt:cnt);
+		EPRINT("invalidate map here!\n", false);
 	}
 	if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP)){
 		if(should_abort){
@@ -158,7 +170,6 @@ retry:
 }
 
 __segment *page_manager_get_seg(page_manager *pm, bool is_map, uint32_t type){
-	uint32_t res;
 	blockmanager *bm=pm->bm;
 	bool temp_used=false;
 	__segment *seg;
@@ -453,10 +464,23 @@ bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_num){
 	std::queue<uint32_t> temp_queue;
 	uint32_t seg_idx;
 	uint32_t remain_page=0;
+
+	uint32_t avg_invalidation_cnt=0;
+	uint32_t target_ridx=0;
+	uint32_t max_invalidation_cnt=0;
+	bool version_check=false;
+
 retry:
 	victim_target=pm->bm->get_gc_target(pm->bm);
-	if(!victim_target){
-		EPRINT("wtf??? no block!", true);
+	if(!victim_target || victim_target->invalidate_number<L2PGAP){
+		/*make invalidation*/
+		if(compaction_early_invalidation(UINT32_MAX)==0){
+			lsmtree_content_print(&LSM);
+			EPRINT("may device has no free block!", true);
+		}
+		else{
+			goto retry;
+		}
 	}
 	seg_idx=victim_target->seg_idx;
 	if(ismap && pm->seg_type_checker[seg_idx]!=MAPSEG){
@@ -480,6 +504,17 @@ retry:
 	switch(pm->seg_type_checker[seg_idx]){
 		case DATASEG:
 		case SEPDATASEG:
+			if(!version_check && victim_target->invalidate_number < _PPS*L2PGAP/5){
+				target_ridx=version_get_max_invalidation_target(LSM.last_run_version,
+						&max_invalidation_cnt, &avg_invalidation_cnt);
+				if(target_ridx!=UINT32_MAX && victim_target->invalidate_number < avg_invalidation_cnt){
+					version_check=true;
+					compaction_early_invalidation(target_ridx);
+					free(victim_target);
+					pm->bm->reinsert_segment(pm->bm, seg_idx);
+					goto retry;
+				}
+			}
 			res=__gc_data(pm, pm->bm, victim_target);
 			remain_page=page_manager_get_total_remain_page(LSM.pm, false);
 			break;
@@ -504,13 +539,21 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_mapping++;
 	if(victim->invalidate_number==_PPS*2 || victim->all_invalid){
 		bm->trim_segment(bm, victim, bm->li);
+		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
+			printf("gc_mapping:%u (seg_idx%u) clean\n", LSM.monitor.gc_mapping, victim->seg_idx);
+		}
+
 		page_manager_change_reserve(pm, true);
 		return true;
 	}
 	else if(victim->invalidate_number>_PPS*2){
 		EPRINT("????", true);
 	}
-	static int cnt=0;
+	
+	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
+		printf("gc_mapping:%u (seg_idx%u)\n", LSM.monitor.gc_mapping, victim->seg_idx);
+	}
+	//static int cnt=0;
 	//printf("mapping gc:%u\n", ++cnt);
 
 	std::queue<gc_read_node*> *gc_target_queue=new std::queue<gc_read_node*>();
@@ -533,6 +576,7 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		char *oob=bm->get_oob(bm, gn->piece_ppa);
 		gn->lba=*(uint32_t*)oob;
 		sst_file *target_sst_file=lsmtree_find_target_sst_mapgc(gn->lba, gn->piece_ppa);
+		invalidate_map_ppa(pm->bm, gn->piece_ppa, true);
 
 		uint32_t ppa=page_manager_get_reserve_new_ppa(pm, true, victim->seg_idx);
 		target_sst_file->file_addr.map_ppa=ppa;
@@ -647,19 +691,20 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_data++;
-	if(victim->invalidate_number==_PPS*2){
+	if(victim->invalidate_number==_PPS*L2PGAP){
+		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
+			printf("gc_data:%u (seg_idx:%u) - clean\n", LSM.monitor.gc_data, victim->seg_idx);
+		}
 		bm->trim_segment(bm, victim, bm->li);
 		page_manager_change_reserve(pm, false);
 		return true;
 	}
-	else if(victim->invalidate_number>_PPS*2){
+	else if(victim->invalidate_number>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
 
-	printf("gc_data_cnt:%u\n", LSM.monitor.gc_data);
-	if(LSM.monitor.gc_data==250){
-		LSM.global_debug_flag=true;
-		EPRINT("debug point",false);
+	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
+		printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
 	}
 
 	std::queue<gc_read_node*> *gc_target_queue=new std::queue<gc_read_node*>();
@@ -693,10 +738,10 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		}
 	}
 
-	if(((_PPS*2-victim->invalidate_number)-(victim->validate_number-victim->invalidate_number))>=2){
+	if(((_PPS*L2PGAP-victim->invalidate_number)-(victim->validate_number-victim->invalidate_number))>=2){
 		if(valid_piece_ppa_num+victim->invalidate_number!=victim->validate_number){
 			printf("valid list\n");
-			for(uint32_t i=0; i<64; i++){
+			for(uint32_t i=0; i<BPS; i++){
 				printf("%u invalid_number:%u validate_number:%u\n", i,victim->blocks[i]->invalidate_number, victim->blocks[i]->validate_number);
 			}
 			EPRINT("not match validation!",true);
@@ -712,7 +757,6 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	sst_file *sptr=NULL;
 	uint32_t recent_version, target_version;
 	uint32_t sptr_idx=0;
-	bool isfirst=false;
 
 	std::queue<gc_mapping_check_node*> *gc_mapping_queue=new std::queue<gc_mapping_check_node*>();
 	gc_mapping_check_node *gmc=NULL;
@@ -736,10 +780,18 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				if(gn->piece_ppa==debug_piece_ppa && gn->lba==debug_lba){
 					EPRINT("break!", false);
 				}
+
+				if(gn->piece_ppa==debug_piece_ppa){
+					if(sptr){
+						printf("target ridx:%u sidx:%u\n", target_version, sptr_idx);
+					}
+					EPRINT("break!", false);
+				}
 				/*check invalidation*/
 				if(!sptr || (sptr && sptr->end_ppa*2<piece_ppa)){ //first round or new sst_file
 					if(sptr){
 						move_sptr(gsn,victim->seg_idx, gsn->ridx, gsn->sidx);
+						gsn=NULL;
 						prev_sptr=NULL;
 					}
 					sptr=level_find_target_run_idx(LSM.disk[LSM.param.LEVELN-1], oob_lba[i], piece_ppa, &target_version, &sptr_idx);
@@ -760,6 +812,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				else{
 					//sptr->trimed_sst_file=true;
 					if(piece_ppa>=(sptr->end_ppa-sptr->map_num+1)*L2PGAP){
+						invalidate_map_ppa(pm->bm, piece_ppa/L2PGAP, true);
 						/*mapaddress*/
 						continue;
 					}
@@ -781,7 +834,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 							prev_sptr=sptr;
 							gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, sptr_idx, target_version);
 						}*/
-
+						invalidate_piece_ppa(pm->bm, gn->piece_ppa, true);
 						insert_target_sptr(gsn, gn->lba, &gn->data->value[LPAGESIZE*i]);
 					}
 					else{
@@ -805,6 +858,11 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	bool kp_set_check_start=false;
 	uint32_t kp_set_iter=0;
 	write_buffer *flushed_kp_set_update=NULL;
+
+	if(gc_mapping_queue->size()){
+		printf("victim invalidation cnt:%u GMC target cnt:%lu ", victim->invalidate_number, gc_mapping_queue->size());
+		EPRINT("debug", false);
+	}
 
 	while(!gc_mapping_queue->empty()){
 		gmc=gc_mapping_queue->front();

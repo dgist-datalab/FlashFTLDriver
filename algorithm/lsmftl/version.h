@@ -13,6 +13,8 @@ typedef struct version{
 	uint8_t *key_version;//key->ridx
 	int8_t valid_version_num;
 	int8_t max_valid_version_num;
+	uint32_t *version_invalidation_cnt;
+	bool *version_early_invalidate;
 	std::queue<uint32_t> *ridx_empty_queue;
 	std::queue<uint32_t> *ridx_populate_queue;
 	uint32_t memory_usage_bit;
@@ -27,6 +29,8 @@ void version_populate_run(version *v, uint32_t ridx);
 void version_sanity_checker(version *v);
 void version_free(version *v);
 void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx);
+void version_reinit_early_invalidation(version *v, uint32_t ridx_num, uint32_t *ridx);
+uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num);
 
 static inline uint32_t version_map_lba(version *v, uint32_t lba){
 	return v->key_version[lba];
@@ -57,5 +61,13 @@ static inline uint32_t version_to_level_idx(version *v, uint32_t version, uint32
 	}
 	else
 		return level_num-1-version+v->max_valid_version_num-1;
+}
+
+static inline bool version_is_early_invalidate(version *v, uint32_t version){
+	return v->version_early_invalidate[version];
+}
+
+static inline void version_set_early_invalidation(version *v, uint32_t version){
+	v->version_early_invalidate[version]=true;
 }
 #endif

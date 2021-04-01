@@ -19,6 +19,7 @@
 #include <queue>
 
 #define COMPACTION_TAGS ((QDEPTH)*2)
+#define TARGETREADNUM(read_arg) (read_arg.to-read_arg.from+1)
 
 typedef struct inter_read_alreq_param{
 	fdriver_lock_t done_lock;
@@ -81,6 +82,7 @@ inter_read_alreq_param *compaction_get_read_param(compaction_master *cm);
 void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *);
 key_value_wrapper *compaction_get_kv_wrapper(uint32_t ppa);
 void compaction_free_kv_wrapper(key_value_wrapper *kv_wrap);
+uint32_t compaction_early_invalidation(uint32_t target_ridx);
 void read_sst_job(void *arg, int th_num);
 
 void stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_stream **os_set, 

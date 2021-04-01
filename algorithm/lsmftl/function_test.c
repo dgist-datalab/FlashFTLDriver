@@ -51,7 +51,6 @@ void LSM_traversal(lsmtree *lsm){
 		printf("level #%d:\n", i);
 		for_each_run(disk, rptr, r_idx){
 			sst_file *sptr; uint32_t s_idx;
-			uint32_t prev=UINT32_MAX;
 			printf("\trun #%d:\n", r_idx);
 			for_each_sst(rptr, sptr, s_idx){
 				printf("\t\tsstfile #%d:\n", s_idx);
