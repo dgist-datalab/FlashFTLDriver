@@ -1,6 +1,7 @@
 #include "lsmtree_param_module.h"
 #include "../../include/settings.h"
 #include <cmath>
+#define MAXRETRY_CNT (2)
 static inline int checking(uint32_t level, uint32_t size_factor, uint32_t blocknumber){
 	uint32_t head_num=0;
 	uint32_t level_head_num=1;
@@ -29,7 +30,7 @@ retry:
 		case -1:
 			target++;
 			retry_cnt++;
-			if(retry_cnt>2) return UINT32_MAX;
+			if(retry_cnt>MAXRETRY_CNT) return UINT32_MAX;
 			goto retry;
 	}
 	return UINT32_MAX;
@@ -47,7 +48,7 @@ retry:
 		case -1:
 			target++;
 			retry_cnt++;
-			if(retry_cnt>2) return UINT32_MAX;
+			if(retry_cnt>MAXRETRY_CNT) return UINT32_MAX;
 			goto retry;
 	}
 	return UINT32_MAX;

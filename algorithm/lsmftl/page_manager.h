@@ -8,7 +8,7 @@
 #define MAX_MAP (PAGESIZE/sizeof(uint32_t))
 #define BLOCK_MAP_SIZE (_PPB*sizeof(uint32_t))
 #define BLOCK_PER_MAP_NUM (BLOCK_MAP_SIZE/PAGESIZE+(BLOCK_MAP_SIZE%PAGESIZE?1:0))
-#define PIECETOPPA(a) ((a)>>1)
+#define PIECETOPPA(a) ((a)/L2PGAP)
 
 enum{
 	SEPDATASEG, DATASEG, MAPSEG

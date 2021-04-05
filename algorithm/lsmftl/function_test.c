@@ -35,7 +35,7 @@ static inline bool kp_data_check(char *data, uint32_t lev_idx, uint32_t run_idx,
 		}
 
 		io_manager_test_read(PIECETOPPA(kp_ptr->piece_ppa), value_data, TEST_IO);
-		if(kp_ptr->lba!=*(uint32_t*)&value_data[4096*(kp_ptr->piece_ppa%2)]){
+		if(kp_ptr->lba!=*(uint32_t*)&value_data[L2PGAP*(kp_ptr->piece_ppa%L2PGAP)]){
 			EPRINT("data fail", true);
 		}
 

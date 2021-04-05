@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#define READHELPER_NUM (2+1)
+#define READHELPER_NUM (3)
 
 enum READ_HELPERTYPE{
 	HELPER_NONE				=   0x0000000,

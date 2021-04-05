@@ -90,7 +90,7 @@ static void  bulk_invalidation(run *r, uint32_t* border_idx, uint32_t border_lba
 	for(i=(*border_idx); i<r->now_sst_file_num; i++){
 		sst_file *sptr=&r->sst_set[i];
 		if(sptr->end_lba<=border_lba){
-			for(uint32_t j=sptr->file_addr.piece_ppa; j<(sptr->end_ppa-sptr->map_num)*2; j++){
+			for(uint32_t j=sptr->file_addr.piece_ppa; j<(sptr->end_ppa-sptr->map_num)*L2PGAP; j++){
 				invalidate_piece_ppa(LSM.pm->bm, j, false);
 			}
 			/* invalidate in map_done
@@ -218,7 +218,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 	LSM.monitor.compaction_cnt[des->idx+1]++;
 
-	for(uint32_t i=0; i<2; i++){
+	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
 		version_unpopulate_run(LSM.last_run_version, idx_set[i]);
 	}
 
@@ -229,10 +229,10 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	read_issue_arg read_arg1={0,}, read_arg2={0,};
 	read_arg_container thread_arg;
 	thread_arg.end_req=merge_end_req;
-	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg*)*2);
+	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg*)*MERGED_RUN_NUM);
 	thread_arg.arg_set[0]=&read_arg1;
 	thread_arg.arg_set[1]=&read_arg2;
-	thread_arg.set_num=2;
+	thread_arg.set_num=MERGED_RUN_NUM;
 
 	uint32_t newer_sst_idx=0, newer_sst_idx_end;
 	uint32_t older_sst_idx=0, older_sst_idx_end;
@@ -242,7 +242,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	uint32_t border_lba;
 
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
-	sst_pf_out_stream *os_set[2];
+	sst_pf_out_stream *os_set[MERGED_RUN_NUM];
 
 	sst_bf_out_stream *bos=NULL;
 	sst_bf_in_stream *bis=NULL;
@@ -314,7 +314,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 //			if(LSM.global_debug_flag){
 //				printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
 //			}
-			uint32_t shard=LOWQDEPTH/2;
+			uint32_t shard=LOWQDEPTH/(1+1);
 
 			if(newer_mr){
 				read_arg1.from=newer_prev;
@@ -384,7 +384,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 			}
 
 			//sorting
-			LSM.monitor.merge_valid_entry_cnt+=stream_sorting(NULL, 2, os_set, NULL, kpq, 
+			LSM.monitor.merge_valid_entry_cnt+=stream_sorting(NULL, MERGED_RUN_NUM, os_set, NULL, kpq, 
 				last_round_check,
 				border_lba,/*limit*/
 				target_ridx, 
@@ -477,7 +477,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 //	level_contents_print(res, true);
 //	lsmtree_gc_unavailable_sanity_check(&LSM);
 	version_poped_update(LSM.last_run_version);
-	version_reinit_early_invalidation(LSM.last_run_version, 2, idx_set);
+	version_reinit_early_invalidation(LSM.last_run_version, MERGED_RUN_NUM, idx_set);
 
 	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], idx_set[0]);
 	delete new_range_set;

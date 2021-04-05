@@ -167,7 +167,6 @@ uint32_t posix_create(lower_info *li, blockmanager *b){
 	lower_flying=cl_init(QDEPTH,true);
 	
 	invalidate_ppa_ptr=(char*)malloc(sizeof(uint32_t)*PPA_LIST_SIZE*20);
-	result_addr=(char*)malloc(8192*(PPA_LIST_SIZE));
 
 #ifdef LASYNC
 	printf("!!! (ASYNC) posix memory NOP:%d!!!\n",li->NOP);
@@ -206,7 +205,6 @@ void *posix_destroy(lower_info *li){
 	free(seg_table);
 	pthread_mutex_destroy(&fd_lock);
 	free(invalidate_ppa_ptr);
-	free(result_addr);
 #ifdef LASYNC
 	stopflag = true;
 	q_free(p_q);
@@ -349,146 +347,3 @@ void print_array(uint32_t *arr, int num){
 	for(int i=0; i<num; i++) printf("%d, ",arr[i]);
 	printf("\n");
 }
-#ifdef Lsmtree
-uint32_t posix_hw_do_merge(uint32_t lp_num, ppa_t *lp_array, uint32_t hp_num,ppa_t *hp_array,ppa_t *tp_array, uint32_t* ktable_num, uint32_t *invliadate_num){
-	if(lp_num==0 || hp_num==0){
-		fprintf(stderr,"l:%d h:%d\n",lp_num,hp_num);
-		abort();
-	}
-	pl_body *lp, *hp, *rp;
-	lp=plbody_init(seg_table,lp_array,lp_num);
-	hp=plbody_init(seg_table,hp_array,hp_num);
-	rp=plbody_init(seg_table,tp_array,lp_num+hp_num);
-	
-	uint32_t lppa, hppa, rppa;
-	KEYT lp_key=plbody_get_next_key(lp,&lppa);
-	KEYT hp_key=plbody_get_next_key(hp,&hppa);
-	KEYT insert_key;
-	int next_pop=0;
-	int result_cnt=0;
-	int invalid_cnt=0;
-	char *res_data;
-	while(!(lp_key.len==UINT8_MAX && hp_key.len==UINT8_MAX)){
-		if(lp_key.len==UINT8_MAX){
-			insert_key=hp_key;
-			rppa=hppa;
-			next_pop=1;
-		}
-		else if(hp_key.len==UINT8_MAX){
-			insert_key=lp_key;
-			rppa=lppa;
-			next_pop=-1;
-		}
-		else{
-			if(!KEYVALCHECK(lp_key)){
-				printf("%.*s\n",KEYFORMAT(lp_key));
-				abort();
-			}
-			if(!KEYVALCHECK(hp_key)){
-				printf("%.*s\n",KEYFORMAT(hp_key));
-				abort();
-			}
-
-			next_pop=KEYCMP(lp_key,hp_key);
-			if(next_pop<0){
-				insert_key=lp_key;
-				rppa=lppa;
-			}
-			else if(next_pop>0){
-				insert_key=hp_key;
-				rppa=hppa;
-			}
-			else{
-				memcpy(&invalidate_ppa_ptr[invalid_cnt++*sizeof(uint32_t)],&lppa,sizeof(lppa));
-				rppa=hppa;
-				insert_key=hp_key;
-			}
-		}
-	
-		if((res_data=plbody_insert_new_key(rp,insert_key,rppa,false))){
-			if(result_cnt>=hp_num+lp_num){
-				printf("%d %d %d\n",result_cnt, hp_num, lp_num);
-			}
-			memcpy(&result_addr[result_cnt*PAGESIZE],res_data,PAGESIZE);
-		//	plbody_data_print(&result_addr[result_cnt*PAGESIZE]);		
-			result_cnt++;
-		}
-		
-		if(next_pop<0) lp_key=plbody_get_next_key(lp,&lppa);
-		else if(next_pop>0) hp_key=plbody_get_next_key(hp,&hppa);
-		else{
-			lp_key=plbody_get_next_key(lp,&lppa);
-			hp_key=plbody_get_next_key(hp,&hppa);
-		}
-	}
-
-	if((res_data=plbody_insert_new_key(rp,insert_key,0,true))){
-		if(result_cnt>PPA_LIST_SIZE*2){
-			printf("too many result!\n");
-			abort();
-		}
-		memcpy(&result_addr[result_cnt*PAGESIZE],res_data,PAGESIZE);
-		//	plbody_data_print(&result_addr[result_cnt*PAGESIZE]);		
-		result_cnt++;
-	}
-	*ktable_num=result_cnt;
-	*invliadate_num=invalid_cnt;
-	free(rp);
-	free(lp);
-	free(hp);
-	return 1;
-}
-
-char * posix_hw_get_kt(){
-	return result_addr;
-}
-
-char *posix_hw_get_inv(){
-	return invalidate_ppa_ptr;
-}
-
-void* posix_read_hw(uint32_t _PPA, char *key,uint32_t key_len, value_set *value,bool async,algo_req * const req){
-	uint32_t PPA=convert_ppa(_PPA);
-	if(PPA>_NOP){
-		printf("address error!\n");
-		abort();
-	}
-
-	if(req->type_lower!=1 && req->type_lower!=0){
-		req->type_lower=0;
-	}
-	if(value->dmatag==-1){
-		printf("dmatag -1 error!\n");
-		abort();
-	}
-
-	pthread_mutex_lock(&fd_lock);
-
-	my_posix.req_type_cnt[MAPPINGR]++;
-	if(my_posix.SOP*PPA >= my_posix.TS){
-		printf("\nread error\n");
-		abort();
-	}
-
-	if(!seg_table[PPA].storage){
-		printf("%u not populated!\n",PPA);
-		abort();
-	}
-	pthread_mutex_unlock(&fd_lock);
-	KEYT temp;
-	temp.key=key;
-	temp.len=key_len;
-
-	uint32_t res=find_ppa_from(seg_table[PPA].storage,key,key_len);
-	if(res==UINT32_MAX){
-		req->type=UINT8_MAX;
-	}
-	else{
-		req->ppa=res;
-	}
-	req->end_req(req);
-	//memcpy(value->value,seg_table[PPA].storage,size);
-	//req->type_lower=1;
-	return NULL;
-}
-#endif

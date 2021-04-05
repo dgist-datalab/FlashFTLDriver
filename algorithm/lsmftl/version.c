@@ -37,7 +37,7 @@ uint32_t version_get_empty_ridx(version *v){
 }
 
 void version_get_merge_target(version *v, uint32_t *ridx_set){
-	for(uint32_t i=0; i<2; i++){
+	for(uint32_t i=0; i<(1+1); i++){
 		ridx_set[i]=v->ridx_populate_queue->front();
 		v->ridx_populate_queue->pop();
 	}

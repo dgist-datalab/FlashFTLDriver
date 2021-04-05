@@ -175,7 +175,7 @@ again:
 			goto again;
 		}
 		else if(req->end_level==LSM.param.LEVELN-1 && level_is_full(LSM.disk[req->end_level])){
-			uint32_t merged_idx_set[2];
+			uint32_t merged_idx_set[MERGED_RUN_NUM];
 			src=compaction_merge(cm, LSM.disk[req->end_level], merged_idx_set);
 			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
 		}

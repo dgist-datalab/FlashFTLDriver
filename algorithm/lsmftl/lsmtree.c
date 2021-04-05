@@ -69,8 +69,7 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		}
 	}
 
-	LSM.param.last_size_factor=TOTALRUNIDX-2;
-	LSM.param.mapping_num=(SHOWINGSIZE/LPAGESIZE/KP_IN_PAGE/LSM.param.last_size_factor);
+
 	printf("------------------------------------------\n");
 	/*rhp setting*/
 	if((leveln_setting && sizef_setting)){
@@ -80,6 +79,8 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		printf("no sizefactor & no # of level\n");
 		printf("# of level is set as 3\n");
 		LSM.param.LEVELN=3;
+		LSM.param.last_size_factor=TOTALRUNIDX-(LSM.param.LEVELN-1);
+		LSM.param.mapping_num=(SHOWINGSIZE/LPAGESIZE/KP_IN_PAGE/LSM.param.last_size_factor);
 		LSM.param.normal_size_factor=get_size_factor(LSM.param.LEVELN-1, LSM.param.mapping_num);
 	}
 	else if(leveln_setting){
@@ -88,8 +89,9 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		LSM.param.normal_size_factor=get_size_factor(LSM.param.LEVELN-1, LSM.param.mapping_num);
 	}
 	else if(sizef_setting){
-		LSM.param.LEVELN=get_level(LSM.param.normal_size_factor, LSM.param.mapping_num);
-		LSM.param.LEVELN++;
+		EPRINT("size factor cannot be set", true);
+		//LSM.param.LEVELN=get_level(LSM.param.normal_size_factor, LSM.param.mapping_num);
+		//LSM.param.LEVELN++;
 	}
 
 	if(!reada_setting){
@@ -125,9 +127,9 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	io_manager_init(li);
 	LSM.pm=page_manager_init(bm);
 	LSM.cm=compaction_init(COMPACTION_REQ_MAX_NUM);
-	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * 2);
+	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * WRITEBUFFER_NUM);
 	LSM.now_wb=0;
-	for(uint32_t i=0; i<2; i++){
+	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 		LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE, LSM.pm, NORMAL_WB);
 	}
 	
@@ -218,7 +220,7 @@ static void lsmtree_monitor_print(){
 void lsmtree_destroy(lower_info *li, algorithm *){
 	lsmtree_monitor_print();
 	compaction_free(LSM.cm);
-	for(uint32_t i=0; i<2; i++){
+	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 		write_buffer_free(LSM.wb_array[i]);
 	}
 	for(uint32_t  i=0; i<LSM.param.LEVELN; i++){
@@ -330,7 +332,7 @@ uint32_t lsmtree_read(request *const req){
 		uint32_t target_version=version_map_lba(LSM.last_run_version, req->key);
 		if(target_version==TOTALRUNIDX){
 			char *target;
-			for(uint32_t i=0; i<2; i++){
+			for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 				if((target=write_buffer_get(LSM.wb_array[i], req->key))){
 					//	printf("find in write_buffer");
 					memcpy(req->value->value, target, LPAGESIZE);
@@ -534,7 +536,7 @@ retry:
 
 
 		LSM.wb_array[LSM.now_wb]=write_buffer_init(KP_IN_PAGE, LSM.pm, NORMAL_WB);
-		if(++LSM.now_wb==2){
+		if(++LSM.now_wb==WRITEBUFFER_NUM){
 			LSM.now_wb=0;
 		}
 	}

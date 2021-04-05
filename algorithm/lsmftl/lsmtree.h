@@ -18,6 +18,7 @@
 
 #define TARGETFPR 0.1f
 #define COMPACTION_REQ_MAX_NUM 1
+#define WRITEBUFFER_NUM (1+1)
 
 typedef struct lsmtree_monitor{
 	uint32_t trivial_move_cnt;

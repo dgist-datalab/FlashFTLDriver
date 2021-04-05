@@ -43,7 +43,7 @@
 #ifdef MLC
 #define TOTALSIZE (300L*G)
 #define REALSIZE (512L*G)
-#define PAGESIZE (8*K)
+#define PAGESIZE (16*K)
 #define _PPB (256)
 #define BPS (64)
 #define _PPS (_PPB*BPS)
@@ -55,9 +55,9 @@
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
 #define REALSIZE (512L*G)
-#define DEVSIZE (64L * G)
-#define PAGESIZE (8*K)
-#define _PPB (256)
+#define PAGE_TARGET_KILO (16)
+#define PAGESIZE (PAGE_TARGET_KILO*K)
+#define _PPB (256*8/PAGE_TARGET_KILO)
 
 #ifdef AMF
 	#define NOC 2

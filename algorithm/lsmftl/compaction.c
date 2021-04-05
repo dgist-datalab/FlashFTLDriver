@@ -252,7 +252,6 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 		bool all_empty_stop, uint32_t limit, uint32_t target_version,
 		bool merge_flag,
 		bool (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_ridx, key_ptr_pair kp)){
-	uint32_t res=0;
 	bool one_empty=false;
 	if(stream_num >= 32){
 		EPRINT("too many stream!!", true);
@@ -492,14 +491,14 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 	thread_arg.arg_set[0]=&read_arg;
 	thread_arg.set_num=1;
 
-	sst_pf_out_stream *os_set[2]={NULL,};
+	sst_pf_out_stream *os_set[COMPACTION_LEVEL_NUM]={NULL,};
 	sst_pf_out_stream *os;
 	sst_pf_in_stream *is=sst_pis_init(true, LSM.param.leveling_rhp);
 
 	uint32_t start_idx=0;
 	compaction_move_unoverlapped_sst(kp_set, NULL, des, res, &start_idx);
 	uint32_t total_num=des->now_sst_num-start_idx+1;
-	uint32_t level_compaction_tags=COMPACTION_TAGS/2;
+	uint32_t level_compaction_tags=COMPACTION_TAGS/COMPACTION_LEVEL_NUM;
 	uint32_t round=total_num/level_compaction_tags+(total_num%level_compaction_tags?1:0);
 	for(uint32_t i=0; i<round; i++){
 		/*set read_arg*/
@@ -525,7 +524,7 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 		/*send read I/O*/
 		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
 
-		stream_sorting(res, 2, os_set, is, NULL, i==round-1, 
+		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, is, NULL, i==round-1, 
 				MIN(LEVELING_SST_AT(des,read_arg.to).end_lba, kp_set[LAST_KP_IDX].lba),
 				version_level_idx_to_version(LSM.last_run_version, res->idx, LSM.param.LEVELN),
 				false,
@@ -599,12 +598,12 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 
 	read_arg_container thread_arg;
 	thread_arg.end_req=comp_alreq_end_req;
-	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg*)*2);
+	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg*)*COMPACTION_LEVEL_NUM);
 	thread_arg.arg_set[0]=&read_arg1;
 	thread_arg.arg_set[1]=&read_arg2;
-	thread_arg.set_num=2;
+	thread_arg.set_num=COMPACTION_LEVEL_NUM;
 
-	sst_pf_out_stream *os_set[2];
+	sst_pf_out_stream *os_set[COMPACTION_LEVEL_NUM];
 	sst_pf_in_stream *is=sst_pis_init(true, LSM.param.leveling_rhp);
 	
 	uint32_t des_start_idx=0;
@@ -652,7 +651,7 @@ level* compaction_leveling(compaction_master *cm, level *src, level *des){
 		/*send read I/O*/
 		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
 
-		stream_sorting(res, 2, os_set, is, NULL, sidx==src->now_sst_num-1, 
+		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, is, NULL, sidx==src->now_sst_num-1, 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba),
 				version_level_idx_to_version(LSM.last_run_version, res->idx, LSM.param.LEVELN),
 				false,
@@ -697,14 +696,14 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
-		if(slm_invalidate_enable(LSM.param.LEVELN-2, kv_wrapper->piece_ppa)){
+		if(slm_invalidate_enable(LSM.param.LEVELN-(1+1), kv_wrapper->piece_ppa)){
 			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
 		}
 
-		if(version_map_lba(LSM.last_run_version, target_pair.lba) > version_level_idx_to_version(LSM.last_run_version, LSM.param.LEVELN-2, LSM.param.LEVELN)){
+		if(version_map_lba(LSM.last_run_version, target_pair.lba) > version_level_idx_to_version(LSM.last_run_version, LSM.param.LEVELN-(1+1), LSM.param.LEVELN)){
 			/*	
 				above level
-				LSM.param.LEVELN-2 (last leveling)
+				LSM.param.LEVELN-(1+1) (last leveling)
 				LSM.param.LEVELN-1 (tierine)
 			 */
 			free(kv_wrapper);
@@ -760,7 +759,7 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 		map_num++;
 
 		ppa=page_manager_get_new_ppa_from_seg(LSM.pm, bis->seg);
-		if(bis->start_piece_ppa/2/_PPS!=ppa/_PPS){
+		if(bis->start_piece_ppa/L2PGAP/_PPS!=ppa/_PPS){
 			EPRINT("map data should same sgement", true);
 		}
 
@@ -904,7 +903,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 
 	uint32_t start_idx=0;
 	uint32_t total_num=src->now_sst_num;
-	uint32_t tier_compaction_tags=COMPACTION_TAGS/2;
+	uint32_t tier_compaction_tags=COMPACTION_TAGS/COMPACTION_LEVEL_NUM;
 	uint32_t round=total_num/tier_compaction_tags+(total_num%tier_compaction_tags?1:0);
 
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
@@ -933,7 +932,6 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		read_sst_job((void*)&thread_arg,-1);
 		
 		uint32_t round2_tier_compaction_tags, picked_kv_num;
-		key_ptr_pair temp_kv_pair;
 
 		do{ 
 			round2_tier_compaction_tags=cm->read_param_queue->size();

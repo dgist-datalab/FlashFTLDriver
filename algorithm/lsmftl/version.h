@@ -3,9 +3,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <queue>
+#include "compaction.h"
 #include "../../include/settings.h"
 #include "lsmtree.h"
 #define TOTALRUNIDX 31
+#define MERGED_RUN_NUM 2
 
 typedef struct version{
 	uint8_t start_hand;
@@ -48,7 +50,7 @@ static inline int version_compare(version *v, int32_t a, int32_t b){
 	return a_-b_;
 }
 static inline void version_poped_update(version *v){
-	v->poped_version_num+=2;
+	v->poped_version_num+=MERGED_RUN_NUM;
 	v->poped_version_num%=v->max_valid_version_num;
 }
 

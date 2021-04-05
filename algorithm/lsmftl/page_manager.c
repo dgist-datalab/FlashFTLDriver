@@ -17,7 +17,7 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 	static int cnt=0;
 	for(uint32_t i=0; i<piece_num; i++){
 		char *oob=bm->get_oob(bm, PIECETOPPA(piece_ppa[i]));
-		memcpy(&oob[(piece_ppa[i]%2)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
+		memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 		if(piece_ppa[i]==debug_piece_ppa){
 			printf("%u ", should_abort?++cnt:cnt);
 			EPRINT("validate piece here!\n", false);
@@ -100,9 +100,6 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t lba, bool sho
 void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
 		static int cnt=0;
-		if(cnt==2){
-			EPRINT("debug point", false);
-		}
 		printf("%u ", should_abort?++cnt:cnt);
 		EPRINT("invalidate map here!\n", false);
 	}
@@ -147,7 +144,7 @@ retry:
 		}
 		if(bm->is_gc_needed(bm)){
 			//EPRINT("before get ppa, try to gc!!\n", true);
-			if(__do_gc(pm,is_map, is_map?1:2)){ //just trim
+			if(__do_gc(pm,is_map, is_map?1:(1+1))){ //just trim
 				free(seg);
 			}
 			else{ //copy trim
@@ -263,7 +260,7 @@ retry:
 		}
 		if(bm->is_gc_needed(bm)){
 			//EPRINT("before get ppa, try to gc!!\n", true);
-			if(__do_gc(pm,is_map, is_map?1:2)){ //just trim
+			if(__do_gc(pm,is_map, is_map?1:(1+1))){ //just trim
 				free(seg);
 			}
 			else{ //copy trim
@@ -509,7 +506,7 @@ retry:
 	switch(pm->seg_type_checker[seg_idx]){
 		case DATASEG:
 		case SEPDATASEG:
-			if(version_check<15 && victim_target->invalidate_number < _PPS*L2PGAP/2){
+			if(version_check<(TOTALRUNIDX/(1+1)) && victim_target->invalidate_number < (_PPS*L2PGAP/(1+1))){
 				target_ridx=version_get_max_invalidation_target(LSM.last_run_version,
 						&max_invalidation_cnt, &avg_invalidation_cnt);
 				if(target_ridx!=UINT32_MAX && victim_target->invalidate_number < avg_invalidation_cnt){
@@ -542,7 +539,7 @@ retry:
 
 bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_mapping++;
-	if(victim->invalidate_number==_PPS*2 || victim->all_invalid){
+	if(victim->invalidate_number==_PPS*L2PGAP || victim->all_invalid){
 		bm->trim_segment(bm, victim, bm->li);
 		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
 			printf("gc_mapping:%u (seg_idx%u) clean\n", LSM.monitor.gc_mapping, victim->seg_idx);
@@ -551,7 +548,7 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		page_manager_change_reserve(pm, true);
 		return true;
 	}
-	else if(victim->invalidate_number>_PPS*2){
+	else if(victim->invalidate_number>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
 	
@@ -720,7 +717,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	bool should_read;
 	uint32_t read_page_num=0;
 	uint32_t valid_piece_ppa_num=0;
-	uint32_t temp[_PPS*2];
+	uint32_t temp[_PPS*L2PGAP];
 	/*
 	for(uint32_t i=0; i<64; i++){
 		printf("%u invalid_number:%u\n", i,victim->blocks[i]->invalidate_number);
@@ -744,7 +741,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		}
 	}
 
-	if(((_PPS*L2PGAP-victim->invalidate_number)-(victim->validate_number-victim->invalidate_number))>=2){
+	if(((_PPS*L2PGAP-victim->invalidate_number)-(victim->validate_number-victim->invalidate_number))>=(1+1)){
 		if(valid_piece_ppa_num+victim->invalidate_number!=victim->validate_number){
 			printf("valid list\n");
 			for(uint32_t i=0; i<BPS; i++){
@@ -801,7 +798,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 //				}
 
 				/*check invalidation*/
-				if(!sptr || (sptr && sptr->end_ppa*2<piece_ppa)){ //first round or new sst_file
+				if(!sptr || (sptr && sptr->end_ppa*L2PGAP<piece_ppa)){ //first round or new sst_file
 					if(sptr){
 						if(gsn){
 							move_sptr(gsn,victim->seg_idx, gsn->ridx, gsn->sidx);
@@ -823,7 +820,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					gmc->lba=oob_lba[i];
 					gmc->map_ppa=UINT32_MAX;
 					gmc->type=MAP_CHECK_FLUSHED_KP;
-					gmc->level=LSM.param.LEVELN-2;
+					gmc->level=LSM.param.LEVELN-(1+1);
 					fdriver_lock_init(&gmc->done_lock, 0);
 					gc_mapping_queue->push(gmc);
 				}

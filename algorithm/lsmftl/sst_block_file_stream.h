@@ -9,7 +9,7 @@
 
 #define REMAIN_DATA_PPA(bis) \
 	((int32_t)(((bis)->piece_ppa_length) - \
-	 (bis)->map_data->size()*2 - \
+	 (bis)->map_data->size()*L2PGAP - \
 	 (bis)->write_issued_kv_num))
 
 typedef struct sst_bf_out_stream{
