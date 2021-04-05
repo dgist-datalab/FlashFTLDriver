@@ -191,6 +191,27 @@ static void lsmtree_monitor_print(){
 	printf("COMPACTION_EARLY_INVALIDATION: %u\n", LSM.monitor.compaction_early_invalidation_cnt);
 	printf("DATA GC cnt:%u\n", LSM.monitor.gc_data);
 	printf("MAPPING GC cnt:%u\n", LSM.monitor.gc_mapping);
+
+	printf("\n");
+	printf("merge efficienty:%.2f (%lu/%lu - valid/total)\n", 
+			(double)LSM.monitor.merge_valid_entry_cnt/LSM.monitor.merge_total_entry_cnt,
+			LSM.monitor.merge_valid_entry_cnt,
+			LSM.monitor.merge_total_entry_cnt);
+	printf("tiering efficienty:%.2f (%lu/%lu - valid/total)\n", 
+			(double)LSM.monitor.tiering_valid_entry_cnt/LSM.monitor.tiering_total_entry_cnt,
+			LSM.monitor.tiering_valid_entry_cnt,
+			LSM.monitor.tiering_total_entry_cnt);
+
+	printf("\n");
+	uint64_t usage_bit=lsmtree_all_memory_usage(&LSM) + RANGE*5;
+	uint64_t showing_size=SHOWINGSIZE/1024/1024/1024;
+	//printf("sw size:%lu\n", showing_size);
+	printf("memory usage:%.2lf%% for PFTL\n\t%lu(bit)\n\t%.2lf(byte)\n\t%.2lf(MB)\n",
+			(double)usage_bit/8/1024/1024/(showing_size),
+			usage_bit,
+			(double)usage_bit/8,
+			(double)usage_bit/8/1024/1024
+			);
 	printf("---------------------------\n");
 }
 
@@ -201,10 +222,6 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 		write_buffer_free(LSM.wb_array[i]);
 	}
 	for(uint32_t  i=0; i<LSM.param.LEVELN; i++){
-		if(LSM.disk[i]){
-			printf("%u free\n",i);
-			level_free(LSM.disk[i], LSM.pm);
-		}
 		rwlock_destroy(&LSM.level_rwlock[i]);
 	}	
 
@@ -305,7 +322,9 @@ retry:
 
 uint32_t lsmtree_read(request *const req){
 	lsmtree_read_param *r_param;
-	printf("req->key:%u\n", req->key);
+	if(req->key==debug_lba){
+		printf("req->key:%u\n", req->key);
+	}
 	if(!req->param){
 		/*find data from write_buffer*/
 		uint32_t target_version=version_map_lba(LSM.last_run_version, req->key);
@@ -631,4 +650,24 @@ void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
 			EPRINT("should be zero", true);
 		}
 	}
+}
+
+uint64_t lsmtree_all_memory_usage(lsmtree *lsm){
+	uint64_t bit=0;
+	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
+		level *lev=lsm->disk[i];
+		run *rptr;
+		uint32_t ridx;
+		for_each_run_max(lev, rptr, ridx){
+			if(!rptr->now_sst_file_num) continue;
+			sst_file *sptr;
+			uint32_t sidx;
+			for_each_sst(rptr, sptr, sidx){
+				if(sptr->_read_helper){
+					bit+=read_helper_memory_usage(sptr->_read_helper);
+				}
+			}	
+		}
+	}
+	return bit;
 }

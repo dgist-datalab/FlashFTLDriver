@@ -155,7 +155,12 @@ void sst_bos_free(sst_bf_out_stream *bos, compaction_master *cm){
 	}
 	if(bos->now_kv_wrap){
 		inf_free_valueset(bos->now_kv_wrap->param->data, FS_MALLOC_R);
-		compaction_free_read_param(cm, bos->now_kv_wrap->param);
+		if(!bos->no_inter_param_alloc){
+			compaction_free_read_param(cm, bos->now_kv_wrap->param);
+		}
+		else{
+			free(bos->now_kv_wrap->param);
+		}
 	}
 	free(bos->now_kv_wrap);
 	delete bos->kv_wrapper_q;

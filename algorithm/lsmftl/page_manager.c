@@ -7,7 +7,7 @@
 #include<queue>
 
 extern lsmtree LSM;
-//uint32_t debug_piece_ppa=(425967*2);
+//uint32_t debug_piece_ppa=208320;
 uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
@@ -708,11 +708,6 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	else if(victim->invalidate_number>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
-	
-	if(LSM.monitor.gc_data==196){
-		LSM.global_debug_flag=true;
-		EPRINT("debug point", false);
-	}
 /*
 //	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx && LSM.global_debug_flag){
 //		printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
@@ -789,9 +784,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				gn->piece_ppa=piece_ppa;
 				gn->lba=oob_lba[i];
 
-				if(gn->piece_ppa/2==425967 && LSM.global_debug_flag){
-					EPRINT("debug point", false);
-				}
+//				if(gn->piece_ppa/2==425967 && LSM.global_debug_flag){
+//					EPRINT("debug point", false);
+//				}
 
 //				if(gn->piece_ppa==debug_piece_ppa && gn->lba==debug_lba){
 //					EPRINT("break!", false);

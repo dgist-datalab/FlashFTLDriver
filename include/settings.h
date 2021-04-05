@@ -50,7 +50,7 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 32L
+#define GIGAUNIT 4L
 #define OP 70
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))

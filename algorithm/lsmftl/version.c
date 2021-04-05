@@ -63,6 +63,8 @@ void version_sanity_checker(version *v){
 void version_free(version *v){
 	delete v->ridx_empty_queue;
 	delete v->ridx_populate_queue;
+	free(v->version_early_invalidate);
+	free(v->version_invalidation_cnt);
 	free(v->key_version);
 	free(v);
 }

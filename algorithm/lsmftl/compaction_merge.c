@@ -222,6 +222,10 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		version_unpopulate_run(LSM.last_run_version, idx_set[i]);
 	}
 
+	if(LSM.monitor.compaction_cnt[des->idx+1]==49){
+		LSM.global_debug_flag=true;
+	}
+
 	read_issue_arg read_arg1={0,}, read_arg2={0,};
 	read_arg_container thread_arg;
 	thread_arg.end_req=merge_end_req;
@@ -256,6 +260,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 			newer_sst_idx<newer->now_sst_file_num?coherence_sst_kp_pair_num(newer,newer_sst_idx, &newer_sst_idx_end, &now_newer_map_num):0;
 		max_target_piece_num+=
 			older_sst_idx<older->now_sst_file_num?coherence_sst_kp_pair_num(older,older_sst_idx, &older_sst_idx_end, &now_older_map_num):0;
+
 
 		if(bis){
 			max_target_piece_num+=(bis->map_data->size()+1+1)*L2PGAP; // buffered + additional mapping
@@ -367,21 +372,32 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 						older_mr[read_arg2.to].end_lba);
 			}
 
+		/*
+			if((newer_mr && newer->sst_set[newer_sst_idx].map_num==1 && !older_mr) || 
+					(older_mr && older->sst_set[older_sst_idx].map_num==1 && !newer_mr)){
+				EPRINT("debug point", false);
+			}*/
+
+			if( (os_set[0]->now_file_empty && os_set[0]->now_mr==os_set[0]->mr_set->front()) || 
+				(os_set[1]->now_file_empty && os_set[1]->now_mr==os_set[1]->mr_set->front())){
+				EPRINT("debug point", false);
+			}
+
 			//sorting
-			stream_sorting(NULL, 2, os_set, NULL, kpq, 
+			LSM.monitor.merge_valid_entry_cnt+=stream_sorting(NULL, 2, os_set, NULL, kpq, 
 				last_round_check,
 				border_lba,/*limit*/
 				target_ridx, 
 				true,
 				merge_invalidation_function);
 
+			read_done+=TARGETREADNUM(read_arg1)+TARGETREADNUM(read_arg2);
 			if(newer_mr){
 				newer_prev=read_arg1.to+1;
 			}
 			if(older_mr){
 				older_prev=read_arg2.to+1;
 			}
-			read_done+=TARGETREADNUM(read_arg1)+TARGETREADNUM(read_arg2);
 		}
 
 		if(bos==NULL){
@@ -427,6 +443,10 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 	sst_bis_free(bis);
 	sst_bos_free(bos, _cm);
+
+	LSM.monitor.merge_total_entry_cnt+=os_set[0]->total_poped_num+
+		os_set[1]->total_poped_num;
+
 	sst_pos_free(os_set[0]);
 	sst_pos_free(os_set[1]);
 	delete kpq;

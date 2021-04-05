@@ -68,6 +68,9 @@ void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *sst_set, inter_read_alreq_
 }
 
 void sst_pos_add_mr(sst_pf_out_stream *os, map_range *mr_set, inter_read_alreq_param **param, uint32_t set_num){
+	if(&mr_set[0]==os->mr_set->front()){
+		EPRINT("!!!??", true);
+	}
 	for(uint32_t i=0; i<set_num; i++){
 		os->mr_set->push(&mr_set[i]);
 		os->check_flag_set->push(param[i]);
@@ -203,6 +206,7 @@ retry:
 
 void sst_pos_pop(sst_pf_out_stream *os){
 	os->idx++;
+	os->total_poped_num++;
 	if(os->idx*sizeof(key_ptr_pair) >=PAGESIZE){
 		os->now_file_empty=true;
 		if(os->type==SST_PAGE_FILE_STREAM || os->type==MAP_FILE_STREAM){

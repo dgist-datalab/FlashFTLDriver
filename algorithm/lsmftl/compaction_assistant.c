@@ -199,6 +199,9 @@ inter_read_alreq_param *compaction_get_read_param(compaction_master *cm){
 }
 
 void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *target){
+	if(cm->read_param_queue->size()>COMPACTION_TAGS){
+		EPRINT("debug point", false);
+	}
 	cm->read_param_queue->push(target);
 	return;
 }
