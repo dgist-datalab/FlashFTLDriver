@@ -2,6 +2,7 @@
 #include "io.h"
 #include <stdlib.h>
 #include <getopt.h>
+#include "function_test.h"
 lsmtree LSM;
 char all_set_page[PAGESIZE];
 void *lsmtree_read_end_req(algo_req *req);
@@ -129,7 +130,10 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	for(uint32_t i=0; i<2; i++){
 		LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE, LSM.pm, NORMAL_WB);
 	}
-	LSM.moved_kp_set=new std::queue<key_ptr_pair*>();
+	
+	LSM.moved_kp_set=new std::deque<key_ptr_pair*>();
+	fdriver_mutex_init(&LSM.moved_kp_lock);
+
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
 
@@ -173,6 +177,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 
 	LSM.gc_unavailable_seg=(uint32_t*)calloc(_NOS, sizeof(uint32_t));
 
+	memset(LSM.now_merging_run, -1, sizeof(uint32_t)*(1+1));
 	LSM.li=li;
 	return 1;
 }
@@ -300,9 +305,8 @@ retry:
 
 uint32_t lsmtree_read(request *const req){
 	lsmtree_read_param *r_param;
+	printf("req->key:%u\n", req->key);
 	if(!req->param){
-
-		//printf("read key:%u\n", req->key);
 		/*find data from write_buffer*/
 		uint32_t target_version=version_map_lba(LSM.last_run_version, req->key);
 		if(target_version==TOTALRUNIDX){
@@ -336,8 +340,13 @@ uint32_t lsmtree_read(request *const req){
 
 		if(target_version==TOTALRUNIDX){
 			uint32_t target_piece_ppa=UINT32_MAX;
+			uint32_t i;
 			rwlock_read_lock(&LSM.flushed_kp_set_lock);
-			for(uint32_t i=0; i<COMPACTION_REQ_MAX_NUM; i++){
+			target_version=version_map_lba(LSM.last_run_version, req->key);		
+			if(target_version!=TOTALRUNIDX){ //check twice
+				goto next;		
+			}
+			for(i=0; i<COMPACTION_REQ_MAX_NUM; i++){
 				if(LSM.flushed_kp_set[i]){
 					if((target_piece_ppa=kp_find_piece_ppa(req->key, (char*)LSM.flushed_kp_set[i]))!=UINT32_MAX){
 						break;
@@ -346,7 +355,18 @@ uint32_t lsmtree_read(request *const req){
 			}
 
 			if(target_piece_ppa==UINT32_MAX){
-				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+				std::deque<key_ptr_pair*>::iterator moved_kp_it=LSM.moved_kp_set->begin();
+				for(;moved_kp_it!=LSM.moved_kp_set->end(); moved_kp_it++){
+					key_ptr_pair *temp_pair=*moved_kp_it;
+					target_piece_ppa=kp_find_piece_ppa(req->key, (char*)temp_pair);
+					if(target_piece_ppa!=UINT32_MAX){
+						break;
+					}
+				}
+			}
+
+			if(target_piece_ppa==UINT32_MAX){
+				rwlock_read_unlock(&LSM.flushed_kp_set_lock);	
 			}
 			else{
 				r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
@@ -359,7 +379,7 @@ uint32_t lsmtree_read(request *const req){
 	else{
 		r_param=(lsmtree_read_param*)req->param;
 	}
-
+next:
 	algo_req *al_req;
 	level *target=NULL;
 	run *rptr=NULL;
@@ -441,6 +461,11 @@ read_helper_check_again:
 notfound:
 	printf("req->key: %u-", req->key);
 	EPRINT("not found key", false);
+	printf("prev_level:%u prev_run:%u read_helper_idx:%u version:%u\n", 
+			r_param->prev_level, r_param->prev_run, r_param->read_helper_idx, LSM.last_run_version->key_version[req->key]);
+
+	LSM_find_lba(&LSM, req->key);
+	abort();
 	req->type=FS_NOTFOUND_T;
 	req->end_req(req);
 	return 0;
@@ -449,6 +474,10 @@ normal_end:
 	return 1;
 }
 
+
+void lsmtree_compaction_reinsert_end_req(compaction_req *req){
+
+}
 
 uint32_t lsmtree_write(request *const req){
 #ifdef DEBUG
@@ -461,13 +490,15 @@ uint32_t lsmtree_write(request *const req){
 	version_coupling_lba_ridx(LSM.last_run_version, req->key, TOTALRUNIDX);
 
 	if(write_buffer_isfull(wb)){
-
+		fdriver_lock(&LSM.moved_kp_lock);
 		while(!LSM.moved_kp_set->empty()){
+
 			key_ptr_pair *kp_set=LSM.moved_kp_set->front();
-			compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(NULL, kp_set, NULL, true));
-			LSM.moved_kp_set->pop();
-		}
 	
+			compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(NULL, kp_set, NULL, true));
+			LSM.moved_kp_set->pop_front();
+		}
+		fdriver_unlock(&LSM.moved_kp_lock);
 	
 retry:
 		rwlock_write_lock(&LSM.flush_wait_wb_lock);
@@ -577,12 +608,20 @@ sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa){
 	return res;
 }
 
-void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr){
-	lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]++;
+void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
+	if(sptr){
+		lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]++;
+	}else{
+		lsm->gc_unavailable_seg[seg_idx]++;
+	}
 }
 
-void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr){
-	lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]--;
+void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
+	if(sptr){
+		lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]--;
+	}else{
+		lsm->gc_unavailable_seg[seg_idx]--;
+	}
 }
 
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){

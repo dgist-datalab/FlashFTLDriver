@@ -354,6 +354,19 @@ void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	}
 	else{
 		uint32_t target_num=lev->array[ridx].now_sst_file_num-sptr_idx;
+		if(sptr_idx+1+target_num >= lev->array[ridx].max_sst_file_num){
+			run *now_r=&lev->array[ridx];
+			sst_file *new_sst_set;
+			new_sst_set=(sst_file*)calloc(now_r->max_sst_file_num+1, sizeof(sst_file));
+			memcpy(new_sst_set, now_r->sst_set, sizeof(sst_file)*now_r->max_sst_file_num);
+			free(now_r->sst_set);
+
+			now_r->max_sst_file_num++;
+			now_r->sst_set=new_sst_set;
+	//		run_print(&lev->array[ridx]);
+	//		EPRINT("over run", true);
+		}
+
 		memmove(&lev->array[ridx].sst_set[sptr_idx+1],&lev->array[ridx].sst_set[sptr_idx], sizeof(sst_file) *target_num);
 		org_sptr=&lev->array[ridx].sst_set[sptr_idx];
 	}
@@ -361,4 +374,20 @@ void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	//free(org_sptr->block_file_map);
 	lev->array[ridx].sst_set[sptr_idx]=(*sptr);
 	lev->array[ridx].now_sst_file_num++;
+}
+
+void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
+	if(!lev->istier){
+		EPRINT("only tier available", true);
+	}
+	
+	run *r=&lev->array[ridx];
+	if(r->now_sst_file_num==0 || r->now_sst_file_num <=sptr_idx){
+		EPRINT("?????", true);
+	}
+
+	uint32_t target_num_sst_file=r->now_sst_file_num-sptr_idx-1;
+	memmove(&r->sst_set[sptr_idx], &r->sst_set[sptr_idx+1], sizeof(sst_file) * target_num_sst_file);
+	memset(&r->sst_set[r->now_sst_file_num-1], 0, sizeof(sst_file));
+	r->now_sst_file_num--;
 }

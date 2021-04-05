@@ -129,6 +129,10 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	
 	block_set *free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
 	
+	if(!free_block_set){
+		EPRINT("dev full??", true);
+	}
+
 	if(free_block_set->total_invalid_number || free_block_set->total_valid_number){
 		EPRINT("not allowed!\n", true);
 	}

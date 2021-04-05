@@ -72,6 +72,9 @@ void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx){
 		EPRINT("over version num", true);
 	}
 	if(lba==debug_lba){
+		if(LSM.global_debug_flag){
+			EPRINT("debug point", false);
+		}
 		printf("[version_map] lba:%u->%u\n",lba, ridx);
 	}
 	if(v->key_version[lba]!=UINT8_MAX){
@@ -108,6 +111,7 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 	uint32_t target_invalidation_cnt=0;
 	for(uint32_t i=0; i<v->max_valid_version_num; i++){
 		if(v->version_early_invalidate[i]) continue;
+		if(LSM.now_merging_run[0]==i || LSM.now_merging_run[1]==i) continue;
 		if(target_invalidation_cnt<v->version_invalidation_cnt[i]){
 			if(early_invalidate_available_check(i)){
 				target_ridx=i;
@@ -128,4 +132,24 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 	}
 
 	return target_ridx;
+}
+
+uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, 
+		uint32_t original_version, uint32_t target_version){
+	for(uint32_t i=start_lba; i<=end_lba; i++){
+		if(version_map_lba(v, i) ==original_version){
+			if(i==debug_lba){
+				EPRINT("target lba's version is updated",false);
+			}
+			version_coupling_lba_ridx(v, i, target_version);
+		}
+		else{
+			if(i==debug_lba){
+				/*
+				printf("\nversion info:%u, ", version_map_lba(v, i));
+				EPRINT("target lba's version is [not] updated",false);*/
+			}
+		}
+	}
+	return 1;
 }

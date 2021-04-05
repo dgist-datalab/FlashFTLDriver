@@ -105,9 +105,9 @@ bool slm_invalidate_enable(uint32_t level_idx, uint32_t piece_ppa){
 	map_iter it=target->find(SEGNUM(piece_ppa));
 
 #ifdef MAPPRINT
-	printf("query---\n");
-	printf("%u: ",level_idx);
-	map_print(target);
+//	printf("query---\n");
+//	printf("%u: ",level_idx);
+//	map_print(target);
 #endif
 
 	if(it==target->end()){
@@ -117,7 +117,8 @@ bool slm_invalidate_enable(uint32_t level_idx, uint32_t piece_ppa){
 		return true;	
 	}
 	else{
-		EPRINT("error", true);
+		return false;
+//		EPRINT("error", true);
 	}
 	return true;
 }

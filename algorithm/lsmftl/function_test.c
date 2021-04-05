@@ -74,7 +74,7 @@ void LSM_traversal(lsmtree *lsm){
 
 bool LSM_find_lba(lsmtree *lsm, uint32_t lba){
 	lsmtree_parameter *param=&lsm->param;
-	for(uint32_t i=0; i<param->LEVELN-1; i++){
+	for(uint32_t i=0; i<=param->LEVELN-1; i++){
 		level *disk=lsm->disk[i];
 		run *rptr; uint32_t r_idx;
 	//	printf("level #%d:\n", i);
@@ -86,16 +86,20 @@ bool LSM_find_lba(lsmtree *lsm, uint32_t lba){
 				char map_data[PAGESIZE];
 				if(sptr->type==PAGE_FILE){
 					io_manager_test_read(sptr->file_addr.map_ppa, map_data, TEST_IO);
-					if(kp_data_check(map_data, i, r_idx, s_idx, lba, false))
+					if(kp_data_check(map_data, i, r_idx, s_idx, lba, false)){
+						printf("level:%u run:%u s_idx:%u\n", i, r_idx, s_idx);
 						return true;
+					}
 				}
 				else{
 					map_range *mr;
 					for(uint32_t mr_idx=0; mr_idx<sptr->map_num; mr_idx++){
 						mr=&sptr->block_file_map[mr_idx];
 						io_manager_test_read(mr->ppa, map_data, TEST_IO);
-						if(kp_data_check(map_data, i, r_idx, s_idx, lba, false))
+						if(kp_data_check(map_data, i, r_idx, s_idx, lba, false)){
+							printf("level:%u run:%u s_idx:%u\n", i, r_idx, s_idx);
 							return true;
+						}
 					}
 				}
 			}

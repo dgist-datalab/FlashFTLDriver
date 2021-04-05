@@ -194,9 +194,7 @@ sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read
 	res->buffer=(key_value_wrapper*)malloc(L2PGAP*sizeof(key_value_wrapper));
 	res->seg=seg;
 
-	if(seg->seg_idx==3){
-		EPRINT("break!\n", false);
-	}
+	lsmtree_gc_unavailable_set(&LSM, NULL, seg->seg_idx);
 
 	res->make_read_helper=make_read_helper;
 
@@ -303,7 +301,14 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 }
 
 bool sst_bis_ppa_empty(sst_bf_in_stream *bis){
-	uint32_t remain_ppa=REMAIN_DATA_PPA(bis);
+	int32_t remain_ppa=REMAIN_DATA_PPA(bis);
+
+	if(bis->now_map_data_idx==KP_IN_PAGE){
+		if(remain_ppa<4){
+			return true;
+		}
+	}
+
 	if(remain_ppa<0){
 		EPRINT("can't be!", true);
 	}
@@ -326,6 +331,8 @@ void sst_bis_free(sst_bf_in_stream *bis){
 		EPRINT("remain data", true);	
 	}
 	
+	lsmtree_gc_unavailable_unset(&LSM, NULL, bis->seg->seg_idx);
+
 	if(bis->seg->used_page_num==_PPS){
 		free(bis->seg);
 	}

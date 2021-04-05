@@ -1,7 +1,10 @@
 #include "sst_page_file_stream.h"
+#include "lsmtree.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+
+extern lsmtree LSM;
 
 sst_pf_out_stream* sst_pos_init_sst(sst_file *sst_set, inter_read_alreq_param **param, uint32_t set_num, 
 		bool(*check_done)(inter_read_alreq_param *, bool), bool (*file_done)(inter_read_alreq_param*)){
@@ -92,6 +95,7 @@ key_ptr_pair sst_pos_pick(sst_pf_out_stream *os){
 	if(sst_pos_is_empty(os)){
 		EPRINT("don't try pick at empty pos", true);
 	}*/
+
 	if(os->type==KP_PAIR_STREAM){
 	//	printf("kp_pair_stream(os->idx):%d\n", os->idx);
 		key_ptr_pair res=os->kp_data[os->idx];
@@ -202,7 +206,9 @@ void sst_pos_pop(sst_pf_out_stream *os){
 	if(os->idx*sizeof(key_ptr_pair) >=PAGESIZE){
 		os->now_file_empty=true;
 		if(os->type==SST_PAGE_FILE_STREAM || os->type==MAP_FILE_STREAM){
-			move_next_file(os);
+			if(!os->file_set_empty){
+				move_next_file(os);
+			}
 		}
 	}
 }

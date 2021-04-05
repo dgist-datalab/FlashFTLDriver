@@ -192,16 +192,14 @@ void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_l
 		mr_free_set now=*mr_iter;
 		if(last || now.mr_set[now.map_num].end_lba <= bound_lba){
 			for(uint32_t i=now.start_idx; i<=now.end_idx; i++){
-				lsmtree_gc_unavailable_unset(&LSM, &now.r->sst_set[i]);
+				lsmtree_gc_unavailable_unset(&LSM, &now.r->sst_set[i], UINT32_MAX);
 			}
-	//		LSM.gc_unavailable_seg[now.mr_set[now.map_num].ppa/_PPS]=false;
 			free(now.mr_set);
 			mr_list->erase(mr_iter++);
 		}
 		else{
 			break;
 		}
-		//mr_iter++;
 	}
 }
 
@@ -212,8 +210,12 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	version_get_merge_target(LSM.last_run_version, idx_set);
 	run *new_run=run_init(des->max_sst_num/des->max_run_num, UINT32_MAX, 0);
 
+	LSM.now_merging_run[0]=idx_set[0];
+	LSM.now_merging_run[1]=idx_set[1];
+
 	run *older=&des->array[idx_set[0]];
 	run	*newer=&des->array[idx_set[1]];
+
 	LSM.monitor.compaction_cnt[des->idx+1]++;
 
 	for(uint32_t i=0; i<2; i++){
@@ -263,8 +265,10 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 			max_target_piece_num+=bos->kv_wrapper_q->size()+L2PGAP;
 		}
 
-		if(page_manager_get_total_remain_page(LSM.pm, false) < max_target_piece_num){
-			__do_gc(LSM.pm, false, max_target_piece_num);
+		uint32_t needed_seg_num=(max_target_piece_num/L2PGAP+1)/_PPS+1+1; //1 for front fragment, 1 for behid fragment
+		if(page_manager_get_total_remain_page(LSM.pm, false) < needed_seg_num*_PPS){
+	//		__do_gc(LSM.pm, false, max_target_piece_num/L2PGAP+(max_target_piece_num%L2PGAP?1:0));
+			__do_gc(LSM.pm, false, needed_seg_num*_PPS);
 
 			/*find */
 			if(newer->sst_set[newer_sst_idx].trimed_sst_file){
@@ -283,7 +287,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		if(newer_mr){
 			mr_free_set temp_mr_free_set={newer_mr, newer, newer_sst_idx, newer_sst_idx_end, now_newer_map_num-1};
 			for(uint32_t i=newer_sst_idx; i<=newer_sst_idx_end; i++){
-				lsmtree_gc_unavailable_set(&LSM, &newer->sst_set[i]);
+				lsmtree_gc_unavailable_set(&LSM, &newer->sst_set[i], UINT32_MAX);
 			}
 			new_range_set->push_back(temp_mr_free_set);
 		}
@@ -291,7 +295,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		if(older_mr){
 			mr_free_set temp_mr_free_set={older_mr, older, older_sst_idx, older_sst_idx_end, now_older_map_num-1};
 			for(uint32_t i=older_sst_idx; i<=older_sst_idx_end; i++){
-				lsmtree_gc_unavailable_set(&LSM, &older->sst_set[i]);
+				lsmtree_gc_unavailable_set(&LSM, &older->sst_set[i], UINT32_MAX);
 			}
 			old_range_set->push_back(temp_mr_free_set);
 		}
@@ -302,7 +306,9 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		uint32_t older_prev=0, newer_prev=0;
 		read_arg1={0,}; read_arg2={0,};
 		while(read_done!=total_map_num){
-				//printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
+//			if(LSM.global_debug_flag){
+//				printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
+//			}
 			uint32_t shard=LOWQDEPTH/2;
 
 			if(newer_mr){
@@ -392,22 +398,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		/*check end*/
 		bulk_invalidation(newer, &newer_borderline, border_lba);
 		bulk_invalidation(older, &older_borderline, border_lba);
-/*
-		mr_free_set temp_mr_free_set;
-		if(newer_mr){
-			temp_mr_free_set.mr_set=newer_mr;
-			temp_mr_free_set.map_num=now_newer_map_num-1;
-			LSM.gc_unavailable_seg[newer_mr[now_newer_map_num-1].ppa/_PPS]=true;
-			new_range_set->push_back(temp_mr_free_set);
-		}
 
-		if(older_mr){
-			temp_mr_free_set.mr_set=older_mr;
-			temp_mr_free_set.map_num=now_older_map_num-1;
-			LSM.gc_unavailable_seg[older_mr[now_older_map_num-1].ppa/_PPS]=true;
-			old_range_set->push_back(temp_mr_free_set);
-		}
-*/
 		map_range_postprocessing(new_range_set, border_lba, last_round_check);
 		map_range_postprocessing(old_range_set, border_lba, last_round_check);
 
@@ -420,14 +411,9 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		//return NULL;
 	}
 
-	for(uint32_t i=0; i<_NOS; i++){
-		if(LSM.gc_unavailable_seg[i]){
-			EPRINT("why??\n", true);	
-		}
-	}
-
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
+		lsmtree_gc_unavailable_set(&LSM, last_file, UINT32_MAX);
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
@@ -460,16 +446,25 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
 	version_populate_run(LSM.last_run_version, target_ridx);
+
+	sst_file *temp_sptr;
+	uint32_t temp_sidx;
+	for_each_sst(new_run, temp_sptr, temp_sidx){
+		lsmtree_gc_unavailable_unset(&LSM, temp_sptr, UINT32_MAX);
+	}
 	run_free(new_run);
 //	level_print(res);
 //	level_contents_print(res, true);
-	lsmtree_gc_unavailable_sanity_check(&LSM);
+//	lsmtree_gc_unavailable_sanity_check(&LSM);
 	version_poped_update(LSM.last_run_version);
 	version_reinit_early_invalidation(LSM.last_run_version, 2, idx_set);
 
 	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], idx_set[0]);
 	delete new_range_set;
 	delete old_range_set;
+
+	LSM.now_merging_run[0]=UINT32_MAX;
+	LSM.now_merging_run[1]=UINT32_MAX;
 	return res;
 }
 

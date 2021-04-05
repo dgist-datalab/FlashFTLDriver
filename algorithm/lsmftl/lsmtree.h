@@ -14,6 +14,7 @@
 #include "version.h"
 #include "helper_algorithm/bf_set.h"
 #include "segment_level_manager.h"
+#include <deque>
 
 #define TARGETFPR 0.1f
 #define COMPACTION_REQ_MAX_NUM 1
@@ -24,6 +25,11 @@ typedef struct lsmtree_monitor{
 	uint32_t gc_mapping;
 	uint32_t *compaction_cnt;
 	uint32_t compaction_early_invalidation_cnt;
+
+	uint32_t merge_read_cnt;
+	uint32_t merge_write_cnt;
+	uint32_t tiering_read_cnt;
+	uint32_t tiering_write_cnt;
 }lsmtree_monitor;
 
 typedef struct lsmtree_parameter{
@@ -56,9 +62,11 @@ typedef struct lsmtree{
 	uint32_t wb_num;
 	page_manager *pm;
 	struct compaction_master *cm;
+	uint32_t now_merging_run[1+1];
 	//page_manager *pm_map;
 
-	std::queue<key_ptr_pair*>* moved_kp_set;
+	fdriver_lock_t moved_kp_lock;
+	std::deque<key_ptr_pair*>* moved_kp_set;
 
 	uint32_t now_wb;
 	write_buffer **wb_array;
@@ -95,8 +103,8 @@ void lsmtree_compaction_end_req(struct compaction_req*);
 void lsmtree_level_summary(lsmtree *lsm);
 void lsmtree_content_print(lsmtree *lsm);
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
-void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr);
-void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr);
+void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
+void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm);
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 

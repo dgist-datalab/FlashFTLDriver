@@ -72,6 +72,7 @@ typedef struct compaction_master{
 compaction_master *compaction_init(uint32_t compaction_queue_num);
 void compaction_free(compaction_master *cm);
 void compaction_issue_req(compaction_master *cm, compaction_req *);
+void compaction_wait(compaction_master *cm);
 level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
 level* compaction_leveling(compaction_master *cm, level *src, level *des);
 level* compaction_tiering(compaction_master *cm, level *src, level *des);

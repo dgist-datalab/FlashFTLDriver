@@ -31,6 +31,7 @@ void version_free(version *v);
 void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx);
 void version_reinit_early_invalidation(version *v, uint32_t ridx_num, uint32_t *ridx);
 uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num);
+uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, uint32_t original_version, uint32_t target_version);
 
 static inline uint32_t version_map_lba(version *v, uint32_t lba){
 	return v->key_version[lba];
@@ -42,8 +43,8 @@ static inline int version_compare(version *v, int32_t a, int32_t b){
 	if(b > v->max_valid_version_num){
 		EPRINT("not valid comparing", true);
 	}
-	int a_=a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a;
-	int b_=b-v->poped_version_num<0?b-v->poped_version_num+v->max_valid_version_num:b;
+	int a_=a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a-v->max_valid_version_num;
+	int b_=b-v->poped_version_num<0?b-v->poped_version_num+v->max_valid_version_num:b-v->max_valid_version_num;
 	return a_-b_;
 }
 static inline void version_poped_update(version *v){
@@ -70,4 +71,5 @@ static inline bool version_is_early_invalidate(version *v, uint32_t version){
 static inline void version_set_early_invalidation(version *v, uint32_t version){
 	v->version_early_invalidate[version]=true;
 }
+
 #endif

@@ -75,6 +75,7 @@ level *level_convert_run_to_lev(run *r, page_manager *pm);
 sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t ppa, uint32_t *version, uint32_t *sptr_idx);
 void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr);
 void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr);
+void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx);
 
 static inline bool level_check_overlap(level *a, level *b){
 	if(b->now_sst_num==0 || a->now_sst_num==0) return false;

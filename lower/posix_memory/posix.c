@@ -226,6 +226,10 @@ void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
 
+	if(_PPA==425967){
+		printf("425967 target write\n");
+	}
+
 	if(PPA>_NOP){
 		printf("address error!\n");
 		abort();
@@ -312,10 +316,14 @@ void *posix_trim_block(uint32_t _PPA, bool async){
 	my_posix.req_type_cnt[TRIM]++;
 	for(uint32_t i=PPA; i<PPA+my_posix.PPS; i++){
 		free(seg_table[i].storage);
-		/*
-		if(i==753631){
-			printf("%u trim!\n", i/2);
-		}*/
+		static int cnt=0;
+		if(i==425967){
+			cnt++;
+			if(cnt==3){
+				printf("debug\n");
+			}
+			printf("%u trim!\n", 425967);
+		}
 		seg_table[i].storage=NULL;
 	}
 	return NULL;

@@ -44,6 +44,7 @@ void run_append_sstfile_move_originality(run *_run, sst_file *sstfile);
 void run_deep_append_sstfile(run *_run, sst_file *sstfile);
 void run_free(run *_run);
 void run_print(run *r);
+void run_content_print(run *r, bool print_sst);
 static inline void run_destroy_content(run *_run, struct _page_manager *pm){
 	sst_file *sptr; uint32_t sidx;
 	for_each_sst(_run, sptr, sidx){
@@ -64,6 +65,19 @@ static inline void run_deep_copy(run *des, run *src){
 }
 
 static inline void run_shallow_copy_move_originality(run *des, run *src){
+
+	if(src->max_sst_file_num!=des->max_sst_file_num){
+		if(src->max_sst_file_num > des->max_sst_file_num){
+			sst_file *new_sst_set=(sst_file*)calloc(src->max_sst_file_num, sizeof(sst_file));
+			memcpy(new_sst_set, des->sst_set, des->now_sst_file_num);
+			free(des->sst_set);
+			des->sst_set=new_sst_set;
+			des->max_sst_file_num=src->max_sst_file_num;
+		}
+		else{
+			EPRINT("how can be?", true);
+		}
+	}
 	sst_file *des_file=des->sst_set;
 	*des=*src;
 	sst_file *each_src_file;

@@ -60,6 +60,8 @@ static inline bool sst_range_overlap(sst_file *a, sst_file *b){
 	return SEGNUM(a->file_addr.piece_ppa)==SEGNUM(b->file_addr.piece_ppa); 
 }
 
+void map_print(map_range *mr);
+
 #define for_each_kp(data_ptr, kp_ptr, kp_idx)\
 	for(kp_idx=0, kp_ptr=(key_ptr_pair*)&data_ptr[kp_idx*sizeof(key_ptr_pair)];\
 			(kp_idx*sizeof(key_ptr_pair) < PAGESIZE && kp_ptr->lba!=UINT32_MAX);\

@@ -43,7 +43,7 @@ static map_range *get_run_maprange(run *r, uint32_t *total_num){
 		map_total_num+=sptr->map_num;
 	}
 
-	map_range *res=(map_range*)malloc(sizeof(map_range)*map_total_num);
+	map_range *res=(map_range*)calloc(map_total_num, sizeof(map_range));
 	uint32_t now_midx=0;
 	for_each_sst(r, sptr, sidx){
 		for_each_map_range(sptr, mptr, midx){
@@ -71,6 +71,7 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 	LSM.monitor.compaction_early_invalidation_cnt++;
 
 	printf("early_invalidation:%u target_ridx:%u\n", LSM.monitor.compaction_early_invalidation_cnt, target_ridx);
+
 	read_issue_arg read_arg;
 	read_arg_container thread_arg;
 	thread_arg.end_req=comp_alreq_end_req;
@@ -88,7 +89,6 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 
 	uint32_t compaction_tag_num=compaction_read_param_remain_num(_cm);
 	uint32_t round=(total_num/compaction_tag_num)+(total_num%compaction_tag_num?1:0);
-
 
 	for(uint32_t i=0; i<round; i++){
 		read_arg.from=start_idx+i*compaction_tag_num;
@@ -117,5 +117,6 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 	free(thread_arg.arg_set);
 	free(target_mr_set);
 	version_set_early_invalidation(LSM.last_run_version, target_ridx);
+	printf("early compaction done!\n");
 	return total_invalidation_cnt;
 }

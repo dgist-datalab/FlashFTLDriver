@@ -75,8 +75,8 @@ again:
 			key_ptr_pair *kp_set;
 
 			if(req->wb){
-				if(page_manager_get_total_remain_page(LSM.pm, false) < KP_IN_PAGE){
-					__do_gc(LSM.pm, false, KP_IN_PAGE);
+				if(page_manager_get_total_remain_page(LSM.pm, false) < (KP_IN_PAGE/L2PGAP)){
+					__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
 				}
 
 				rwlock_write_lock(&LSM.flushed_kp_set_lock);
@@ -91,13 +91,21 @@ again:
 			}
 			else{
 				kp_set=req->target;
+				if(kp_find_piece_ppa(807091, (char*)kp_set)!=UINT32_MAX){
+					EPRINT("break\n", false);
+				}
+				if(kp_find_piece_ppa(464699, (char*)kp_set)!=UINT32_MAX){
+					EPRINT("break\n", false);
+				}
 			}
 
 			req->target=kp_set;
 
-			uint32_t last_piece_ppa=kp_set[kp_end_idx((char*)kp_set)].piece_ppa;
-			uint32_t first_piece_ppa=kp_set[0].piece_ppa;
+		//	uint32_t last_piece_ppa=kp_set[kp_end_idx((char*)kp_set)].piece_ppa;
+		//	uint32_t first_piece_ppa=kp_set[0].piece_ppa;
+
 			src=compaction_first_leveling(cm, kp_set, LSM.disk[0]);
+			/*
 			//printf("compaction done\n");
 			if(SEGNUM(first_piece_ppa)==SEGNUM(last_piece_ppa)){
 				slm_coupling_level_seg(0, SEGNUM(first_piece_ppa), SEGPIECEOFFSET(last_piece_ppa), req->gc_data);
@@ -105,7 +113,37 @@ again:
 			else{
 				slm_coupling_level_seg(0, SEGNUM(first_piece_ppa), _PPS*L2PGAP-1, req->gc_data);
 				slm_coupling_level_seg(0, SEGNUM(last_piece_ppa), SEGPIECEOFFSET(last_piece_ppa), req->gc_data);
+			}*/
+			uint32_t end_idx=kp_end_idx((char*)kp_set);
+			uint32_t prev_seg=UINT32_MAX;
+			uint32_t prev_piece_ppa;
+
+			if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[end_idx].piece_ppa)){
+				slm_coupling_level_seg(0, SEGNUM(kp_set[end_idx].piece_ppa), SEGPIECEOFFSET(kp_set[end_idx].piece_ppa), req->gc_data);
 			}
+			else{
+				for(uint32_t i=0; i<=end_idx; i++){
+					if(prev_seg==UINT32_MAX){
+						prev_seg=SEGNUM(kp_set[i].piece_ppa);
+						prev_piece_ppa=kp_set[i].piece_ppa;
+						continue;
+					}
+					uint32_t now_seg=SEGNUM(kp_set[i].piece_ppa);
+					if(now_seg==prev_seg){
+						prev_piece_ppa=kp_set[i].piece_ppa;
+					}
+					else{
+						slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), req->gc_data);
+						prev_seg=now_seg;
+						prev_piece_ppa=kp_set[i].piece_ppa;
+					}
+				}
+
+				if(!slm_invalidate_enable(0, kp_set[end_idx].piece_ppa)){
+					slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), req->gc_data);	
+				}
+			}
+
 		}
 		else if(req->end_level==LSM.param.LEVELN-1){
 			src=compaction_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
@@ -163,4 +201,7 @@ inter_read_alreq_param *compaction_get_read_param(compaction_master *cm){
 void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *target){
 	cm->read_param_queue->push(target);
 	return;
+}
+void compaction_wait(compaction_master *cm){
+	while(cm->tm->tagQ->size()!=COMPACTION_REQ_MAX_NUM){}
 }

@@ -111,3 +111,15 @@ void run_print(run *rptr){
 	printf("lba:%u~%u sst_file num:%u/%u\n",rptr->start_lba, rptr->end_lba,
 			rptr->now_sst_file_num, rptr->max_sst_file_num);
 }
+
+void run_content_print(run *r, bool print_sst){
+	sst_file *sptr;
+	uint32_t sidx;
+	run_print(r);
+	if(print_sst){
+		for_each_sst(r, sptr, sidx){
+			printf("\t\t[%u] ",sidx);
+			sst_print(sptr);
+		}
+	}
+}

@@ -106,6 +106,7 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 	char *oob=NULL;
 	key_ptr_pair *res=(key_ptr_pair*)malloc(sizeof(key_ptr_pair)*wb->data->size());
 	fdriver_lock(&LSM.flush_lock);
+
 	for(uint32_t i=0; it!=wb->data->end(); i++, it++){
 		uint8_t inter_idx=i%L2PGAP;
 		if(inter_idx==0){
@@ -271,6 +272,9 @@ retry:
 		res[i].lba=it->first;
 		if(debug_lba==res[i].lba){
 			static int cnt=0;
+			if(cnt==11){
+				LSM.global_debug_flag=true;
+			}
 			printf("[%u] gc %u -> %u\n", cnt++, res[i].lba, res[i].piece_ppa);
 		}
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
@@ -281,7 +285,12 @@ retry:
 		if(inter_idx==(L2PGAP-1)){//issue data
 			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync, true), false);
 			if(force_stop && (ppa+prev_map+1)%_PPS==_PPS-1){
-				*force_stop=true;
+				*force_stop=true; 
+			}
+			if(force_stop && i==KP_IN_PAGE-1){
+				if((ppa+prev_map+1+1)%_PPS==_PPS-1){//need two page, bound case
+					*force_stop=true;	
+				}
 			}
 			ppa=-1;
 			oob=NULL;

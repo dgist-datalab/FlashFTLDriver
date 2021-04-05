@@ -154,3 +154,7 @@ void sst_print(sst_file *sptr){
 				sptr->end_ppa*L2PGAP, sptr->map_num);
 	}
 }
+
+void map_print(map_range *mr){
+	printf("range:%u~%u ppa:%u\n", mr->start_lba, mr->end_lba, mr->ppa);
+}
