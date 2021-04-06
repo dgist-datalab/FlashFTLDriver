@@ -2,6 +2,10 @@
 #include "../../interface/interface.h"
 #include "demand_mapping.h"
 
+enum{
+	DATASEG, MAPSEG
+};
+
 typedef struct align_gc_buffer{
 	uint8_t idx;
 	char value[PAGESIZE];
@@ -20,6 +24,8 @@ typedef struct pm_body{
 
 	__segment *map_active;
 	__segment *map_reserve;
+
+	uint8_t seg_type_checker[_NOS];
 }pm_body;
 
 

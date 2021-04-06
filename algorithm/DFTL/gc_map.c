@@ -1,5 +1,6 @@
 #include "gc.h"
 #include "demand_mapping.h"
+#include <queue>
 extern struct algorithm demand_ftl;
 extern uint32_t test_ppa;
 void invalidate_map_ppa(uint32_t piece_ppa){
@@ -18,7 +19,7 @@ void validate_map_ppa(uint32_t piece_ppa, KEYT gtd_idx){
 ppa_t get_map_ppa(KEYT gtd_idx){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
-	if(demand_ftl.bm->check_full(demand_ftl.bm, p->map_active,MASTER_PAGE) && demand_ftl.bm->pt_isgc_needed(demand_ftl.bm, MAP_S)){
+	if(demand_ftl.bm->check_full(demand_ftl.bm, p->map_active,MASTER_PAGE) && demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 		do_map_gc();//call gc
 	}
 
@@ -26,7 +27,8 @@ retry:
 	res=demand_ftl.bm->get_page_num(demand_ftl.bm, p->map_active);
 	if(res==UINT32_MAX){
 		demand_ftl.bm->free_segment(demand_ftl.bm, p->map_active);
-		p->map_active=demand_ftl.bm->pt_get_segment(demand_ftl.bm,MAP_S, false); //get a new block
+		p->map_active=demand_ftl.bm->get_segment(demand_ftl.bm, false); //get a new block
+		p->seg_type_checker[p->map_active->seg_idx]=MAPSEG;
 		goto retry;
 	}
 
@@ -49,10 +51,17 @@ extern demand_map_manager dmm;
 void do_map_gc(){
 	//static int cnt=0;
 	//printf("map gc:%u\n", ++cnt);
-	__gsegment *target=demand_ftl.bm->pt_get_gc_target(demand_ftl.bm, MAP_S);
+	pm_body *p=(pm_body*)demand_ftl.algo_body;
+	__gsegment *target=NULL;
+	std::queue<uint32_t> temp_queue;
+	while(!target || 
+			p->seg_type_checker[target->seg_idx]!=MAPSEG){
+		if(target){
+			temp_queue.push(target->seg_idx);
+		}
+	} 
 
 	blockmanager *bm=demand_ftl.bm;
-	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	list *temp_list=NULL;	
 	gc_value *gv;
 	uint32_t page;
@@ -94,12 +103,18 @@ void do_map_gc(){
 	}
 
 finish:
-	bm->pt_trim_segment(bm,MAP_S,target,demand_ftl.li); //erase a block
-	bm->free_segment(bm, p->map_active);
-
+	bm->trim_segment(bm,target,demand_ftl.li); //erase a block
 	p->map_active=p->map_reserve;//make reserved to active block
-	p->map_reserve=bm->change_pt_reserve(bm, MAP_S, p->map_reserve); //get new reserve block from block_manager
+	p->map_reserve=bm->change_reserve(bm, p->map_reserve); //get new reserve block from block_manager
+	p->seg_type_checker[p->map_reserve->seg_idx]=MAPSEG;
 	if(temp_list){
 		list_free(temp_list);
+	}
+
+	uint32_t seg_idx;
+	while(temp_queue.size()){
+		seg_idx=temp_queue.front();
+		bm->reinsert_segment(bm, seg_idx);
+		temp_queue.pop();
 	}
 }

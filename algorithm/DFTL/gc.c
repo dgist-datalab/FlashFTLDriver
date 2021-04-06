@@ -4,6 +4,7 @@
 #include "demand_mapping.h"
 #include <stdlib.h>
 #include <stdint.h>
+#include <queue>
 
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
@@ -12,11 +13,15 @@ uint32_t test_ppa=655468;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
-	res->active=bm->pt_get_segment(bm, DATA_S, false);
-	res->reserve=bm->pt_get_segment(bm, DATA_S, true);
+	res->active=bm->get_segment(bm, false);
+	res->reserve=bm->get_segment(bm, true);
+	res->seg_type_checker[res->active->seg_idx]=DATASEG;
+	res->seg_type_checker[res->reserve->seg_idx]=DATASEG;
 
-	res->map_active=bm->pt_get_segment(bm, MAP_S, false);
-	res->map_reserve=bm->pt_get_segment(bm, MAP_S, true);
+	res->map_active=bm->get_segment(bm, false);
+	res->map_reserve=bm->get_segment(bm, true);
+	res->seg_type_checker[res->map_active->seg_idx]=MAPSEG;
+	res->seg_type_checker[res->map_reserve->seg_idx]=MAPSEG;
 	return res;
 }
 void invalidate_ppa(uint32_t t_ppa){
@@ -81,15 +86,24 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
-	__gsegment *target=demand_ftl.bm->pt_get_gc_target(demand_ftl.bm, DATA_S);
+	pm_body *p=(pm_body*)demand_ftl.algo_body;
+	__gsegment *target=NULL;
+	std::queue<uint32_t> temp_queue;
+	while(!target || 
+			p->seg_type_checker[target->seg_idx]!=DATASEG){
+		if(target){
+			temp_queue.push(target->seg_idx);
+		}
+	} 
+	demand_ftl.bm->get_gc_target(demand_ftl.bm);
 //	printf("gc range : %u~%u\n", target->blocks[0]->block_num * _PPB, (target->blocks[63]->block_num+1) * _PPB-1);
+
 	uint32_t page;
 	uint32_t bidx, pidx;
 	blockmanager *bm=demand_ftl.bm;
-	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	uint32_t update_target_idx=0;
 	uint32_t debuging_cnt=0;
-	list *temp_list;
+	list *temp_list=NULL;
 	if(target->invalidate_number==_PPS*L2PGAP){
 		goto finish;
 	}
@@ -172,15 +186,23 @@ void do_gc(){
 	demand_map_some_update(update_target, update_target_idx);
 
 finish:
-	bm->pt_trim_segment(bm,DATA_S,target,demand_ftl.li); //erase a block
-	bm->free_segment(bm, p->active);
+	bm->trim_segment(bm,target,demand_ftl.li); //erase a block
 
 	free(update_target);
 
 	p->active=p->reserve;//make reserved to active block
-	p->reserve=bm->change_pt_reserve(bm,DATA_S, p->reserve); //get new reserve block from block_manager
+	p->reserve=bm->change_reserve(bm, p->reserve); //get new reserve block from block_manager
+	p->seg_type_checker[p->reserve->seg_idx]=DATASEG;
+	if(temp_list){
+		list_free(temp_list);
+	}
 
-	list_free(temp_list);
+	uint32_t seg_idx;
+	while(temp_queue.size()){
+		seg_idx=temp_queue.front();
+		bm->reinsert_segment(bm, seg_idx);
+		temp_queue.pop();
+	}
 }
 
 
@@ -188,7 +210,7 @@ ppa_t get_ppa(KEYT *lbas){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
-	if(demand_ftl.bm->check_full(demand_ftl.bm, p->active,MASTER_PAGE) && demand_ftl.bm->pt_isgc_needed(demand_ftl.bm, DATA_S)){
+	if(demand_ftl.bm->check_full(demand_ftl.bm, p->active,MASTER_PAGE) && demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 		do_gc();//call gc
 	}
 
@@ -198,7 +220,8 @@ retry:
 
 	if(res==UINT32_MAX){
 		demand_ftl.bm->free_segment(demand_ftl.bm, p->active);
-		p->active=demand_ftl.bm->pt_get_segment(demand_ftl.bm,DATA_S, false); //get a new block
+		p->active=demand_ftl.bm->get_segment(demand_ftl.bm, false); //get a new block
+		p->seg_type_checker[p->active->seg_idx]=DATASEG;
 		goto retry;
 	}
 
