@@ -668,14 +668,12 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 			sptr->start_lba=kp_set[0][0].lba;
 			sptr->end_lba=mr_set[kp_set_idx-1].end_lba;
 			sptr->_read_helper=gsn->wb->rh;
-			rwlock_write_lock(&LSM.level_rwlock[LSM.param.LEVELN-1]);
 			if(round==0){
 				level_sptr_update_in_gc(LSM.disk[LSM.param.LEVELN-1], ridx, sidx, sptr);
 			}
 			else{
 				level_sptr_add_at_in_gc(LSM.disk[LSM.param.LEVELN-1], ridx, sidx+round, sptr);
 			}
-			rwlock_write_unlock(&LSM.level_rwlock[LSM.param.LEVELN-1]);
 
 			for(uint32_t i=0; i<kp_set_idx; i++){
 				free(kp_set[i]);
@@ -705,10 +703,6 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	else if(victim->invalidate_number>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
-/*
-//	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx && LSM.global_debug_flag){
-//		printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
-	}*/
 
 	std::queue<gc_read_node*> *gc_target_queue=new std::queue<gc_read_node*>();
 	uint32_t bidx;

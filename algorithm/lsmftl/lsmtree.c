@@ -252,12 +252,7 @@ static inline algo_req *get_read_alreq(request *const req, uint8_t type,
 
 static bool lsmtree_select_target_place(lsmtree_read_param *r_param, level **lptr, 
 		run **rptr, sst_file **sptr, uint32_t lba){
-	rwlock *target;
 retry:
-	if(r_param->target_level_rw_lock){
-		rwlock_read_unlock(r_param->target_level_rw_lock);
-	}
-
 	//r_param->prev_level++;
 	if(r_param->prev_level==-1){
 		r_param->prev_level=version_to_level_idx(LSM.last_run_version, 
@@ -271,7 +266,7 @@ retry:
 	if(r_param->prev_level==LSM.param.LEVELN-1){
 		if(LSM.param.version_enable){
 			if(r_param->prev_run==UINT32_MAX){
-				r_param->prev_run=version_map_lba(LSM.last_run_version, lba);
+				r_param->prev_run=r_param->version;
 			}
 			else{
 				return false;
@@ -289,14 +284,10 @@ retry:
 			}
 		}
 
-		target=&LSM.level_rwlock[r_param->prev_level];
-		rwlock_read_lock(target);
 		*lptr=LSM.disk[r_param->prev_level];
 		*rptr=&(*lptr)->array[r_param->prev_run];
 	}
 	else{
-		target=&LSM.level_rwlock[r_param->prev_level];
-		rwlock_read_lock(target);
 		*lptr=LSM.disk[r_param->prev_level];
 		*rptr=&(*lptr)->array[0];
 	}
@@ -317,9 +308,49 @@ retry:
 	}
 
 	r_param->prev_sf=*sptr;
-	r_param->target_level_rw_lock=target;
 	r_param->read_helper_idx=read_helper_idx_init((*sptr)->_read_helper, lba);
 	return true;
+}
+
+
+void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param){
+	rwlock *res;
+	uint32_t version;
+	uint32_t queried_level;
+	for(int i=-1; i<(int)LSM.param.LEVELN; i++){
+		if(i==-1 || i==0){
+			res=&LSM.level_rwlock[0];	
+		}
+		else{
+		//	rwlock_read_lock(LSM.level_rwlock[i-1]);
+			res=&LSM.level_rwlock[i];
+		}
+		rwlock_read_lock(res);
+		version=version_map_lba(LSM.last_run_version, lba);
+		queried_level=version_to_level_idx(LSM.last_run_version, version, LSM.param.LEVELN);
+		if((i==-1 && queried_level==31) || (i==queried_level)){
+			param->prev_level=queried_level;
+			param->version=version;
+			param->target_level_rw_lock=res;
+		}
+		else{
+			rwlock_read_unlock(res);
+		}
+	}
+}
+
+static void not_found_process(request *const req){
+	lsmtree_read_param * r_param=(lsmtree_read_param*)req->param;
+	rwlock_read_unlock(r_param->target_level_rw_lock);
+	printf("req->key: %u-", req->key);
+	EPRINT("not found key", false);
+	printf("prev_level:%u prev_run:%u read_helper_idx:%u version:%u\n", 
+			r_param->prev_level, r_param->prev_run, r_param->read_helper_idx, version_map_lba(LSM.last_run_version,req->key));
+
+	LSM_find_lba(&LSM, req->key);
+	abort();
+	req->type=FS_NOTFOUND_T;
+	req->end_req(req);
 }
 
 uint32_t lsmtree_read(request *const req){
@@ -328,14 +359,25 @@ uint32_t lsmtree_read(request *const req){
 		printf("req->key:%u\n", req->key);
 	}
 	if(!req->param){
+		r_param=(lsmtree_read_param*)calloc(1, sizeof(lsmtree_read_param));
+		req->param=(void*)r_param;
+		r_param->prev_level=-1;
+		r_param->prev_run=UINT32_MAX;
+		r_param->target_level_rw_lock=NULL;
+
 		/*find data from write_buffer*/
-		uint32_t target_version=version_map_lba(LSM.last_run_version, req->key);
+		lsmtree_find_version_with_lock(req->key, r_param);
+		uint32_t target_version=r_param->version;
+
 		if(target_version==TOTALRUNIDX){
 			char *target;
 			for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 				if((target=write_buffer_get(LSM.wb_array[i], req->key))){
 					//	printf("find in write_buffer");
 					memcpy(req->value->value, target, LPAGESIZE);
+
+					rwlock_read_unlock(r_param->target_level_rw_lock);
+					free(r_param);
 					req->end_req(req);
 					return 1;
 				}
@@ -345,6 +387,9 @@ uint32_t lsmtree_read(request *const req){
 			if(LSM.flush_wait_wb && (target=write_buffer_get(LSM.flush_wait_wb, req->key))){
 				//	printf("find in write_buffer");
 				memcpy(req->value->value, target, LPAGESIZE);
+				rwlock_read_unlock(r_param->target_level_rw_lock);
+				free(r_param);
+
 				req->end_req(req);
 				rwlock_read_unlock(&LSM.flush_wait_wb_lock);
 				return 1;
@@ -352,21 +397,10 @@ uint32_t lsmtree_read(request *const req){
 			rwlock_read_unlock(&LSM.flush_wait_wb_lock);
 		}
 
-		r_param=(lsmtree_read_param*)calloc(1, sizeof(lsmtree_read_param));
-		req->param=(void*)r_param;
-		r_param->prev_level=-1;
-		r_param->prev_run=UINT32_MAX;
-		r_param->target_level_rw_lock=NULL;
-
-
 		if(target_version==TOTALRUNIDX){
 			uint32_t target_piece_ppa=UINT32_MAX;
 			uint32_t i;
 			rwlock_read_lock(&LSM.flushed_kp_set_lock);
-			target_version=version_map_lba(LSM.last_run_version, req->key);		
-			if(target_version!=TOTALRUNIDX){ //check twice
-				goto next;		
-			}
 			for(i=0; i<COMPACTION_REQ_MAX_NUM; i++){
 				if(LSM.flushed_kp_set[i]){
 					if((target_piece_ppa=kp_find_piece_ppa(req->key, (char*)LSM.flushed_kp_set[i]))!=UINT32_MAX){
@@ -387,9 +421,12 @@ uint32_t lsmtree_read(request *const req){
 			}
 
 			if(target_piece_ppa==UINT32_MAX){
-				rwlock_read_unlock(&LSM.flushed_kp_set_lock);	
+				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+				not_found_process(req);
+				return 0;
 			}
 			else{
+				rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
 				r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
 				io_manager_issue_read(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
@@ -400,7 +437,7 @@ uint32_t lsmtree_read(request *const req){
 	else{
 		r_param=(lsmtree_read_param*)req->param;
 	}
-next:
+
 	algo_req *al_req;
 	level *target=NULL;
 	run *rptr=NULL;
@@ -460,6 +497,9 @@ read_helper_check_again:
 			io_manager_issue_read(PIECETOPPA(read_target_ppa), req->value, al_req, false);
 			goto normal_end;
 		}else{
+			if(r_param->read_helper_idx==UINT32_MAX){
+				goto notfound;
+			}
 			if(lsmtree_select_target_place(r_param, &target, &rptr, &sptr, req->key)==false){
 				goto notfound;
 			}
@@ -480,15 +520,7 @@ read_helper_check_again:
 	}
 
 notfound:
-	printf("req->key: %u-", req->key);
-	EPRINT("not found key", false);
-	printf("prev_level:%u prev_run:%u read_helper_idx:%u version:%u\n", 
-			r_param->prev_level, r_param->prev_run, r_param->read_helper_idx, LSM.last_run_version->key_version[req->key]);
-
-	LSM_find_lba(&LSM, req->key);
-	abort();
-	req->type=FS_NOTFOUND_T;
-	req->end_req(req);
+	not_found_process(req);
 	return 0;
 
 normal_end:

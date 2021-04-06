@@ -24,6 +24,7 @@ version *version_init(uint8_t max_valid_version_num, uint32_t LBA_num){
 	res->ridx_populate_queue=new std::queue<uint32_t>();
 	res->memory_usage_bit=ceil(log2(max_valid_version_num))*LBA_num;
 	res->poped_version_num=0;
+	fdriver_mutex_init(&res->version_lock);
 	return res;
 }
 
@@ -79,10 +80,12 @@ void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx){
 		}
 		printf("[version_map] lba:%u->%u\n",lba, ridx);
 	}
+	fdriver_lock(&v->version_lock);
 	if(v->key_version[lba]!=UINT8_MAX){
 		v->version_invalidation_cnt[v->key_version[lba]]++;
 	}
 	v->key_version[lba]=ridx;
+	fdriver_unlock(&v->version_lock);
 }
 
 
@@ -139,7 +142,7 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, 
 		uint32_t original_version, uint32_t target_version){
 	for(uint32_t i=start_lba; i<=end_lba; i++){
-		if(version_map_lba(v, i) ==original_version){
+		if(version_map_lba(v, i)==original_version){
 			if(i==debug_lba){
 				EPRINT("target lba's version is updated",false);
 			}

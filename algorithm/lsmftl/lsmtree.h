@@ -54,6 +54,7 @@ typedef struct lsmtree_read_param{
 	int32_t prev_level;
 	int32_t prev_run;
 	sst_file *prev_sf;
+	uint32_t version;
 	bool use_read_helper;
 	uint32_t read_helper_idx;
 	rwlock *target_level_rw_lock;
@@ -103,6 +104,7 @@ uint32_t lsmtree_remove(request *const req);
 void lsmtree_compaction_end_req(struct compaction_req*);
 void lsmtree_level_summary(lsmtree *lsm);
 void lsmtree_content_print(lsmtree *lsm);
+void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param);
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
 void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);

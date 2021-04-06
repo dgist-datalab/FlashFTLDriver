@@ -17,6 +17,7 @@ sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(inter_read_alreq_param *, b
 static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_wrapper **kv_wrap_buf, 
 		uint8_t num, compaction_master *cm){
 	key_value_wrapper *res;
+	inter_read_alreq_param *_param;
 	char *value;
 	for(uint32_t i=0; i<num; i++){
 		if(i==0){
@@ -27,12 +28,18 @@ static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_w
 			else{
 				res->param=(inter_read_alreq_param*)calloc(1, sizeof(inter_read_alreq_param));
 			}
+			_param=res->param;
 	//		printf("after size:%u\n", cm->read_param_queue->size());
 			res->param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 			fdriver_lock_init(&res->param->done_lock, 0);
 			value=res->param->data->value;
 		}
 		kv_wrap_buf[i]->kv_ptr.data=&value[LPAGESIZE*(kv_wrap_buf[i]->piece_ppa%L2PGAP)];
+		if(i==num-1){
+			kv_wrap_buf[i]->free_target_req=true;
+			kv_wrap_buf[i]->no_inter_param_alloc=bos->no_inter_param_alloc;
+			kv_wrap_buf[i]->param=_param;
+		}
 	}
 	return res;
 }
@@ -88,12 +95,8 @@ key_value_wrapper *sst_bos_get_pending(sst_bf_out_stream *bos,
 
 key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool should_buffer_check){
 	key_value_wrapper *target=bos->kv_wrapper_q->front();
-	if(!bos->now_kv_wrap){
-	//	bos->now_kv_wrap=(key_value_wrapper*)malloc(sizeof(key_value_wrapper));
-		bos->now_kv_wrap=target;
-	}
 
-	if(target->param){
+	if(target->param  && target->check_req){
 		bos->kv_read_check_done(target->param, false);
 	}
 	else{
@@ -113,6 +116,7 @@ key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool should_buffer_chec
 }
 
 void sst_bos_pop(sst_bf_out_stream *bos, compaction_master *cm){
+	/*
 	key_value_wrapper *target=bos->kv_wrapper_q->front();
 	if(PIECETOPPA(bos->now_kv_wrap->piece_ppa)!=PIECETOPPA(target->piece_ppa)){
 		inf_free_valueset(bos->now_kv_wrap->param->data, FS_MALLOC_R);
@@ -133,16 +137,8 @@ void sst_bos_pop(sst_bf_out_stream *bos, compaction_master *cm){
 			free(target);
 		}
 	}
+	*/
 	bos->kv_wrapper_q->pop();
-}
-
-void sst_bos_pop_pending(sst_bf_out_stream *bos, struct compaction_master *cm){
-	key_value_wrapper *target=bos->kv_wrapper_q->front();
-	if(PIECETOPPA(bos->now_kv_wrap->piece_ppa)!=PIECETOPPA(target->piece_ppa)){
-		inf_free_valueset(bos->now_kv_wrap->param->data, FS_MALLOC_R);
-		compaction_free_read_param(cm, bos->now_kv_wrap->param);
-		bos->now_kv_wrap=NULL;
-	}
 }
 
 bool sst_bos_is_empty(sst_bf_out_stream *bos){
@@ -153,6 +149,7 @@ void sst_bos_free(sst_bf_out_stream *bos, compaction_master *cm){
 	if(bos->kv_buf_idx){
 		EPRINT("free after processing pending req", true);
 	}
+	/*
 	if(bos->now_kv_wrap){
 		inf_free_valueset(bos->now_kv_wrap->param->data, FS_MALLOC_R);
 		if(!bos->no_inter_param_alloc){
@@ -162,7 +159,7 @@ void sst_bos_free(sst_bf_out_stream *bos, compaction_master *cm){
 			free(bos->now_kv_wrap->param);
 		}
 	}
-	free(bos->now_kv_wrap);
+	free(bos->now_kv_wrap);*/
 	delete bos->kv_wrapper_q;
 	free(bos);
 }
@@ -196,7 +193,7 @@ sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read
 	res->piece_ppa_length=(_PPS-seg->used_page_num)*L2PGAP;
 	res->map_data=new std::queue<value_set*>();
 	res->pm=pm;
-	res->buffer=(key_value_wrapper*)malloc(L2PGAP*sizeof(key_value_wrapper));
+	res->buffer=(key_value_wrapper**)malloc(L2PGAP*sizeof(key_value_wrapper*));
 	res->seg=seg;
 
 	lsmtree_gc_unavailable_set(&LSM, NULL, seg->seg_idx);
@@ -214,7 +211,7 @@ bool sst_bis_insert(sst_bf_in_stream *bis, key_value_wrapper *kv_wrapper){
 	if(bis->buffer_idx==L2PGAP){
 		EPRINT("plz check buffer_idx", true);
 	}
-	bis->buffer[bis->buffer_idx++]=*kv_wrapper;
+	bis->buffer[bis->buffer_idx++]=kv_wrapper;
 
 	if(bis->start_lba>kv_wrapper->kv_ptr.lba){
 		bis->start_lba=kv_wrapper->kv_ptr.lba;
@@ -280,7 +277,7 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 		}
 
 		key_ptr_pair *map_pair=&((key_ptr_pair*)(bis->now_map_data->value))[bis->now_map_data_idx++];
-		map_pair->lba=bis->buffer[i].kv_ptr.lba;
+		map_pair->lba=bis->buffer[i]->kv_ptr.lba;
 		map_pair->piece_ppa=ppa*L2PGAP+(i%L2PGAP);
 
 		debug_kp[i].lba=map_pair->lba;
@@ -290,14 +287,23 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 			printf("tiering lba:%u map to %u\n", debug_lba, map_pair->piece_ppa);
 		}*/
 		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, true);
-		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i].kv_ptr.data, LPAGESIZE);
+		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i]->kv_ptr.data, LPAGESIZE);
 
 		if(bis->make_read_helper){
 			read_helper_stream_insert(bis->rh, map_pair->lba, map_pair->piece_ppa);
 		}
 
 		bis->write_issued_kv_num++;
-		//free(bis->buffer[i]);
+		if(bis->buffer[i]->free_target_req){
+			inf_free_valueset(bis->buffer[i]->param->data, FS_MALLOC_R);
+			if(!bis->buffer[i]->no_inter_param_alloc){
+				compaction_free_read_param(LSM.cm, bis->buffer[i]->param);
+			}
+			else{
+				free(bis->buffer[i]->param);
+			}
+		}
+		free(bis->buffer[i]);
 	}
 
 	(*debug_idx)=bis->buffer_idx;

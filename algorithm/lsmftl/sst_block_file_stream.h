@@ -19,10 +19,10 @@ typedef struct sst_bf_out_stream{
 	uint8_t kv_buf_idx;
 	uint8_t version_idx;
 	struct key_value_wrapper *kv_wrap_buffer[L2PGAP];
+	bool no_inter_param_alloc;
 	
 	/*for pop*/
-	struct key_value_wrapper* now_kv_wrap;
-	bool no_inter_param_alloc;
+//	struct key_value_wrapper* now_kv_wrap;
 
 #ifdef DEBUG
 	bool isstart;
@@ -48,7 +48,7 @@ typedef struct sst_bf_in_stream{
 	read_helper_param rhp;
 
 	uint8_t buffer_idx;
-	key_value_wrapper *buffer;//assigned L2PGAP * key_value_wrapper;
+	key_value_wrapper **buffer;//assigned L2PGAP * key_value_wrapper;
 
 	page_manager *pm;
 	__segment *seg;
@@ -61,7 +61,6 @@ struct key_value_wrapper *sst_bos_get_pending(sst_bf_out_stream *bos, struct com
 key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool);
 bool sst_bos_is_empty(sst_bf_out_stream *bos);
 void sst_bos_pop(sst_bf_out_stream *bos, struct compaction_master *);
-void sst_bos_pop_pending(sst_bf_out_stream *bos, struct compaction_master *);
 void sst_bos_free(sst_bf_out_stream *bos, struct compaction_master *);
 
 static inline uint32_t sst_bos_kv_q_size(sst_bf_out_stream *bos){

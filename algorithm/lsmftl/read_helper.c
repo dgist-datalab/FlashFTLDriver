@@ -115,6 +115,7 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 			*piece_ppa_result=bf_set_get_piece_ppa((bf_set*)rh->body, 
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
+				(*idx)=UINT32_MAX;
 				return false;
 			}
 			else{
@@ -125,6 +126,7 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 			*piece_ppa_result=bf_set_get_piece_ppa((bf_set*)rh->body, 
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
+				(*idx)=UINT32_MAX;
 				return false;
 			}
 			else{
@@ -139,6 +141,7 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 			*piece_ppa_result=gbf_set_get_piece_ppa((guard_bf_set*)rh->body,
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
+				(*idx)=UINT32_MAX;
 				return false;
 			}
 			else{
@@ -152,6 +155,7 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 			*piece_ppa_result=gbf_set_get_piece_ppa((guard_bf_set*)rh->body,
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
+				(*idx)=UINT32_MAX;
 				return false;
 			}
 			else{

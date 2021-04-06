@@ -5,6 +5,7 @@
 #include <queue>
 #include "compaction.h"
 #include "../../include/settings.h"
+#include "../../include/sem_lock.h"
 #include "lsmtree.h"
 #define TOTALRUNIDX 31
 #define MERGED_RUN_NUM 2
@@ -17,6 +18,7 @@ typedef struct version{
 	int8_t max_valid_version_num;
 	uint32_t *version_invalidation_cnt;
 	bool *version_early_invalidate;
+	fdriver_lock_t version_lock;
 	std::queue<uint32_t> *ridx_empty_queue;
 	std::queue<uint32_t> *ridx_populate_queue;
 	uint32_t memory_usage_bit;
@@ -36,7 +38,11 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, uint32_t original_version, uint32_t target_version);
 
 static inline uint32_t version_map_lba(version *v, uint32_t lba){
-	return v->key_version[lba];
+	uint32_t res;
+	fdriver_lock(&v->version_lock);
+	res=v->key_version[lba];
+	fdriver_unlock(&v->version_lock);
+	return res;
 }
 
 static inline int version_compare(version *v, int32_t a, int32_t b){

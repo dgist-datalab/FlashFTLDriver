@@ -11,7 +11,7 @@ extern lsmtree LSM;
 compaction_master *_cm;
 
 //uint32_t debug_lba=807091;
-//uint32_t debug_lba=57809;
+//uint32_t debug_lba=520671;
 uint32_t debug_lba=UINT32_MAX;
 
 extern uint32_t debug_piece_ppa;
@@ -111,15 +111,15 @@ static inline void tiering_compaction_error_check(level *src, run *r1, run *r2, 
 		}
 
 		if(res->start_lba!=min_lba){
-			if(LSM.last_run_version->key_version[res->start_lba]!=
-				LSM.last_run_version->key_version[min_lba]){
+			if(version_map_lba(LSM.last_run_version,res->start_lba)!=
+				version_map_lba(LSM.last_run_version,min_lba)){
 				goto out;
 			}
 		}
 
 		if(res->end_lba!=max_lba){
-			if(LSM.last_run_version->key_version[res->end_lba]!=
-				LSM.last_run_version->key_version[max_lba]){
+			if(version_map_lba(LSM.last_run_version,res->end_lba)!=
+				version_map_lba(LSM.last_run_version, max_lba)){
 				goto out;
 			}
 		}
@@ -389,8 +389,13 @@ static void trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des
 				}
 			}
 		}
+		/*
 		version_update_for_trivial_move(LSM.last_run_version, kp_set[0].lba, 
-				kp_get_end_lba((char*)kp_set),TOTALRUNIDX, TOTALRUNIDX-1);
+				kp_get_end_lba((char*)kp_set),TOTALRUNIDX, TOTALRUNIDX-1);*/
+
+		for(uint32_t i=0; i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++){
+			version_coupling_lba_ridx(LSM.last_run_version, kp_set[i].lba, TOTALRUNIDX-1);
+		}
 		sst_free(file, LSM.pm);
 	}
 	else{ //L1~LN-1
