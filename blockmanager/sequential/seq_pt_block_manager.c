@@ -63,6 +63,7 @@ __segment* seq_pt_get_segment (struct blockmanager*bm, int pt_num, bool isreserv
 		mh_insert_append(p->max_heap_pt[pt_num], (void*)free_block_set);
 
 	memcpy(res->blocks, free_block_set->blocks, sizeof(__block*)*BPS);
+	res->seg_idx=res->blocks[0]->block_num/BPS;
 
 	res->now=0;
 	res->max=BPS;
@@ -80,9 +81,11 @@ __gsegment* seq_pt_get_gc_target (struct blockmanager* bm, int pt_num){
 	mh_construct(p->max_heap_pt[pt_num]);
 	block_set* target=(block_set*)mh_get_max(p->max_heap_pt[pt_num]);
 	res->invalidate_number=target->total_invalid_number;
+	res->validate_number=target->total_valid_number;
 
 	memcpy(res->blocks, target->blocks, sizeof(__block*)*BPS);
 
+	res->seg_idx=res->blocks[0]->block_num/BPS;
 	res->now=res->max=0;
 	return res;
 }

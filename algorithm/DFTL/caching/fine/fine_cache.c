@@ -33,7 +33,7 @@ my_cache fine_cache_func{
 
 uint32_t fine_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&fcm.lru, NULL);
-	fcm.max_caching_map=(total_caching_physical_pages*PAGESIZE/(sizeof(uint32_t)*2));
+	fcm.max_caching_map=(total_caching_physical_pages*PAGESIZE/FINECACHEENT_SZ);
 	fcm.now_caching_map=0;
 	mc->type=FINE;
 	mc->private_data=NULL;

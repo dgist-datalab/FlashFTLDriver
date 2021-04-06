@@ -37,12 +37,12 @@ void page_destroy (lower_info* li, algorithm *algo){
 
 inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
-	page_params* params=(page_params*)malloc(sizeof(page_params));
+	page_param* param=(page_param*)malloc(sizeof(page_param));
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
-	params->value=value;
+	param->value=value;
 	my_req->parents=req;//add the upper request
 	my_req->end_req=page_end_req;//this is callback function
-	my_req->params=(void*)params;//add your parameter structure 
+	my_req->param=(void*)param;//add your parameter structure 
 	my_req->type=type;//DATAR means DATA reads, this affect traffics results
 	/*you note that after read a PPA, the callback function called*/
 
@@ -79,7 +79,7 @@ uint32_t page_read(request *const req){
 	else{
 		req->value->ppa=page_map_pick(req->key);
 
-		DPRINTF("\t\tmap info : %u->%u\n", req->key, req->value->ppa);
+		//DPRINTF("\t\tmap info : %u->%u\n", req->key, req->value->ppa);
 		if(req->value->ppa==UINT32_MAX){
 			req->type=FS_NOTFOUND_T;
 			req->end_req(req);
@@ -170,14 +170,14 @@ uint32_t page_flush(request *const req){
 
 void *page_end_req(algo_req* input){
 	//this function is called when the device layer(lower_info) finish the request.
-	page_params* params=(page_params*)input->params;
+	page_param* param=(page_param*)input->param;
 	switch(input->type){
 		case DATAW:
-			inf_free_valueset(params->value,FS_MALLOC_W);
+			inf_free_valueset(param->value,FS_MALLOC_W);
 			break;
 		case DATAR:
-			if(params->value->ppa%L2PGAP){
-				memmove(params->value->value, &params->value->value[4096], 4096);
+			if(param->value->ppa%L2PGAP){
+				memmove(param->value->value, &param->value->value[4096], 4096);
 			}
 			break;
 	}
@@ -186,7 +186,7 @@ void *page_end_req(algo_req* input){
 		res->type_ftl=res->type_lower=0;
 		res->end_req(res);//you should call the parents end_req like this
 	}
-	free(params);
+	free(param);
 	free(input);
 	return NULL;
 }

@@ -309,7 +309,7 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		}
 	}
 
-	if((scm.gtd_size[gtd_idx]-BITMAPSIZE)/sizeof(uint32_t) > 2048){
+	if((scm.gtd_size[gtd_idx]-BITMAPSIZE)/sizeof(uint32_t) > PAGESIZE/sizeof(uint32_t)){
 		printf("oversize!\n");
 		abort();
 	}
@@ -437,7 +437,7 @@ void sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
 			}
 		}
 	}
-	if(total_head<1 || total_head>2048){
+	if(total_head<1 || total_head>PAGESIZE/sizeof(uint32_t)){
 		printf("total_head over or small %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}

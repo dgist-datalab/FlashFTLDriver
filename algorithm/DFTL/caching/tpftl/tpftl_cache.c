@@ -374,10 +374,11 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
 			mapping_entry *target=(mapping_entry*)malloc(sizeof(mapping_entry));
 			target->lba=GETLBA(target_tn, tc);
 			target->ppa=tc->ppa;
+			/*
 			if(target->lba > UINT32_MAX/2){
 				printf("wtf??\n");
 				abort();
-			}
+			}*/
 			return target;
 		}
 	}

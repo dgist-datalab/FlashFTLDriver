@@ -8,7 +8,7 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
-uint32_t test_ppa=UINT32_MAX;
+uint32_t test_ppa=655468;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -24,7 +24,9 @@ void invalidate_ppa(uint32_t t_ppa){
 	if(t_ppa==test_ppa){
 		printf("%u unpopulated!\n",test_ppa);
 	}
-	demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa);
+	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
+		EPRINT("double invalidation!", true);
+	}
 }
 
 void validate_ppa(uint32_t ppa, KEYT *lbas){
@@ -33,7 +35,9 @@ void validate_ppa(uint32_t ppa, KEYT *lbas){
 		if(ppa*L2PGAP+i==test_ppa){
 			printf("%u populated!\n", test_ppa);
 		}
-		demand_ftl.bm->populate_bit(demand_ftl.bm,ppa * L2PGAP+i);
+		if(!demand_ftl.bm->populate_bit(demand_ftl.bm,ppa * L2PGAP+i)){
+			EPRINT("double validation!", true);
+		}
 	}
 
 	/*this function is used for write some data to OOB(spare area) for reverse mapping*/
@@ -54,20 +58,20 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 			res=(gc_value*)malloc(sizeof(gc_value));
 			res->isdone=false;
 			res->ppa=ppa;
-			my_req->params=(void *)res;
+			my_req->param=(void *)res;
 			my_req->type_lower=0;
 			/*when read a value, you can assign free value by this function*/
 			res->value=inf_get_valueset(NULL,FS_MALLOC_R,PAGESIZE);
 			demand_ftl.li->read(ppa,PAGESIZE,res->value,ASYNC,my_req);
 			break;
 		case GCMW:
-			my_req->params=(void*)gv;
+			my_req->param=(void*)gv;
 			demand_ftl.li->write(ppa,PAGESIZE,gv->value,ASYNC,my_req );
 			break;
 		case GCDW:
 			res=(gc_value*)malloc(sizeof(gc_value));
 			res->value=value;
-			my_req->params=(void *)res;
+			my_req->param=(void *)res;
 			demand_ftl.li->write(ppa,PAGESIZE,res->value,ASYNC,my_req);
 			break;
 	}
@@ -83,11 +87,16 @@ void do_gc(){
 	uint32_t bidx, pidx;
 	blockmanager *bm=demand_ftl.bm;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
-	list *temp_list=list_init();
+	uint32_t update_target_idx=0;
+	uint32_t debuging_cnt=0;
+	list *temp_list;
+	if(target->invalidate_number==_PPS*L2PGAP){
+		goto finish;
+	}
+	temp_list=list_init();
 	align_gc_buffer g_buffer;
 	gc_value *gv;
 	mapping_entry *update_target;
-	uint32_t update_target_idx=0;
 
 	/*by using this for loop, you can traversal all page in block*/
 	for_each_page_in_seg(target,page,bidx,pidx){
@@ -103,13 +112,12 @@ void do_gc(){
 		if(should_read){
 			gv=send_req(page,GCDR,NULL,NULL);
 			list_insert(temp_list,(void*)gv);
-			update_target_idx+=2;
+			update_target_idx+=L2PGAP;
 		}
 	}
 	update_target=(mapping_entry*)malloc(sizeof(mapping_entry)*update_target_idx);
 	update_target_idx=0;
 
-	uint32_t debuging_cnt=0;
 	uint32_t cached_ppa;
 	li_node *now,*nxt;
 	g_buffer.idx=0;
@@ -163,6 +171,7 @@ void do_gc(){
 
 	demand_map_some_update(update_target, update_target_idx);
 
+finish:
 	bm->pt_trim_segment(bm,DATA_S,target,demand_ftl.li); //erase a block
 	bm->free_segment(bm, p->active);
 
@@ -223,7 +232,7 @@ ppa_t get_rppa(KEYT *lbas, uint8_t idx, mapping_entry *target, uint32_t *_target
 }
 
 void *page_gc_end_req(algo_req *input){
-	gc_value *gv=(gc_value*)input->params;
+	gc_value *gv=(gc_value*)input->param;
 	switch(input->type){
 		case GCMR:
 		case GCDR:

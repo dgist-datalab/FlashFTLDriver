@@ -1,10 +1,10 @@
 #include "../../include/settings.h"
 #include "../../include/container.h"
-typedef struct page_params{
+typedef struct page_param{
 	request *parents;
 	uint32_t address;
 	value_set *value;
-}page_params;
+}page_param;
 
 typedef struct align_buffer{
 	uint8_t idx;

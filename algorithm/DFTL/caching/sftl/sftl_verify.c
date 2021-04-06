@@ -53,7 +53,7 @@ void sftl_print_mapping(sftl_cache *sc){
 			}
 			else isstart=false;
 			seq_cnt=0;
-			printf("%d\t (LBA:%u head-%d, idx:%d) ", ppa_list_idx,sc->etr->idx*2048+offset, now_ppa, i);
+			printf("%d\t (LBA:%u head-%d, idx:%d) ", ppa_list_idx,sc->etr->idx*PAGESIZE/sizeof(uint32_t)+offset, now_ppa, i);
 			if(sc->etr->idx==483 && now_ppa > 1070000){
 				debug_flag=true;
 			}

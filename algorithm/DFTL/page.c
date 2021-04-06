@@ -40,22 +40,20 @@ void page_destroy (lower_info* li, algorithm *algo){
 	return;
 }
 
-
-
 uint32_t page_read(request *const req){
-	if(!req->params){
+	if(!req->param){
 		value_set *cached_value=buffer->get(req->key);
 		if(!cached_value){
 			for(uint32_t i=0; i<a_buffer.idx; i++){
 				if(req->key==a_buffer.key[i]){
-					memcpy(req->value->value, &a_buffer.value[i*4096], 4096);
+					memcpy(req->value->value, &a_buffer.value[i*LPAGESIZE], LPAGESIZE);
 					req->end_req(req);		
 					return 1;
 				}
 			}
 		}
 		if(cached_value){
-			memcpy(req->value->value, cached_value->value, 4096);
+			memcpy(req->value->value, cached_value->value, LPAGESIZE);
 			req->end_req(req);
 		}
 	}
@@ -65,11 +63,11 @@ uint32_t page_read(request *const req){
 
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	if(req){
-		memcpy(&a_buffer.value[a_buffer.idx*4096], req->value->value, 4096);
+		memcpy(&a_buffer.value[a_buffer.idx*LPAGESIZE], req->value->value, LPAGESIZE);
 		a_buffer.key[a_buffer.idx]=req->key;
 	}
 	else{
-		memcpy(&a_buffer.value[a_buffer.idx*4096], req->value->value, 4096);
+		memcpy(&a_buffer.value[a_buffer.idx*LPAGESIZE], req->value->value, LPAGESIZE);
 		a_buffer.key[a_buffer.idx]=key;
 	}
 	a_buffer.idx++;
@@ -79,9 +77,11 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		value_set *value=inf_get_valueset(a_buffer.value, FS_MALLOC_W, PAGESIZE);
 		send_user_req(NULL, DATAW, ppa, value);
 		
-		KEYT physical[2];
-		physical[0]=ppa*L2PGAP;
-		physical[1]=ppa*L2PGAP+1;
+		KEYT physical[L2PGAP];
+
+		for(uint32_t i=0; i<L2PGAP; i++){
+			physical[i]=ppa*L2PGAP+i;
+		}
 
 		demand_map_assign(req, a_buffer.key, physical);
 
@@ -92,10 +92,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 }
 
 uint32_t page_write(request *const req){
-	if(req->key==2097102){
-		printf("2097102 write!!!!\n");
-	}
-	if(req->params){
+	if(req->param){
 		return demand_map_assign(req, NULL, NULL);
 	}
 
@@ -125,14 +122,14 @@ uint32_t page_flush(request *const req){
 
 void *page_end_req(algo_req* input){
 	//this function is called when the device layer(lower_info) finish the request.
-	page_params* params=(page_params*)input->params;
+	page_params* params=(page_params*)input->param;
 	switch(input->type){
 		case DATAW:
 			inf_free_valueset(params->value,FS_MALLOC_W);
 			break;
 		case DATAR:
 			if(params->value->ppa%L2PGAP){
-				memmove(params->value->value, &params->value->value[4096], 4096);
+				memmove(params->value->value, &params->value->value[LPAGESIZE], LPAGESIZE);
 			}
 			break;
 	}

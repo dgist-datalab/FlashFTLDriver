@@ -50,25 +50,25 @@ typedef union evict_target{
 	mapping_entry *mapping;
 }evict_target;
 
-typedef struct demand_params{
+typedef struct demand_param{
 	MAP_ASSIGN_STATUS status;
 	GTD_entry *etr;
 	evict_target et;
 	mapping_entry target;
-	void *params_ex;
+	void *param_ex;
 	bool is_hit_eviction;
-}demand_params;
+}demand_param;
 
-typedef struct assign_params_ex{
+typedef struct assign_param_ex{
 	KEYT *lba;
 	KEYT *physical;
 	uint8_t idx;
-}assign_params_ex;
+}assign_param_ex;
 
 
-typedef struct pick_params_ex{
+typedef struct pick_param_ex{
 	KEYT lba;
-}pick_params_ex;
+}pick_param_ex;
 
 typedef struct demand_map_manager{
 	uint32_t max_caching_pages;

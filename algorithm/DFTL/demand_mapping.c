@@ -94,7 +94,7 @@ void demand_map_free(){
 	dmm.cache->free(dmm.cache);
 }
 
-uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, void *params){
+uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, void *param){
 	if(etr->status==FLYING){
 		fdriver_lock(&etr->lock);
 		list_insert(etr->pending_req, (void*)req);
@@ -103,14 +103,14 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, void *para
 	}else{
 		fdriver_lock(&etr->lock);
 		etr->status=FLYING;
-		demand_mapping_read(etr->physical_address/L2PGAP, dmm.li, req, params);
+		demand_mapping_read(etr->physical_address/L2PGAP, dmm.li, req, param);
 		list_insert(etr->pending_req, (void*)req);
 		fdriver_unlock(&etr->lock);
 		return 0;
 	}
 }
 
-inline void __demand_map_pending_read(request *req, demand_params *dp, pick_params_ex *pp){
+inline void __demand_map_pending_read(request *req, demand_param *dp, pick_param_ex *pp){
 	uint32_t ppa=dmm.cache->get_mapping(dmm.cache, req->key);
 	if(ppa==UINT32_MAX){
 		printf("try to read invalidate ppa %s:%d\n", __FILE__,__LINE__);
@@ -133,9 +133,9 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 	request *treq;
 	KEYT* lba;
 	KEYT* physical;
-	demand_params *dp;
-	assign_params_ex *ap;
-	pick_params_ex *pp;
+	demand_param *dp;
+	assign_param_ex *ap;
+	pick_param_ex *pp;
 	uint32_t old_ppa;
 	uint8_t i;
 
@@ -145,12 +145,12 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 	fdriver_lock(&etr->lock);
 	for_each_list_node_safe(etr->pending_req, now, next){
 		treq=(request*)now->data;
-		dp=(demand_params*)treq->params;
+		dp=(demand_param*)treq->param;
 		ap=NULL;
 		pp=NULL;
 
 		if(treq->type==FS_SET_T && dp->status==MISSR){
-			ap=(assign_params_ex*)dp->params_ex;
+			ap=(assign_param_ex*)dp->param_ex;
 			lba=ap->lba;
 			physical=ap->physical;
 			i=ap->idx;
@@ -206,9 +206,9 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	request *treq;
 	KEYT* lba=NULL;
 	KEYT* physical=NULL;
-	demand_params *dp;
-	assign_params_ex *ap;
-	pick_params_ex *pp;
+	demand_param *dp;
+	assign_param_ex *ap;
+	pick_param_ex *pp;
 	uint32_t old_ppa;
 	uint8_t i=0;
 
@@ -219,14 +219,14 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	fdriver_lock(&etr->lock);
 	for_each_list_node_safe(etr->pending_req, now, next){ //for read
 		treq=(request*)now->data;
-		dp=(demand_params*)treq->params;
+		dp=(demand_param*)treq->param;
 		ap=NULL;
 		pp=NULL;
 
 		if(dp->status==MISSR){
 			dmm.cache->insert_entry_from_translation(dmm.cache, etr, mapping->lba, value);
 			if(treq->type==FS_SET_T){
-				ap=(assign_params_ex*)dp->params_ex;
+				ap=(assign_param_ex*)dp->param_ex;
 				lba=ap->lba;
 				physical=ap->physical;
 				i=ap->idx;
@@ -267,7 +267,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 
 	for_each_list_node_safe(etr->pending_req, now, next){ //for eviction
 		treq=(request*)now->data;
-		dp=(demand_params*)treq->params;
+		dp=(demand_param*)treq->param;
 		ap=NULL;
 		pp=NULL;
 		if(dp->status!=EVICTIONR){
@@ -310,8 +310,8 @@ end:
 
 uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 	uint8_t i=0;
-	demand_params *dp;
-	assign_params_ex *mp;
+	demand_param *dp;
+	assign_param_ex *mp;
 
 	uint32_t gtd_idx;
 	uint32_t trans_offset;
@@ -319,25 +319,25 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 	uint32_t old_ppa;
 	KEYT *lba=NULL, *physical=NULL;
 
-	if(!req->params){
-		dp=(demand_params*)malloc(sizeof(demand_params));
+	if(!req->param){
+		dp=(demand_param*)malloc(sizeof(demand_param));
 		dp->status=NONE;
 		lba=_lba; physical=_physical;
 		gtd_idx=GETGTDIDX(lba[i]);
 		trans_offset=TRANSOFFSET(lba[i]);
 		etr=dp->etr=&dmm.GTD[gtd_idx];
 
-		mp=(assign_params_ex*)malloc(sizeof(assign_params_ex));
+		mp=(assign_param_ex*)malloc(sizeof(assign_param_ex));
 		cpy_keys(&mp->lba,_lba);
 		cpy_keys(&mp->physical, _physical);
 		i=mp->idx=0;
-		dp->params_ex=(void*)mp;
+		dp->param_ex=(void*)mp;
 		dp->is_hit_eviction=false;
-		req->params=(void*)dp;
+		req->param=(void*)dp;
 	}
 	else{
-		dp=(demand_params*)req->params;
-		mp=(assign_params_ex*)dp->params_ex;
+		dp=(demand_param*)req->param;
+		mp=(assign_param_ex*)dp->param_ex;
 
 		i=mp->idx;
 		lba=mp->lba;
@@ -354,6 +354,9 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 		dp->etr=etr;
 		mp->idx=i;
 		mapping_entry *target=&dp->target;
+		if(lba[i]==499368){
+			EPRINT("debug point", false);
+		}
 		target->lba=lba[i];
 		target->ppa=physical[i];
 retry:
@@ -462,10 +465,11 @@ eviction_path:
 				}
 				
 				if(target_etr->physical_address!=UINT32_MAX){
-					invalidate_ppa(target_etr->physical_address);
+					invalidate_map_ppa(target_etr->physical_address);
 				}
 
-				target_etr->physical_address=get_map_ppa(gtd_idx)*L2PGAP;
+				target_etr->physical_address=get_map_ppa(target_etr->idx)*L2PGAP;
+
 				demand_mapping_write(target_etr->physical_address/L2PGAP, dmm.li, req, (void*)dp);
 				return 1;
 			case MISSR:
@@ -486,11 +490,11 @@ eviction_path:
 		return 0;
 	}
 	if(i==L2PGAP){
-		if(req->params){
+		if(req->param){
 			free(mp->lba);
 			free(mp->physical);
 			free(mp);
-			free(req->params);
+			free(req->param);
 		}
 		req->end_req(req);
 		return 1;
@@ -500,22 +504,22 @@ eviction_path:
 
 
 uint32_t demand_page_read(request *const req){
-	demand_params *dp;
+	demand_param *dp;
 	mapping_entry target;
 	uint32_t gtd_idx, trans_offset;
 	uint32_t ppa;
 	GTD_entry *etr;
 
-	if(!req->params){
-		dp=(demand_params*)malloc(sizeof(demand_params));
+	if(!req->param){
+		dp=(demand_param*)malloc(sizeof(demand_param));
 		dp->status=NONE;
 		gtd_idx=GETGTDIDX(req->key);
 		trans_offset=TRANSOFFSET(req->key);
 		etr=dp->etr=&dmm.GTD[gtd_idx];
 		dp->is_hit_eviction=false;
-		req->params=(void*)dp;
+		req->param=(void*)dp;
 	}else{
-		dp=(demand_params*)req->params;
+		dp=(demand_param*)req->param;
 		etr=dp->etr;
 	}
 
@@ -605,8 +609,9 @@ retry:
 				dp->status=EVICTIONW;
 			}
 
-			if(target_etr->physical_address!=UINT32_MAX)
-				invalidate_ppa(target_etr->physical_address);
+			if(target_etr->physical_address!=UINT32_MAX){
+				invalidate_map_ppa(target_etr->physical_address);
+			}
 			target_etr->physical_address=get_map_ppa(gtd_idx) * L2PGAP;
 			demand_mapping_write(target_etr->physical_address/L2PGAP, dmm.li, req, dp);
 			return 1;
@@ -633,7 +638,7 @@ read_data:
 		printf("%u:%u read data\n", req->key, ppa);
 	}
 	req->value->ppa=ppa;
-	free(req->params);
+	free(req->param);
 	send_user_req(req, DATAR, ppa/L2PGAP, req->value);
 end:
 	return 1;
@@ -703,8 +708,8 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 			if(dmm.cache->entry_type==DYNAMIC){
 				dmm.cache->update_dynamic_size(dmm.cache, gtd_idx*PAGESIZE/sizeof(uint32_t), gmv->value->value);
 			}
-
-			invalidate_ppa(dmm.GTD[gtd_idx].physical_address);
+			
+			invalidate_map_ppa(dmm.GTD[gtd_idx].physical_address);
 			uint32_t new_ppa=get_map_ppa(gtd_idx);
 			dmm.GTD[gtd_idx].physical_address=new_ppa*L2PGAP;
 			demand_mapping_inter_write(new_ppa, dmm.li, gmv);
@@ -812,8 +817,8 @@ uint32_t demand_argument(int argc, char **argv){
 		}
 	}
 	else{
-		dmm.c_type=TPFTL;
-		dmm.cache=&tp_cache_func;
+		dmm.c_type=DEMAND_COARSE;
+		dmm.cache=&coarse_cache_func;
 	}
 
 	if(!cache_size){

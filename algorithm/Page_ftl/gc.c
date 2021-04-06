@@ -48,7 +48,7 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value){
 			res=(gc_value*)malloc(sizeof(gc_value));
 			res->isdone=false;
 			res->ppa=ppa;
-			my_req->params=(void *)res;
+			my_req->param=(void *)res;
 			my_req->type_lower=0;
 			/*when read a value, you can assign free value by this function*/
 			res->value=inf_get_valueset(NULL,FS_MALLOC_R,PAGESIZE);
@@ -57,7 +57,7 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value){
 		case GCDW:
 			res=(gc_value*)malloc(sizeof(gc_value));
 			res->value=value;
-			my_req->params=(void *)res;
+			my_req->param=(void *)res;
 			page_ftl.li->write(ppa,PAGESIZE,res->value,ASYNC,my_req);
 			break;
 	}
@@ -240,7 +240,7 @@ retry:
 }
 
 void *page_gc_end_req(algo_req *input){
-	gc_value *gv=(gc_value*)input->params;
+	gc_value *gv=(gc_value*)input->param;
 	switch(input->type){
 		case GCDR:
 			gv->isdone=true;

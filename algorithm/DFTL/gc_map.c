@@ -1,6 +1,20 @@
 #include "gc.h"
 #include "demand_mapping.h"
 extern struct algorithm demand_ftl;
+extern uint32_t test_ppa;
+void invalidate_map_ppa(uint32_t piece_ppa){
+	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa)){
+		EPRINT("double invalidation!", true);
+	}
+}
+
+void validate_map_ppa(uint32_t piece_ppa, KEYT gtd_idx){
+	if(!demand_ftl.bm->populate_bit(demand_ftl.bm, piece_ppa)){
+		EPRINT("double validation!", true);
+	}
+	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)&gtd_idx, sizeof(KEYT), piece_ppa/L2PGAP);
+}
+
 ppa_t get_map_ppa(KEYT gtd_idx){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
@@ -16,8 +30,7 @@ retry:
 		goto retry;
 	}
 
-	KEYT temp[2]={gtd_idx, 0};
-	validate_ppa(res, temp);
+	validate_map_ppa(res*L2PGAP, gtd_idx);
 	return res;
 }
 
@@ -27,21 +40,28 @@ ppa_t get_map_rppa(KEYT gtd_idx){
 
 	/*when the gc phase, It should get a page from the reserved block*/
 	res=demand_ftl.bm->get_page_num(demand_ftl.bm,p->map_reserve);
-	KEYT temp[2]={gtd_idx, 0};
+	KEYT temp[L2PGAP]={gtd_idx, 0};
 	validate_ppa(res, temp);
 	return res;
 }
 extern demand_map_manager dmm;
 
 void do_map_gc(){
+	//static int cnt=0;
+	//printf("map gc:%u\n", ++cnt);
 	__gsegment *target=demand_ftl.bm->pt_get_gc_target(demand_ftl.bm, MAP_S);
-	uint32_t page;
-	uint32_t bidx, pidx;
+
 	blockmanager *bm=demand_ftl.bm;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
-	list *temp_list=list_init();
+	list *temp_list=NULL;	
 	gc_value *gv;
+	uint32_t page;
+	uint32_t bidx, pidx;
+	if(target->invalidate_number==_PPS){
+		goto finish;
+	}
 
+	temp_list=list_init();
 	for_each_page_in_seg(target,page,bidx,pidx){
 		//this function check the page is valid or not
 		bool should_read=false;
@@ -67,16 +87,19 @@ void do_map_gc(){
 			if(!gv->isdone) continue;
 			gtd_idx=(KEYT*)bm->get_oob(bm, gv->ppa);
 			new_ppa=get_map_rppa(gtd_idx[0]);
-			dmm.GTD[gtd_idx[0]].physical_address=new_ppa;
+			dmm.GTD[gtd_idx[0]].physical_address=new_ppa*L2PGAP;
 			send_req(new_ppa, GCMW, NULL, gv);
+			list_delete_node(temp_list,now);
 		}
 	}
 
+finish:
 	bm->pt_trim_segment(bm,MAP_S,target,demand_ftl.li); //erase a block
 	bm->free_segment(bm, p->map_active);
 
 	p->map_active=p->map_reserve;//make reserved to active block
 	p->map_reserve=bm->change_pt_reserve(bm, MAP_S, p->map_reserve); //get new reserve block from block_manager
-
-	list_free(temp_list);
+	if(temp_list){
+		list_free(temp_list);
+	}
 }

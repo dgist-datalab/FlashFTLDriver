@@ -29,7 +29,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 	params->value=value;
 	my_req->parents=req;//add the upper request
 	my_req->end_req=page_end_req;//this is callback function
-	my_req->params=(void*)params;//add your parameter structure 
+	my_req->param=(void*)params;//add your parameter structure 
 	my_req->type=type;//DATAR means DATA reads, this affect traffics results
 	/*you note that after read a PPA, the callback function called*/
 

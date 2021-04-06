@@ -31,7 +31,7 @@ uint32_t page_map_assign(KEYT* lba){
 		}
 		/*mapping update*/
 		p->mapping[t_lba]=res*L2PGAP+i;
-		DPRINTF("\tmap set : %u->%u\n", t_lba, p->mapping[t_lba]);
+	//	DPRINTF("\tmap set : %u->%u\n", t_lba, p->mapping[t_lba]);
 	}
 
 	return res;
