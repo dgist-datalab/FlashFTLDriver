@@ -485,7 +485,10 @@ retry:
 		}
 	}
 	seg_idx=victim_target->seg_idx;
-	if(ismap && pm->seg_type_checker[seg_idx]!=MAPSEG){
+	if(victim_target->invalidate_number==_PPS*L2PGAP){
+		//EPRINT("all invalid block", false);
+	}
+	else if(ismap && pm->seg_type_checker[seg_idx]!=MAPSEG){
 		free(victim_target);
 		temp_queue.push(seg_idx);
 		goto retry;
@@ -540,11 +543,10 @@ retry:
 bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_mapping++;
 	if(victim->invalidate_number==_PPS*L2PGAP || victim->all_invalid){
-		bm->trim_segment(bm, victim, bm->li);
 		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
 			printf("gc_mapping:%u (seg_idx%u) clean\n", LSM.monitor.gc_mapping, victim->seg_idx);
 		}
-
+		bm->trim_segment(bm, victim, bm->li);
 		page_manager_change_reserve(pm, true);
 		return true;
 	}
@@ -775,7 +777,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				gn->piece_ppa=piece_ppa;
 				gn->lba=oob_lba[i];
 
-//				if(gn->piece_ppa/2==425967 && LSM.global_debug_flag){
+//				if(gn->piece_ppa/L2PGAP==425967 && LSM.global_debug_flag){
 //					EPRINT("debug point", false);
 //				}
 

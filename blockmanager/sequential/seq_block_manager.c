@@ -29,6 +29,7 @@ struct blockmanager seq_bm={
 	.reinsert_segment=seq_reinsert_segment,
 	.remain_free_page=seq_remain_free_page,
 	.invalidate_number_decrease=seq_invalidate_number_decrease,
+	.get_invalidate_number=seq_get_invalidate_number,
 
 	.pt_create=seq_pt_create,
 	.pt_destroy=seq_pt_destroy,
@@ -130,7 +131,8 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	block_set *free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
 	
 	if(!free_block_set){
-		EPRINT("dev full??", true);
+		EPRINT("dev full??", false);
+		return NULL;
 	}
 
 	if(free_block_set->total_invalid_number || free_block_set->total_valid_number){
@@ -480,4 +482,9 @@ void seq_free_segment(struct blockmanager *, __segment *seg){
 uint32_t seq_remain_free_page(struct blockmanager *bm, __segment *active){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	return p->free_block*_PPS+(active?(_PPS-active->used_page_num):0);
+}
+
+uint32_t seq_get_invalidate_number(struct blockmanager *bm, uint32_t seg_idx){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	return p->logical_segment[seg_idx].total_invalid_number;
 }

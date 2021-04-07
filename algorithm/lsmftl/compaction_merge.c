@@ -12,6 +12,7 @@ extern uint32_t debug_lba;
 void *merge_end_req(algo_req *);
 void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 	inter_read_alreq_param *param;
+	uint32_t param_idx=0;
 	for(int i=read_arg->from; i<=read_arg->to; i++){
 		//param=compaction_get_read_param(_cm);
 		param=(inter_read_alreq_param*)calloc(1,sizeof(inter_read_alreq_param));
@@ -19,7 +20,7 @@ void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 		mr[i].data=NULL;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&param->done_lock, 0);
-		read_arg->param[i]=param;
+		read_arg->param[param_idx++]=param;
 	}
 }
 

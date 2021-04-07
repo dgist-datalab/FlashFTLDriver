@@ -1,0 +1,5 @@
+#!/bin/bash
+make -f MakefileSan -j
+make clean
+cp drver driver_sanity
+make -j 

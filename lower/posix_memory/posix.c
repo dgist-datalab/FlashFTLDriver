@@ -63,7 +63,8 @@ lower_info my_posix={
 };
 
 uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;
-uint32_t lower_test_ppa=655468/2;
+//uint32_t lower_test_ppa=655468/2;
+uint32_t lower_test_ppa=UINT32_MAX;
 
 #ifdef LASYNC
 void *l_main(void *__input){

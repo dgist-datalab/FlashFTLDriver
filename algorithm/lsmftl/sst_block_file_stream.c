@@ -315,7 +315,7 @@ bool sst_bis_ppa_empty(sst_bf_in_stream *bis){
 	int32_t remain_ppa=REMAIN_DATA_PPA(bis);
 
 	if(bis->now_map_data_idx==KP_IN_PAGE){
-		if(remain_ppa<4){
+		if(remain_ppa<=(L2PGAP+L2PGAP)){
 			return true;
 		}
 	}

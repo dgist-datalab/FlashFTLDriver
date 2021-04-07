@@ -19,6 +19,7 @@ robusta*
 *trace*
 driver
 range_driver
+driver_sanity
 *driver
 *.swp
 ycsb*

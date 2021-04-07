@@ -64,7 +64,7 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 #endif
 
 	mp->li->create(mp->li,mp->bm);
-#if (defined(partition) && !defined(Page_ftl)) || defined(DFTL)
+#if (defined(partition) && !defined(Page_ftl))
 	printf("PARTNUM: %u, MAP: %lu, DATA: %lu\n", PARTNUM, MAPPART_SEGS, DATAPART_SEGS);
 	int temp[PARTNUM];
 	temp[MAP_S]=MAPPART_SEGS;

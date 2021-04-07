@@ -26,6 +26,7 @@ typedef struct sst_file{
 	uint8_t type;
 	bool ismoved_originality;
 	bool trimed_sst_file;
+	bool sequential_file;
 
 	p_addr file_addr;
 	uint32_t end_ppa;

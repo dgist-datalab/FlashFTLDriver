@@ -6,6 +6,9 @@
 lsmtree LSM;
 char all_set_page[PAGESIZE];
 void *lsmtree_read_end_req(algo_req *req);
+static void processing_data_read_req(algo_req *req, char *v, bool);
+typedef std::map<uint32_t, algo_req*>::iterator rb_r_iter;
+page_read_buffer rb;
 extern uint32_t debug_lba;
 
 struct algorithm lsm_ftl={
@@ -181,6 +184,12 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 
 	memset(LSM.now_merging_run, -1, sizeof(uint32_t)*(1+1));
 	LSM.li=li;
+
+	rb.pending_req=new std::map<uint32_t, algo_req *>();
+	rb.issue_req=new std::map<uint32_t, algo_req*>();
+	fdriver_mutex_init(&rb.pending_lock);
+	fdriver_mutex_init(&rb.read_buffer_lock);
+	rb.buffer_ppa=UINT32_MAX;
 	return 1;
 }
 
@@ -237,6 +246,9 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	free(LSM.flushed_kp_set);
 
 	free(LSM.gc_unavailable_seg);
+
+	delete rb.pending_req;
+	delete rb.issue_req;
 }
 
 static inline algo_req *get_read_alreq(request *const req, uint8_t type, 
@@ -353,6 +365,41 @@ static void not_found_process(request *const req){
 	req->end_req(req);
 }
 
+enum{
+	BUFFER_HIT, BUFFER_MISS, BUFFER_PENDING
+};
+
+static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_req *req, bool sync){
+	if(req->type==DATAR){
+		fdriver_lock(&rb.read_buffer_lock);
+		if(ppa==rb.buffer_ppa){
+			processing_data_read_req(req, rb.buffer_value, false);
+			fdriver_unlock(&rb.read_buffer_lock);
+			return BUFFER_HIT;
+		}
+		else{
+			fdriver_unlock(&rb.read_buffer_lock);
+		}
+
+		fdriver_lock(&rb.pending_lock);
+		rb_r_iter temp_r_iter=rb.issue_req->find(ppa);
+		if(temp_r_iter==rb.issue_req->end()){
+			rb.issue_req->insert(std::pair<uint32_t,algo_req*>(ppa, req));
+			fdriver_unlock(&rb.pending_lock);
+		}
+		else{
+			rb.pending_req->insert(std::pair<uint32_t, algo_req*>(ppa, req));
+			fdriver_unlock(&rb.pending_lock);
+			return BUFFER_PENDING;
+		}
+	}
+	
+
+	io_manager_issue_read(ppa, value, req, sync);
+	return BUFFER_MISS;
+}
+
+
 uint32_t lsmtree_read(request *const req){
 	lsmtree_read_param *r_param;
 	if(req->key==debug_lba){
@@ -429,7 +476,7 @@ uint32_t lsmtree_read(request *const req){
 				rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
 				r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
-				io_manager_issue_read(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+				read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
 				return 1;
 			}
 		}
@@ -452,7 +499,7 @@ uint32_t lsmtree_read(request *const req){
 			}
 			else{//FOUND
 				al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
-				io_manager_issue_read(PIECETOPPA(read_target_ppa), req->value, al_req, false);
+				read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false);
 				goto normal_end;
 			}
 			break;
@@ -494,7 +541,7 @@ read_helper_check_again:
 		r_param->use_read_helper=true;
 		if(read_helper_check(sptr->_read_helper, req->key, &read_target_ppa, sptr, &r_param->read_helper_idx)){
 			al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
-			io_manager_issue_read(PIECETOPPA(read_target_ppa), req->value, al_req, false);
+			read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false);
 			goto normal_end;
 		}else{
 			if(r_param->read_helper_idx==UINT32_MAX){
@@ -515,7 +562,7 @@ read_helper_check_again:
 		}
 		r_param->check_type=K2VMAP;
 		al_req=get_read_alreq(req, MAPPINGR, read_target_ppa, r_param);
-		io_manager_issue_read(read_target_ppa, req->value, al_req, false);
+		read_buffer_checker(read_target_ppa, req->value, al_req, false);
 		goto normal_end;
 	}
 
@@ -593,13 +640,40 @@ uint32_t lsmtree_remove(request *const req){
 	return 1;
 }
 
-void *lsmtree_read_end_req(algo_req *req){
+static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_path){
 	request *parents=req->parents;
 	lsmtree_read_param *r_param=(lsmtree_read_param*)req->param;
-	uint32_t piece_ppa;
 	uint32_t idx;
-	bool read_done=false;
-	switch(req->type){
+	uint32_t piece_ppa=req->ppa;
+	if(page_manager_oob_lba_checker(LSM.pm, piece_ppa, parents->key, &idx)){
+		rwlock_read_unlock(r_param->target_level_rw_lock);
+		if(idx>=L2PGAP){
+			EPRINT("can't be plz checking oob_lba_checker", true);
+		}
+		if(idx){
+			memcpy(parents->value->value, &v[idx*LPAGESIZE], LPAGESIZE);
+		}
+		parents->end_req(parents);
+		free(r_param);
+		free(req);
+	}
+	else{
+		if(from_end_req_path){
+			LSM.li->req_type_cnt[MISSDATAR]++;
+			parents->type_ftl++;
+		}
+		if(!inf_assign_try(parents)){
+			EPRINT("why cannot retry?", true);
+		}	
+	}
+}
+
+void *lsmtree_read_end_req(algo_req *req){
+	rb_r_iter target_r_iter;
+	request *parents=req->parents;
+	algo_req *pending_req;
+	uint32_t type=req->type;
+	switch(type){
 		case MAPPINGR:
 			parents->type_ftl++;
 			if(!inf_assign_try(parents)){
@@ -607,31 +681,27 @@ void *lsmtree_read_end_req(algo_req *req){
 			}
 			break;
 		case DATAR:
-			piece_ppa=req->ppa;
-			if(page_manager_oob_lba_checker(LSM.pm, piece_ppa, parents->key, &idx)){
-				rwlock_read_unlock(r_param->target_level_rw_lock);
-				if(idx>=L2PGAP){
-					EPRINT("can't be plz checking oob_lba_checker", true);
-				}
-				if(idx){
-					memcpy(parents->value->value, &parents->value->value[idx*LPAGESIZE], LPAGESIZE);
-				}
-				read_done=true;
+			fdriver_lock(&rb.read_buffer_lock);
+			rb.buffer_ppa=PIECETOPPA(req->ppa);
+			memcpy(rb.buffer_value, parents->value->value, PAGESIZE);
+			fdriver_unlock(&rb.read_buffer_lock);
+
+			fdriver_lock(&rb.pending_lock);
+			target_r_iter=rb.pending_req->find(PIECETOPPA(req->ppa));
+			for(;target_r_iter->first==PIECETOPPA(req->ppa) && 
+					target_r_iter!=rb.pending_req->end();){
+				pending_req=target_r_iter->second;
+				processing_data_read_req(pending_req, parents->value->value, false);
+				rb.pending_req->erase(target_r_iter++);
 			}
-			else{
-				LSM.li->req_type_cnt[MISSDATAR]++;
-				parents->type_ftl++;
-				if(!inf_assign_try(parents)){
-					EPRINT("why cannot retry?", true);
-				}	
-			}
+			rb.issue_req->erase(req->ppa/L2PGAP);
+			processing_data_read_req(req, parents->value->value, true);
+			fdriver_unlock(&rb.pending_lock);
 			break;
 	}
-	if(read_done){
-		parents->end_req(parents);
-		free(r_param);
+	if(type==MAPPINGR){
+		free(req);
 	}
-	free(req);
 	return NULL;
 }
 

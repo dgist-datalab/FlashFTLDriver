@@ -393,3 +393,4 @@ void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
 	memset(&r->sst_set[r->now_sst_file_num-1], 0, sizeof(sst_file));
 	r->now_sst_file_num--;
 }
+

@@ -93,7 +93,7 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 	for(uint32_t i=0; i<round; i++){
 		read_arg.from=start_idx+i*compaction_tag_num;
 		if(i!=round-1){
-			read_arg.to=start_idx+(i-1)*compaction_tag_num-1;
+			read_arg.to=start_idx+(i+1)*compaction_tag_num-1;
 		}
 		else{
 			read_arg.to=total_num-1;

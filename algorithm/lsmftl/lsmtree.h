@@ -93,6 +93,15 @@ typedef struct lsmtree{
 	lower_info *li;
 }lsmtree;
 
+typedef struct page_read_buffer{
+	std::map<uint32_t, algo_req *> * pending_req;
+	std::map<uint32_t, algo_req *>* issue_req;
+	fdriver_lock_t pending_lock;
+	fdriver_lock_t read_buffer_lock;
+	uint32_t buffer_ppa;
+	char buffer_value[PAGESIZE];
+}page_read_buffer;
+
 
 uint32_t lsmtree_argument_set(int argc, char *argv[]);
 uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *);
