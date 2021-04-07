@@ -30,6 +30,7 @@ typedef struct pm_body{
 
 
 pm_body *pm_body_create(blockmanager *bm);
+void pm_body_destroy(pm_body *pm);
 void invalidate_ppa(uint32_t t_ppa);
 void validate_ppa(uint32_t t_ppa, KEYT *lbas);
 void invalidate_map_ppa(uint32_t ppa);

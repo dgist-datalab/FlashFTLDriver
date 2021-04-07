@@ -354,9 +354,6 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical){
 		dp->etr=etr;
 		mp->idx=i;
 		mapping_entry *target=&dp->target;
-		if(lba[i]==499368){
-			EPRINT("debug point", false);
-		}
 		target->lba=lba[i];
 		target->ppa=physical[i];
 retry:

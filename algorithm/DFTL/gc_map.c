@@ -49,24 +49,38 @@ ppa_t get_map_rppa(KEYT gtd_idx){
 extern demand_map_manager dmm;
 
 void do_map_gc(){
-	//static int cnt=0;
-	//printf("map gc:%u\n", ++cnt);
+
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
+	blockmanager *bm=demand_ftl.bm;
+//	static int cnt=0;
+//	printf("map gc:%u\n", ++cnt);
 	__gsegment *target=NULL;
 	std::queue<uint32_t> temp_queue;
 	while(!target || 
 			p->seg_type_checker[target->seg_idx]!=MAPSEG){
 		if(target){
+			if(p->seg_type_checker[target->seg_idx]==DATASEG && target->invalidate_number==_PPS*L2PGAP){
+				break;	
+			}
 			temp_queue.push(target->seg_idx);
+			free(target);
 		}
+		target=bm->get_gc_target(bm);
 	} 
 
-	blockmanager *bm=demand_ftl.bm;
+	uint32_t seg_idx;
+	while(temp_queue.size()){
+		seg_idx=temp_queue.front();
+		bm->reinsert_segment(bm, seg_idx);
+		temp_queue.pop();
+	}
+
 	list *temp_list=NULL;	
 	gc_value *gv;
 	uint32_t page;
 	uint32_t bidx, pidx;
-	if(target->invalidate_number==_PPS){
+	if((p->seg_type_checker[target->seg_idx]==DATASEG && target->invalidate_number==_PPS*L2PGAP) ||
+			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS)){
 		goto finish;
 	}
 
@@ -104,17 +118,11 @@ void do_map_gc(){
 
 finish:
 	bm->trim_segment(bm,target,demand_ftl.li); //erase a block
+	free(p->map_active);
 	p->map_active=p->map_reserve;//make reserved to active block
 	p->map_reserve=bm->change_reserve(bm, p->map_reserve); //get new reserve block from block_manager
 	p->seg_type_checker[p->map_reserve->seg_idx]=MAPSEG;
 	if(temp_list){
 		list_free(temp_list);
-	}
-
-	uint32_t seg_idx;
-	while(temp_queue.size()){
-		seg_idx=temp_queue.front();
-		bm->reinsert_segment(bm, seg_idx);
-		temp_queue.pop();
 	}
 }
