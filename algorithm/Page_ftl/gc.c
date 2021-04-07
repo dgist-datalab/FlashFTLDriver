@@ -143,8 +143,8 @@ void do_gc(){
 	align_gc_buffer g_buffer;
 	gc_value *gv;
 
-	static int cnt=0;
-	printf("gc: %d\n", cnt++);
+	//static int cnt=0;
+	//printf("gc: %d\n", cnt++);
 	/*by using this for loop, you can traversal all page in block*/
 	for_each_page_in_seg(target,page,bidx,pidx){
 		//this function check the page is valid or not

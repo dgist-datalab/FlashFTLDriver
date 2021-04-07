@@ -1,5 +1,6 @@
 #include "../../include/settings.h"
 #include "../../include/container.h"
+#include <map>
 typedef struct page_param{
 	request *parents;
 	uint32_t address;
@@ -11,6 +12,16 @@ typedef struct align_buffer{
 	value_set *value[L2PGAP];
 	KEYT key[L2PGAP];
 }align_buffer;
+
+
+typedef struct page_read_buffer{
+	std::map<uint32_t, algo_req *> * pending_req;
+	std::map<uint32_t, algo_req *>* issue_req;
+	fdriver_lock_t pending_lock;
+	fdriver_lock_t read_buffer_lock;
+	uint32_t buffer_ppa;
+	char buffer_value[PAGESIZE];
+}page_read_buffer;
 
 uint32_t page_create (lower_info*,blockmanager *, algorithm *);
 void page_destroy (lower_info*,  algorithm *);
