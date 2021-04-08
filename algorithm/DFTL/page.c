@@ -66,10 +66,12 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	if(req){
 		memcpy(&a_buffer.value[a_buffer.idx*LPAGESIZE], req->value->value, LPAGESIZE);
 		a_buffer.key[a_buffer.idx]=req->key;
+		a_buffer.prefetching_info[a_buffer.idx]=req->consecutive_length;
 	}
 	else{
 		memcpy(&a_buffer.value[a_buffer.idx*LPAGESIZE], req->value->value, LPAGESIZE);
 		a_buffer.key[a_buffer.idx]=key;
+		a_buffer.prefetching_info[a_buffer.idx]=req->consecutive_length;
 	}
 	a_buffer.idx++;
 
@@ -84,7 +86,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 			physical[i]=ppa*L2PGAP+i;
 		}
 
-		demand_map_assign(req, a_buffer.key, physical);
+		demand_map_assign(req, a_buffer.key, physical, a_buffer.prefetching_info);
 
 		a_buffer.idx=0;
 		return 1;
@@ -94,7 +96,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
 uint32_t page_write(request *const req){
 	if(req->param){
-		return demand_map_assign(req, NULL, NULL);
+		return demand_map_assign(req, NULL, NULL, NULL);
 	}
 
 	/*std::pair<ppa_t, value_set *> r; 

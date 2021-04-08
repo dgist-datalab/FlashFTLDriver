@@ -9,6 +9,7 @@ typedef struct page_params{
 
 typedef struct align_buffer{
 	uint8_t idx;
+	uint32_t prefetching_info[L2PGAP];
 	KEYT key[L2PGAP];
 	char *value;
 }align_buffer;

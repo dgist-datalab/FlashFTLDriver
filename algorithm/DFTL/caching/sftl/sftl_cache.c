@@ -61,7 +61,7 @@ uint32_t sftl_free(struct my_cache *mc){
 	return 1;
 }
 
-bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba){
+bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba, uint32_t *){
 	uint32_t target_size=scm.gtd_size[GETGTDIDX(lba)];
 	if(scm.max_caching_byte <= scm.now_caching_byte+target_size+sizeof(uint32_t)*2){
 		return true;
@@ -73,6 +73,9 @@ bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba){
 	return false;
 }
 
+bool sftl_is_needed_more_eviction(struct my_cache *mc, uint32_t lba){
+	return sftl_is_needed_eviction(mc, lba, NULL);
+}
 
 inline static sftl_cache* get_initial_state_cache(uint32_t gtd_idx, GTD_entry *etr){
 	sftl_cache *res=(sftl_cache *)malloc(sizeof(sftl_cache));
@@ -378,7 +381,7 @@ static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, uint32_t lba,
 	return sc;
 }
 
-uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data){
+uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *){
 	if(etr->private_data){
 		printf("already lru node exists! %s:%d\n", __FILE__, __LINE__);
 		abort();

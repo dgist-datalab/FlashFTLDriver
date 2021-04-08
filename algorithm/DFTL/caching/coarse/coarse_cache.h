@@ -19,10 +19,10 @@ typedef struct coarse_cache_monitor{
 
 uint32_t coarse_init(struct my_cache *, uint32_t total_caching_physical_pages);
 uint32_t coarse_free(struct my_cache *);
-bool coarse_is_needed_eviction(struct my_cache *, uint32_t lba);
+bool coarse_is_needed_eviction(struct my_cache *, uint32_t lba, uint32_t *prefetching_num);
 uint32_t coarse_update_entry(struct my_cache *, GTD_entry *, uint32_t lba, uint32_t ppa);
 uint32_t coarse_update_entry_gc(struct my_cache *, GTD_entry *, uint32_t lba, uint32_t ppa);
-uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *, uint32_t lba, char *data);
+uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *, uint32_t lba, char *data, uint32_t *);
 uint32_t coarse_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa);
 uint32_t coarse_get_mapping(struct my_cache *, uint32_t lba);
 struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *, uint32_t lba);//if return value is NULL, it is clean eviction.

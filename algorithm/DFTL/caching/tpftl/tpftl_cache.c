@@ -41,6 +41,7 @@ inline static uint32_t get_bits_from_int(uint32_t t){
 }
 
 inline static void etr_sanity_check(GTD_entry *etr){
+	return;
 	if(!etr || !etr->private_data) return;
 	tp_node *tn=(tp_node*)etr->private_data;
 	if(tn->idx!=etr->idx){
@@ -116,9 +117,10 @@ static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
 	return cnt;
 }
 
-bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba){
+bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num){
 	GTD_entry *etr=GETETR(dmm, lba);
 
+	uint32_t prefetching_hint=((*prefetching_num)!=UINT32_MAX?(*prefetching_num):0);
 	etr_sanity_check(etr);
 	uint32_t target_byte;
 	if(etr->private_data){
@@ -128,11 +130,23 @@ bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba){
 	else{
 		target_byte=TP_ENTRY_SZ+TP_NODE_SZ;
 	}
+
+	if(prefetching_hint){
+		for(uint32_t i=lba+1; i<=lba+prefetching_hint; i++){
+			if(GETGTDIDX(i)!=GETGTDIDX(lba)) break;
+			target_byte+=TP_ENTRY_SZ;
+		}
+	}
 	
 	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte){
 		return false;
 	}
 	else return true;
+}
+
+
+bool tp_is_needed_more_eviction(struct my_cache *a, uint32_t lba){
+	return tp_is_needed_eviction(a, lba, NULL);
 }
 
 static inline tp_node* __find_tp_node(GTD_entry *etr){
@@ -219,7 +233,7 @@ uint32_t tp_update_entry_gc(struct my_cache *, GTD_entry *e, uint32_t lba, uint3
 	return __update_entry(e, lba, ppa, true);
 }
 
-uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data){
+uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *prefetching_num){
 	if(etr->status==EMPTY){
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
@@ -255,10 +269,15 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		tcm.tp_node_change_cnt=0;
 		tcm.prefetching_mode=false;
 	}
+	prefetching_len+=*prefetching_num;
 
 	tp_cache_node *tc;
 	uint32_t *ppa_list=(uint32_t*)data;
 	for(uint32_t i=0; i<1+prefetching_len; i++){
+		if(GETGTDIDX(lba)!=(GETGTDIDX((lba+i)))){
+			break;
+		}
+
 		if(bitmap_is_set(tcm.populated_cache_entry, lba+i)){
 			continue;
 		}
@@ -268,6 +287,11 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 
 		tc->ppa=ppa_list[tc->offset];
 		tc->dirty_bit=false;
+
+		if(tc->ppa==UINT32_MAX){
+			free(tc); //not populated entry;
+			continue;
+		}
 
 		if(i==0){
 			tc->lru_node=lru_push(tn->tp_lru,(void*)tc);
@@ -279,6 +303,7 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		bitmap_set(tcm.populated_cache_entry, lba+i);
 		tcm.now_caching_byte+=TP_ENTRY_SZ;
 	}
+
 
 	return 1;
 }
