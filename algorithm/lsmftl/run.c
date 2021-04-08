@@ -79,8 +79,13 @@ sst_file *run_retrieve_close_sst(run *r, uint32_t lba){
 }
 
 void run_append_sstfile_move_originality(run *_run, sst_file *sstfile){
-	if(_run->now_sst_file_num>_run->max_sst_file_num){
-		EPRINT("over sst file", true);
+	if(_run->now_sst_file_num>=_run->max_sst_file_num){
+		/*EPRINT("over sst file", true);*/
+		sst_file *new_sst_set=(sst_file*)calloc(_run->max_sst_file_num*2, sizeof(sst_file));
+		memcpy(new_sst_set, _run->sst_set, sizeof(sst_file) * _run->now_sst_file_num);
+		free(_run->sst_set);
+		_run->sst_set=new_sst_set;
+		_run->max_sst_file_num=_run->max_sst_file_num*2;
 	}
 	if(_run->now_sst_file_num && !(sstfile->start_lba > _run->start_lba && sstfile->start_lba>_run->end_lba)){
 		EPRINT("cannot append!", true);

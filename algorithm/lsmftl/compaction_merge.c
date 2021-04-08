@@ -91,7 +91,7 @@ static void  bulk_invalidation(run *r, uint32_t* border_idx, uint32_t border_lba
 	for(i=(*border_idx); i<r->now_sst_file_num; i++){
 		sst_file *sptr=&r->sst_set[i];
 		if(sptr->end_lba<=border_lba){
-			for(uint32_t j=sptr->file_addr.piece_ppa; j<(sptr->end_ppa-sptr->map_num)*L2PGAP; j++){
+			for(uint32_t j=sptr->file_addr.piece_ppa; j<sptr->end_ppa * L2PGAP; j++){
 				invalidate_piece_ppa(LSM.pm->bm, j, false);
 			}
 			/* invalidate in map_done

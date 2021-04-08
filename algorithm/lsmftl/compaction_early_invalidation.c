@@ -4,7 +4,7 @@ extern lsmtree LSM;
 extern compaction_master *_cm;
 extern void read_map_param_init(read_issue_arg *read_arg, map_range *mr);
 extern bool read_map_done_check(inter_read_alreq_param *param, bool check_page_sst);
-static bool early_map_done(inter_read_alreq_param *param){
+bool early_map_done(inter_read_alreq_param *param){
 	param->map_target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);

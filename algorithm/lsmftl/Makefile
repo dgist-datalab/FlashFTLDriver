@@ -19,6 +19,7 @@ SRCS +=\
 	   segment_level_manager.c\
 	   compaction_merge.c\
 	   compaction_early_invalidation.c\
+	   compaction_sst_convert.c\
 #	   gc.c\
 #	   helper_algorithm/bf_set.c\
 #	   helper_algorithm/compressed_bloomfilter.c

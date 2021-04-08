@@ -61,6 +61,15 @@ static inline bool sst_range_overlap(sst_file *a, sst_file *b){
 	return SEGNUM(a->file_addr.piece_ppa)==SEGNUM(b->file_addr.piece_ppa); 
 }
 
+static inline bool is_map_ppa(sst_file *sptr, uint32_t ppa){
+	for(uint32_t i=0; i<sptr->map_num; i++){
+		if(ppa==sptr->block_file_map[i].ppa){
+			return true;
+		}
+	}
+	return false;
+}
+
 void map_print(map_range *mr);
 
 #define for_each_kp(data_ptr, kp_ptr, kp_idx)\

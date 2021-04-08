@@ -485,7 +485,7 @@ retry:
 		}
 	}
 	seg_idx=victim_target->seg_idx;
-	if(victim_target->invalidate_number==_PPS*L2PGAP){
+	if(victim_target->invalidate_number==victim_target->validate_number){
 		//EPRINT("all invalid block", false);
 	}
 	else if(ismap && pm->seg_type_checker[seg_idx]!=MAPSEG){
@@ -580,6 +580,7 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		char *oob=bm->get_oob(bm, gn->piece_ppa);
 		gn->lba=*(uint32_t*)oob;
 		sst_file *target_sst_file=lsmtree_find_target_sst_mapgc(gn->lba, gn->piece_ppa);
+		target_sst_file->sequential_file=false;
 		invalidate_map_ppa(pm->bm, gn->piece_ppa, true);
 
 		uint32_t ppa=page_manager_get_reserve_new_ppa(pm, true, victim->seg_idx);
@@ -693,7 +694,7 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_data++;
-	if(victim->invalidate_number==_PPS*L2PGAP){
+	if(victim->invalidate_number==victim->validate_number){
 		/*
 	//	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx || LSM.global_debug_flag){
 	//		printf("gc_data:%u (seg_idx:%u) - clean\n", LSM.monitor.gc_data, victim->seg_idx);
@@ -822,7 +823,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				}
 				else{
 					//sptr->trimed_sst_file=true;
-					if(piece_ppa>=(sptr->end_ppa-sptr->map_num+1)*L2PGAP){
+					if(is_map_ppa(sptr, piece_ppa/L2PGAP)){
 						invalidate_map_ppa(pm->bm, piece_ppa/L2PGAP, true);
 						/*mapaddress*/
 						continue;

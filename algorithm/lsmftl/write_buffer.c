@@ -104,7 +104,8 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 	value_set* target_value=NULL;
 	uint32_t ppa=-1;
 	char *oob=NULL;
-	key_ptr_pair *res=(key_ptr_pair*)malloc(sizeof(key_ptr_pair)*wb->data->size());
+	key_ptr_pair *res=(key_ptr_pair*)malloc(PAGESIZE);
+	memset(res, -1, PAGESIZE);
 	fdriver_lock(&LSM.flush_lock);
 
 	for(uint32_t i=0; it!=wb->data->end(); i++, it++){
@@ -235,7 +236,7 @@ key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync, uint32_t se
 	value_set* target_value=NULL;
 	uint32_t ppa=-1;
 	char *oob=NULL;
-	key_ptr_pair *res=(key_ptr_pair*)malloc(sizeof(key_ptr_pair)*KP_IN_PAGE);
+	key_ptr_pair *res=(key_ptr_pair*)malloc(PAGESIZE);
 	memset(res, -1, PAGESIZE);
 	uint32_t remain_page_num=0;
 	if(!wb->rh && wb->rhp.type!=HELPER_NONE){

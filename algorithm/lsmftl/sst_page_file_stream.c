@@ -201,6 +201,9 @@ retry:
 		os->prev_lba=res.lba;
 	}
 #endif
+	if(res.lba==UINT32_MAX){
+		EPRINT("???", false);
+	}
 	return res;
 }
 

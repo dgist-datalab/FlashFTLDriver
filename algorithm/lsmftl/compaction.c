@@ -351,22 +351,23 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 }
 
 static sst_file *key_ptr_to_sst_file(key_ptr_pair *kp_set, bool should_flush){
-	uint32_t ppa=UINT32_MAX;
+	uint32_t map_ppa=UINT32_MAX;
 	if(should_flush){
 		value_set *vs=inf_get_valueset((char*)kp_set, FS_MALLOC_W, PAGESIZE);
-		ppa=page_manager_get_new_ppa(LSM.pm, true, MAPSEG);
-		validate_map_ppa(LSM.pm->bm, ppa, kp_set[0].lba, true);
+		map_ppa=page_manager_get_new_ppa(LSM.pm, false, DATASEG); //DATASEG for sequential tiering 
+		validate_map_ppa(LSM.pm->bm, map_ppa, kp_set[0].lba, true);
 		algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 		write_req->type=MAPPINGW;
 		write_req->param=(void*)vs;
 		write_req->end_req=comp_alreq_end_req;
-		io_manager_issue_internal_write(ppa, vs, write_req, false);
+		io_manager_issue_internal_write(map_ppa, vs, write_req, false);
 	}
 	uint32_t end_idx=kp_end_idx((char*)kp_set);
-	sst_file *sstfile=sst_pf_init(ppa, kp_set[0].lba, kp_set[end_idx].lba);
-	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[end_idx].piece_ppa)){
+	sst_file *sstfile=sst_pf_init(map_ppa, kp_set[0].lba, kp_set[end_idx].lba);
+	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[end_idx].piece_ppa) && SEGNUM(kp_set[0].piece_ppa)==map_ppa/_PPS){
 		sstfile->sequential_file=true;
 	}
+
 	return sstfile;
 }
 
@@ -806,16 +807,30 @@ sst_bf_in_stream *tiering_new_bis(){
 	return bis;
 }
 
+void issue_bis_result(sst_bf_in_stream *bis, uint32_t target_ridx, bool final){
+	uint32_t debug_idx=0;
+	key_ptr_pair debug_kp[L2PGAP];
+	value_set *result=sst_bis_get_result(bis, final, &debug_idx, debug_kp);
+	for(uint32_t i=0; i<debug_idx; i++){
+		compaction_debug_func(debug_kp[i].lba, debug_kp[i].piece_ppa, target_ridx,
+				LSM.disk[LSM.param.LEVELN-1]);
+	}
+	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
+	write_req->type=COMPACTIONDATAW;
+	write_req->param=(void*)result;
+	write_req->end_req=comp_alreq_end_req;
+	io_manager_issue_write(result->ppa, result, write_req, false);	
+}
+
 uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, run *new_run,
 		int32_t entry_num, uint32_t target_ridx, bool final){
 	int32_t inserted_entry_num=0;
-	uint32_t debug_idx=0;
-	key_ptr_pair debug_kp[L2PGAP];
 	uint32_t last_lba=UINT32_MAX;
 
 	fdriver_lock(&LSM.flush_lock);
 	while(!sst_bos_is_empty(bos)){
 		key_value_wrapper *target=NULL;
+
 		if(!final && !(target=sst_bos_pick(bos, entry_num-inserted_entry_num <=L2PGAP))){
 			break;
 		}
@@ -833,22 +848,11 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 
 		if((target && sst_bis_insert(*bis, target)) ||
 				(final && sst_bos_kv_q_size(bos)==1)){
-
-			value_set *result=sst_bis_get_result(*bis, final, &debug_idx, debug_kp);
-			for(uint32_t i=0; i<debug_idx; i++){
-				compaction_debug_func(debug_kp[i].lba, debug_kp[i].piece_ppa, target_ridx,
-					LSM.disk[LSM.param.LEVELN-1]);
-			}
-
-			algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
-			write_req->type=COMPACTIONDATAW;
-			write_req->param=(void*)result;
-			write_req->end_req=comp_alreq_end_req;
-			io_manager_issue_write(result->ppa, result, write_req, false);
+			issue_bis_result(*bis, target_ridx, final);
 		}
 
 		sst_bos_pop(bos, _cm);
-	//	if(!final & sst_bis_ppa_empty(*bis)){
+
 		if(sst_bis_ppa_empty(*bis)){
 			sst_file *sptr=bis_to_sst_file(*bis);
 			lsmtree_gc_unavailable_set(&LSM, sptr, UINT32_MAX);
@@ -861,37 +865,42 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 	}
 	
 	if(final && sst_bos_kv_q_size(bos)==0 && (*bis)->buffer_idx){
-
-		value_set *result=sst_bis_get_result(*bis, final, &debug_idx, debug_kp);
-		for(uint32_t i=0; i<debug_idx; i++){
-			compaction_debug_func(debug_kp[i].lba, debug_kp[i].piece_ppa, target_ridx,
-				LSM.disk[LSM.param.LEVELN-1]);
-		}
-
-		algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
-		write_req->type=COMPACTIONDATAW;
-		write_req->param=(void*)result;
-		write_req->end_req=comp_alreq_end_req;
-		io_manager_issue_write(result->ppa, result, write_req, false);	
+		issue_bis_result(*bis, target_ridx, final);
 	}
 	fdriver_unlock(&LSM.flush_lock);
 	return last_lba;
 }
 
-typedef std::queue<sst_file *> sst_pf_queue;
-
 static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num, uint32_t target_ridx, uint32_t* start_sst_file_idx){
 	run *new_run=run_init(max_sst_file_num, UINT32_MAX, 0);
-	return new_run;
-	
 	bool moved=false;
 	run *rptr;
 	sst_file *sptr;
-//	sst_file *prev_sptr=NULL;
+	sst_file *prev_sptr=NULL;
 	uint32_t ridx, sidx;
+	sst_queue *pf_queue=NULL;
 	for_each_sst_level(src, rptr, ridx, sptr, sidx){
 		if(!sptr->sequential_file) break;
 		moved=true;
+		if(prev_sptr==NULL){
+			prev_sptr=sptr;
+			pf_queue=new sst_queue();
+			pf_queue->push(sptr);
+		}
+		else{
+			if(prev_sptr->file_addr.map_ppa/_PPS == sptr->file_addr.map_ppa/_PPS){
+				pf_queue->push(sptr);
+			}
+			else{
+				sst_file *block_file=compaction_seq_pagesst_to_blocksst(pf_queue);
+				run_append_sstfile_move_originality(new_run, block_file);
+				sst_free(block_file, LSM.pm);
+				delete pf_queue;
+				pf_queue=new sst_queue();
+				pf_queue->push(sptr);
+			}
+			prev_sptr=sptr;
+		}
 		//version update!
 		version_update_for_trivial_move(LSM.last_run_version, 
 				sptr->start_lba, 
@@ -899,6 +908,14 @@ static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num,
 				version_level_idx_to_version(LSM.last_run_version, src->idx, LSM.param.LEVELN),
 				target_ridx);
 	}
+
+	if(pf_queue){
+		sst_file *block_file=compaction_seq_pagesst_to_blocksst(pf_queue);
+		run_append_sstfile_move_originality(new_run, block_file);
+		sst_free(block_file, LSM.pm);
+		delete pf_queue;
+	}
+
 	if(moved){
 		*start_sst_file_idx=sidx;
 	}
@@ -911,9 +928,6 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 
 	LSM.monitor.compaction_cnt[des->idx]++;
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
-
-
-
 	uint32_t start_sst_file_idx=UINT32_MAX;
 	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_ridx, &start_sst_file_idx);
 
@@ -921,7 +935,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		level_update_run_at_move_originality(res, target_ridx, new_run, true);
 		version_populate_run(LSM.last_run_version, target_ridx);
 		tiering_compaction_error_check(src, NULL, NULL, new_run, LSM.monitor.compaction_cnt[des->idx]);
-
+		
 		run_free(new_run);
 		level_print(res);
 		return res;
@@ -933,7 +947,23 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	//	start_sst_file_idx=0;
 	}
 	else{
-		needed_seg_num=(((src->now_sst_num-start_sst_file_idx-1)*KP_IN_PAGE/L2PGAP+(src->now_sst_num-start_sst_file_idx-1))/_PPS+1+1);
+		if(src->now_sst_num==start_sst_file_idx){
+			run *rptr; uint32_t ridx;
+			for_each_run_max(des, rptr, ridx){
+				if(rptr->now_sst_file_num){
+					level_append_run_copy_move_originality(res, rptr, ridx);
+				}
+			}
+			level_update_run_at_move_originality(res, target_ridx, new_run, true);
+			version_populate_run(LSM.last_run_version, target_ridx);
+			tiering_compaction_error_check(src, NULL, NULL, new_run, LSM.monitor.compaction_cnt[des->idx]);
+			run_free(new_run);
+			level_print(res);
+			return res;
+		}
+		else{
+			needed_seg_num=(((src->now_sst_num-start_sst_file_idx)*KP_IN_PAGE/L2PGAP+(src->now_sst_num-start_sst_file_idx))/_PPS+1+1);
+		}
 	}
 
 	if(page_manager_get_total_remain_page(LSM.pm, false) < needed_seg_num*_PPS){
@@ -1044,7 +1074,9 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	sst_file *temp_sptr;
 	uint32_t temp_sidx;
 	for_each_sst(new_run, temp_sptr, temp_sidx){
-		lsmtree_gc_unavailable_unset(&LSM, temp_sptr, UINT32_MAX);
+		if(!temp_sptr->sequential_file){
+			lsmtree_gc_unavailable_unset(&LSM, temp_sptr, UINT32_MAX);
+		}
 	}
 
 	run_free(new_run);

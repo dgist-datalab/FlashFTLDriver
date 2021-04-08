@@ -73,6 +73,8 @@ typedef struct compaction_master{
 	//slab_master *kv_wrapper_slab;
 }compaction_master;
 
+typedef std::queue<sst_file *> sst_queue;
+
 compaction_master *compaction_init(uint32_t compaction_queue_num);
 void compaction_free(compaction_master *cm);
 void compaction_issue_req(compaction_master *cm, compaction_req *);
@@ -81,6 +83,7 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *d
 level* compaction_leveling(compaction_master *cm, level *src, level *des);
 level* compaction_tiering(compaction_master *cm, level *src, level *des);
 level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx);
+sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *);
 
 uint32_t compaction_read_param_remain_num(compaction_master *cm);
 inter_read_alreq_param *compaction_get_read_param(compaction_master *cm);
@@ -89,6 +92,8 @@ key_value_wrapper *compaction_get_kv_wrapper(uint32_t ppa);
 void compaction_free_kv_wrapper(key_value_wrapper *kv_wrap);
 uint32_t compaction_early_invalidation(uint32_t target_ridx);
 void read_sst_job(void *arg, int th_num);
+void read_map_param_init(read_issue_arg *read_arg, map_range *mr);
+bool read_map_done_check(inter_read_alreq_param *param, bool check_page_sst);
 
 uint32_t stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_stream **os_set, 
 		struct sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 

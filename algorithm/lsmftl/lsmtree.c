@@ -133,7 +133,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * WRITEBUFFER_NUM);
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
-		LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE, LSM.pm, NORMAL_WB);
+		LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
 	}
 	
 	LSM.moved_kp_set=new std::deque<key_ptr_pair*>();
@@ -614,7 +614,7 @@ retry:
 		compaction_issue_req(LSM.cm, temp_req);
 
 
-		LSM.wb_array[LSM.now_wb]=write_buffer_init(KP_IN_PAGE, LSM.pm, NORMAL_WB);
+		LSM.wb_array[LSM.now_wb]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
 		if(++LSM.now_wb==WRITEBUFFER_NUM){
 			LSM.now_wb=0;
 		}

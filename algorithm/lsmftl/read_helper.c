@@ -44,13 +44,13 @@ read_helper *read_helper_kpset_to_rh(read_helper_param rhp, key_ptr_pair *kp_set
 	switch(rhp.type){
 		case HELPER_BF_PTR:
 			res->body=(void*)bf_set_init(rhp.target_prob, rhp.member_num, BLOOM_PTR_PAIR);
-			for(;i<KP_IN_PAGE; i++){
+			for(;i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++){
 				bf_set_insert((bf_set*)res->body, kp_set[i].lba, kp_set[i].piece_ppa);
 			}
 			break;
 		case HELPER_BF_PTR_GUARD:
 			res->body=(void*)gbf_set_init(rhp.target_prob, rhp.member_num, BLOOM_PTR_PAIR);
-			for(;i<KP_IN_PAGE; i++){
+			for(;i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++){
 				gbf_set_insert((guard_bf_set*)res->body, kp_set[i].lba, kp_set[i].piece_ppa);
 			}
 			break;
@@ -101,6 +101,34 @@ uint32_t read_helper_memory_usage(read_helper *rh){
 	return UINT32_MAX;
 }
 
+static inline uint32_t adjust_piece_ppa(uint8_t type, uint32_t hp_result_piece_ppa, uint32_t start_addr_piece_ppa, sst_file *sptr){
+	uint32_t res=0;
+	uint32_t i;
+	map_range *mr;
+	switch(type){
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_BF_ONLY:
+			if(sptr->sequential_file){
+				mr=sptr->block_file_map;
+				for(i=0; i<sptr->map_num; i++){
+					if(mr[i].ppa <= (start_addr_piece_ppa+hp_result_piece_ppa)/L2PGAP){
+						hp_result_piece_ppa+=L2PGAP;
+					}
+					else break;
+				}
+				res=hp_result_piece_ppa+start_addr_piece_ppa;
+			}
+			else{
+				res=hp_result_piece_ppa+start_addr_piece_ppa;
+			}
+			break;
+		default:
+			EPRINT("error", true);
+			break;
+	}
+	return res;
+}
+
 bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result, 
 		sst_file *sptr, uint32_t *idx){
 	if(!rh){
@@ -133,7 +161,7 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 				if(sptr->type!=BLOCK_FILE){
 					EPRINT("read_helper miss match", true);
 				}
-				*piece_ppa_result=*piece_ppa_result+sptr->file_addr.piece_ppa;
+				*piece_ppa_result=adjust_piece_ppa(rh->type, *piece_ppa_result, sptr->file_addr.piece_ppa, sptr);
 				(*idx)--;
 				return true;
 			}
@@ -162,7 +190,7 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 				if(sptr->type!=BLOCK_FILE){
 					EPRINT("read_helper miss match", true);
 				}
-				*piece_ppa_result=*piece_ppa_result+sptr->file_addr.piece_ppa;
+				*piece_ppa_result=adjust_piece_ppa(rh->type, *piece_ppa_result, sptr->file_addr.piece_ppa, sptr);
 				(*idx)--;
 				return true;
 			}
