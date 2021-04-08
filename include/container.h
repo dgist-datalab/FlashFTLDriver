@@ -76,6 +76,8 @@ struct request {
 	//pthread_mutex_t async_mutex;
 	//fdriver_lock_t sync_lock;
 	int mark;
+	bool is_sequential_start;
+	uint32_t consecutive_length; 
 
 /*s:for application req
 	char *target_buf;

@@ -45,6 +45,8 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 	txn->req_array=(request*)malloc(sizeof(request)*txn->size);
 
 	static uint32_t seq=0;
+	uint32_t prev_lba=UINT32_MAX;
+	uint32_t consecutive_cnt=0;
 	for(uint32_t i=0; i<txn->size; i++){
 		request *temp=&txn->req_array[i];
 		temp->tid=txn->tid;
@@ -82,12 +84,31 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		}
 
 		temp->key=*(uint32_t*)buf_parser(buf,&idx,sizeof(uint32_t));
+		if(prev_lba==UINT32_MAX){
+			prev_lba=temp->key;
+		}
+		else{
+			if(prev_lba+1==temp->key){
+				consecutive_cnt++;
+			}
+			else{
+				txn->req_array[i-consecutive_cnt-1].is_sequential_start=(consecutive_cnt!=0);
+				txn->req_array[i-consecutive_cnt-1].consecutive_length=
+					(consecutive_cnt?consecutive_cnt:0);
+				consecutive_cnt=0;
+			}
+			prev_lba=temp->key;
+			temp->consecutive_length=0;
+		}
 		if(mp._data_check_flag && temp->type==FS_SET_T){
 			__checking_data_make( temp->key,temp->value->value);
 		}
-		temp->offset=*(uint32_t*)buf_parser(buf, &idx, sizeof(uint32_t));
-		
+		temp->offset=*(uint32_t*)buf_parser(buf, &idx, sizeof(uint32_t));	
 	}
+
+	txn->req_array[(txn->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
+	txn->req_array[(txn->size-1)-consecutive_cnt].consecutive_length=
+		(consecutive_cnt?consecutive_cnt:UINT32_MAX);
 
 	while(1){
 		pthread_mutex_lock(&flying_cnt_lock);
