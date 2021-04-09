@@ -2,6 +2,7 @@
 #define __READ_HELPER_H__
 #include "key_value_pair.h"
 #include "../../include/settings.h"
+#include "page_manager.h"
 #include "sst_file.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -30,6 +31,9 @@ typedef struct read_helper_param{
 	uint32_t type;
 	float target_prob;
 	uint32_t member_num;
+	/*for PLR*/
+	uint64_t slop_bit;
+	uint32_t range;
 }read_helper_param;
 
 //read_helper *read_helper_stream_init(uint32_t helper_type);
@@ -45,7 +49,9 @@ read_helper* read_helper_copy(read_helper *src);
 void read_helper_move(read_helper *des, read_helper *src);
 bool read_helper_last(read_helper *rh, uint32_t idx);
 uint32_t read_helper_idx_init(read_helper *rh, uint32_t lba);
-
+bool read_helper_data_checking(read_helper *rh, struct _page_manager*, uint32_t piece_ppa, 
+		uint32_t lba, uint32_t *rh_idx, uint32_t *offset);
+void read_helper_insert_done(read_helper *rh);
 static inline char *read_helper_type(uint32_t i){
 	switch(i){
 		case 0: return "NONE";

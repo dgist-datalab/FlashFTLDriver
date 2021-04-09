@@ -109,7 +109,7 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		LSM.param.leveling_rhp.type=HELPER_BF_PTR_GUARD;
 		LSM.param.leveling_rhp.target_prob=LSM.param.read_amplification/LSM.param.LEVELN;
 		LSM.param.leveling_rhp.member_num=KP_IN_PAGE;
-
+#if 0
 		LSM.param.tiering_rhp.type=HELPER_BF_ONLY_GUARD;
 		if(LSM.param.version_enable){
 			LSM.param.tiering_rhp.target_prob=LSM.param.read_amplification/(LSM.param.LEVELN-1+LSM.param.last_size_factor);
@@ -118,6 +118,13 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 			LSM.param.tiering_rhp.target_prob=LSM.param.read_amplification/(LSM.param.LEVELN);
 		}
 		LSM.param.tiering_rhp.member_num=KP_IN_PAGE;
+#else
+		LSM.param.tiering_rhp.type=HELPER_PLR;
+		LSM.param.tiering_rhp.slop_bit=7;
+		LSM.param.tiering_rhp.range=50;
+		LSM.param.tiering_rhp.member_num=KP_IN_PAGE;
+#endif
+ 
 	}
 	printf("------------------------------------------\n");
 	print_level_param();
@@ -164,15 +171,19 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 
 
 	/*read helper prepair*/
-	read_helper_prepare(
-			LSM.param.leveling_rhp.target_prob, 
-			LSM.param.leveling_rhp.member_num, 
-			BLOOM_PTR_PAIR);
+	if(LSM.param.leveling_rhp.type!=HELPER_PLR){
+		read_helper_prepare(
+				LSM.param.leveling_rhp.target_prob, 
+				LSM.param.leveling_rhp.member_num, 
+				BLOOM_PTR_PAIR);
+	}
 
-	read_helper_prepare(
-			LSM.param.tiering_rhp.target_prob,
-			LSM.param.tiering_rhp.member_num,
-			BLOOM_ONLY);
+	if(LSM.param.tiering_rhp.type!=HELPER_PLR){
+		read_helper_prepare(
+				LSM.param.tiering_rhp.target_prob,
+				LSM.param.tiering_rhp.member_num,
+				BLOOM_ONLY);
+	}
 
 	rwlock_init(&LSM.flushed_kp_set_lock);
 	LSM.flushed_kp_set=(key_ptr_pair**)malloc(sizeof(key_ptr_pair*)*COMPACTION_REQ_MAX_NUM);
@@ -255,6 +266,7 @@ static inline algo_req *get_read_alreq(request *const req, uint8_t type,
 		uint32_t physical_address, lsmtree_read_param *r_param){
 	algo_req *res=(algo_req *)calloc(1,sizeof(algo_req));
 	res->ppa=physical_address;
+	r_param->piece_ppa=physical_address;
 	res->type=type;
 	res->param=(void*)r_param;
 	res->end_req=lsmtree_read_end_req;
@@ -318,9 +330,9 @@ retry:
 	if(*sptr==NULL){
 		goto retry;
 	}
-
 	r_param->prev_sf=*sptr;
 	r_param->read_helper_idx=read_helper_idx_init((*sptr)->_read_helper, lba);
+	r_param->rh=(*sptr)->_read_helper;
 	return true;
 }
 
@@ -411,6 +423,7 @@ uint32_t lsmtree_read(request *const req){
 		r_param->prev_level=-1;
 		r_param->prev_run=UINT32_MAX;
 		r_param->target_level_rw_lock=NULL;
+		r_param->piece_ppa=UINT32_MAX;
 
 		/*find data from write_buffer*/
 		lsmtree_find_version_with_lock(req->key, r_param);
@@ -489,7 +502,8 @@ uint32_t lsmtree_read(request *const req){
 	level *target=NULL;
 	run *rptr=NULL;
 	sst_file *sptr=NULL;
-	uint32_t read_target_ppa=UINT32_MAX; //map_ppa && map_piece_ppa
+	uint32_t read_target_ppa=r_param->piece_ppa; //map_ppa && map_piece_ppa
+	//uint32_t read_target_ppa=UINT32_MAX; //map_ppa && map_piece_ppa
 
 	switch(r_param->check_type){
 		case K2VMAP:
@@ -643,15 +657,30 @@ uint32_t lsmtree_remove(request *const req){
 static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_path){
 	request *parents=req->parents;
 	lsmtree_read_param *r_param=(lsmtree_read_param*)req->param;
-	uint32_t idx;
+	uint32_t offset;
 	uint32_t piece_ppa=req->ppa;
-	if(page_manager_oob_lba_checker(LSM.pm, piece_ppa, parents->key, &idx)){
+
+	if(r_param->use_read_helper && 
+			read_helper_data_checking(r_param->rh, LSM.pm, piece_ppa, parents->key, &r_param->read_helper_idx,&offset)){
 		rwlock_read_unlock(r_param->target_level_rw_lock);
-		if(idx>=L2PGAP){
+		if(offset>=L2PGAP){
 			EPRINT("can't be plz checking oob_lba_checker", true);
 		}
-		if(idx){
-			memcpy(parents->value->value, &v[idx*LPAGESIZE], LPAGESIZE);
+		if(offset){
+			memcpy(parents->value->value, &v[offset*LPAGESIZE], LPAGESIZE);
+		}
+		parents->end_req(parents);
+		free(r_param);
+		free(req);
+	}
+	else if(page_manager_oob_lba_checker(LSM.pm, piece_ppa, 
+				parents->key, &offset)){
+		rwlock_read_unlock(r_param->target_level_rw_lock);
+		if(offset>=L2PGAP){
+			EPRINT("can't be plz checking oob_lba_checker", true);
+		}
+		if(offset){
+			memcpy(parents->value->value, &v[offset*LPAGESIZE], LPAGESIZE);
 		}
 		parents->end_req(parents);
 		free(r_param);

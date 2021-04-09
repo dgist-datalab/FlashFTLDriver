@@ -1,6 +1,7 @@
 #include "read_helper.h"
 #include "helper_algorithm/bf_set.h"
 #include "helper_algorithm/guard_bf_set.h"
+#include "helper_algorithm/plr_helper.h"
 #include "key_value_pair.h"
 extern uint32_t debug_lba;
 
@@ -25,6 +26,9 @@ read_helper *read_helper_init(read_helper_param rhp){
 			break;
 		case HELPER_BF_ONLY_GUARD:
 			res->body=(void*)gbf_set_init(rhp.target_prob, rhp.member_num, BLOOM_ONLY);
+			break;
+		case HELPER_PLR:
+			res->body=(void*)plr_init(rhp.slop_bit, rhp.range, rhp.member_num);
 			break;
 		default:
 			EPRINT("not collect type",true);
@@ -54,6 +58,7 @@ read_helper *read_helper_kpset_to_rh(read_helper_param rhp, key_ptr_pair *kp_set
 				gbf_set_insert((guard_bf_set*)res->body, kp_set[i].lba, kp_set[i].piece_ppa);
 			}
 			break;
+		case HELPER_PLR:
 		case HELPER_BF_ONLY_GUARD:
 		case HELPER_BF_ONLY:
 			EPRINT("cannot",true);
@@ -62,11 +67,14 @@ read_helper *read_helper_kpset_to_rh(read_helper_param rhp, key_ptr_pair *kp_set
 			EPRINT("not collect type",true);
 			break;
 	}
-
+	read_helper_insert_done(res);
 	return res;
 }
 uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece_ppa){
 	if(!rh) return 1;
+	if(lba==debug_lba){
+		EPRINT("debug point", false);
+	}
 	switch(rh->type){
 		case HELPER_BF_PTR:
 		case HELPER_BF_ONLY:
@@ -75,6 +83,9 @@ uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece
 		case HELPER_BF_ONLY_GUARD:
 		case HELPER_BF_PTR_GUARD:
 			gbf_set_insert((guard_bf_set*)rh->body, lba, piece_ppa);
+			break;
+		case HELPER_PLR:
+			plr_insert((plr_helper*)rh->body, lba, piece_ppa/L2PGAP);
 			break;
 		default:
 			EPRINT("not collect type",true);
@@ -93,6 +104,8 @@ uint32_t read_helper_memory_usage(read_helper *rh){
 		case HELPER_BF_PTR_GUARD:
 		case HELPER_BF_ONLY_GUARD:
 			return gbf_get_memory_usage_bit((guard_bf_set*)rh->body);
+		case HELPER_PLR:
+			return plr_memory_usage((plr_helper*)rh->body);
 		default:
 			EPRINT("not collect type",true);
 			break;
@@ -138,6 +151,7 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 
 	if((*idx)==UINT32_MAX) 
 		return false;
+	uint32_t ppa;
 	switch(rh->type){
 		case HELPER_BF_PTR:
 			*piece_ppa_result=bf_set_get_piece_ppa((bf_set*)rh->body, 
@@ -194,6 +208,17 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 				(*idx)--;
 				return true;
 			}
+		case HELPER_PLR:
+			if(lba==debug_lba){
+				printf("debug_break!\n");
+			}
+			if((*idx)==PLR_SECOND_ROUND){
+				(*idx)=UINT32_MAX;
+				return false;
+			}
+			ppa=plr_get_ppa((plr_helper*)rh->body, lba, (*piece_ppa_result)/L2PGAP, idx);
+			*piece_ppa_result=ppa*L2PGAP;
+			return true;
 		default:
 			EPRINT("not collect type",true);
 			break;
@@ -216,6 +241,9 @@ void read_helper_free(read_helper *rh){
 		case HELPER_BF_ONLY_GUARD:
 			gbf_set_free((guard_bf_set*)rh->body);
 			break;
+		case HELPER_PLR:
+			plr_free((plr_helper*)rh->body);
+			break;
 		default:
 			EPRINT("not collect type",true);
 			break;
@@ -236,6 +264,9 @@ read_helper* read_helper_copy(read_helper *src){
 		case HELPER_BF_PTR_GUARD:
 		case HELPER_BF_ONLY_GUARD:
 			res->body=(void*)gbf_set_copy((guard_bf_set*)src->body);
+			break;
+		case HELPER_PLR:
+			res->body=(void*)plr_copy((plr_helper*)src->body);
 			break;
 		default:
 			EPRINT("not collect type",true);
@@ -259,6 +290,9 @@ void read_helper_move(read_helper *des, read_helper *src){
 		case HELPER_BF_ONLY_GUARD:
 			gbf_set_move((guard_bf_set*)des->body, (guard_bf_set*)src->body);
 			break;
+		case HELPER_PLR:
+			plr_move((plr_helper*)des->body, (plr_helper*)src->body);
+			break;
 		default:
 			EPRINT("not collect type",true);
 			break;
@@ -272,6 +306,7 @@ bool read_helper_last(read_helper *rh, uint32_t idx){
 		case HELPER_BF_PTR:
 		case HELPER_BF_ONLY_GUARD:
 		case HELPER_BF_PTR_GUARD:
+		case HELPER_PLR:
 			if((int32_t)idx==-1) return true;
 			break;
 		default:
@@ -290,9 +325,71 @@ uint32_t read_helper_idx_init(read_helper *rh, uint32_t lba){
 		case HELPER_BF_ONLY_GUARD:
 		case HELPER_BF_PTR_GUARD:
 			return gbf_get_start_idx((guard_bf_set*)rh->body, lba);
+		case HELPER_PLR:
+			return PLR_NORMAL_PPA;
 		default:
 			EPRINT("not collect type",true);
 			break;
 	}
 	return UINT32_MAX;
+}
+
+static inline int PLR_checking_oob(uint32_t lba, uint32_t piece_ppa, uint32_t *lba_set){
+	for(uint32_t i=0; i<L2PGAP; i++){
+		if(i==0 && lba < lba_set[i]){
+			return -1;
+		}
+		if(lba==lba_set[i]) return i;
+	}
+	return L2PGAP;
+}
+
+bool read_helper_data_checking(read_helper *rh, page_manager* pm, uint32_t piece_ppa, 
+		uint32_t lba, uint32_t *rh_idx, uint32_t *offset){
+	if(lba==debug_lba){
+		EPRINT("debug point", false);
+	}
+	switch(rh->type){
+		case HELPER_BF_ONLY:
+		case HELPER_BF_PTR:
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_BF_PTR_GUARD:
+			if(page_manager_oob_lba_checker(pm, piece_ppa, lba, offset)){
+				return true;
+			}
+			break;
+		case HELPER_PLR:
+			(*offset)=PLR_checking_oob(lba, piece_ppa, 
+					(uint32_t*)pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa)));
+			switch((int32_t)(*offset)){
+				case -1:
+					if((*rh_idx)==PLR_NORMAL_PPA) (*rh_idx)=PLR_FRONT_PPA;
+					else (*rh_idx)=PLR_SECOND_ROUND;
+					return false;
+				case L2PGAP:
+					if((*rh_idx)==PLR_NORMAL_PPA) (*rh_idx)=PLR_BEHIND_PPA;
+					else (*rh_idx)=PLR_SECOND_ROUND;
+					return false;			
+				default:
+					return true;
+			}
+			break;
+		default:
+			EPRINT("not collect type",true);
+			break;
+	}
+	return false;
+}
+
+void read_helper_insert_done(read_helper *rh){
+	switch(rh->type){
+		case HELPER_BF_ONLY:
+		case HELPER_BF_PTR:
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_BF_PTR_GUARD:
+			return;
+		case HELPER_PLR:
+			plr_insert_done((plr_helper*)rh->body);
+			break;
+	}
 }

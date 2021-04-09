@@ -61,19 +61,8 @@ sst_pf_in_stream* sst_pis_init(bool make_read_helper, read_helper_param rhp);
 void sst_pis_set_space(sst_pf_in_stream *is, value_set *data, uint8_t type);
 bool sst_pis_insert(sst_pf_in_stream *is, key_ptr_pair kp);
 
-static inline value_set *sst_pis_get_result(sst_pf_in_stream *is, 
-		sst_file **result_ptr){
-	value_set *res=is->vs;
-	is->now->start_lba=((key_ptr_pair*)is->now->data)[0].lba;
-	is->now->end_lba=((key_ptr_pair*)is->now->data)[is->idx-1].lba;
-	*result_ptr=is->now;
-	is->now->_read_helper=is->rh;
-	is->rh=NULL;
-	is->vs=NULL;
-	is->now=NULL;
-	is->idx=0;
-	return res;
-}
+value_set *sst_pis_get_result(sst_pf_in_stream *is, 
+		sst_file **result_ptr);
 
 static inline bool sst_pis_remain_data(sst_pf_in_stream *is){
 	return !(is->idx==0);

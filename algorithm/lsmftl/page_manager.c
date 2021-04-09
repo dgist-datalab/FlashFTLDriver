@@ -671,6 +671,7 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 			sptr->start_lba=kp_set[0][0].lba;
 			sptr->end_lba=mr_set[kp_set_idx-1].end_lba;
 			sptr->_read_helper=gsn->wb->rh;
+			read_helper_insert_done(gsn->wb->rh);
 			if(round==0){
 				level_sptr_update_in_gc(LSM.disk[LSM.param.LEVELN-1], ridx, sidx, sptr);
 			}

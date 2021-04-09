@@ -57,6 +57,8 @@ typedef struct lsmtree_read_param{
 	uint32_t version;
 	bool use_read_helper;
 	uint32_t read_helper_idx;
+	uint32_t piece_ppa;
+	read_helper *rh;
 	rwlock *target_level_rw_lock;
 }lsmtree_read_param;
 

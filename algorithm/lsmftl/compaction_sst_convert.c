@@ -142,6 +142,7 @@ sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q){
 	}
 	sst_pos_free(pos);
 	free(thread_arg.arg_set);
+	read_helper_insert_done(res->_read_helper);
 	sst_sanity_checker(res);
 	return res;
 }

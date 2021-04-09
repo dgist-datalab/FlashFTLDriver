@@ -5,7 +5,7 @@
 #include "lsmtree.h"
 #include <stdio.h>
 #include <stdlib.h>
-
+extern uint32_t debug_lba;
 extern lsmtree LSM;
 write_buffer *write_buffer_reinit(write_buffer *wb){
 	std::map<uint32_t, buffer_entry*>::iterator it=wb->data->begin();
@@ -122,6 +122,11 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
+
+		if(res[i].lba==debug_lba){
+			printf("map target:%u -> %u in buffer", res[i].lba, res[i].piece_ppa);
+		}
+
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
 		inf_free_valueset(it->second->data.data, FS_MALLOC_W);
 		it->second->data.data=NULL;
@@ -225,7 +230,6 @@ uint32_t write_buffer_insert_for_gc(write_buffer *wb, uint32_t lba, char *gc_dat
 	return encode_return_code(SUCCESSED, WB_NONE);
 }
 
-extern uint32_t debug_lba;
 
 key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync, uint32_t seg_idx, bool *force_stop, uint32_t prev_map){
 	if(wb->buffered_entry_num==0) return NULL;

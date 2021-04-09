@@ -10,8 +10,8 @@ extern lsmtree LSM;
 
 compaction_master *_cm;
 
-//uint32_t debug_lba=807091;
-//uint32_t debug_lba=520671;
+//uint32_t debug_lba=4550;
+//uint32_t debug_lba=4;
 uint32_t debug_lba=UINT32_MAX;
 
 extern uint32_t debug_piece_ppa;
@@ -795,6 +795,7 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 	res->start_lba=bis->start_lba;
 	res->end_lba=bis->end_lba;
 	res->_read_helper=bis->rh;
+	read_helper_insert_done(bis->rh);
 	bis->rh=NULL;
 	return res;
 }
