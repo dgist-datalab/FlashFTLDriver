@@ -136,7 +136,7 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	}
 
 	if(free_block_set->total_invalid_number || free_block_set->total_valid_number){
-		EPRINT("not allowed!\n", true);
+		EPRINT("how can it be!\n", true);
 	}
 
 	if(!free_block_set){

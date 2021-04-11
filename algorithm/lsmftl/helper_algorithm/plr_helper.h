@@ -7,6 +7,8 @@ enum{
 	PLR_NORMAL_PPA, PLR_FRONT_PPA, PLR_BEHIND_PPA, PLR_SECOND_ROUND
 };
 
+class PLR;
+
 typedef struct plr_helper{
 	uint32_t now;
 	uint32_t max;

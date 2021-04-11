@@ -474,6 +474,38 @@ bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_num){
 
 retry:
 	victim_target=pm->bm->get_gc_target(pm->bm);
+	seg_idx=victim_target->seg_idx;
+
+	if(ismap){
+		if(pm->seg_type_checker[seg_idx]!=MAPSEG &&  
+				pm->current_segment[DATA_S]->seg_idx!=seg_idx && 
+				victim_target->invalidate_number==victim_target->validate_number){
+			goto out;
+		}
+		else if(pm->seg_type_checker[seg_idx]==MAPSEG){
+			goto out;
+		}
+	}
+	else{
+		if(pm->seg_type_checker[seg_idx]==MAPSEG &&  
+				pm->current_segment[MAP_S]->seg_idx!=seg_idx && 
+				victim_target->invalidate_number==victim_target->validate_number){
+			goto out;
+		}
+		else if(pm->seg_type_checker[seg_idx]!=MAPSEG){
+			goto out;
+		}
+	}
+
+retry_logic:
+	free(victim_target);
+	temp_queue.push(seg_idx);
+	goto retry;
+
+out:
+	if(LSM.gc_unavailable_seg[seg_idx]){
+		goto retry_logic;
+	}
 	if(!victim_target || victim_target->invalidate_number<L2PGAP){
 		/*make invalidation*/
 		if(compaction_early_invalidation(UINT32_MAX)==0){
@@ -481,29 +513,8 @@ retry:
 			EPRINT("may device has no free block!", true);
 		}
 		else{
-			goto retry;
+			goto retry_logic;
 		}
-	}
-	seg_idx=victim_target->seg_idx;
-	if(victim_target->invalidate_number==victim_target->validate_number){
-		//EPRINT("all invalid block", false);
-	}
-	else if(ismap && pm->seg_type_checker[seg_idx]!=MAPSEG){
-		free(victim_target);
-		temp_queue.push(seg_idx);
-		goto retry;
-	}
-	else if(!ismap && (pm->seg_type_checker[seg_idx]!=DATASEG &&
-					pm->seg_type_checker[seg_idx]!=SEPDATASEG)){
-		free(victim_target);
-		temp_queue.push(seg_idx);
-		goto retry;
-	}
-
-	if(LSM.gc_unavailable_seg[seg_idx]){
-		free(victim_target);
-		temp_queue.push(seg_idx);
-		goto retry;
 	}
 
 	switch(pm->seg_type_checker[seg_idx]){
@@ -542,6 +553,7 @@ retry:
 
 bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_mapping++;
+//	printf("gc_mapping:%u (seg_idx:%u)\n", LSM.monitor.gc_mapping, victim->seg_idx);
 	if(victim->invalidate_number==_PPS*L2PGAP || victim->all_invalid){
 		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
 			printf("gc_mapping:%u (seg_idx%u) clean\n", LSM.monitor.gc_mapping, victim->seg_idx);
@@ -554,9 +566,6 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		EPRINT("????", true);
 	}
 	
-	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
-		printf("gc_mapping:%u (seg_idx%u)\n", LSM.monitor.gc_mapping, victim->seg_idx);
-	}
 	//static int cnt=0;
 	//printf("mapping gc:%u\n", ++cnt);
 
@@ -695,6 +704,7 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_data++;
+	//printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
 	if(victim->invalidate_number==victim->validate_number){
 		/*
 	//	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx || LSM.global_debug_flag){
@@ -716,12 +726,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	uint32_t read_page_num=0;
 	uint32_t valid_piece_ppa_num=0;
 	uint32_t temp[_PPS*L2PGAP];
-	/*
-	for(uint32_t i=0; i<64; i++){
-		printf("%u invalid_number:%u\n", i,victim->blocks[i]->invalidate_number);
-	}
-	printf("all_invalid: %u\n", victim->all_invalid);
-	*/
+
 	for_each_page_in_seg(victim, page, bidx, pidx){
 		should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){

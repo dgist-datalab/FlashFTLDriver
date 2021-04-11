@@ -52,6 +52,8 @@ void measure_adding(MeasureTime *m){
 	m->adding.tv_usec+=res.tv_usec;
 	t=m->header;
 	m->header=m->header->next;
+	m->cnt++;
+	m->isadding=true;
 	free(t);
 }
 void measure_adding_print(MeasureTime *m){

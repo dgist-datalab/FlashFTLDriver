@@ -1,8 +1,7 @@
-#include "read_helper.h"
-#include "helper_algorithm/bf_set.h"
-#include "helper_algorithm/guard_bf_set.h"
-#include "helper_algorithm/plr_helper.h"
 #include "key_value_pair.h"
+#include "lsmtree.h"
+#include "read_helper.h"
+extern lsmtree LSM;
 extern uint32_t debug_lba;
 
 void read_helper_prepare(float target_fpr, uint32_t member, uint32_t type){
@@ -75,6 +74,14 @@ uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece
 	if(lba==debug_lba){
 		EPRINT("debug point", false);
 	}
+#ifdef TIMERESULT
+	if(rh->type & HELPER_BF_PTR){
+		measure_start(&LSM.monitor.RH_make_stopwatch[0]);
+	}
+	else{
+		measure_start(&LSM.monitor.RH_make_stopwatch[1]);
+	}
+#endif
 	switch(rh->type){
 		case HELPER_BF_PTR:
 		case HELPER_BF_ONLY:
@@ -91,6 +98,14 @@ uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece
 			EPRINT("not collect type",true);
 			break;
 	}
+#ifdef TIMERESULT
+	if(rh->type & HELPER_BF_PTR){
+		measure_adding(&LSM.monitor.RH_make_stopwatch[0]);
+	}
+	else{
+		measure_adding(&LSM.monitor.RH_make_stopwatch[1]);
+	}
+#endif
 	return 1;
 }
 
@@ -151,25 +166,37 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 
 	if((*idx)==UINT32_MAX) 
 		return false;
+	bool result=true;
 	uint32_t ppa;
+#ifdef TIMERESULT
+	if(sptr->type==PAGE_FILE){
+		measure_start(&LSM.monitor.RH_check_stopwatch[0]);
+	}
+	else{
+		measure_start(&LSM.monitor.RH_check_stopwatch[1]);
+	}
+#endif
 	switch(rh->type){
 		case HELPER_BF_PTR:
 			*piece_ppa_result=bf_set_get_piece_ppa((bf_set*)rh->body, 
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
 				(*idx)=UINT32_MAX;
-				return false;
+				result=false;
+				break;
 			}
 			else{
 				(*idx)--;
-				return true;
+				result=true;
+				break;
 			}
 		case HELPER_BF_ONLY:
 			*piece_ppa_result=bf_set_get_piece_ppa((bf_set*)rh->body, 
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
 				(*idx)=UINT32_MAX;
-				return false;
+				result=false;
+				break;
 			}
 			else{
 				if(sptr->type!=BLOCK_FILE){
@@ -177,18 +204,21 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 				}
 				*piece_ppa_result=adjust_piece_ppa(rh->type, *piece_ppa_result, sptr->file_addr.piece_ppa, sptr);
 				(*idx)--;
-				return true;
+				result=true;
+				break;
 			}
 		case HELPER_BF_PTR_GUARD:
 			*piece_ppa_result=gbf_set_get_piece_ppa((guard_bf_set*)rh->body,
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
 				(*idx)=UINT32_MAX;
-				return false;
+				result=false;
+				break;
 			}
 			else{
 				(*idx)--;
-				return true;
+				result=true;
+				break;
 			}
 		case HELPER_BF_ONLY_GUARD:
 			if(lba==debug_lba){
@@ -198,7 +228,8 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
 				(*idx)=UINT32_MAX;
-				return false;
+				result=false;
+				break;
 			}
 			else{
 				if(sptr->type!=BLOCK_FILE){
@@ -206,7 +237,8 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 				}
 				*piece_ppa_result=adjust_piece_ppa(rh->type, *piece_ppa_result, sptr->file_addr.piece_ppa, sptr);
 				(*idx)--;
-				return true;
+				result=true;
+				break;
 			}
 		case HELPER_PLR:
 			if(lba==debug_lba){
@@ -214,16 +246,26 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 			}
 			if((*idx)==PLR_SECOND_ROUND){
 				(*idx)=UINT32_MAX;
-				return false;
+				result=false;
+				break;
 			}
 			ppa=plr_get_ppa((plr_helper*)rh->body, lba, (*piece_ppa_result)/L2PGAP, idx);
 			*piece_ppa_result=ppa*L2PGAP;
-			return true;
+			result=true;
+			break;
 		default:
 			EPRINT("not collect type",true);
 			break;
 	}
-	return true;
+#ifdef TIMERESULT
+	if(sptr->type==PAGE_FILE){
+		measure_adding(&LSM.monitor.RH_check_stopwatch[0]);
+	}
+	else{
+		measure_adding(&LSM.monitor.RH_check_stopwatch[1]);
+	}
+#endif
+	return result;
 }
 
 void read_helper_print(read_helper *rh){

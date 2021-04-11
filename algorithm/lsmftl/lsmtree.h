@@ -14,13 +14,16 @@
 #include "version.h"
 #include "helper_algorithm/bf_set.h"
 #include "segment_level_manager.h"
+#include "../../bench/measurement.h"
 #include <deque>
 
 #define TARGETFPR 0.1f
 #define COMPACTION_REQ_MAX_NUM 1
 #define WRITEBUFFER_NUM (1+1)
+#define TIMERESULT
 
 typedef struct lsmtree_monitor{
+	/*cnt*/
 	uint32_t trivial_move_cnt;
 	uint32_t gc_data;
 	uint32_t gc_mapping;
@@ -31,6 +34,10 @@ typedef struct lsmtree_monitor{
 	uint64_t merge_valid_entry_cnt;
 	uint64_t tiering_total_entry_cnt;
 	uint64_t tiering_valid_entry_cnt;
+
+	/*time*/
+	MeasureTime RH_check_stopwatch[2]; //0 -> leveling 1-> tiering
+	MeasureTime RH_make_stopwatch[2]; //0 -> leveling 1-> tiering
 }lsmtree_monitor;
 
 typedef struct lsmtree_parameter{
@@ -120,7 +127,7 @@ sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
 void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm);
-uint64_t lsmtree_all_memory_usage(lsmtree *lsm);
+uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t* , uint64_t *);
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 
 #define MAKE_L0COMP_REQ(wb, kp_set, param, is_gc_data)\

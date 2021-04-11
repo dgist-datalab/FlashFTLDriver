@@ -4,6 +4,9 @@
 #include "../../include/settings.h"
 #include "page_manager.h"
 #include "sst_file.h"
+#include "helper_algorithm/plr_helper.h"
+#include "helper_algorithm/bf_set.h"
+#include "helper_algorithm/guard_bf_set.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
