@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=lsmftl
+export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
@@ -139,10 +139,10 @@ DEBUG: debug_driver
 
 duma_sim: duma_driver
 
-debug_driver: ./interface/main.c libdriver_d.a
+debug_driver: ./interface/main.c libdriver_d.a libart.o
 	$(CC) $(CFLAGS) -DDEBUG -o $@ $^ $(LIBS)
 
-driver: ./interface/vectored_main.c libdriver.a
+driver: ./interface/vectored_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a
@@ -165,7 +165,11 @@ duma_driver: ./interface/main.c libdriver.a
 
 jni: libdriver.a ./jni/DriverInterface.c
 	$(CC) -fPIC -o libdriver.so -shared -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux ./object/* $(LIBS)
-	
+
+libart.o:
+	make -C ./include/data_struct/libart/
+	mv ./include/data_struct/libart/src/libart.o ./
+
 libfdsock.a:
 	cd ./include/flash_sock/ && $(MAKE) libfdsock.a && mv ./libfdsock.a ../../ && cd ../../
 
@@ -198,6 +202,7 @@ clean :
 	@$(RM) ./data/*
 	@$(RM) ./object/*.o
 	@$(RM) ./object/*.a
+	@$(RM) ./libeart.o
 	@$(RM) *.a
 	@$(RM) driver_memory_check
 	@$(RM) debug_driver

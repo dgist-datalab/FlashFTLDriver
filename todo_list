@@ -1,7 +1,0 @@
-1. gc
-	leveling invalidation
-		seg check befor invalidation
-	tiering invalidation
-		seg check before invalidation
-	merge invalidation
-		already trimed sstfile check before merge

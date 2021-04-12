@@ -9,7 +9,7 @@
 uint32_t *keymap;
 static uint32_t my_seed;
 static fdriver_lock_t data_check_lock;
-uint32_t test_key=673818;
+uint32_t test_key=UINT32_MAX;
 
 int str2int(const char* str, int len)
 {
@@ -109,7 +109,7 @@ bool __checking_data_check(uint32_t key, char *data){
 			printf("%u %u (read : org)\n", t, tt);
 		}
 		if(tt != t){
-			printf("data miss!!!!\n");
+			printf("lba:%u data miss!!!!\n", key);
 			abort();
 		}
 	}
