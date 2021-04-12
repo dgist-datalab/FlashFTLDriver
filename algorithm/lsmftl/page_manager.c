@@ -478,7 +478,7 @@ retry:
 
 	if(ismap){
 		if(pm->seg_type_checker[seg_idx]!=MAPSEG &&  
-				pm->current_segment[DATA_S]->seg_idx!=seg_idx && 
+				(pm->current_segment[DATA_S]==NULL || pm->current_segment[DATA_S]->seg_idx!=seg_idx) && 
 				victim_target->invalidate_number==victim_target->validate_number){
 			goto out;
 		}
@@ -488,7 +488,7 @@ retry:
 	}
 	else{
 		if(pm->seg_type_checker[seg_idx]==MAPSEG &&  
-				pm->current_segment[MAP_S]->seg_idx!=seg_idx && 
+				(pm->current_segment[MAP_S]==NULL || pm->current_segment[MAP_S]->seg_idx!=seg_idx) && 
 				victim_target->invalidate_number==victim_target->validate_number){
 			goto out;
 		}

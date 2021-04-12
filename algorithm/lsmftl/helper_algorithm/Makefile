@@ -17,3 +17,6 @@ all: $(OBJS)
 
 %.o :%.c
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
+
+plr/plr.o: plr/plr.cpp
+	$(CC) $(CFLAGS_ALGO) -c $< -o $@
