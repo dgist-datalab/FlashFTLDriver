@@ -105,11 +105,10 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 	LSM.param.version_enable=true;
 
 	if(!rh_setting){
-		printf("no rh setting - set rh as HELPER_BF_GUARD\n");
 		LSM.param.leveling_rhp.type=HELPER_BF_PTR_GUARD;
 		LSM.param.leveling_rhp.target_prob=LSM.param.read_amplification;
 		LSM.param.leveling_rhp.member_num=KP_IN_PAGE;
-#if 1
+#if 0
 		LSM.param.tiering_rhp.type=HELPER_BF_ONLY_GUARD;
 		if(LSM.param.version_enable){
 			LSM.param.tiering_rhp.target_prob=LSM.param.read_amplification;
@@ -124,6 +123,7 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		LSM.param.tiering_rhp.range=50;
 		LSM.param.tiering_rhp.member_num=KP_IN_PAGE;
 #endif
+		printf("no rh setting - set rh as leveling:HELPER_BF_GUARD tiering:\n");
  
 	}
 	printf("------------------------------------------\n");

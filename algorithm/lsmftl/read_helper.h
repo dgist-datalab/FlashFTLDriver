@@ -58,8 +58,9 @@ void read_helper_insert_done(read_helper *rh);
 static inline char *read_helper_type(uint32_t i){
 	switch(i){
 		case 0: return "NONE";
-		case 1: return "HELPER_BF";
-		case 2: return "HELPER_BF_GUARD";
+		case 1: return "BF";
+		case 2: return "BF_GUARD";
+		case 3: return "PLR";
 		default: EPRINT("no type", true); break;
 	}
 	return NULL;
