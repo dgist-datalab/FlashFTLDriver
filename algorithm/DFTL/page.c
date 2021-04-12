@@ -78,7 +78,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	a_buffer.idx++;
 
 	if(a_buffer.idx==L2PGAP){
-		ppa_t ppa=get_ppa(a_buffer.key);
+		ppa_t ppa=get_ppa(a_buffer.key, a_buffer.idx);
 		value_set *value=inf_get_valueset(a_buffer.value, FS_MALLOC_W, PAGESIZE);
 		send_user_req(NULL, DATAW, ppa, value);
 		
@@ -130,7 +130,6 @@ typedef std::map<uint32_t, algo_req*>::iterator rb_r_iter;
 inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
 	if(type==DATAR){
-		printf("ppa %u\n", ppa);
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
 			read_buffer_hit_cnt++;
@@ -207,13 +206,16 @@ void *page_end_req(algo_req* input){
 			}
 			rb.issue_req->erase(params->value->ppa/L2PGAP);
 			fdriver_unlock(&rb.pending_lock);
-			if(params->value->ppa%L2PGAP){
-				memmove(params->value->value, &params->value->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-			}
+
 			fdriver_lock(&rb.read_buffer_lock);
 			rb.buffer_ppa=params->value->ppa/L2PGAP;
 			memcpy(rb.buffer_value, params->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
+
+			if(params->value->ppa%L2PGAP){
+				memmove(params->value->value, &params->value->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+			}
+
 			break;
 	}
 	request *res=input->parents;

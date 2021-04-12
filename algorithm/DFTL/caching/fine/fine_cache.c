@@ -31,8 +31,13 @@ my_cache fine_cache_func{
 	.exist=fine_exist,
 };
 
+uint32_t entry_to_lba(void *_entry){
+	fine_cache *fc=(fine_cache*)_entry;
+	return fc->lba;
+}
+
 uint32_t fine_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
-	lru_init(&fcm.lru, NULL);
+	lru_init(&fcm.lru, NULL, entry_to_lba);
 	fcm.max_caching_map=(total_caching_physical_pages*PAGESIZE/FINECACHEENT_SZ);
 	fcm.now_caching_map=0;
 	mc->type=FINE;
@@ -129,9 +134,6 @@ static inline uint32_t __update_entry(GTD_entry *etr,uint32_t lba, uint32_t ppa,
 	fc->ppa=ppa;
 	
 last:
-	if(lba==1652090){
-		printf("%u %u->%u\n", lba, old_ppa, ppa);
-	}
 	set_flag(fc,1);
 	if(!isgc){
 		lru_update(fcm.lru, get_ln(fc));

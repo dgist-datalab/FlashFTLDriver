@@ -41,9 +41,9 @@ void invalidate_ppa(uint32_t t_ppa){
 	}
 }
 
-void validate_ppa(uint32_t ppa, KEYT *lbas){
+void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx){
 	/*when the ppa is validated this function must be called*/
-	for(uint32_t i=0; i<L2PGAP; i++){
+	for(uint32_t i=0; i<max_idx; i++){
 		if(ppa*L2PGAP+i==test_ppa){
 			printf("%u populated!\n", test_ppa);
 		}
@@ -53,7 +53,7 @@ void validate_ppa(uint32_t ppa, KEYT *lbas){
 	}
 
 	/*this function is used for write some data to OOB(spare area) for reverse mapping*/
-	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)lbas,sizeof(KEYT)*L2PGAP,ppa);
+	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)lbas,sizeof(KEYT)*max_idx,ppa);
 }
 
 gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
@@ -219,7 +219,7 @@ finish:
 }
 
 
-ppa_t get_ppa(KEYT *lbas){
+ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	blockmanager *bm=demand_ftl.bm;
@@ -248,7 +248,7 @@ retry:
 	}
 
 	/*validate a page*/
-	validate_ppa(res,lbas);
+	validate_ppa(res,lbas, max_idx);
 	//printf("assigned %u\n",res);
 	return res;
 }

@@ -61,7 +61,7 @@ inline static void tc_lru_traverse(LRU *lru, tp_node *tn){
 }
 
 uint32_t tp_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
-	lru_init(&tcm.lru, NULL);
+	lru_init(&tcm.lru, NULL, NULL);
 	uint32_t target_bits=(32+get_bits_from_int(PAGESIZE/sizeof(uint32_t))+1); // ppa, offset, dirty
 	TP_ENTRY_SZ=target_bits/8+(target_bits%8?1:0);
 
@@ -157,13 +157,19 @@ static inline tp_node* __find_tp_node(GTD_entry *etr){
 
 static inline tp_cache_node * __find_tp_cache_node(tp_node *tn, uint32_t lba){
 	lru_node *ln;
+	/*
 	for_each_lru_list(tn->tp_lru,ln){
 		tp_cache_node *tcn=(tp_cache_node*)ln->data;
 		if(tcn->offset==GETOFFSET(lba)){
 			return tcn;	
 		}
-	}
-	return NULL;
+	}*/
+	return (tp_cache_node*)lru_find(tn->tp_lru, GETOFFSET(lba));
+}
+
+uint32_t tp_retrieve_key(void *_entry){
+	tp_cache_node *tcn=(tp_cache_node*)_entry;
+	return tcn->offset;
 }
 
 static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc){
@@ -192,7 +198,7 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	}
 	else{
 		tn=(tp_node*)malloc(sizeof(tp_node));
-		lru_init(&tn->tp_lru, NULL);
+		lru_init(&tn->tp_lru, NULL, tp_retrieve_key);
 		tn->idx=etr->idx;
 
 		tc=(tp_cache_node*)malloc(sizeof(tp_cache_node));
@@ -249,7 +255,7 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 	}
 	else{
 		tn=(tp_node*)malloc(sizeof(tp_node));
-		lru_init(&tn->tp_lru, NULL);
+		lru_init(&tn->tp_lru, NULL, tp_retrieve_key);
 		tn->lru_node=lru_push(tcm.lru, (void*)tn);
 		etr->private_data=(void*)tn;
 		tn->idx=etr->idx;

@@ -3,7 +3,13 @@
 #include <queue>
 extern struct algorithm demand_ftl;
 extern uint32_t test_ppa;
+extern uint32_t test_key;
 void invalidate_map_ppa(uint32_t piece_ppa){
+
+	if(piece_ppa==98016){
+		printf("map %u invalidate\n", piece_ppa);
+	}
+
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa)){
 		EPRINT("double invalidation!", true);
 	}
@@ -31,6 +37,10 @@ retry:
 		p->seg_type_checker[p->map_active->seg_idx]=MAPSEG;
 		goto retry;
 	}
+	
+	if(GETGTDIDX(test_key)==gtd_idx){
+		printf("%u mapping change to %u\n", test_key, res*L2PGAP);
+	}
 
 	validate_map_ppa(res*L2PGAP, gtd_idx);
 	return res;
@@ -43,7 +53,7 @@ ppa_t get_map_rppa(KEYT gtd_idx){
 	/*when the gc phase, It should get a page from the reserved block*/
 	res=demand_ftl.bm->get_page_num(demand_ftl.bm,p->map_reserve);
 	KEYT temp[L2PGAP]={gtd_idx, 0};
-	validate_ppa(res, temp);
+	validate_ppa(res, temp, L2PGAP);
 	return res;
 }
 extern demand_map_manager dmm;
@@ -52,7 +62,6 @@ void do_map_gc(){
 
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	blockmanager *bm=demand_ftl.bm;
-//	static int cnt=0;
 //	printf("map gc:%u\n", ++cnt);
 	__gsegment *target=NULL;
 	std::queue<uint32_t> temp_queue;
@@ -75,6 +84,9 @@ void do_map_gc(){
 		temp_queue.pop();
 	}
 
+	static int cnt=0;
+	printf("map_gc:%u seg_idx:%u (piece_ppa:%u~%u)\n", cnt++, target->seg_idx, target->seg_idx*L2PGAP*_PPS, (target->seg_idx+1)*L2PGAP*_PPS-1);
+
 	list *temp_list=NULL;	
 	gc_value *gv;
 	uint32_t page;
@@ -89,6 +101,9 @@ void do_map_gc(){
 		//this function check the page is valid or not
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
+			if(page*L2PGAP==98016){
+				printf("%u gc invalidation check!\n", 98016);
+			}
 			if(bm->is_invalid_page(bm,page*L2PGAP)) continue;
 			else{
 				should_read=true;

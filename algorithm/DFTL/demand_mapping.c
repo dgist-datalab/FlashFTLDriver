@@ -10,7 +10,6 @@ extern bool global_debug_flag;
 demand_map_manager dmm;
 dmi DMI;
 
-
 inline static void cpy_keys(uint32_t **des, uint32_t *src){
 	(*des)=(uint32_t*)malloc(sizeof(KEYT)*L2PGAP);
 	memcpy((*des), src, sizeof(KEYT)*L2PGAP);
@@ -526,6 +525,11 @@ uint32_t demand_page_read(request *const req){
 		etr=dp->etr;
 	}
 
+
+	if(req->key==test_key){
+		EPRINT("read function", false);
+	}
+
 	GTD_entry *target_etr;
 retry:
 	switch(dp->status){
@@ -615,7 +619,7 @@ retry:
 			if(target_etr->physical_address!=UINT32_MAX){
 				invalidate_map_ppa(target_etr->physical_address);
 			}
-			target_etr->physical_address=get_map_ppa(gtd_idx) * L2PGAP;
+			target_etr->physical_address=get_map_ppa(target_etr->idx) * L2PGAP;
 			demand_mapping_write(target_etr->physical_address/L2PGAP, dmm.li, req, dp);
 			return 1;
 		case MISSR:

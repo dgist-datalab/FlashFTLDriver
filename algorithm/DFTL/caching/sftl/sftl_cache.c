@@ -32,7 +32,7 @@ sftl_cache_monitor scm;
 extern demand_map_manager dmm;
 
 uint32_t sftl_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
-	lru_init(&scm.lru, NULL);
+	lru_init(&scm.lru, NULL, NULL);
 	scm.max_caching_byte=total_caching_physical_pages * PAGESIZE;
 	scm.now_caching_byte=0;
 	mc->type=COARSE;

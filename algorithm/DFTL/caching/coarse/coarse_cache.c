@@ -30,7 +30,7 @@ coarse_cache_monitor ccm;
 extern demand_map_manager dmm;
 
 uint32_t coarse_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
-	lru_init(&ccm.lru, NULL);
+	lru_init(&ccm.lru, NULL, NULL);
 	ccm.max_caching_page=total_caching_physical_pages;
 	ccm.now_caching_page=0;
 	mc->type=COARSE;
