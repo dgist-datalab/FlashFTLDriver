@@ -172,6 +172,10 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	uint32_t old_ppa;
 	uint32_t target_byte=0;
 	
+	if(lba==test_key){
+		printf("[%s]mapping update %u->%u\n", isgc?"gc":"normal",lba, ppa);
+	}
+
 	etr_sanity_check(etr);
 
 	if(tn){
@@ -316,10 +320,10 @@ uint32_t tp_update_from_translation_gc(struct my_cache *, char *data, uint32_t l
 	GTD_entry *etr=GETETR(dmm,lba);
 
 	etr_sanity_check(etr);
-	/*if(etr->idx==test_key/2048 && ppa==test_ppa){
+	if(etr->idx==test_key/2048 && ppa==test_ppa){
 		printf("%s-", tp_exist(NULL,lba)?"true":"false");
 		printf("%u gc dirty evict!\n",etr->idx);
-	}*/
+	}
 	return old_ppa;
 }
 

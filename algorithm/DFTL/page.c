@@ -21,6 +21,7 @@ struct algorithm demand_ftl={
 };
 
 page_read_buffer rb;
+uint32_t read_buffer_hit_cnt=0;
 
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	algo->li=li; //lower_info means the NAND CHIP
@@ -41,6 +42,7 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 
 void page_destroy (lower_info* li, algorithm *algo){
 	demand_map_free();
+	printf("read buffer hit:%u\n", read_buffer_hit_cnt);
 	free(a_buffer.value);
 
 	delete rb.pending_req;
@@ -128,8 +130,10 @@ typedef std::map<uint32_t, algo_req*>::iterator rb_r_iter;
 inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
 	if(type==DATAR){
+		printf("ppa %u\n", ppa);
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
+			read_buffer_hit_cnt++;
 			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 			req->type_ftl=req->type_lower=0;
 			req->end_req(req);

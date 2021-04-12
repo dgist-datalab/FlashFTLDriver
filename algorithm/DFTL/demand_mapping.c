@@ -201,7 +201,7 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 	return res;
 }
 
-uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping, char *value){
+uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping, char *value, uint32_t *sequential_cnt){
 	list_node *now, *next;
 	request *treq;
 	KEYT* lba=NULL;
@@ -224,7 +224,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 		pp=NULL;
 
 		if(dp->status==MISSR){
-			dmm.cache->insert_entry_from_translation(dmm.cache, etr, mapping->lba, value, &req->consecutive_length);
+			dmm.cache->insert_entry_from_translation(dmm.cache, etr, mapping->lba, value, sequential_cnt);
 			if(treq->type==FS_SET_T){
 				ap=(assign_param_ex*)dp->param_ex;
 				lba=ap->lba;
@@ -318,7 +318,7 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 	GTD_entry *etr;
 	uint32_t old_ppa;
 	KEYT *lba=NULL, *physical=NULL;
-
+	
 	if(!req->param){
 		dp=(demand_param*)malloc(sizeof(demand_param));
 		dp->status=NONE;
@@ -358,6 +358,9 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		mapping_entry *target=&dp->target;
 		target->lba=lba[i];
 		target->ppa=physical[i];
+		if(target->lba==test_key){
+			EPRINT("debug point", false);
+		}
 retry:
 		switch(dp->status){
 			case EVICTIONW:
@@ -450,7 +453,7 @@ eviction_path:
 				}
 				else{
 					target_etr=&dmm.GTD[GETGTDIDX(dp->et.mapping->lba)];
-					demand_map_fine_type_pending(req, dp->et.mapping, req->value->value);
+					demand_map_fine_type_pending(req, dp->et.mapping, req->value->value, &mp->prefetching_info[i]);
 				}
 
 				if(dp->is_hit_eviction){
@@ -473,7 +476,7 @@ eviction_path:
 				return 1;
 			case MISSR:
 				if(dmm.cache->type==FINE){
-					if(demand_map_fine_type_pending(req, target, req->value->value)==1){
+					if(demand_map_fine_type_pending(req, target, req->value->value, &mp->prefetching_info[i])==1){
 						return 1;
 					}
 				}
@@ -598,7 +601,7 @@ retry:
 			}
 			else{
 				target_etr=&dmm.GTD[GETGTDIDX(dp->et.mapping->lba)];
-				demand_map_fine_type_pending(req, dp->et.mapping, req->value->value);
+				demand_map_fine_type_pending(req, dp->et.mapping, req->value->value, &req->consecutive_length);
 			}
 
 			if(dmm.cache->entry_type==DYNAMIC && dmm.cache->need_more_eviction(dmm.cache, req->key, &req->consecutive_length)){
@@ -618,7 +621,7 @@ retry:
 		case MISSR:
 			if(dmm.cache->type==FINE){
 				target.lba=req->key;
-				if((demand_map_fine_type_pending(req, &target, req->value->value)==1)){
+				if((demand_map_fine_type_pending(req, &target, req->value->value, &req->consecutive_length)==1)){
 					goto end;
 				}
 			}

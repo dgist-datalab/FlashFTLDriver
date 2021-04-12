@@ -93,8 +93,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 			}
 			else{
 				txn->req_array[i-consecutive_cnt-1].is_sequential_start=(consecutive_cnt!=0);
-				txn->req_array[i-consecutive_cnt-1].consecutive_length=
-					(consecutive_cnt?consecutive_cnt:0);
+				txn->req_array[i-consecutive_cnt-1].consecutive_length=consecutive_cnt;
 				consecutive_cnt=0;
 			}
 			prev_lba=temp->key;
@@ -107,8 +106,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 	}
 
 	txn->req_array[(txn->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
-	txn->req_array[(txn->size-1)-consecutive_cnt].consecutive_length=
-		(consecutive_cnt?consecutive_cnt:UINT32_MAX);
+	txn->req_array[(txn->size-1)-consecutive_cnt].consecutive_length=consecutive_cnt;
 
 	while(1){
 		pthread_mutex_lock(&flying_cnt_lock);
