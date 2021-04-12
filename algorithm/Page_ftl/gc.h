@@ -14,8 +14,8 @@ typedef struct gc_value{
 }gc_value;
 
 void invalidate_ppa(uint32_t t_ppa);
-void validate_ppa(uint32_t t_ppa, KEYT *lbas);
-ppa_t get_ppa(KEYT* lba);
+void validate_ppa(uint32_t t_ppa, KEYT *lbas, uint32_t max_idx);
+ppa_t get_ppa(KEYT* lba, uint32_t max_idx);
 void do_gc();
 
 

@@ -50,6 +50,9 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
+			if(test_key==req->key){
+				printf("%u page hit(piece_ppa:%u)\n", req->key,value->ppa);
+			}
 			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 			req->type_ftl=req->type_lower=0;
 			req->end_req(req);
@@ -97,7 +100,7 @@ uint32_t page_read(request *const req){
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		if(req->key==a_buffer.key[i]){
 			//		printf("buffered read!\n");
-			memcpy(req->value->value, a_buffer.value[i]->value, 4096);
+			memcpy(req->value->value, a_buffer.value[i]->value, LPAGESIZE);
 			req->end_req(req);		
 			return 1;
 		}
@@ -106,6 +109,9 @@ uint32_t page_read(request *const req){
 	//printf("read key :%u\n",req->key);
 
 	req->value->ppa=page_map_pick(req->key);
+	if(req->key==test_key){
+		printf("read: map info - %u->%u\n", req->key, req->value->ppa);
+	}
 
 	//DPRINTF("\t\tmap info : %u->%u\n", req->key, req->value->ppa);
 	if(req->value->ppa==UINT32_MAX){
@@ -130,10 +136,10 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	a_buffer.idx++;
 
 	if(a_buffer.idx==L2PGAP){
-		ppa_t ppa=page_map_assign(a_buffer.key);
+		ppa_t ppa=page_map_assign(a_buffer.key, a_buffer.idx);
 		value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 		for(uint32_t i=0; i<L2PGAP; i++){
-			memcpy(&value->value[i*4096], a_buffer.value[i]->value, 4096);
+			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
 		send_user_req(NULL, DATAW, ppa, value);
@@ -207,13 +213,16 @@ void *page_end_req(algo_req* input){
 			}
 			rb.issue_req->erase(param->value->ppa/L2PGAP);
 			fdriver_unlock(&rb.pending_lock);
-			if(param->value->ppa%L2PGAP){
-				memmove(param->value->value, &param->value->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-			}
+
 			fdriver_lock(&rb.read_buffer_lock);
 			rb.buffer_ppa=param->value->ppa/L2PGAP;
 			memcpy(rb.buffer_value, param->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
+
+			if(param->value->ppa%L2PGAP){
+				memmove(param->value->value, &param->value->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+			}
+
 			break;
 	}
 	request *res=input->parents;

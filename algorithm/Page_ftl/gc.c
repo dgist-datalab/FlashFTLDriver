@@ -6,33 +6,18 @@
 
 extern algorithm page_ftl;
 void invalidate_ppa(uint32_t t_ppa){
-	if(t_ppa<32768){
-		//abort();
-	}
 	/*when the ppa is invalidated this function must be called*/
-	if(t_ppa==24537){
-		printf("%d invalidate!\n", t_ppa);
-	}
-	if(t_ppa==1933569){
-		printf("%d invalidate!\n", t_ppa);
-	}
 	page_ftl.bm->unpopulate_bit(page_ftl.bm, t_ppa);
 }
 
-void validate_ppa(uint32_t ppa, KEYT *lbas){
+void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx){
 	/*when the ppa is validated this function must be called*/
-	for(uint32_t i=0; i<L2PGAP; i++){
-		if(24536==ppa*L2PGAP+i || 24537==ppa*L2PGAP+i){
-			printf("%d validate!\n", ppa*L2PGAP+i);
-		}
-		if(1933569==ppa*L2PGAP+i){
-			printf("%d validate!\n", ppa*L2PGAP+i);
-		}
+	for(uint32_t i=0; i<max_idx; i++){
 		page_ftl.bm->populate_bit(page_ftl.bm,ppa * L2PGAP+i);
 	}
 
 	/*this function is used for write some data to OOB(spare area) for reverse mapping*/
-	page_ftl.bm->set_oob(page_ftl.bm,(char*)lbas,sizeof(KEYT)*L2PGAP,ppa);
+	page_ftl.bm->set_oob(page_ftl.bm,(char*)lbas,sizeof(KEYT)*max_idx,ppa);
 }
 
 gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value){
@@ -96,14 +81,14 @@ void new_do_gc(){
 		lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 		for(uint32_t i=0; i<L2PGAP; i++){
 			if(page_map_pick(lbas[i])!=gv->ppa*L2PGAP+i) continue;
-			memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
+			memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 			g_buffer.key[g_buffer.idx]=lbas[i];
 
 			g_buffer.idx++;
 
 			if(g_buffer.idx==L2PGAP){
 				uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP);
-				validate_ppa(res, g_buffer.key);
+				validate_ppa(res, g_buffer.key, g_buffer.idx);
 				send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 				g_buffer.idx=0;
 			}
@@ -119,7 +104,7 @@ next:
 
 	if(g_buffer.idx!=0){
 		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx);
-		validate_ppa(res, g_buffer.key);
+		validate_ppa(res, g_buffer.key, g_buffer.idx);
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 		g_buffer.idx=0;	
 	}
@@ -172,18 +157,18 @@ void do_gc(){
 			if(!gv->isdone) continue;
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
-				if(gv->ppa*L2PGAP+i==1933569){
-					printf("target is gcing %u\n",1933569);
+				if(gv->ppa*L2PGAP+i==343414){
+					printf("temp_break\n");
 				}
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
-				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
+				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
 				g_buffer.idx++;
 
 				if(g_buffer.idx==L2PGAP){
 					uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP);
-					validate_ppa(res, g_buffer.key);
+					validate_ppa(res, g_buffer.key, g_buffer.idx);
 					send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 					g_buffer.idx=0;
 				}
@@ -198,7 +183,7 @@ void do_gc(){
 
 	if(g_buffer.idx!=0){
 		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx);
-		validate_ppa(res, g_buffer.key);
+		validate_ppa(res, g_buffer.key, g_buffer.idx);
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 		g_buffer.idx=0;	
 	}
@@ -214,7 +199,7 @@ void do_gc(){
 }
 
 
-ppa_t get_ppa(KEYT *lbas){
+ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	uint32_t res;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
@@ -234,7 +219,7 @@ retry:
 	}
 
 	/*validate a page*/
-	validate_ppa(res,lbas);
+	validate_ppa(res, lbas, max_idx);
 	//printf("assigned %u\n",res);
 	return res;
 }

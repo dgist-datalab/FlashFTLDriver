@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
-
+extern uint32_t test_key;
 extern algorithm page_ftl;
 
 void page_map_create(){
@@ -18,19 +18,24 @@ void page_map_create(){
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
 }
 
-uint32_t page_map_assign(KEYT* lba){
+uint32_t page_map_assign(KEYT* lba, uint32_t max_idx){
 	uint32_t res=0;
 
-	res=get_ppa(lba);
+	res=get_ppa(lba, L2PGAP);
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	for(uint32_t i=0; i<L2PGAP; i++){
 		KEYT t_lba=lba[i];
+		uint32_t previous_ppa=p->mapping[t_lba];
 		if(p->mapping[t_lba]!=UINT_MAX){
 			/*when mapping was updated, the old one is checked as a inavlid*/
 			invalidate_ppa(p->mapping[t_lba]);
 		}
 		/*mapping update*/
 		p->mapping[t_lba]=res*L2PGAP+i;
+		if(t_lba==test_key){
+			static int cnt=0;
+			printf("[%d] %u map to %u from %u\n",cnt++, test_key,p->mapping[t_lba], previous_ppa);
+		}
 	//	DPRINTF("\tmap set : %u->%u\n", t_lba, p->mapping[t_lba]);
 	}
 
@@ -74,6 +79,10 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
 		}
 		/*mapping update*/
 		p->mapping[t_lba]=res*L2PGAP+i;
+		if(t_lba==test_key){
+			static int cnt=0;
+			printf("[%d] gc: %u map to %u\n",cnt++, test_key,p->mapping[t_lba]);
+		}
 	}
 
 /*
