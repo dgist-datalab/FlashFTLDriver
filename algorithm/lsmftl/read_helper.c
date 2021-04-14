@@ -109,7 +109,7 @@ uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece
 	return 1;
 }
 
-uint32_t read_helper_memory_usage(read_helper *rh){
+uint32_t read_helper_memory_usage(read_helper *rh, uint32_t lba_unit){
 	if(!rh) return 0;
 	
 	switch(rh->type){
@@ -118,9 +118,9 @@ uint32_t read_helper_memory_usage(read_helper *rh){
 			return ((bf_set*)rh->body)->memory_usage_bit;
 		case HELPER_BF_PTR_GUARD:
 		case HELPER_BF_ONLY_GUARD:
-			return gbf_get_memory_usage_bit((guard_bf_set*)rh->body);
+			return gbf_get_memory_usage_bit((guard_bf_set*)rh->body, lba_unit);
 		case HELPER_PLR:
-			return plr_memory_usage((plr_helper*)rh->body);
+			return plr_memory_usage((plr_helper*)rh->body, lba_unit);
 		default:
 			EPRINT("not collect type",true);
 			break;
@@ -250,6 +250,7 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 				break;
 			}
 			ppa=plr_get_ppa((plr_helper*)rh->body, lba, (*piece_ppa_result)/L2PGAP, idx);
+		
 			*piece_ppa_result=ppa*L2PGAP;
 			result=true;
 			break;
@@ -376,21 +377,31 @@ uint32_t read_helper_idx_init(read_helper *rh, uint32_t lba){
 	return UINT32_MAX;
 }
 
-static inline int PLR_checking_oob(uint32_t lba, uint32_t piece_ppa, uint32_t *lba_set){
-	for(uint32_t i=0; i<L2PGAP; i++){
-		if(i==0 && lba < lba_set[i]){
-			return -1;
+static inline int PLR_checking_oob(uint32_t lba, uint32_t piece_ppa, uint32_t *lba_set, bool map_ppa_check){
+	if(map_ppa_check){ //map page
+		if(lba<lba_set[0] || lba_set[1]<lba){
+			return L2PGAP;
 		}
-		if(lba==lba_set[i]) return i;
+		else return -1;
 	}
-	return L2PGAP;
+	else{
+		for(uint32_t i=0; i<L2PGAP; i++){
+			if(i==0 && lba < lba_set[i]){
+				return -1;
+			}
+			if(lba==lba_set[i]) return i;
+		}
+		return L2PGAP;
+	}
 }
 
 bool read_helper_data_checking(read_helper *rh, page_manager* pm, uint32_t piece_ppa, 
-		uint32_t lba, uint32_t *rh_idx, uint32_t *offset){
+		uint32_t lba, uint32_t *rh_idx, uint32_t *offset, sst_file *sptr){
 	if(lba==debug_lba){
 		EPRINT("debug point", false);
 	}
+	uint32_t *lba_set;
+	bool is_map_ppa_flag;
 	switch(rh->type){
 		case HELPER_BF_ONLY:
 		case HELPER_BF_PTR:
@@ -401,16 +412,35 @@ bool read_helper_data_checking(read_helper *rh, page_manager* pm, uint32_t piece
 			}
 			break;
 		case HELPER_PLR:
-			(*offset)=PLR_checking_oob(lba, piece_ppa, 
-					(uint32_t*)pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa)));
+			lba_set=(uint32_t*)pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa));
+			is_map_ppa_flag=sptr->sequential_file?is_map_ppa(sptr, PIECETOPPA(piece_ppa)):false;
+			(*offset)=PLR_checking_oob(lba, piece_ppa, lba_set, is_map_ppa_flag);
 			switch((int32_t)(*offset)){
 				case -1:
-					if((*rh_idx)==PLR_NORMAL_PPA) (*rh_idx)=PLR_FRONT_PPA;
-					else (*rh_idx)=PLR_SECOND_ROUND;
+					if((*rh_idx)==PLR_NORMAL_PPA) {
+						if(sptr->sequential_file && is_map_ppa(sptr, PIECETOPPA(piece_ppa-L2PGAP))){
+							(*rh_idx)=PLR_DOUBLE_FRONT_PPA;
+						}
+						else{
+							(*rh_idx)=PLR_FRONT_PPA;
+						}
+					}
+					else{
+						(*rh_idx)=PLR_SECOND_ROUND;
+					}
 					return false;
 				case L2PGAP:
-					if((*rh_idx)==PLR_NORMAL_PPA) (*rh_idx)=PLR_BEHIND_PPA;
-					else (*rh_idx)=PLR_SECOND_ROUND;
+					if((*rh_idx)==PLR_NORMAL_PPA) {
+						if(sptr->sequential_file && is_map_ppa(sptr, PIECETOPPA(piece_ppa+L2PGAP))){
+							(*rh_idx)=PLR_DOUBLE_BEHIND_PPA;
+						}
+						else{
+							(*rh_idx)=PLR_BEHIND_PPA;
+						}
+					}
+					else{
+						(*rh_idx)=PLR_SECOND_ROUND;
+					}
 					return false;			
 				default:
 					return true;

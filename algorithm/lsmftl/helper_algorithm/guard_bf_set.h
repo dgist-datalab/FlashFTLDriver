@@ -27,12 +27,12 @@ guard_bf_set* gbf_set_copy(guard_bf_set *src);
 void gbf_set_move(guard_bf_set *des, guard_bf_set *src);
 void gbf_set_free(guard_bf_set*);
 
-static inline uint32_t gbf_get_memory_usage_bit(guard_bf_set *gbf_set){
+static inline uint32_t gbf_get_memory_usage_bit(guard_bf_set *gbf_set, uint32_t lba_unit){
 	uint32_t res=0;
 	for(uint32_t i=0; i<gbf_set->set_num; i++){
 		uint32_t bf_set_memory=0;
 		if((bf_set_memory=((bf_set*)gbf_set->body[i].array)->memory_usage_bit)){
-			res+=bf_set_memory+2*sizeof(uint32_t);
+			res+=bf_set_memory+2*lba_unit;
 		}
 		else break;
 	}

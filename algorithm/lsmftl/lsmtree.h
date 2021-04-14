@@ -50,6 +50,8 @@ typedef struct lsmtree_parameter{
 	read_helper_param leveling_rhp;
 	read_helper_param tiering_rhp;
 	bool version_enable;
+	uint32_t plr_bit;
+	uint32_t error_range;
 }lsmtree_parameter;
 
 enum{
@@ -127,7 +129,7 @@ sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
 void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm);
-uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t* , uint64_t *);
+uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t* , uint64_t *, uint32_t);
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 
 #define MAKE_L0COMP_REQ(wb, kp_set, param, is_gc_data)\

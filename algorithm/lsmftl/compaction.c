@@ -10,8 +10,8 @@ extern lsmtree LSM;
 
 compaction_master *_cm;
 
-uint32_t debug_lba=81440;
-//uint32_t debug_lba=UINT32_MAX;
+//uint32_t debug_lba=2043;
+uint32_t debug_lba=UINT32_MAX;
 
 extern uint32_t debug_piece_ppa;
 
@@ -206,7 +206,7 @@ static void write_sst_file(sst_pf_in_stream *is, level *des){ //for page file
 	sst_file *sptr;
 	value_set *vs=sst_pis_get_result(is, &sptr);
 	sptr->file_addr.map_ppa=page_manager_get_new_ppa(LSM.pm,true,MAPSEG);
-	validate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, sptr->start_lba, true);
+	validate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, sptr->start_lba, sptr->end_lba,true);
 	
 	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 	write_req->type=MAPPINGW;
@@ -351,17 +351,17 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 
 static sst_file *key_ptr_to_sst_file(key_ptr_pair *kp_set, bool should_flush){
 	uint32_t map_ppa=UINT32_MAX;
+	uint32_t end_idx=kp_end_idx((char*)kp_set);
 	if(should_flush){
 		value_set *vs=inf_get_valueset((char*)kp_set, FS_MALLOC_W, PAGESIZE);
 		map_ppa=page_manager_get_new_ppa(LSM.pm, false, DATASEG); //DATASEG for sequential tiering 
-		validate_map_ppa(LSM.pm->bm, map_ppa, kp_set[0].lba, true);
+		validate_map_ppa(LSM.pm->bm, map_ppa, kp_set[0].lba,  kp_set[end_idx].lba, true);
 		algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 		write_req->type=MAPPINGW;
 		write_req->param=(void*)vs;
 		write_req->end_req=comp_alreq_end_req;
 		io_manager_issue_internal_write(map_ppa, vs, write_req, false);
 	}
-	uint32_t end_idx=kp_end_idx((char*)kp_set);
 	sst_file *sstfile=sst_pf_init(map_ppa, kp_set[0].lba, kp_set[end_idx].lba);
 	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[end_idx].piece_ppa) && SEGNUM(kp_set[0].piece_ppa)==map_ppa/_PPS){
 		sstfile->sequential_file=true;
@@ -777,7 +777,7 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 		mr_set[mr_idx].ppa=ppa;
 
 		//uint32_t temp_ppa=ppa*L2PGAP;
-		validate_map_ppa(LSM.pm->bm, ppa, mr_set[mr_idx].start_lba, true);
+		validate_map_ppa(LSM.pm->bm, ppa, mr_set[mr_idx].start_lba, mr_set[mr_idx].end_lba, true);
 		//validate_piece_ppa(LSM.pm->bm,1, &temp_ppa, &mr_set[mr_idx].start_lba);
 
 		io_manager_issue_write(ppa, data, write_req, false);

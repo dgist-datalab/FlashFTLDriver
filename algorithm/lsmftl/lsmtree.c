@@ -23,13 +23,17 @@ struct algorithm lsm_ftl={
 
 static void print_help(){
 	printf("-----help-----\n");
-	printf("parameters (L,S,a,R)\n");
+	printf("parameters (L,S,a,b,r,R)\n");
 	printf("-L: set total levels of LSM-tree\n");
 	printf("-S: set size factor of LSM-tree\n");
 	printf("-a: set read amplification (float type)\n");
+	printf("-b: bit num for plr line\n");
+	printf("-r: error lange for plr\n");
+
 	printf("-R: set read helper type\n");
+	printf("\t%d: %s\n", 0, read_helper_type(0));
 	for(int i=0; i<READHELPER_NUM; i++){
-		printf("\t%d: %s\n", i, read_helper_type(i));
+		printf("\t%d: %s\n", 1<<i, read_helper_type(1<<i));
 	}
 }
 
@@ -38,7 +42,14 @@ static void print_level_param(){
 	printf("[param] normal size factor: %u\n", LSM.param.normal_size_factor);
 	printf("[param] last size factor: %u\n", LSM.param.last_size_factor);
 	printf("[param] read amplification: %f\n", LSM.param.read_amplification);
-	printf("[param] read_helper_type: %s\n", read_helper_type(LSM.param.read_helper_type));
+	printf("[param] read_helper_type: L-(%s) T-(%s)\n", 
+			read_helper_type(LSM.param.leveling_rhp.type),
+			read_helper_type(LSM.param.tiering_rhp.type));
+	printf("[param] target FPR for BF :%lf\n", LSM.param.read_amplification);
+	if(LSM.param.tiering_rhp.type==HELPER_PLR){
+		printf("\tPLR slope_bit:%lu\n", LSM.param.tiering_rhp.slop_bit);
+		printf("\tPLR error_range:%u\n", LSM.param.tiering_rhp.range);
+	}
 
 	printf("[PERF] WAF:%.3lf+GC\n", (double)(LSM.param.normal_size_factor*(LSM.param.LEVELN-1))/KP_IN_PAGE+1+1);
 	printf("[PERF] RAF:%.3lf\n", LSM.param.read_amplification+1);
@@ -47,7 +58,7 @@ static void print_level_param(){
 uint32_t lsmtree_argument_set(int argc, char *argv[]){
 	int c;
 	bool leveln_setting=false, sizef_setting=false, reada_setting=false, rh_setting=false;
-	while((c=getopt(argc,argv,"LSah"))!=-1){
+	while((c=getopt(argc,argv,"LSRahbr"))!=-1){
 		switch(c){
 			case 'h':
 				print_help();
@@ -60,6 +71,12 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 			case 'S':
 				LSM.param.normal_size_factor=atoi(argv[optind]);
 				sizef_setting=true;
+				break;
+			case 'b':
+				LSM.param.plr_bit=atoi(argv[optind]);
+				break;
+			case 'r':
+				LSM.param.error_range=atoi(argv[optind]);
 				break;
 			case 'R':
 				LSM.param.read_helper_type=atoi(argv[optind]);
@@ -103,11 +120,11 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 	}
 
 	LSM.param.version_enable=true;
+	LSM.param.leveling_rhp.type=HELPER_BF_PTR_GUARD;
+	LSM.param.leveling_rhp.target_prob=LSM.param.read_amplification;
+	LSM.param.leveling_rhp.member_num=KP_IN_PAGE;
 
 	if(!rh_setting){
-		LSM.param.leveling_rhp.type=HELPER_BF_PTR_GUARD;
-		LSM.param.leveling_rhp.target_prob=LSM.param.read_amplification;
-		LSM.param.leveling_rhp.member_num=KP_IN_PAGE;
 #if 0
 		LSM.param.tiering_rhp.type=HELPER_BF_ONLY_GUARD;
 		if(LSM.param.version_enable){
@@ -120,12 +137,21 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 #else
 		LSM.param.tiering_rhp.type=HELPER_PLR;
 		LSM.param.tiering_rhp.slop_bit=7;
-		LSM.param.tiering_rhp.range=50;
+		LSM.param.tiering_rhp.range=30;
 		LSM.param.tiering_rhp.member_num=KP_IN_PAGE;
 #endif
-		printf("no rh setting - set rh as leveling:HELPER_BF_GUARD tiering:\n");
  
 	}
+	else{
+		LSM.param.tiering_rhp.type=LSM.param.read_helper_type;
+		LSM.param.tiering_rhp.member_num=KP_IN_PAGE;
+	}
+
+	if(LSM.param.tiering_rhp.type==HELPER_PLR){
+		LSM.param.tiering_rhp.slop_bit=LSM.param.plr_bit?LSM.param.plr_bit:7;
+		LSM.param.tiering_rhp.range=LSM.param.error_range?LSM.param.error_range:50;
+	}
+
 	printf("------------------------------------------\n");
 	print_level_param();
 	printf("------------------------------------------\n");
@@ -237,20 +263,37 @@ static void lsmtree_monitor_print(){
 	printf("\n");
 	uint64_t tiering_memory=0;
 	uint64_t leveling_memory=0;
-	uint64_t usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory) + RANGE*5;
-	uint64_t showing_size=SHOWINGSIZE/1024/1024/1024;
+	uint64_t usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 32) + RANGE*5;
+	uint64_t showing_size=RANGE*32/8; //for 48 bit
 	//printf("sw size:%lu\n", showing_size);
-	printf("memory usage:%.2lf for PFTL\n\t%lu(bit)\n\t%.2lf(byte)\n\t%.2lf(MB)\n",
-			(double)usage_bit/8/1024/1024/(showing_size),
+	printf("[32-BIT] memory usage: %.2lf for PFTL\n\t%lu(bit)\n\t%.2lf(byte)\n\t%.2lf(MB)\n",
+			(double)usage_bit/8/(showing_size),
 			usage_bit,
 			(double)usage_bit/8,
 			(double)usage_bit/8/1024/1024
 			);
-	printf("memory breakdown\n\tleveling:%lu (%.2lf)\n\ttiering:%lu (%.2lf)\n\tversion_bit:%lu (%.2lf)\n\n",
+	printf("  memory breakdown\n\tleveling:%lu (%.2lf)\n\ttiering:%lu (%.2lf)\n\tversion_bit:%lu (%.2lf)\n\n",
 			leveling_memory/8, (double)leveling_memory/usage_bit,
 			tiering_memory/8, (double)tiering_memory/usage_bit,
 			(RANGE*5)/8, (double)RANGE*5/usage_bit	
 			);
+
+	tiering_memory=0;
+	leveling_memory=0;
+	usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 48) + RANGE*5;
+	showing_size=RANGE*48/8; //for 48 bit
+	printf("\n[48-BIT] memory usage: %.2lf for PFTL\n\t%lu(bit)\n\t%.2lf(byte)\n\t%.2lf(MB)\n",
+			(double)usage_bit/8/(showing_size),
+			usage_bit,
+			(double)usage_bit/8,
+			(double)usage_bit/8/1024/1024
+			);
+	printf("  memory breakdown\n\tleveling:%lu (%.2lf)\n\ttiering:%lu (%.2lf)\n\tversion_bit:%lu (%.2lf)\n\n",
+			leveling_memory/8, (double)leveling_memory/usage_bit,
+			tiering_memory/8, (double)tiering_memory/usage_bit,
+			(RANGE*5)/8, (double)RANGE*5/usage_bit	
+			);
+
 
 	printf("----- Time result ------\n");
 	print_adding_result("leveling RH [make] time :", 
@@ -267,6 +310,15 @@ static void lsmtree_monitor_print(){
 
 void lsmtree_destroy(lower_info *li, algorithm *){
 	lsmtree_monitor_print();
+	printf("----- traffic result -----\n");
+	printf("RAF: %lf\n",
+			(double)(li->req_type_cnt[DATAR]+li->req_type_cnt[MISSDATAR])/li->req_type_cnt[DATAR]);
+	printf("WAF: %lf\n\n",
+			(double)(li->req_type_cnt[MAPPINGW] +
+				li->req_type_cnt[DATAW]+
+				li->req_type_cnt[GCDW]+
+				li->req_type_cnt[GCMW_DGC]+
+				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	compaction_free(LSM.cm);
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 		write_buffer_free(LSM.wb_array[i]);
@@ -689,7 +741,7 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	uint32_t piece_ppa=req->ppa;
 
 	if(r_param->use_read_helper && 
-			read_helper_data_checking(r_param->rh, LSM.pm, piece_ppa, parents->key, &r_param->read_helper_idx,&offset)){
+			read_helper_data_checking(r_param->rh, LSM.pm, piece_ppa, parents->key, &r_param->read_helper_idx,&offset, r_param->prev_sf)){
 		rwlock_read_unlock(r_param->target_level_rw_lock);
 		if(offset>=L2PGAP){
 			EPRINT("can't be plz checking oob_lba_checker", true);
@@ -716,6 +768,7 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	}
 	else{
 		if(from_end_req_path){
+			LSM.li->req_type_cnt[DATAR]--;
 			LSM.li->req_type_cnt[MISSDATAR]++;
 			parents->type_ftl++;
 		}
@@ -813,7 +866,7 @@ void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
 	}
 }
 
-uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *tiering){
+uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *tiering, uint32_t lba_unit){
 	uint64_t bit=0;
 	(*leveling)=0;
 	(*tiering)=0;
@@ -828,7 +881,7 @@ uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *ti
 			uint32_t now_bit;
 			for_each_sst(rptr, sptr, sidx){
 				if(sptr->_read_helper){
-					now_bit=read_helper_memory_usage(sptr->_read_helper);
+					now_bit=read_helper_memory_usage(sptr->_read_helper, lba_unit);
 					if(lev->istier){
 						(*tiering)+=now_bit;
 					}

@@ -79,10 +79,10 @@ void page_manager_free(page_manager* pm){
 	free(pm);
 }
 
-void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t lba, bool should_abort){
+void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, uint32_t end_lba, bool should_abort){
 	char *oob=bm->get_oob(bm, map_ppa);
-	((uint32_t*)oob)[0]=lba;
-	((uint32_t*)oob)[1]=UINT32_MAX;
+	((uint32_t*)oob)[0]=start_lba;
+	((uint32_t*)oob)[1]=end_lba;
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
 		static int cnt=0;
 		printf("%u ", should_abort?++cnt:cnt);
@@ -594,7 +594,7 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 		uint32_t ppa=page_manager_get_reserve_new_ppa(pm, true, victim->seg_idx);
 		target_sst_file->file_addr.map_ppa=ppa;
-		validate_map_ppa(pm->bm, ppa, gn->lba, true);
+		validate_map_ppa(pm->bm, ppa, gn->lba, target_sst_file->end_lba, true);
 		gc_issue_write_node(ppa, gn->data, true, bm->li);
 		gn->data=NULL;
 		gc_read_node_free(gn);
@@ -664,7 +664,7 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 				mr_set[i].start_lba=kp_set[i][0].lba;
 				mr_set[i].end_lba=kp_get_end_lba((char*)kp_set[i]);
 				mr_set[i].ppa=map_ppa;
-				validate_map_ppa(LSM.pm->bm, map_ppa, mr_set[i].start_lba, true);
+				validate_map_ppa(LSM.pm->bm, map_ppa, mr_set[i].start_lba,mr_set[i].end_lba, true);
 				io_manager_issue_write(map_ppa, data, write_req, false);
 			}
 

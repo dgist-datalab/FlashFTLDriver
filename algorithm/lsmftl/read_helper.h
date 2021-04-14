@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#define READHELPER_NUM (3)
+#define READHELPER_NUM (4)
 
 enum READ_HELPERTYPE{
 	HELPER_NONE				=   0x0000000,
@@ -45,7 +45,7 @@ read_helper *read_helper_init(read_helper_param rhp);
 read_helper *read_helper_kpset_to_rh(read_helper_param rhp, key_ptr_pair *kp_set);
 uint32_t read_helper_stream_insert(read_helper *, uint32_t lba, uint32_t piece_ppa);
 bool read_helper_check(read_helper *, uint32_t lba, uint32_t *piece_ppa_result, struct sst_file *, uint32_t *idx);
-uint32_t read_helper_memory_usage(read_helper *);
+uint32_t read_helper_memory_usage(read_helper *, uint32_t lba_unit);
 void read_helper_print(read_helper *);
 void read_helper_free(read_helper *);
 read_helper* read_helper_copy(read_helper *src);
@@ -53,14 +53,17 @@ void read_helper_move(read_helper *des, read_helper *src);
 bool read_helper_last(read_helper *rh, uint32_t idx);
 uint32_t read_helper_idx_init(read_helper *rh, uint32_t lba);
 bool read_helper_data_checking(read_helper *rh, struct _page_manager*, uint32_t piece_ppa, 
-		uint32_t lba, uint32_t *rh_idx, uint32_t *offset);
+		uint32_t lba, uint32_t *rh_idx, uint32_t *offset, sst_file *sptr);
 void read_helper_insert_done(read_helper *rh);
 static inline char *read_helper_type(uint32_t i){
 	switch(i){
-		case 0: return "NONE";
-		case 1: return "BF";
-		case 2: return "BF_GUARD";
-		case 3: return "PLR";
+		case HELPER_NONE: return "NONE";
+		case HELPER_BF_PTR:
+		case HELPER_BF_ONLY: return "BF";
+		case HELPER_BF_PTR_GUARD:
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_GUARD: return "BF_GUARD";
+		case HELPER_PLR: return "PLR";
 		default: EPRINT("no type", true); break;
 	}
 	return NULL;

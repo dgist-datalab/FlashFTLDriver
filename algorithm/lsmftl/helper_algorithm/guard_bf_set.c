@@ -10,7 +10,7 @@ static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32
 	uint32_t target_number;
 	for(uint32_t i=(1+1); i<member; i++){
 		uint32_t member_set_num=member/i + (member%i?1:0);
-		uint32_t total_bit=get_number_of_bits(get_target_each_fpr(target_fpr, i)) * i + member_set_num*(sizeof(uint32_t) * 2);
+		uint32_t total_bit=get_number_of_bits(get_target_each_fpr(target_fpr, i)) * i + member_set_num*(6 * 2);
 		if(min_bit>total_bit){
 			min_bit=total_bit;
 			target_number=i;

@@ -21,8 +21,8 @@ bool plr_insert(plr_helper *ph, uint32_t lba, uint32_t ppa){
 	return true;
 }
 
-uint64_t plr_memory_usage(plr_helper *ph){
-	return ph->body->memory_usage();
+uint64_t plr_memory_usage(plr_helper *ph, uint32_t lba_unit){
+	return ph->body->memory_usage(lba_unit);
 }
 
 uint32_t plr_get_ppa(plr_helper *ph, uint32_t lba, uint32_t ppa, uint32_t *idx){
@@ -31,8 +31,12 @@ uint32_t plr_get_ppa(plr_helper *ph, uint32_t lba, uint32_t ppa, uint32_t *idx){
 			 return (uint32_t)ph->body->get(lba);
 		case PLR_FRONT_PPA:
 			 return ppa-1;
+		case PLR_DOUBLE_FRONT_PPA:
+			 return ppa-2;
 		case PLR_BEHIND_PPA:
 			 return ppa+1;
+		case PLR_DOUBLE_BEHIND_PPA:
+			 return ppa+2;
 		case PLR_SECOND_ROUND:
 			 (*idx)=UINT32_MAX;
 			 break;
