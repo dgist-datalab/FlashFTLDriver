@@ -228,6 +228,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	}
 
 	read_issue_arg read_arg1={0,}, read_arg2={0,};
+	read_issue_arg read_arg1_prev={0,}, read_arg2_prev={0,};
 	read_arg_container thread_arg;
 	thread_arg.end_req=merge_end_req;
 	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg*)*MERGED_RUN_NUM);
@@ -243,7 +244,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	uint32_t border_lba;
 
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
-	sst_pf_out_stream *os_set[MERGED_RUN_NUM];
+	sst_pf_out_stream *os_set[MERGED_RUN_NUM]={0,};
 
 	sst_bf_out_stream *bos=NULL;
 	sst_bf_in_stream *bis=NULL;
@@ -341,6 +342,8 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 				read_arg2.to=0;
 			}
 
+//			printf("read_arg1:%u~%u, read_arg2:%u~%u\n", read_arg1.from, read_arg1.to, read_arg2.from, read_arg2.to);
+
 			//pos setting
 			if(init){
 				init=false;
@@ -421,7 +424,9 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 		newer_sst_idx=newer_sst_idx_end+1;
 		older_sst_idx=older_sst_idx_end+1;
-	
+		
+		read_arg1_prev=read_arg1;
+		read_arg2_prev=read_arg2;
 	//	EPRINT("should delete before run", false);
 
 	//	EPRINT("should delete before run", false);

@@ -73,6 +73,7 @@ uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece
 	if(!rh) return 1;
 	if(lba==debug_lba){
 		EPRINT("debug point", false);
+		printf("\tpiece_ppa:%u rh:%p\n", piece_ppa, rh);
 	}
 #ifdef TIMERESULT
 	if(rh->type & HELPER_BF_PTR){

@@ -60,6 +60,9 @@ sst_pf_out_stream *sst_pos_init_kp(key_ptr_pair *data){
 }
 
 void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *sst_set, inter_read_alreq_param **param, uint32_t set_num){
+	if(os->now_file_empty){
+		os->now=NULL;
+	}
 	for(uint32_t i=0; i<set_num; i++){
 		os->sst_file_set->push(&sst_set[i]);
 		os->check_flag_set->push(param[i]);
@@ -68,8 +71,8 @@ void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *sst_set, inter_read_alreq_
 }
 
 void sst_pos_add_mr(sst_pf_out_stream *os, map_range *mr_set, inter_read_alreq_param **param, uint32_t set_num){
-	if(&mr_set[0]==os->mr_set->front()){
-		EPRINT("!!!??", true);
+	if(os->now_file_empty){
+		os->now_mr=NULL;
 	}
 	for(uint32_t i=0; i<set_num; i++){
 		os->mr_set->push(&mr_set[i]);

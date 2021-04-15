@@ -31,11 +31,9 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 
 bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t lba, uint32_t *idx){
 	char *oob=pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa));
-	for(uint32_t i=0; i<L2PGAP; i++){
-		if((*(uint32_t*)&oob[i*sizeof(uint32_t)])==lba){
-			*idx=i;
-			return true;
-		}
+	if(*(uint32_t*)&oob[(piece_ppa%L2PGAP)*sizeof(uint32_t)]==lba){
+		*idx=piece_ppa%L2PGAP;
+		return true;
 	}
 	*idx=L2PGAP;
 	return false;

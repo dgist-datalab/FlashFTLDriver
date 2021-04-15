@@ -509,69 +509,65 @@ uint32_t lsmtree_read(request *const req){
 		lsmtree_find_version_with_lock(req->key, r_param);
 		uint32_t target_version=r_param->version;
 
-		if(target_version >= TOTALRUNIDX-1){
-			char *target;
-			for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
-				if((target=write_buffer_get(LSM.wb_array[i], req->key))){
-					//	printf("find in write_buffer");
-					memcpy(req->value->value, target, LPAGESIZE);
-
-					rwlock_read_unlock(r_param->target_level_rw_lock);
-					free(r_param);
-					req->end_req(req);
-					return 1;
-				}
-			}
-
-			rwlock_read_lock(&LSM.flush_wait_wb_lock);
-			if(LSM.flush_wait_wb && (target=write_buffer_get(LSM.flush_wait_wb, req->key))){
+		char *target;
+		for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
+			if((target=write_buffer_get(LSM.wb_array[i], req->key))){
 				//	printf("find in write_buffer");
 				memcpy(req->value->value, target, LPAGESIZE);
+
 				rwlock_read_unlock(r_param->target_level_rw_lock);
 				free(r_param);
-
 				req->end_req(req);
-				rwlock_read_unlock(&LSM.flush_wait_wb_lock);
 				return 1;
 			}
-			rwlock_read_unlock(&LSM.flush_wait_wb_lock);
 		}
 
-		if(target_version >= TOTALRUNIDX-1){
-			uint32_t target_piece_ppa=UINT32_MAX;
-			uint32_t i;
-			rwlock_read_lock(&LSM.flushed_kp_set_lock);
-			for(i=0; i<COMPACTION_REQ_MAX_NUM; i++){
-				if(LSM.flushed_kp_set[i]){
-					if((target_piece_ppa=kp_find_piece_ppa(req->key, (char*)LSM.flushed_kp_set[i]))!=UINT32_MAX){
-						break;
-					}
+		rwlock_read_lock(&LSM.flush_wait_wb_lock);
+		if(LSM.flush_wait_wb && (target=write_buffer_get(LSM.flush_wait_wb, req->key))){
+			//	printf("find in write_buffer");
+			memcpy(req->value->value, target, LPAGESIZE);
+			rwlock_read_unlock(r_param->target_level_rw_lock);
+			free(r_param);
+
+			req->end_req(req);
+			rwlock_read_unlock(&LSM.flush_wait_wb_lock);
+			return 1;
+		}
+		rwlock_read_unlock(&LSM.flush_wait_wb_lock);
+
+		uint32_t target_piece_ppa=UINT32_MAX;
+		uint32_t i;
+		rwlock_read_lock(&LSM.flushed_kp_set_lock);
+		for(i=0; i<COMPACTION_REQ_MAX_NUM; i++){
+			if(LSM.flushed_kp_set[i]){
+				if((target_piece_ppa=kp_find_piece_ppa(req->key, (char*)LSM.flushed_kp_set[i]))!=UINT32_MAX){
+					break;
 				}
 			}
+		}
 
-			if(target_piece_ppa==UINT32_MAX){
-				std::deque<key_ptr_pair*>::iterator moved_kp_it=LSM.moved_kp_set->begin();
-				for(;moved_kp_it!=LSM.moved_kp_set->end(); moved_kp_it++){
-					key_ptr_pair *temp_pair=*moved_kp_it;
-					target_piece_ppa=kp_find_piece_ppa(req->key, (char*)temp_pair);
-					if(target_piece_ppa!=UINT32_MAX){
-						break;
-					}
+		if(target_piece_ppa==UINT32_MAX){
+			std::deque<key_ptr_pair*>::iterator moved_kp_it=LSM.moved_kp_set->begin();
+			for(;moved_kp_it!=LSM.moved_kp_set->end(); moved_kp_it++){
+				key_ptr_pair *temp_pair=*moved_kp_it;
+				target_piece_ppa=kp_find_piece_ppa(req->key, (char*)temp_pair);
+				if(target_piece_ppa!=UINT32_MAX){
+					break;
 				}
 			}
+		}
 
-			if(target_piece_ppa==UINT32_MAX){
-				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
-				//not_found_process(req);
-				//return 0;
-			}
-			else{
-				rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
-				r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
-				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
-				read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
-				return 1;
-			}
+		if(target_piece_ppa==UINT32_MAX){
+			rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+			//not_found_process(req);
+			//return 0;
+		}
+		else{
+			rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
+			r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
+			algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
+			read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+			return 1;
 		}
 	}
 	else{
