@@ -509,7 +509,7 @@ uint32_t lsmtree_read(request *const req){
 		lsmtree_find_version_with_lock(req->key, r_param);
 		uint32_t target_version=r_param->version;
 
-		if(target_version==TOTALRUNIDX){
+		if(target_version >= TOTALRUNIDX-1){
 			char *target;
 			for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 				if((target=write_buffer_get(LSM.wb_array[i], req->key))){
@@ -537,7 +537,7 @@ uint32_t lsmtree_read(request *const req){
 			rwlock_read_unlock(&LSM.flush_wait_wb_lock);
 		}
 
-		if(target_version==TOTALRUNIDX){
+		if(target_version >= TOTALRUNIDX-1){
 			uint32_t target_piece_ppa=UINT32_MAX;
 			uint32_t i;
 			rwlock_read_lock(&LSM.flushed_kp_set_lock);
@@ -562,8 +562,8 @@ uint32_t lsmtree_read(request *const req){
 
 			if(target_piece_ppa==UINT32_MAX){
 				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
-				not_found_process(req);
-				return 0;
+				//not_found_process(req);
+				//return 0;
 			}
 			else{
 				rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
@@ -674,9 +674,6 @@ void lsmtree_compaction_reinsert_end_req(compaction_req *req){
 }
 
 uint32_t lsmtree_write(request *const req){
-#ifdef DEBUG
-	memcpy(req->value->value, &req->key, sizeof(req->key));
-#endif
 	write_buffer *wb=LSM.wb_array[LSM.now_wb];
 	write_buffer_insert(wb, req->key, req->value);
 //	printf("write lba:%u\n", req->key);
@@ -746,9 +743,7 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 		if(offset>=L2PGAP){
 			EPRINT("can't be plz checking oob_lba_checker", true);
 		}
-		if(offset){
-			memcpy(parents->value->value, &v[offset*LPAGESIZE], LPAGESIZE);
-		}
+		memcpy(parents->value->value, &v[offset*LPAGESIZE], LPAGESIZE);
 		parents->end_req(parents);
 		free(r_param);
 		free(req);
@@ -759,9 +754,8 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 		if(offset>=L2PGAP){
 			EPRINT("can't be plz checking oob_lba_checker", true);
 		}
-		if(offset){
-			memcpy(parents->value->value, &v[offset*LPAGESIZE], LPAGESIZE);
-		}
+		memcpy(parents->value->value, &v[offset*LPAGESIZE], LPAGESIZE);
+
 		parents->end_req(parents);
 		free(r_param);
 		free(req);

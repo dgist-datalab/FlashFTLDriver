@@ -9,9 +9,9 @@
 extern lsmtree LSM;
 
 compaction_master *_cm;
-
-//uint32_t debug_lba=2043;
-uint32_t debug_lba=UINT32_MAX;
+extern uint32_t test_key;
+uint32_t debug_lba=test_key;
+//uint32_t debug_lba=UINT32_MAX;
 
 extern uint32_t debug_piece_ppa;
 
