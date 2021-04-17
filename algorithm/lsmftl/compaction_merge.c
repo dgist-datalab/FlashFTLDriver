@@ -222,6 +222,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
 		version_unpopulate_run(LSM.last_run_version, idx_set[i]);
 	}
+	version_reinit_early_invalidation(LSM.last_run_version, MERGED_RUN_NUM, idx_set);
 
 	if(LSM.monitor.compaction_cnt[des->idx+1]==49){
 		LSM.global_debug_flag=true;
@@ -483,7 +484,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 //	level_contents_print(res, true);
 //	lsmtree_gc_unavailable_sanity_check(&LSM);
 	version_poped_update(LSM.last_run_version);
-	version_reinit_early_invalidation(LSM.last_run_version, MERGED_RUN_NUM, idx_set);
 
 	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], idx_set[0]);
 	delete new_range_set;

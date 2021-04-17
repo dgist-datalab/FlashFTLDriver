@@ -150,3 +150,7 @@ void slm_empty_level(uint32_t des_lev_idx){
 	}
 	target->clear();
 }
+
+std::unordered_map<uint32_t, slm_node*> *slm_get_target_map(uint32_t level_idx){
+	return slm_manager.body[level_idx];
+}

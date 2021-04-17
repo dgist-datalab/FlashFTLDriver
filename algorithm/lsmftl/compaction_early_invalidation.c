@@ -21,8 +21,9 @@ static uint32_t stream_invalidation(sst_pf_out_stream *os, uint32_t ridx){
 			a=version_map_lba(LSM.last_run_version, kp.lba);
 			b=ridx;
 			if(version_compare(LSM.last_run_version, a, b) > 0){
-				invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, true);
-				res++;
+				if(invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, false)){
+					res++;
+				}
 			}
 		}
 		sst_pos_pop(os);
@@ -79,7 +80,7 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 	thread_arg.arg_set[0]=&read_arg;
 	thread_arg.set_num=1;
 
-	sst_pf_out_stream *pos;
+	sst_pf_out_stream *pos=NULL;
 
 	run *target_r=&LSM.disk[LSM.param.LEVELN-1]->array[target_ridx];
 
@@ -113,10 +114,13 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 		total_invalidation_cnt+=stream_invalidation(pos, target_ridx);
 	}
 
-	sst_pos_free(pos);
+	if(pos){
+		sst_pos_free(pos);
+	}
 	free(thread_arg.arg_set);
 	free(target_mr_set);
 	version_set_early_invalidation(LSM.last_run_version, target_ridx);
-	printf("early compaction done!\n");
+	printf("invalidation_number:%u early compaction done!\n", total_invalidation_cnt);
+
 	return total_invalidation_cnt;
 }

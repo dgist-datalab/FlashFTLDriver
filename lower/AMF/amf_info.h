@@ -1,6 +1,8 @@
 #include "../../include/settings.h"
 #include "../../include/container.h"
 
+#define REAL_PAGE_SIZE 8192
+
 uint32_t amf_info_create(lower_info *li, blockmanager *bm);
 void* amf_info_destroy(lower_info *li);
 

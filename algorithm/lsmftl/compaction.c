@@ -10,8 +10,8 @@ extern lsmtree LSM;
 
 compaction_master *_cm;
 extern uint32_t test_key;
-uint32_t debug_lba=test_key;
-//uint32_t debug_lba=UINT32_MAX;
+//uint32_t debug_lba=738663;
+uint32_t debug_lba=UINT32_MAX;
 
 extern uint32_t debug_piece_ppa;
 
@@ -233,7 +233,8 @@ static bool leveling_invalidation_function(level *des, uint32_t stream_id, uint3
 		   target_version+1 -> src
 		   target_version  ->des
 		 */
-		if(version_map_lba(LSM.last_run_version, kp.lba)> version+1){
+		uint32_t lba_version=version_map_lba(LSM.last_run_version, kp.lba);
+		if(lba_version!=UINT8_MAX && lba_version > version+1){
 			if(stream_id==0 && des->idx!=0 && slm_invalidate_enable(des->idx-1, kp.piece_ppa)){
 				invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, true);
 			}
@@ -398,7 +399,7 @@ static void trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des
 				kp_get_end_lba((char*)kp_set),TOTALRUNIDX, TOTALRUNIDX-1);*/
 
 		for(uint32_t i=0; i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++){
-			version_coupling_lba_ridx(LSM.last_run_version, kp_set[i].lba, TOTALRUNIDX-1);
+			version_coupling_lba_ridx(LSM.last_run_version, kp_set[i].lba, LSM.last_run_version->total_version_number-1);
 		}
 		sst_free(file, LSM.pm);
 	}
@@ -456,7 +457,7 @@ static void compaction_move_unoverlapped_sst
 		version_update_for_trivial_move(LSM.last_run_version, 
 				sptr->start_lba, 
 				sptr->end_lba,
-				up?version_level_idx_to_version(LSM.last_run_version, up->idx, LSM.param.LEVELN):TOTALRUNIDX,
+				up? version_level_idx_to_version(LSM.last_run_version, up->idx, LSM.param.LEVELN):UINT32_MAX,
 				version_level_idx_to_version(LSM.last_run_version, down->idx, LSM.param.LEVELN));
 	}
 	if(is_close_target){
@@ -465,7 +466,7 @@ static void compaction_move_unoverlapped_sst
 		version_update_for_trivial_move(LSM.last_run_version, 
 				sptr->start_lba, 
 				sptr->end_lba,
-				up?version_level_idx_to_version(LSM.last_run_version, up->idx, LSM.param.LEVELN):TOTALRUNIDX,
+				up?version_level_idx_to_version(LSM.last_run_version, up->idx, LSM.param.LEVELN):UINT32_MAX,
 				version_level_idx_to_version(LSM.last_run_version, down->idx, LSM.param.LEVELN));
 		_start_idx++;
 	}
@@ -966,6 +967,14 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		}
 	}
 
+	/*lock segments which are belong to this level to be gc target*/
+	std::unordered_map<uint32_t, slm_node *>* slm_body=slm_get_target_map(src->idx);
+	std::unordered_map<uint32_t, slm_node *>::iterator map_iter;
+	for(map_iter=slm_body->begin(); map_iter!=slm_body->end(); map_iter++){
+		lsmtree_gc_unavailable_set(&LSM, NULL, map_iter->first);
+	}
+	
+
 	if(page_manager_get_total_remain_page(LSM.pm, false) < needed_seg_num*_PPS){
 		__do_gc(LSM.pm, false, needed_seg_num*_PPS);
 	}
@@ -1068,6 +1077,9 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		level_update_run_at_move_originality(res, target_ridx, new_run, true);
 		version_populate_run(LSM.last_run_version, target_ridx);
 		tiering_compaction_error_check(src, NULL, NULL, new_run, LSM.monitor.compaction_cnt[des->idx]);
+		if(level_is_full(res)){
+			version_make_early_invalidation_enable_old(LSM.last_run_version);
+		}
 	}
 
 
@@ -1079,6 +1091,9 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		}
 	}
 
+	for(map_iter=slm_body->begin(); map_iter!=slm_body->end(); map_iter++){
+		lsmtree_gc_unavailable_unset(&LSM, NULL, map_iter->first);
+	}
 	run_free(new_run);
 	level_print(res);
 //	lsmtree_gc_unavailable_sanity_check(&LSM);

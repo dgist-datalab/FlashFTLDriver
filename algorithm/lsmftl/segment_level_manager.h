@@ -19,5 +19,7 @@ void slm_remove_node(uint32_t level_idx, uint32_t seg_idx);
 void slm_free();
 bool slm_invalidate_enable(uint32_t level_idx, uint32_t piece_ppa);
 void slm_empty_level(uint32_t des_lev_idx);
+std::unordered_map<uint32_t, slm_node*> *slm_get_target_map(uint32_t level_idx);
+
 
 #endif

@@ -112,8 +112,7 @@ key_ptr_pair sst_pos_pick(sst_pf_out_stream *os){
 	}
 retry:
 	key_ptr_pair temp_res;
-	if(os->now_file_empty){
-	
+	if(os->now_file_empty){ //first or retry
 		switch(os->type){
 			case SST_PAGE_FILE_STREAM:
 				if(os->sst_file_set->size()==0){
@@ -139,10 +138,6 @@ retry:
 				break;
 		}
 		os->check_done(os->check_flag_set->front(), true);
-/*
-		os->sst_file_set->pop();
-		os->check_flag_set->pop();
-*/
 		os->now_file_empty=false;
 		os->idx=0;
 	}
@@ -182,16 +177,18 @@ retry:
 			break;
 	}
 
-	if(os->idx*sizeof(key_ptr_pair) >=PAGESIZE){
+	if(os->idx*sizeof(key_ptr_pair) >=PAGESIZE){ //next time new file 
 		os->now_file_empty=true;
 	}
-	else if(res.lba==UINT32_MAX){
+	else if(res.lba==UINT32_MAX){ //now retry
 		os->now_file_empty=true;
 		if(os->type==SST_PAGE_FILE_STREAM || os->type==MAP_FILE_STREAM){
 			move_next_file(os);
 		}
 		goto retry;
 	}
+
+
 #ifdef DEBUG
 	if(!os->isstart){
 		os->isstart=true;

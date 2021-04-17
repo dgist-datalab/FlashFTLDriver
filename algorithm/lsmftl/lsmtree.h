@@ -52,6 +52,7 @@ typedef struct lsmtree_parameter{
 	bool version_enable;
 	uint32_t plr_bit;
 	uint32_t error_range;
+	uint32_t version_number;
 }lsmtree_parameter;
 
 enum{
@@ -130,6 +131,7 @@ void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm);
 uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t* , uint64_t *, uint32_t);
+void lsmtree_tiered_level_all_print();
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 
 #define MAKE_L0COMP_REQ(wb, kp_set, param, is_gc_data)\

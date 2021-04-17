@@ -7,7 +7,7 @@
 #include<queue>
 
 extern lsmtree LSM;
-//uint32_t debug_piece_ppa=208320;
+//uint32_t debug_piece_ppa=720896;
 uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
@@ -39,7 +39,7 @@ bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t
 	return false;
 }
 
-void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abort){
+bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abort){
 	if(piece_ppa==debug_piece_ppa){
 		static int cnt=0;
 		printf("%u ", should_abort?++cnt:cnt);
@@ -52,8 +52,10 @@ void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abor
 		}
 		else{
 			bm->invalidate_number_decrease(bm, piece_ppa);
+			return false;
 		}
 	}
+	return true;
 }
 
 page_manager* page_manager_init(struct blockmanager *_bm){
@@ -464,12 +466,7 @@ bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_num){
 	std::queue<uint32_t> temp_queue;
 	uint32_t seg_idx;
 	uint32_t remain_page=0;
-
-	uint32_t avg_invalidation_cnt=0;
 	uint32_t target_ridx=0;
-	uint32_t max_invalidation_cnt=0;
-	uint32_t version_check=0;
-
 retry:
 	victim_target=pm->bm->get_gc_target(pm->bm);
 	seg_idx=victim_target->seg_idx;
@@ -518,16 +515,12 @@ out:
 	switch(pm->seg_type_checker[seg_idx]){
 		case DATASEG:
 		case SEPDATASEG:
-			if(version_check<(TOTALRUNIDX/(1+1)) && victim_target->invalidate_number < (_PPS*L2PGAP/(1+1))){
-				target_ridx=version_get_max_invalidation_target(LSM.last_run_version,
-						&max_invalidation_cnt, &avg_invalidation_cnt);
-				if(target_ridx!=UINT32_MAX && victim_target->invalidate_number < avg_invalidation_cnt){
-					version_check++;
-					compaction_early_invalidation(target_ridx);
-					free(victim_target);
-					pm->bm->reinsert_segment(pm->bm, seg_idx);
-					goto retry;
-				}
+			if(	victim_target->invalidate_number < (_PPS*L2PGAP/(1+1)) &&
+					(target_ridx=version_get_early_invalidation_target(LSM.last_run_version))!=UINT32_MAX){
+				compaction_early_invalidation(target_ridx);
+				free(victim_target);
+				pm->bm->reinsert_segment(pm->bm, seg_idx);
+				goto retry;
 			}
 			res=__gc_data(pm, pm->bm, victim_target);
 			remain_page=page_manager_get_total_remain_page(LSM.pm, false);
@@ -965,7 +958,7 @@ retry:
 					target_version=version_level_idx_to_version(LSM.last_run_version, gmc->level, LSM.param.LEVELN);
 					recent_version=version_map_lba(LSM.last_run_version, gmc->lba);
 					if(version_compare(LSM.last_run_version, recent_version, target_version)<=0){
-						version_coupling_lba_ridx(LSM.last_run_version, gmc->lba, TOTALRUNIDX);
+	//					version_coupling_lba_ridx(LSM.last_run_version, gmc->lba, TOTALRUNIDX);
 						write_buffer_insert_for_gc(gc_wb, gmc->lba, gmc->data_ptr);
 					}
 					else{

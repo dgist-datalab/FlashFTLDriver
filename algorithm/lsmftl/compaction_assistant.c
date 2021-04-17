@@ -54,6 +54,8 @@ static inline void disk_change(level **up, level *src, level** des, uint32_t* id
 	level *delete_target_level=*des;
 	(*des)=src;
 	level_free(delete_target_level, LSM.pm);
+
+	//lsmtree_level_summary(&LSM);
 }
 
 void* compaction_main(void *_cm){
