@@ -3,7 +3,6 @@ SRCS +=\
 	   level.c\
 	   lftl_slab.c\
 	   lsmtree.c\
-	   lsmtree_param_module.c\
 	   page_manager.c\
 	   run.c\
 	   write_buffer.c\
@@ -20,6 +19,7 @@ SRCS +=\
 	   compaction_merge.c\
 	   compaction_early_invalidation.c\
 	   compaction_sst_convert.c\
+	   gc_helper.c\
 #	   gc.c\
 #	   helper_algorithm/bf_set.c\
 #	   helper_algorithm/compressed_bloomfilter.c
@@ -53,6 +53,8 @@ libnom.a : $(TARGETOBJ)
 HelperAlgorithm:
 	cd helper_algorithm && make 
 	cp helper_algorithm/*.o ../../object/
+	cd design_knob && make 
+	cp design_knob/*.o ../../object/
 
 clean : 
 	@$(RM) ./helper_algorithm/*.o

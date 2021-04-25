@@ -2,8 +2,11 @@
 #define __PAGE_MANAGER_H__
 #include "../../include/settings.h"
 #include "../../include/container.h"
+#include "write_buffer.h"
 #include "sst_file.h"
 #include <stdint.h>
+#include <map>
+#include <queue>
 
 #define MAX_MAP (PAGESIZE/sizeof(uint32_t))
 #define BLOCK_MAP_SIZE (_PPB*sizeof(uint32_t))
@@ -14,7 +17,7 @@ enum{
 	SEPDATASEG, DATASEG, MAPSEG
 };
 
-typedef struct _page_manager{
+typedef struct page_manager{
 	uint8_t seg_type_checker[_NOS];
 	bool is_master_page_manager;
 	__segment *temp_data_segment;
@@ -32,7 +35,7 @@ typedef struct gc_read_node{
 }gc_read_node;
 
 enum{
-	MAP_CHECK_FLUSHED_KP, MAP_READ_ISSUE, MAP_READ_DONE
+	MAP_CHECK_FLUSHED_KP, MAP_READ_ISSUE, MAP_READ_DONE, MAP_READ_DONE_PENDING,
 };
 
 typedef struct gc_mapping_check_node{
@@ -43,7 +46,11 @@ typedef struct gc_mapping_check_node{
 	uint32_t level;
 	uint32_t map_ppa;
 	uint32_t piece_ppa; 
+	uint32_t new_piece_ppa;
 	uint32_t lba;
+	uint64_t validate_piece_cnt;
+	uint64_t invalidate_piece_cnt;
+	struct sst_file *target_sst_file;
 }gc_mapping_check_node;
 
 bool __do_gc(page_manager *pm, bool is_map, uint32_t target_page_num);
@@ -68,4 +75,9 @@ uint32_t page_manager_get_new_ppa_from_seg(page_manager *pm, __segment *seg);
 uint32_t page_manager_pick_new_ppa_from_seg(page_manager *pm, __segment *seg);
 __segment *page_manager_get_seg(page_manager *pm, bool ismap, uint32_t type);
 __segment *page_manager_get_seg_for_bis(page_manager *pm,  uint32_t type);
+#ifdef PINKGC
+void gc_helper_for_pink(std::queue<gc_mapping_check_node*>*);
+#endif
+void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*>*, 
+		struct write_buffer *wb, uint32_t seg_idx);
 #endif

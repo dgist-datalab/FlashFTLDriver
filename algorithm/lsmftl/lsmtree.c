@@ -139,7 +139,6 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		//LSM.param.LEVELN++;
 	}
 
-
 	if(!reada_setting){
 		printf("no read amplification setting - set read amp as %f\n", TARGETFPR);
 		LSM.param.read_amplification=TARGETFPR;
@@ -204,8 +203,10 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 		LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
 	}
 	
+#ifdef PINKGC
 	LSM.moved_kp_set=new std::deque<key_ptr_pair*>();
 	fdriver_mutex_init(&LSM.moved_kp_lock);
+#endif
 
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
@@ -369,7 +370,9 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	version_free(LSM.last_run_version);
 
 	page_manager_free(LSM.pm);
+#ifdef PINKGC
 	delete LSM.moved_kp_set;
+#endif
 	
 	rwlock_destroy(&LSM.flushed_kp_set_lock);
 	rwlock_destroy(&LSM.flush_wait_wb_lock);
@@ -589,6 +592,7 @@ uint32_t lsmtree_read(request *const req){
 			}
 		}
 
+#ifdef PINKGC
 		if(target_piece_ppa==UINT32_MAX){
 			std::deque<key_ptr_pair*>::iterator moved_kp_it=LSM.moved_kp_set->begin();
 			for(;moved_kp_it!=LSM.moved_kp_set->end(); moved_kp_it++){
@@ -599,6 +603,7 @@ uint32_t lsmtree_read(request *const req){
 				}
 			}
 		}
+#endif
 
 		if(target_piece_ppa==UINT32_MAX){
 			rwlock_read_unlock(&LSM.flushed_kp_set_lock);
@@ -720,6 +725,7 @@ uint32_t lsmtree_write(request *const req){
 	//version_coupling_lba_ridx(LSM.last_run_version, req->key, TOTALRUNIDX);
 
 	if(write_buffer_isfull(wb)){
+#ifdef PINKGC
 		fdriver_lock(&LSM.moved_kp_lock);
 		while(!LSM.moved_kp_set->empty()){
 
@@ -729,6 +735,7 @@ uint32_t lsmtree_write(request *const req){
 			LSM.moved_kp_set->pop_front();
 		}
 		fdriver_unlock(&LSM.moved_kp_lock);
+#endif
 	
 retry:
 		rwlock_write_lock(&LSM.flush_wait_wb_lock);

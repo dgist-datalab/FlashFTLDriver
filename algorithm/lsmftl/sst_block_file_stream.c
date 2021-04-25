@@ -88,6 +88,7 @@ key_value_wrapper *sst_bos_get_pending(sst_bf_out_stream *bos,
 	if(bos->kv_buf_idx){
 		key_value_wrapper *res=kv_wrapper_setting(bos, bos->kv_wrap_buffer, bos->kv_buf_idx, cm);
 		bos->kv_buf_idx=0;
+		bos->prev_ppa=UINT32_MAX;
 		return res;
 	}
 	else return NULL;

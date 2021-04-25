@@ -45,7 +45,7 @@ void run_deep_append_sstfile(run *_run, sst_file *sstfile);
 void run_free(run *_run);
 void run_print(run *r);
 void run_content_print(run *r, bool print_sst);
-static inline void run_destroy_content(run *_run, struct _page_manager *pm){
+static inline void run_destroy_content(run *_run, struct page_manager *pm){
 	sst_file *sptr; uint32_t sidx;
 	for_each_sst(_run, sptr, sidx){
 		sst_destroy_content(sptr, pm);

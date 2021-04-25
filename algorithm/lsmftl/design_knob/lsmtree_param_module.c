@@ -1,5 +1,5 @@
 #include "lsmtree_param_module.h"
-#include "../../include/settings.h"
+#include "../../../include/settings.h"
 #include <cmath>
 #define MAXRETRY_CNT (2)
 static inline int checking(uint32_t level, uint32_t size_factor, uint32_t blocknumber){

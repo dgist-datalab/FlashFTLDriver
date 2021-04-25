@@ -314,9 +314,9 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		uint32_t older_prev=0, newer_prev=0;
 		read_arg1={0,}; read_arg2={0,};
 		while(read_done!=total_map_num){
-//			if(LSM.global_debug_flag){
-//				printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
-//			}
+	/*		if(LSM.global_debug_flag){
+				printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
+			}*/
 			uint32_t shard=LOWQDEPTH/(1+1);
 
 			if(newer_mr){
@@ -382,11 +382,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 					(older_mr && older->sst_set[older_sst_idx].map_num==1 && !newer_mr)){
 				EPRINT("debug point", false);
 			}*/
-
-			if( (os_set[0]->now_file_empty && os_set[0]->now_mr==os_set[0]->mr_set->front()) || 
-				(os_set[1]->now_file_empty && os_set[1]->now_mr==os_set[1]->mr_set->front())){
-				EPRINT("debug point", false);
-			}
 
 			//sorting
 			LSM.monitor.merge_valid_entry_cnt+=stream_sorting(NULL, MERGED_RUN_NUM, os_set, NULL, kpq, 

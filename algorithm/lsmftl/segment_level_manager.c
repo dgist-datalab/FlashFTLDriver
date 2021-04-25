@@ -68,10 +68,7 @@ void slm_move(uint32_t des_lev_idx, uint32_t src_lev_idx){
 	for(map_iter it=src_target->begin(); it!=src_target->end(); it++){
 		map_iter des_it=des_target->find(it->first);
 		if(des_it!=des_target->end()){
-			if(des_it->second->piece_offset >= it->second->piece_offset){
-				EPRINT("append only error", true);
-			}
-			des_it->second->piece_offset=it->second->piece_offset;
+			des_it->second->piece_offset=MAX(it->second->piece_offset,des_it->second->piece_offset);
 			free(it->second);
 		}
 		else{

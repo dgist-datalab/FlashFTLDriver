@@ -2,11 +2,11 @@
 #define __WRITE_BUFFER_H__
 #include "../../include/settings.h"
 #include "../../interface/interface.h"
+#include "read_helper.h"
 #include "page_manager.h"
 #include "global_return_code.h"
 #include "lftl_slab.h"
 #include "key_value_pair.h"
-#include "read_helper.h"
 #include <map>
 
 typedef enum write_buffer_return_code{
@@ -35,15 +35,15 @@ typedef struct write_buffer{
 	uint32_t buffered_entry_num;
 	uint32_t max_buffer_entry_num;
 	slab_master *sm;
-	page_manager *pm;
+	struct page_manager *pm;
 //	buffer_entry **data;
 	std::map<uint32_t, buffer_entry *> *data;
 	uint32_t flushed_req_cnt;
 	fdriver_lock_t cnt_lock;
 	fdriver_lock_t sync_lock;
 
-	read_helper *rh;
-	read_helper_param rhp;
+	struct read_helper *rh;
+	struct read_helper_param rhp;
 }write_buffer;
 
 write_buffer *write_buffer_reinit(write_buffer *wb);
@@ -55,7 +55,8 @@ char *write_buffer_get(write_buffer *, uint32_t lba);
 void write_buffer_free(write_buffer*);
 
 uint32_t write_buffer_insert_for_gc(write_buffer *, uint32_t lba, char *gc_data);
-key_ptr_pair* write_buffer_flush_for_gc(write_buffer *, bool sync, uint32_t seg_idx, bool *, uint32_t prev_map_num);
+key_ptr_pair* write_buffer_flush_for_gc(write_buffer *, bool sync, uint32_t seg_idx, bool *,
+		uint32_t prev_map_num, std::map<uint32_t, struct gc_mapping_check_node*>* gkv);
 
 inline static uint32_t write_buffer_isfull(write_buffer *wb){
 	return wb->buffered_entry_num >= wb->max_buffer_entry_num;

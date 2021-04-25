@@ -1,33 +1,55 @@
 #include "guard_bf_set.h"
 #include <stdlib.h>
 #include <stdio.h>
-
 static uint32_t BP_sub_member_num=UINT32_MAX;
 static uint32_t BO_sub_member_num=UINT32_MAX;
+static uint32_t prev_bit=UINT32_MAX;
+float gbf_min_bit=0.0f;
 extern uint32_t debug_lba;
+
 static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32_t type){
-	uint32_t min_bit=UINT32_MAX;
-	uint32_t target_number;
-	for(uint32_t i=(1+1); i<member; i++){
-		uint32_t member_set_num=member/i + (member%i?1:0);
-		uint32_t total_bit=get_number_of_bits(get_target_each_fpr(target_fpr, i)) * i + member_set_num*(6 * 2);
-		if(min_bit>total_bit){
-			min_bit=total_bit;
-			target_number=i;
-		}
-	}
-	switch(type){
-		case BLOOM_PTR_PAIR:
-			BP_sub_member_num=target_number;
-			break;
-		case BLOOM_ONLY:
-			BO_sub_member_num=target_number;
-			break;
-		default:
-			EPRINT("no type of gbf_set", true);
-			break;
-	}
+    uint32_t target_number;
+    uint32_t target_bit=0;
+    float result_each_fpr;
+    uint32_t result_member_num=0;
+    for(uint32_t i=(1+1); i<member/2; i++){
+        uint32_t member_set_num=member/i;// + (member%i?1:0);
+        float target_each_fpr=get_target_each_fpr(target_fpr,i );
+        uint32_t bit=get_number_of_bits(target_each_fpr);
+        float avg_bit=(float)(bit* i + (48 * 2))/i;
+
+        if(gbf_min_bit==0.0f){
+            gbf_min_bit=avg_bit;
+        }
+        else if(gbf_min_bit>avg_bit){
+            gbf_min_bit=avg_bit;
+            target_number=i;
+
+            target_bit=bit;
+            result_each_fpr=target_each_fpr;
+            result_member_num=member_set_num;
+        }
+        else break;
+    }   
+    switch(type){
+        case BLOOM_PTR_PAIR:
+            BP_sub_member_num=target_number;
+            break;
+        case BLOOM_ONLY:
+            BO_sub_member_num=target_number;
+            break;
+        default:
+            EPRINT("no type of gbf_set", true);
+            break;
+    }   
+    if(prev_bit!=target_bit){
+        printf("BF target bit:%u fpr:%f member_set:%u target_member:%u min_bit:%f\n", target_bit, 
+                result_each_fpr, result_member_num, target_number, gbf_min_bit);
+    }   
+    prev_bit=target_bit;
 }
+
+
 
 void gbf_set_prepare(float target_fpr, uint32_t member, uint32_t type){
 	if(type==BLOOM_PTR_PAIR){

@@ -10,7 +10,7 @@ extern lsmtree LSM;
 
 compaction_master *_cm;
 extern uint32_t test_key;
-//uint32_t debug_lba=738663;
+//uint32_t debug_lba=1549288;
 uint32_t debug_lba=UINT32_MAX;
 
 extern uint32_t debug_piece_ppa;
@@ -925,7 +925,6 @@ static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num,
 
 level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move to last level*/
 	_cm=cm;
-	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
 
 	LSM.monitor.compaction_cnt[des->idx]++;
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
@@ -933,6 +932,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_ridx, &start_sst_file_idx);
 
 	if(start_sst_file_idx!=UINT32_MAX && start_sst_file_idx==src->now_sst_num-1){ //all sequential_file
+		level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
 		level_update_run_at_move_originality(res, target_ridx, new_run, true);
 		version_populate_run(LSM.last_run_version, target_ridx);
 		tiering_compaction_error_check(src, NULL, NULL, new_run, LSM.monitor.compaction_cnt[des->idx]);
@@ -941,6 +941,8 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		level_print(res);
 		return res;
 	}
+	
+	//level_content_print(LSM.disk[1], true);
 
 	uint32_t needed_seg_num=0;
 	if(start_sst_file_idx==UINT32_MAX){
@@ -949,6 +951,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	}
 	else{
 		if(src->now_sst_num==start_sst_file_idx){
+			level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
 			run *rptr; uint32_t ridx;
 			for_each_run_max(des, rptr, ridx){
 				if(rptr->now_sst_file_num){
@@ -967,24 +970,10 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		}
 	}
 
-	/*lock segments which are belong to this level to be gc target*/
-	std::unordered_map<uint32_t, slm_node *>* slm_body=slm_get_target_map(src->idx);
-	std::unordered_map<uint32_t, slm_node *>::iterator map_iter;
-	for(map_iter=slm_body->begin(); map_iter!=slm_body->end(); map_iter++){
-		lsmtree_gc_unavailable_set(&LSM, NULL, map_iter->first);
-	}
-	
-
+	/*
 	if(page_manager_get_total_remain_page(LSM.pm, false) < needed_seg_num*_PPS){
 		__do_gc(LSM.pm, false, needed_seg_num*_PPS);
-	}
-
-	run *rptr; uint32_t ridx;
-	for_each_run_max(des, rptr, ridx){
-		if(rptr->now_sst_file_num){
-			level_append_run_copy_move_originality(res, rptr, ridx);
-		}
-	}
+	}*/
 
 	read_issue_arg read_arg;
 	read_arg.des=src;
@@ -1020,6 +1009,11 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		}
 		read_param_init(&read_arg);
 
+		needed_seg_num=(TARGETREADNUM(read_arg)*KP_IN_PAGE/L2PGAP+TARGETREADNUM(read_arg))/_PPS+1+1;
+		if(page_manager_get_total_remain_page(LSM.pm, false) <needed_seg_num * _PPS){ 
+			__do_gc(LSM.pm, false, needed_seg_num*_PPS);
+		}
+
 		if(i==0){
 			pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param, 
 					read_arg.to-read_arg.from+1, read_done_check, file_done);
@@ -1028,6 +1022,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 			sst_pos_add_sst(pos, LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
 					read_arg.to-read_arg.from+1);
 		}
+
 		read_sst_job((void*)&thread_arg,-1);
 		
 		uint32_t round2_tier_compaction_tags, picked_kv_num;
@@ -1035,7 +1030,7 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		do{ 
 			round2_tier_compaction_tags=cm->read_param_queue->size();
 			picked_kv_num=issue_read_kv_for_bos(bos, pos, round2_tier_compaction_tags, target_ridx, 
-					i==round-1);
+					true);
 			LSM.monitor.tiering_valid_entry_cnt+=picked_kv_num;
 			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
 			total_moved_num+=picked_kv_num;
@@ -1072,6 +1067,14 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 	sst_bos_free(bos, _cm);
 	free(thread_arg.arg_set);
 	
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
+	run *rptr; uint32_t ridx;
+	for_each_run_max(des, rptr, ridx){
+		if(rptr->now_sst_file_num){
+			level_append_run_copy_move_originality(res, rptr, ridx);
+		}
+	}
+
 	//level_append_run(res, new_run);
 	if(total_moved_num){
 		level_update_run_at_move_originality(res, target_ridx, new_run, true);
@@ -1082,7 +1085,6 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		}
 	}
 
-
 	sst_file *temp_sptr;
 	uint32_t temp_sidx;
 	for_each_sst(new_run, temp_sptr, temp_sidx){
@@ -1091,9 +1093,6 @@ level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move
 		}
 	}
 
-	for(map_iter=slm_body->begin(); map_iter!=slm_body->end(); map_iter++){
-		lsmtree_gc_unavailable_unset(&LSM, NULL, map_iter->first);
-	}
 	run_free(new_run);
 	level_print(res);
 //	lsmtree_gc_unavailable_sanity_check(&LSM);

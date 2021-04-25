@@ -177,6 +177,7 @@ again:
 			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
 			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
 		}
+
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);
 	}

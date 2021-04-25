@@ -7,7 +7,7 @@
 #include<queue>
 
 extern lsmtree LSM;
-//uint32_t debug_piece_ppa=720896;
+//uint32_t debug_piece_ppa=2490458;
 uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
@@ -20,7 +20,10 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 		memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 		if(piece_ppa[i]==debug_piece_ppa){
 			printf("%u ", should_abort?++cnt:cnt);
-			EPRINT("validate piece here!\n", false);
+			EPRINT("validate piece here!\n", false);	
+			if(cnt==4){
+				EPRINT("break point",false);
+			}
 		}
 
 		if(!bm->populate_bit(bm, piece_ppa[i]) && should_abort){
@@ -150,7 +153,14 @@ retry:
 			else{ //copy trim
 				
 			}
-			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			if(pm->current_segment[is_map?MAP_S:DATA_S] &&
+					pm->current_segment[is_map?MAP_S:DATA_S]->used_page_num<_PPS){
+			
+			}
+			else{
+				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			}
+			
 		}
 		else{
 			if(seg){
@@ -385,7 +395,6 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim);
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim);
 
 void *gc_end_req(algo_req* req);
-void *gc_map_check_end_req(algo_req *req);
 
 static inline gc_read_node *gc_read_node_init(bool ismapping, uint32_t ppa){
 	gc_read_node *res=(gc_read_node*)malloc(sizeof(gc_read_node));
@@ -425,21 +434,6 @@ static void gc_issue_write_node(uint32_t ppa, value_set *data, bool ismap, lower
 	li->write(ppa, PAGESIZE, data, ASYNC, req);
 }
 
-static void gc_issue_mapcheck_read(gc_mapping_check_node *gmc, lower_info *li){
-	algo_req *req=(algo_req*)malloc(sizeof(algo_req));
-	req->param=(void*)gmc;
-	req->end_req=gc_map_check_end_req;
-	req->type=GCMR;
-	li->read(gmc->map_ppa, PAGESIZE, gmc->mapping_data, ASYNC, req);
-}
-
-void *gc_map_check_end_req(algo_req *req){
-	gc_mapping_check_node *gmc=(gc_mapping_check_node*)req->param;
-	fdriver_unlock(&gmc->done_lock);
-	free(req);
-	return NULL;
-}
-
 void *gc_end_req(algo_req *req){
 	gc_read_node *gn;
 	value_set *v;
@@ -464,6 +458,7 @@ bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_num){
 	bool res=false;
 	__gsegment *victim_target;
 	std::queue<uint32_t> temp_queue;
+	std::queue<uint32_t> diff_type_queue;
 	uint32_t seg_idx;
 	uint32_t remain_page=0;
 	uint32_t target_ridx=0;
@@ -494,7 +489,15 @@ retry:
 
 retry_logic:
 	free(victim_target);
-	temp_queue.push(seg_idx);
+	if(ismap && pm->seg_type_checker[seg_idx]!=MAPSEG){
+		diff_type_queue.push(seg_idx);
+	}
+	else if(!ismap && pm->seg_type_checker[seg_idx]==MAPSEG){
+		diff_type_queue.push(seg_idx);
+	}
+	else{
+		temp_queue.push(seg_idx);
+	}
 	goto retry;
 
 out:
@@ -515,35 +518,47 @@ out:
 	switch(pm->seg_type_checker[seg_idx]){
 		case DATASEG:
 		case SEPDATASEG:
-			if(	victim_target->invalidate_number < (_PPS*L2PGAP/(1+1)) &&
+			if(	victim_target->invalidate_number < L2PGAP &&
 					(target_ridx=version_get_early_invalidation_target(LSM.last_run_version))!=UINT32_MAX){
 				compaction_early_invalidation(target_ridx);
 				free(victim_target);
 				pm->bm->reinsert_segment(pm->bm, seg_idx);
-				goto retry;
+				goto retry;	
+			}
+			while(diff_type_queue.size()){
+				seg_idx=diff_type_queue.front();
+				pm->bm->reinsert_segment(pm->bm, seg_idx);
+				diff_type_queue.pop();
 			}
 			res=__gc_data(pm, pm->bm, victim_target);
 			remain_page=page_manager_get_total_remain_page(LSM.pm, false);
 			break;
 		case MAPSEG:
+			while(diff_type_queue.size()){
+				seg_idx=diff_type_queue.front();
+				pm->bm->reinsert_segment(pm->bm, seg_idx);
+				diff_type_queue.pop();
+			}
 			res=__gc_mapping(pm, pm->bm, victim_target);
 			remain_page=page_manager_get_total_remain_page(LSM.pm, true);
 			break;
 	}
-
-	if(remain_page<target_page_num)
-		goto retry;
-
 	while(temp_queue.size()){
 		seg_idx=temp_queue.front();
 		pm->bm->reinsert_segment(pm->bm, seg_idx);
 		temp_queue.pop();
 	}
+	if(remain_page<target_page_num)
+		goto retry;
+
 	return res;
 }
 
 bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_mapping++;
+	if(LSM.monitor.gc_mapping==10){
+		EPRINT("break!", false);
+	}
 //	printf("gc_mapping:%u (seg_idx:%u)\n", LSM.monitor.gc_mapping, victim->seg_idx);
 	if(victim->invalidate_number==_PPS*L2PGAP || victim->all_invalid){
 		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
@@ -636,7 +651,8 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t ridx, uint32
 			uint32_t kp_set_idx=0;
 			key_ptr_pair *now_kp_set;
 			bool force_stop=false;
-			while((now_kp_set=write_buffer_flush_for_gc(gsn->wb, false, seg_idx, &force_stop, kp_set_idx))){
+			while((now_kp_set=write_buffer_flush_for_gc(gsn->wb, false, seg_idx, &force_stop, 
+							kp_set_idx, NULL))){
 				kp_set[kp_set_idx]=now_kp_set;
 				kp_set_idx++;
 				if(force_stop) break;
@@ -745,7 +761,6 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		}
 	}
 
-	write_buffer *gc_wb=write_buffer_init(_PPS*L2PGAP, pm,GC_WB);
 	value_set **free_target=(value_set**)malloc(sizeof(value_set*)*read_page_num);
 
 	uint32_t* oob_lba;
@@ -754,8 +769,12 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	sst_file *sptr=NULL;
 	uint32_t recent_version, target_version;
 	uint32_t sptr_idx=0;
-
+#ifdef PINKGC
 	std::queue<gc_mapping_check_node*> *gc_mapping_queue=new std::queue<gc_mapping_check_node*>();
+#else
+	write_buffer *leveling_node_wb=NULL;
+	std::map<uint32_t, gc_mapping_check_node *> *gc_kv_map=new std::map<uint32_t, gc_mapping_check_node*>();
+#endif
 	gc_mapping_check_node *gmc=NULL;
 
 	sst_file *prev_sptr=NULL;
@@ -806,17 +825,56 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					sptr=level_find_target_run_idx(LSM.disk[LSM.param.LEVELN-1], oob_lba[i], piece_ppa, &target_version, &sptr_idx);
 				}
 				if(sptr==NULL || !(sptr && sptr->file_addr.piece_ppa<=piece_ppa && sptr->end_ppa*L2PGAP>=piece_ppa)){
+					uint32_t level_idx=version_to_level_idx(LSM.last_run_version,
+							version_map_lba(LSM.last_run_version,oob_lba[i]),
+							LSM.param.LEVELN);
+					
+					if(level_idx!=LSM.param.LEVELN-1 && !slm_invalidate_enable(level_idx, piece_ppa)){
+#ifdef DEBUG
+						bool find_testing=false;
+						for(uint32_t k=0; k<LSM.param.LEVELN-1; k++){
+							if(slm_invalidate_enable(k, piece_ppa)){
+								if(k!=level_idx){
+									/*
+									static uint32_t really_exist_cnt=0;
+									printf("%u ", really_exist_cnt++);
+									EPRINT("invalid data but move", false);*/
+									find_testing=true;
+									break;
+								}
+							}
+						}
+						if(!find_testing){
+							EPRINT("not found piece_ppa", true);
+						}
+#endif
+						//invalidate_piece_ppa(pm->bm, piece_ppa, true);
+					}
+					else if(level_idx==LSM.param.LEVELN-1){
+						EPRINT("???", true);
+					}
+
 					/*checking other level*/
 					gmc=(gc_mapping_check_node*)malloc(sizeof(gc_mapping_check_node));
-					gmc->mapping_data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 					gmc->data_ptr=&gn->data->value[LPAGESIZE*i];
 					gmc->piece_ppa=piece_ppa;
+					gmc->new_piece_ppa=UINT32_MAX;
 					gmc->lba=oob_lba[i];
 					gmc->map_ppa=UINT32_MAX;
 					gmc->type=MAP_CHECK_FLUSHED_KP;
 					gmc->level=LSM.param.LEVELN-(1+1);
+#ifdef PINKGC
 					fdriver_lock_init(&gmc->done_lock, 0);
+					gmc->mapping_data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 					gc_mapping_queue->push(gmc);
+#else
+					if(!leveling_node_wb){
+						leveling_node_wb=write_buffer_init(_PPS*L2PGAP, pm, GC_WB);	
+					}
+					gmc->mapping_data=NULL;
+					write_buffer_insert_for_gc(leveling_node_wb, gmc->lba, gmc->data_ptr);
+					gc_kv_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
+#endif
 				}
 				else{
 					//sptr->trimed_sst_file=true;
@@ -862,181 +920,25 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 			move_sptr(gsn, victim->seg_idx,target_version,sptr_idx);
 		}
 		else{
-			level_sptr_remove_at_in_gc(LSM.disk[LSM.param.LEVELN-1], target_version, sptr_idx);
+			level_sptr_remove_at_in_gc(LSM.disk[LSM.param.LEVELN], target_version, sptr_idx);
 		}
 	}
 
-	sst_file *map_ptr;
-	uint32_t found_piece_ppa=UINT32_MAX;
-	bool kp_set_check_start=false;
-	uint32_t kp_set_iter=0;
-	write_buffer *flushed_kp_set_update=NULL;
-
+#ifdef PINKGC
 	if(gc_mapping_queue->size()){
 		printf("[%u] victim invalidation cnt:%u GMC target cnt:%lu ", LSM.monitor.gc_data,victim->invalidate_number, gc_mapping_queue->size());
 		EPRINT("debug", false);
 		//LSM.global_debug_flag=true;
 	}
-
-	while(!gc_mapping_queue->empty()){
-		gmc=gc_mapping_queue->front();
-		/*
-		if(gmc->piece_ppa==debug_piece_ppa && gmc->lba==debug_lba){
-			printf("break!\n");
-		}*/
-		std::deque<key_ptr_pair*>::iterator moved_kp_it;
-		key_ptr_pair *moved_kp_now;
-		bool moved_kp_found=false;
-retry:
-		switch(gmc->type){
-			case MAP_CHECK_FLUSHED_KP:
-				found_piece_ppa=UINT32_MAX;
-				for(kp_set_iter=0;kp_set_iter<COMPACTION_REQ_MAX_NUM; kp_set_iter++){
-					if(!LSM.flushed_kp_set[kp_set_iter]) continue;
-					found_piece_ppa=kp_find_piece_ppa(gmc->lba, (char*)LSM.flushed_kp_set[kp_set_iter]);
-					if(found_piece_ppa!=UINT32_MAX){break;}
-				}
-				if(found_piece_ppa==gmc->piece_ppa){
-					if(!kp_set_check_start){
-						kp_set_check_start=true;
-						rwlock_write_lock(&LSM.flushed_kp_set_lock);
-						flushed_kp_set_update=write_buffer_init(_PPS*L2PGAP, pm, GC_WB);
-					}
-					invalidate_piece_ppa(pm->bm, gmc->piece_ppa, true);
-					write_buffer_insert_for_gc(flushed_kp_set_update, gmc->lba, gmc->data_ptr);
-				}
-				else{
-					//check moved kp
-					moved_kp_it=LSM.moved_kp_set->begin();
-					for(;moved_kp_it!=LSM.moved_kp_set->end(); moved_kp_it++){
-						moved_kp_now=*moved_kp_it;
-						found_piece_ppa=kp_find_piece_ppa(gmc->lba, (char*)moved_kp_now);
-						if(found_piece_ppa==gmc->piece_ppa){
-							if(!kp_set_check_start){
-								kp_set_check_start=true;
-								rwlock_write_lock(&LSM.flushed_kp_set_lock);
-								flushed_kp_set_update=write_buffer_init(_PPS*L2PGAP, pm, GC_WB);
-							}
-							invalidate_piece_ppa(pm->bm, gmc->piece_ppa, true);
-							write_buffer_insert_for_gc(flushed_kp_set_update, gmc->lba, gmc->data_ptr);
-							moved_kp_found=true;
-							break;
-						}
-					}
-					if(!moved_kp_found){
-						gmc->type=MAP_READ_ISSUE;
-						goto retry;
-					}
-				}
-				break;
-				//asdfasdf
-			case MAP_READ_ISSUE:
-				if((int)gmc->level<0){
-					printf("gmc->lba:%u piece_ppa:%u\n", gmc->lba, gmc->piece_ppa);
-					EPRINT("mapping not found", true);
-				}
-				map_ptr=level_retrieve_sst_with_check(LSM.disk[gmc->level], gmc->lba);
-				if(!map_ptr){
-					gmc->level--;
-					goto retry;
-				}
-				else{
-					gmc->type=MAP_READ_DONE;
-					gmc->map_ppa=map_ptr->file_addr.map_ppa;
-					gc_issue_mapcheck_read(gmc, bm->li);
-					gc_mapping_queue->pop();
-					gc_mapping_queue->push(gmc);
-					continue;
-				}
-			case MAP_READ_DONE:
-				fdriver_lock(&gmc->done_lock);
-				found_piece_ppa=kp_find_piece_ppa(gmc->lba, gmc->mapping_data->value);
-				if(gmc->piece_ppa==found_piece_ppa){
-					invalidate_piece_ppa(pm->bm, gmc->piece_ppa, true);
-					slm_remove_node(gmc->level, SEGNUM(gmc->piece_ppa));
-
-					target_version=version_level_idx_to_version(LSM.last_run_version, gmc->level, LSM.param.LEVELN);
-					recent_version=version_map_lba(LSM.last_run_version, gmc->lba);
-					if(version_compare(LSM.last_run_version, recent_version, target_version)<=0){
-	//					version_coupling_lba_ridx(LSM.last_run_version, gmc->lba, TOTALRUNIDX);
-						write_buffer_insert_for_gc(gc_wb, gmc->lba, gmc->data_ptr);
-					}
-					else{
-						goto out;
-					}
-				}
-				else{
-					gmc->type=MAP_READ_ISSUE;
-					gmc->level--;
-					goto retry;
-				}
-		}
-out:
-		fdriver_destroy(&gmc->done_lock);
-		inf_free_valueset(gmc->mapping_data, FS_MALLOC_R);
-		free(gmc);
-		gc_mapping_queue->pop();
+	gc_helper_for_pink(gc_mapping_queue);
+#else
+	if(gc_kv_map->size()){
+		printf("[%u] victim invalidation cnt:%u GMC target cnt:%lu ", LSM.monitor.gc_data,victim->invalidate_number, gc_kv_map->size());
+		EPRINT("debug", false);
+		//LSM.global_debug_flag=true;
 	}
-
-
-	key_ptr_pair *kp_set;
-	if(flushed_kp_set_update){
-		while((kp_set=write_buffer_flush_for_gc(flushed_kp_set_update, false, victim->seg_idx, NULL, UINT32_MAX))){
-			for(uint32_t j=0; j<COMPACTION_REQ_MAX_NUM; j++){
-				bool check=false;
-				key_ptr_pair *target_kp_set=LSM.flushed_kp_set[j];
-				for(uint32_t i=0; i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++){
-					uint32_t idx=UINT32_MAX;
-					if(target_kp_set){
-						kp_find_idx(kp_set[i].lba, (char*)target_kp_set);
-					}
-					if(idx==UINT32_MAX){
-						std::deque<key_ptr_pair*>::iterator moved_kp_it=LSM.moved_kp_set->begin();
-						for(;moved_kp_it!=LSM.moved_kp_set->end(); moved_kp_it++){
-							key_ptr_pair *temp_pair=*moved_kp_it;
-							idx=kp_find_idx(kp_set[i].lba, (char*)temp_pair);
-							if(idx!=UINT32_MAX){
-								temp_pair[idx].piece_ppa=kp_set[i].piece_ppa;
-								check=true;
-								break;
-							}
-						}
-						//check false
-					}
-					else{
-						check=true;
-						target_kp_set[idx].piece_ppa=kp_set[i].piece_ppa;
-					}
-					if(!check){
-						printf("target pair:%u,%u\n", kp_set[i].lba, kp_set[i].piece_ppa);
-						EPRINT("the pair should be in flushed_kp_set", true);
-					}
-				}
-			}
-			free(kp_set);
-		}
-		write_buffer_free(flushed_kp_set_update);
-		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
-	}
-	uint32_t k=0;
-	while((kp_set=write_buffer_flush_for_gc(gc_wb, false, victim->seg_idx, NULL,UINT32_MAX))){
-		k++;
-		for(uint32_t i=0; i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++){
-			if(kp_set[i].lba==807091 || kp_set[i].lba==464699){
-				printf("%u target %u reinsert at %u\n", k, kp_set[i].lba, kp_set[i].piece_ppa);
-			}
-		}
-		fdriver_lock(&LSM.moved_kp_lock);
-		LSM.moved_kp_set->push_back(kp_set);
-		fdriver_unlock(&LSM.moved_kp_lock);
-	}
-	write_buffer_free(gc_wb);
-
-//
-//	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx && LSM.global_debug_flag){
-//		printf("target gc done--------------------------\n");
-//		temp_debug_flag=true;
-//	}
+	gc_helper_for_normal(gc_kv_map, leveling_node_wb, victim->seg_idx); 
+#endif
 
 	bm->trim_segment(bm, victim, bm->li);
 	page_manager_change_reserve(pm, false);
@@ -1045,8 +947,15 @@ out:
 		inf_free_valueset(free_target[i], FS_MALLOC_R);
 	}
 	free(free_target);
-	delete gc_target_queue;
+#ifdef PINKGC
 	delete gc_mapping_queue;
+	delete gc_target_queue;
+#else
+	delete gc_kv_map;
+	if(leveling_node_wb){
+		write_buffer_free(leveling_node_wb);
+	}
+#endif
 
 	return false;
 }

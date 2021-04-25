@@ -52,7 +52,7 @@ read_helper* read_helper_copy(read_helper *src);
 void read_helper_move(read_helper *des, read_helper *src);
 bool read_helper_last(read_helper *rh, uint32_t idx);
 uint32_t read_helper_idx_init(read_helper *rh, uint32_t lba);
-bool read_helper_data_checking(read_helper *rh, struct _page_manager*, uint32_t piece_ppa, 
+bool read_helper_data_checking(read_helper *rh, struct page_manager*, uint32_t piece_ppa, 
 		uint32_t lba, uint32_t *rh_idx, uint32_t *offset, sst_file *sptr);
 void read_helper_insert_done(read_helper *rh);
 static inline char *read_helper_type(uint32_t i){

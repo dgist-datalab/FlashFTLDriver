@@ -1,10 +1,10 @@
 #ifndef __SST_H__
 #define __SST_H__
-#include "read_helper.h"
 #include "key_value_pair.h"
 #include <stdint.h>
 #include "../../interface/interface.h"
 #include "page_manager.h"
+#include "read_helper.h"
 enum{
 	PAGE_FILE, BLOCK_FILE
 };
@@ -43,9 +43,9 @@ typedef struct sst_file{
 sst_file *sst_init_empty(uint8_t type);
 sst_file *sst_pf_init(uint32_t ppa, uint32_t start_lba, uint32_t end_lba);
 sst_file *sst_bf_init(uint32_t ppa, uint32_t end_ppa,uint32_t start_lba, uint32_t end_lba);
-void sst_destroy_content(sst_file*, struct _page_manager *);
+void sst_destroy_content(sst_file*, struct page_manager *);
 void sst_reinit(sst_file *);
-void sst_free(sst_file*, struct _page_manager *);
+void sst_free(sst_file*, struct page_manager *);
 void sst_print(sst_file *);
 void sst_deep_copy(sst_file *des, sst_file *src);
 static inline void sst_shallow_copy_move_originality(sst_file *des, sst_file *src){

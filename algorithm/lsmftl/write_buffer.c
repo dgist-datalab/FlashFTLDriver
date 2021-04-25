@@ -231,7 +231,7 @@ uint32_t write_buffer_insert_for_gc(write_buffer *wb, uint32_t lba, char *gc_dat
 }
 
 
-key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync, uint32_t seg_idx, bool *force_stop, uint32_t prev_map){
+key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync, uint32_t seg_idx, bool *force_stop, uint32_t prev_map, std::map<uint32_t, gc_mapping_check_node*>* gkv){
 	if(wb->buffered_entry_num==0) return NULL;
 	else if((int)wb->buffered_entry_num<0){
 		EPRINT("minus number not allowed!", true);
@@ -243,6 +243,7 @@ key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync, uint32_t se
 	key_ptr_pair *res=(key_ptr_pair*)malloc(PAGESIZE);
 	memset(res, -1, PAGESIZE);
 	uint32_t remain_page_num=0;
+	std::map<uint32_t, gc_mapping_check_node*>::iterator gkv_iter;
 	if(!wb->rh && wb->rhp.type!=HELPER_NONE){
 retry:
 		remain_page_num=page_manager_get_reserve_remain_ppa(LSM.pm, false, seg_idx);
@@ -263,6 +264,10 @@ retry:
 	uint8_t inter_idx;
 	for(uint32_t i=0; it!=wb->data->end() && i<KP_IN_PAGE; i++){
 		inter_idx=i%L2PGAP;
+		if(gkv){
+			gkv_iter=gkv->find(it->first);	
+		}
+
 		if(inter_idx==0){
 			ppa=page_manager_get_reserve_new_ppa(wb->pm, false, seg_idx);
 			target_value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
@@ -277,14 +282,19 @@ retry:
 		res[i].lba=it->first;
 		if(debug_lba==res[i].lba){
 			static int cnt=0;
-			if(cnt==11){
-				LSM.global_debug_flag=true;
-			}
 			printf("[%u] gc %u -> %u\n", cnt++, res[i].lba, res[i].piece_ppa);
 		}
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
 		if(wb->rh){
 			read_helper_stream_insert(wb->rh, res[i].lba, res[i].piece_ppa);
+		}
+
+		if(gkv){
+			if(gkv_iter->first!=it->first){
+				EPRINT("error", true);
+			}
+			gkv_iter->second->new_piece_ppa=res[i].piece_ppa;
+			gkv_iter++;
 		}
 
 		if(inter_idx==(L2PGAP-1)){//issue data

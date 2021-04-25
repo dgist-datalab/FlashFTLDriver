@@ -9,7 +9,7 @@
 #include "version.h"
 #include "level.h"
 #include "compaction.h"
-#include "lsmtree_param_module.h"
+#include "./design_knob/lsmtree_param_module.h"
 #include "read_helper.h"
 #include "version.h"
 #include "helper_algorithm/bf_set.h"
@@ -79,8 +79,10 @@ typedef struct lsmtree{
 	uint32_t now_merging_run[1+1];
 	//page_manager *pm_map;
 
+#ifdef PINKGC
 	fdriver_lock_t moved_kp_lock;
 	std::deque<key_ptr_pair*>* moved_kp_set;
+#endif
 
 	uint32_t now_wb;
 	write_buffer **wb_array;
