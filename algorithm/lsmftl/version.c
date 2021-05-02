@@ -5,7 +5,7 @@
 
 extern lsmtree LSM;
 
-version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, uint32_t LBA_num){
+version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, uint32_t last_level_version_sidx, uint32_t LBA_num){
 	version *res=(version*)malloc(sizeof(version));
 	res->start_hand=res->end_hand=0;
 	res->key_version=(uint8_t*)calloc(LBA_num, sizeof(uint8_t));
@@ -17,7 +17,7 @@ version *version_init(uint8_t max_valid_version_num, uint8_t total_version_numbe
 	printf("max_version idx:%u\n", max_valid_version_num);
 	for(uint32_t i=0; i<max_valid_version_num; i++){
 		res->ridx_empty_queue->push(i);
-		printf("version:%u \n", i);
+	//	printf("version:%u \n", i);
 	}
 
 	res->total_version_number=total_version_number;
@@ -27,6 +27,7 @@ version *version_init(uint8_t max_valid_version_num, uint8_t total_version_numbe
 	res->memory_usage_bit=ceil(log2(max_valid_version_num))*LBA_num;
 	res->poped_version_num=0;
 	fdriver_mutex_init(&res->version_lock);
+	res->last_level_version_sidx=last_level_version_sidx;
 	return res;
 }
 
@@ -133,7 +134,7 @@ static bool early_invalidate_available_check(uint32_t ridx){
 uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num){
 	uint32_t target_ridx=UINT32_MAX;
 	uint32_t target_invalidation_cnt=0;
-	for(uint32_t i=0; i<v->max_valid_version_num; i++){
+	for(uint32_t i=v->last_level_version_sidx; i<v->max_valid_version_num; i++){
 		if(v->version_early_invalidate[i]) continue;
 		if(LSM.now_merging_run[0]==i || LSM.now_merging_run[1]==i) continue;
 		if(target_invalidation_cnt<v->version_invalidation_cnt[i]){
@@ -182,4 +183,18 @@ void version_make_early_invalidation_enable_old(version *v){
 	for(uint32_t i=0; i<v->max_valid_version_num-1; i++){
 		v->version_early_invalidate[version_to_run(v,i)]=true;
 	}
+}
+
+
+uint32_t version_level_to_start_version(level *lev){
+	uint32_t above_run=0;
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		if(LSM.disk[i]==lev){
+			return above_run+1;
+		}
+		else{
+			above_run+=(i==LSM.param.LEVELN-1?LSM.param.last_size_factor:LSM.param.normal_size_factor);
+		}
+	}
+	return above_run;
 }

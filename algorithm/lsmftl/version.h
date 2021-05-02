@@ -18,6 +18,7 @@ typedef struct version{
 	int8_t total_version_number;
 	int8_t max_valid_version_num;
 	uint32_t *version_invalidation_cnt;
+	uint32_t last_level_version_sidx;
 	bool *version_early_invalidate;
 	fdriver_lock_t version_lock;
 	std::queue<uint32_t> *ridx_empty_queue;
@@ -26,7 +27,8 @@ typedef struct version{
 	int32_t poped_version_num;
 }version;
 
-version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, uint32_t LBA_num);
+version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, 
+		uint32_t last_level_version_sidx, uint32_t LBA_num);
 uint32_t version_get_empty_ridx(version *v);
 void version_get_merge_target(version *v, uint32_t *ridx_set);
 void version_unpopulate_run(version *v, uint32_t ridx);
@@ -39,6 +41,7 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, uint32_t original_version, uint32_t target_version);
 uint32_t version_get_early_invalidation_target(version *v);
 void version_make_early_invalidation_enable_old(version *v);
+uint32_t version_level_to_start_version(level *lev);
 static inline void version_enable_ealry_invalidation(version *v, uint32_t r_idx){
 	v->version_early_invalidate[r_idx]=true;
 }

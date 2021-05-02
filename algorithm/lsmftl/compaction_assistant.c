@@ -1,6 +1,7 @@
 #include "compaction.h"
 #include "lsmtree.h"
 #include "segment_level_manager.h"
+#include <math.h>
 extern lsmtree LSM;
 
 void* compaction_main(void *);
@@ -137,7 +138,7 @@ again:
 		else if(req->end_level==LSM.param.LEVELN-1){
 			rwlock_write_lock(&LSM.level_rwlock[req->end_level]);
 			rwlock_write_lock(&LSM.level_rwlock[req->start_level]);
-			src=compaction_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
+			src=compaction_level_to_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
 			slm_empty_level(req->start_level);
 		}
 		else{
@@ -177,7 +178,17 @@ again:
 			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
 			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
 		}
-
+/*
+		uint64_t level_bit, tiering_bit;
+		uint64_t temp_memory_usage_bit=lsmtree_all_memory_usage(&LSM, &level_bit, &tiering_bit, 48)+RANGE*ceil(log2(LSM.param.last_size_factor));
+		if(LSM.monitor.max_memory_usage_bit < temp_memory_usage_bit){
+			printf("update max memory!\n");
+			printf("level print\n");
+			lsmtree_level_summary(&LSM);
+			printf("memory_usage:%.2lf\n", (double)temp_memory_usage_bit/(RANGE*48));
+			LSM.monitor.max_memory_usage_bit=temp_memory_usage_bit;
+		}
+*/
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);
 	}

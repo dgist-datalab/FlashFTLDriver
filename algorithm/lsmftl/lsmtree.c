@@ -70,7 +70,32 @@ static void print_level_param(){
 	printf("[PERF] RAF:%.3lf\n", LSM.param.read_amplification+1);
 }
 
+void lsmtree_param_defualt_setting(){
+	/*
+	LSM.param.LEVELN=2;
+	LSM.param.mapping_num=(SHOWINGSIZE/LPAGESIZE/KP_IN_PAGE/LSM.param.last_size_factor);
+	LSM.param.normal_size_factor=get_size_factor(LSM.param.LEVELN, LSM.param.mapping_num);
+	LSM.param.last_size_factor=LSM.param.normal_size_factor;
+	LSM.param.version_number=LSM.last_size_factor+1;
+	LSM.param.version_enable=true;
+
+	LSM.param.leveling_rhp.type=HELPER_BF_PTR_GUARD;
+	LSM.param.leveling_rhp.target_prob=LSM.param.read_amplification;
+	LSM.param.leveling_rhp.member_num=KP_IN_PAGE;
+
+	LSM.param.tiering_rhp.type=HELPER_PLR;
+	LSM.param.tiering_rhp.slop_bit=8;
+	LSM.param.tiering_rhp.range=5;
+	LSM.param.tiering_rhp.member_num=KP_IN_PAGE;*/
+}
+
 uint32_t lsmtree_argument_set(int argc, char *argv[]){
+	/*
+	lsmtree_param_default_setting();
+	printf("------------------------------------------\n");
+	print_level_param();
+	printf("------------------------------------------\n");
+	return 1;*/
 	int c;
 	bool leveln_setting=false, sizef_setting=false, reada_setting=false, rh_setting=false;
 	bool version_setting=false;
@@ -161,8 +186,8 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		LSM.param.tiering_rhp.member_num=KP_IN_PAGE;
 #else
 		LSM.param.tiering_rhp.type=HELPER_PLR;
-		LSM.param.tiering_rhp.slop_bit=7;
-		LSM.param.tiering_rhp.range=30;
+		LSM.param.tiering_rhp.slop_bit=8;
+		LSM.param.tiering_rhp.range=5;
 		LSM.param.tiering_rhp.member_num=KP_IN_PAGE;
 #endif
  
@@ -174,7 +199,7 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 
 	if(LSM.param.tiering_rhp.type==HELPER_PLR){
 		LSM.param.tiering_rhp.slop_bit=LSM.param.plr_bit?LSM.param.plr_bit:7;
-		LSM.param.tiering_rhp.range=LSM.param.error_range?LSM.param.error_range:50;
+		LSM.param.tiering_rhp.range=5; //LSM.param.error_range?LSM.param.error_range:50;
 	}
 
 	printf("------------------------------------------\n");
@@ -225,7 +250,8 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 		rwlock_init(&LSM.level_rwlock[i]);
 	}
 
-	LSM.last_run_version=version_init(LSM.disk[LSM.param.LEVELN-1]->max_run_num, LSM.param.version_number, RANGE);
+	LSM.last_run_version=version_init(LSM.disk[LSM.param.LEVELN-1]->max_run_num, LSM.param.version_number, 
+			LSM.param.last_size_factor,RANGE);
 
 	printf("--------version number test---------\n");
 	printf("level idx to version\n");
@@ -281,6 +307,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 }
 
 static void lsmtree_monitor_print(){
+
 	printf("----LSMtree monitor log----\n");
 	printf("TRIVIAL MOVE cnt:%u\n", LSM.monitor.trivial_move_cnt);
 	for(uint32_t i=0; i<=LSM.param.LEVELN; i++){
@@ -299,6 +326,11 @@ static void lsmtree_monitor_print(){
 			(double)LSM.monitor.tiering_valid_entry_cnt/LSM.monitor.tiering_total_entry_cnt,
 			LSM.monitor.tiering_valid_entry_cnt,
 			LSM.monitor.tiering_total_entry_cnt);
+
+	printf("\n");
+
+	printf("level print\n");
+	lsmtree_level_summary(&LSM);
 
 	printf("\n");
 	uint64_t tiering_memory=0;

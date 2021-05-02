@@ -54,7 +54,7 @@ HelperAlgorithm:
 	cd helper_algorithm && make 
 	cp helper_algorithm/*.o ../../object/
 	cd design_knob && make 
-	cp design_knob/*.o ../../object/
+	mv design_knob/*.o ../../object/
 
 clean : 
 	@$(RM) ./helper_algorithm/*.o

@@ -270,6 +270,10 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 		uint32_t target_idx=UINT32_MAX;
 		for(uint32_t i=0; i<stream_num; i++){
 			if(all_empty_check & 1<<i) continue;
+			if(!os_set[i]){
+				all_empty_check|=(1<<i);
+				continue;
+			}
 			key_ptr_pair now=sst_pos_pick(os_set[i]);
 			
 			if(target_idx==UINT32_MAX){
@@ -923,7 +927,7 @@ static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num,
 	return new_run;
 }
 
-level* compaction_tiering(compaction_master *cm, level *src, level *des){ /*move to last level*/
+level* compaction_level_to_tiering(compaction_master *cm, level *src, level *des){ /*move to last level*/
 	_cm=cm;
 
 	LSM.monitor.compaction_cnt[des->idx]++;

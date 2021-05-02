@@ -57,7 +57,7 @@ static inline void sst_shallow_copy_move_originality(sst_file *des, sst_file *sr
 void sst_set_file_map(sst_file *, uint32_t, map_range*);
 uint32_t sst_find_map_addr(sst_file *, uint32_t lba);
 sst_file *sst_MR_to_sst_file(map_range *mr);
-static inline bool sst_range_overlap(sst_file *a, sst_file *b){
+static inline bool sst_physical_range_overlap(sst_file *a, sst_file *b){
 	return SEGNUM(a->file_addr.piece_ppa)==SEGNUM(b->file_addr.piece_ppa); 
 }
 

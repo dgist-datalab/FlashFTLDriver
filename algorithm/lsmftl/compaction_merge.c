@@ -56,7 +56,7 @@ static inline uint32_t coherence_sst_kp_pair_num(run *r, uint32_t start_idx, uin
 			now_map_num+=prev_sptr->map_num;
 			continue;
 		}
-		if(sst_range_overlap(prev_sptr, sptr)){
+		if(sst_physical_range_overlap(prev_sptr, sptr)){
 			prev_sptr=sptr;
 			prev_sptr=&r->sst_set[iter_start_idx];
 			now_map_num+=prev_sptr->map_num;
@@ -263,7 +263,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 			newer_sst_idx<newer->now_sst_file_num?coherence_sst_kp_pair_num(newer,newer_sst_idx, &newer_sst_idx_end, &now_newer_map_num):0;
 		max_target_piece_num+=
 			older_sst_idx<older->now_sst_file_num?coherence_sst_kp_pair_num(older,older_sst_idx, &older_sst_idx_end, &now_older_map_num):0;
-
 
 		if(bis){
 			max_target_piece_num+=(bis->map_data->size()+1+1)*L2PGAP; // buffered + additional mapping
@@ -486,6 +485,190 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 	LSM.now_merging_run[0]=UINT32_MAX;
 	LSM.now_merging_run[1]=UINT32_MAX;
+	return res;
+}
+
+static uint32_t issue_read_kv_for_bos_tiering(sst_bf_out_stream *bos, std::queue<key_ptr_pair> *kpq,
+		bool round_final){
+	key_value_wrapper *read_target;
+	uint32_t res=0;
+	while(kpq->size()){
+		key_ptr_pair target_pair=kpq->front();
+		key_value_wrapper *kv_wrapper=(key_value_wrapper*)calloc(1,sizeof(key_value_wrapper));
+
+		kv_wrapper->piece_ppa=target_pair.piece_ppa;
+		kv_wrapper->kv_ptr.lba=target_pair.lba;
+
+		invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
+
+		if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){
+			if(!read_target->param){
+				EPRINT("can't be",true);
+			}
+			algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
+			read_req->type=COMPACTIONDATAR;
+			read_req->param=(void*)read_target;
+			read_req->end_req=merge_end_req;
+			io_manager_issue_read(PIECETOPPA(read_target->piece_ppa),
+					read_target->param->data, read_req, false);
+		}
+
+		kpq->pop();
+		res++;
+	}
+
+	if(kpq->empty() && round_final){
+		if((read_target=sst_bos_get_pending(bos, _cm))){
+			algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
+			read_req->type=COMPACTIONDATAR;
+			read_req->param=(void*)read_target;
+			read_req->end_req=merge_end_req;		
+			io_manager_issue_read(PIECETOPPA(read_target->piece_ppa),
+					read_target->param->data, read_req, false);
+		}
+	}
+	return res;
+}
+
+uint32_t update_read_arg_tiering(uint32_t read_done_flag, sst_pf_out_stream **pos_set, 
+		map_range **mr_set, read_issue_arg *read_arg_set, uint32_t stream_num, level *src){
+	uint32_t remain_num=0;
+	for(uint32_t i=0; i<stream_num; i++){
+		if(read_done_flag & (1<<i)) continue;
+		else remain_num++;
+	}
+
+	for(uint32_t i=0; i<stream_num; i++){
+		if(read_done_flag & (1<<i)) continue;
+		if(read_arg_set[i].to==src->array[i].now_sst_file_num){
+			read_done_flag|=(1<<i);
+			sst_pos_free(pos_set[i]);
+			pos_set[i]=NULL;
+		}
+
+		if(!read_done_flag){
+			read_arg_set[i].to=read_arg_set[i].from+COMPACTION_TAGS/remain_num;
+			read_map_param_init(&read_arg_set[i], mr_set[i]);
+			pos_set[i]=sst_pos_init_mr(&mr_set[i][read_arg_set[i].from], 
+					read_arg_set[i].param, TARGETREADNUM(read_arg_set[i]), 
+					read_map_done_check, map_done);
+			pos_set[i]->version_idx=version_level_to_start_version(src)+i;
+		}
+		else{
+			read_arg_set[i].from=read_arg_set[i].to+1;
+			read_arg_set[i].to=MIN(read_arg_set[i].from+COMPACTION_TAGS/remain_num, src->array[i].now_sst_file_num);
+			sst_pos_add_mr(pos_set[i], &mr_set[i][read_arg_set[i].from], 
+					read_arg_set[i].param, TARGETREADNUM(read_arg_set[i]));
+		}
+	}
+	return read_done_flag;
+}
+
+level* compaction_tiering(compaction_master *cm, level *src, level *des){
+	_cm=cm;
+	run *new_run=run_init(src->max_sst_num, UINT32_MAX, 0);
+	uint32_t target_ridx=(des->idx==LSM.param.LEVELN?version_get_empty_ridx(LSM.last_run_version):
+			des->idx*LSM.param.normal_size_factor+des->run_num);
+	uint32_t stream_num=src->run_num;
+	run **target_run_set=(run**)calloc(stream_num, sizeof(run*));
+	for(uint32_t i=0; i<src->run_num; i++){
+		target_run_set[i]=&src->array[i];
+	}
+
+	run *rptr; uint32_t ridx;
+	for_each_run_max(src, rptr, ridx){
+		sst_file *sptr; uint32_t sidx;
+		for_each_sst(rptr, sptr, sidx){
+			lsmtree_gc_unavailable_set(&LSM, sptr, UINT32_MAX);
+		}
+	}
+
+	read_issue_arg *read_arg_set=(read_issue_arg*)calloc(stream_num, sizeof(read_issue_arg));
+	read_arg_container thread_arg;
+	thread_arg.end_req=merge_end_req;
+	thread_arg.arg_set=&read_arg_set;
+	thread_arg.set_num=stream_num;
+
+	map_range **mr_set=(map_range **)calloc(stream_num, sizeof(map_range*));
+	for(uint32_t i=0; i<stream_num; i++){
+		uint32_t sst_file_num=src->array[i].now_sst_file_num;
+		uint32_t map_num=0;
+		for(uint32_t j=0; j<sst_file_num; j++){
+			map_num+=src->array[i].sst_set[j].map_num;
+		}
+		mr_set[i]=make_mr_set(src->array[i].sst_set, 0, src->array[i].now_sst_file_num, map_num);
+	}
+
+	std::queue<key_ptr_pair> *kpq=new std::queue<key_ptr_pair>();
+	uint32_t sorting_done=0;
+	uint32_t read_done=0;
+	sst_pf_out_stream **pos_set=(sst_pf_out_stream **)calloc(stream_num, sizeof(sst_pf_out_stream*));
+	sst_bf_out_stream *bos=NULL;
+	sst_bf_in_stream *bis=NULL;
+	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
+		uint32_t border_lba;
+		read_done=update_read_arg_tiering(read_done, pos_set, mr_set, read_arg_set, stream_num, src);
+		bool last_round=(read_done==(1<<stream_num)-1);
+	
+		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
+		uint32_t sorted_entry_num=stream_sorting(NULL, stream_num, pos_set, NULL, kpq,
+				last_round,
+				border_lba,/*limit*/
+				target_ridx, 
+				true,
+				merge_invalidation_function);
+		if(bos==NULL){
+			bos=sst_bos_init(read_map_done_check, true);
+		}
+		if(bis==NULL){
+			bis=tiering_new_bis();	
+		}
+
+		for(uint32_t moved_num=0; moved_num<sorted_entry_num; ){
+			uint32_t read_num=issue_read_kv_for_bos_tiering(bos, kpq, last_round);
+			border_lba=issue_write_kv_for_bis(&bis, bos, new_run, read_num, target_ridx, last_round);
+			moved_num+=read_num;
+		}
+
+		for(uint32_t i=0; i<stream_num; i++){
+			if(!(read_done & (1<<i))) continue;
+			if((sorting_done & (1<<i))) continue;
+			if(sst_pos_is_empty(pos_set[i])){
+				sorting_done |=(1<<i);
+			}
+		}
+	}
+
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
+	//level_run_reinit(des, idx_set[1]);
+
+	for_each_run_max(des, rptr, ridx){
+		if(rptr->now_sst_file_num){
+			level_append_run_copy_move_originality(res, rptr, ridx);
+		}
+	}
+
+	level_update_run_at_move_originality(res, target_ridx, new_run, true);
+
+	for_each_run_max(src, rptr, ridx){
+		sst_file *sptr; uint32_t sidx;
+		for_each_sst(rptr, sptr, sidx){
+			lsmtree_gc_unavailable_unset(&LSM, sptr, UINT32_MAX);
+		}
+	}
+
+	run_free(new_run);
+	sst_bis_free(bis);
+	sst_bos_free(bos, _cm);
+
+	for(uint32_t i=0; i<stream_num; i++){
+		free(mr_set[i]);
+	}
+
+	delete kpq;
+	free(mr_set);
+	free(read_arg_set);
+	free(target_run_set);
 	return res;
 }
 

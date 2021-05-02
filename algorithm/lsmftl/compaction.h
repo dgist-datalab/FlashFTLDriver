@@ -81,6 +81,7 @@ void compaction_issue_req(compaction_master *cm, compaction_req *);
 void compaction_wait(compaction_master *cm);
 level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
 level* compaction_leveling(compaction_master *cm, level *src, level *des);
+level* compaction_level_to_tiering(compaction_master *cm, level *src, level *des);
 level* compaction_tiering(compaction_master *cm, level *src, level *des);
 level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx);
 sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *);
