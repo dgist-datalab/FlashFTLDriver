@@ -564,7 +564,7 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, sst_pf_out_stream **po
 	return read_done_flag;
 }
 
-level* compaction_tiering(compaction_master *cm, level *src, level *des){
+level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 	_cm=cm;
 	run *new_run=run_init(src->max_sst_num, UINT32_MAX, 0);
 	uint32_t target_ridx=(des->idx==LSM.param.LEVELN?version_get_empty_ridx(LSM.last_run_version):

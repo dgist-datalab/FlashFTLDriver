@@ -2,7 +2,7 @@
 #include "run.h"
 #include "../../include/settings.h"
 
-level *level_init(uint32_t max_sst_num, uint32_t max_run_num, bool istier, uint32_t idx){
+level *level_init(uint32_t max_sst_num, uint32_t max_run_num, uint32_t level_type, uint32_t idx){
 	level *res=(level*)calloc(1,sizeof(level));
 	res->idx=idx;
 	res->array=(run*)calloc(max_run_num, sizeof(run));
@@ -10,7 +10,7 @@ level *level_init(uint32_t max_sst_num, uint32_t max_run_num, bool istier, uint3
 	for(uint32_t i=0; i<max_run_num; i++){
 		run_space_init(&res->array[i], max_sst_num/max_run_num, -1, 0);
 	}
-	res->istier=istier;
+	res->level_type=level_type;
 	if(!istier){
 		res->run_num=1;
 	}
@@ -229,19 +229,28 @@ uint32_t level_update_run_at_move_originality(level *lev, uint32_t idx, run *r, 
 }
 
 void level_print(level *lev){
+	uint32_t sidx=0, ridx=0;
+	sst_file *sptr;
+	run *rptr;
+	uint32_t content_num=0;
+	for_each_sst_level(lev, rptr, ridx, sptr, sidx){
+		content_num+=read_helper_get_cnt(sptr->_read_helper);
+	}
 	if(lev->now_sst_num){
 		if(lev->istier){
-			printf("level idx:%d run %u/%u\n",
+			printf("level idx:%d run %u/%u content_num: %u (%.2lf %%)\n",
 					lev->idx,
-					lev->run_num, lev->max_run_num
+					lev->run_num, lev->max_run_num,
+					content_num, (double)content_num/RANGE*100
 				  );	
 		}
 		else{
-			printf("level idx:%d sst:%u/%u start lba:%u~end lba:%u\n", 
+			printf("level idx:%d sst:%u/%u start lba:%u~end lba:%u content_num:%u (%.2lf %%)\n", 
 					lev->idx,
 					lev->now_sst_num, lev->max_sst_num,
 					FIRST_RUN_PTR(lev)->start_lba,
-					LAST_RUN_PTR(lev)->end_lba
+					LAST_RUN_PTR(lev)->end_lba,
+					content_num, (double)content_num/RANGE*100
 				  );
 		}
 	}

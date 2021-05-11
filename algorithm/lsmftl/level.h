@@ -3,7 +3,7 @@
 #include "run.h"
 #include "page_manager.h"
 
-enum {LEVELING, TIERING};
+enum {LEVELING, LEVELING_WISCKYE, TIERING};
 
 
 typedef struct level{
@@ -12,7 +12,8 @@ typedef struct level{
 	uint32_t max_sst_num;
 	uint32_t run_num;
 	uint32_t max_run_num;
-	bool istier;
+	//bool istier;
+	uint32_t level_type;
 	run *array;
 }level;
 
@@ -36,7 +37,7 @@ typedef struct level{
 	for_each_run(level_ptr, rptr, ridx)\
 		for_each_sst(rptr, sptr, sidx)
 
-level *level_init(uint32_t max_sst_num, uint32_t run_num, bool istier, uint32_t idx);
+level *level_init(uint32_t max_sst_num, uint32_t run_num, uint32_t level_type, uint32_t idx);
 uint32_t level_append_sstfile(level *, sst_file *sptr);
 uint32_t level_deep_append_sstfile(level *, run *);
 uint32_t level_append_run_copy_move_originality(level *, run *, uint32_t ridx);

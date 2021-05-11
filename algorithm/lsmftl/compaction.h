@@ -80,10 +80,17 @@ void compaction_free(compaction_master *cm);
 void compaction_issue_req(compaction_master *cm, compaction_req *);
 void compaction_wait(compaction_master *cm);
 level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
-level* compaction_leveling(compaction_master *cm, level *src, level *des);
-level* compaction_level_to_tiering(compaction_master *cm, level *src, level *des);
-level* compaction_tiering(compaction_master *cm, level *src, level *des);
+level* compaction_LW2LW(compaction_master *cm, level *src, level *des); //done
+level* compaction_LW2TI(compaction_master *cm, level *src, level *des); //done
+level* compaction_LW2LE(compaction_master *cm, level *src, level *des);
+level* compaction_LE2LE(compaction_master *cm, level *src, level *des);
+level* compaction_LE2TI(compaction_master *cm, level *src, level *des);
+level* compaction_TI2TI(compaction_master *cm, level *src, level *des); //done
+level* compaction_wisckey_to_normal(compaction_master *cm, level *src);
 level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx);
+
+
+
 sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *);
 
 uint32_t compaction_read_param_remain_num(compaction_master *cm);

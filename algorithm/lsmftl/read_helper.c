@@ -5,7 +5,7 @@ extern lsmtree LSM;
 extern uint32_t debug_lba;
 
 void read_helper_prepare(float target_fpr, uint32_t member, uint32_t type){
-	bf_set_prepare(target_fpr, member, type);
+	//bf_set_prepare(target_fpr, member, type);
 	gbf_set_prepare(target_fpr, member, type);
 }
 
@@ -465,4 +465,22 @@ void read_helper_insert_done(read_helper *rh){
 			plr_insert_done((plr_helper*)rh->body);
 			break;
 	}
+}
+
+uint32_t read_helper_get_cnt(read_helper *rh){
+	uint32_t res=0;
+	switch(rh->type){
+		case HELPER_BF_ONLY:
+		case HELPER_BF_PTR:
+			res=((bf_set*)rh->body)->now;
+			break;
+		case HELPER_BF_ONLY_GUARD:
+		case HELPER_BF_PTR_GUARD:
+			res=((guard_bf_set*)rh->body)->now;
+			break;
+		case HELPER_PLR:
+			res=((plr_helper*)rh->body)->now;
+			break;
+	}
+	return res;
 }

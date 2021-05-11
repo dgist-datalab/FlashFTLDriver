@@ -148,15 +148,23 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		printf("no sizefactor & no # of level\n");
 		printf("# of level is set as 3\n");
 		LSM.param.LEVELN=3;
-		LSM.param.last_size_factor=LSM.param.version_number-(LSM.param.LEVELN-1);
-		LSM.param.mapping_num=(SHOWINGSIZE/LPAGESIZE/KP_IN_PAGE/LSM.param.last_size_factor);
-		LSM.param.normal_size_factor=get_size_factor(LSM.param.LEVELN-1, LSM.param.mapping_num);
+		LSM.param.write_buffer_ent=KP_IN_PAGE;
+		LSM.param.mapping_num=(TOTALSIZE/LPAGESIZE/LSM.param.write_buffer_ent);
+
+		LSM.param.last_size_factor=
+			LSM.param.normal_size_factor=
+			get_size_factor(LSM.param.LEVELN, LSM.param.mapping_num);
+		LSM.param.version_number=LSM.param.LEVELN*LSM.param.normal_size_factor;
 	}
 	else if(leveln_setting){
 	//	LSM.param.last_size_factor=32-1-LSM.param.LEVELN;
-		LSM.param.last_size_factor=LSM.param.version_number-LSM.param.LEVELN;
-		LSM.param.mapping_num=(SHOWINGSIZE/LPAGESIZE/KP_IN_PAGE/LSM.param.last_size_factor);
-		LSM.param.normal_size_factor=get_size_factor(LSM.param.LEVELN-1, LSM.param.mapping_num);
+		LSM.param.write_buffer_ent=KP_IN_PAGE;
+		LSM.param.mapping_num=(TOTALSIZE/LPAGESIZE/LSM.param.write_buffer_ent);
+
+		LSM.param.last_size_factor=
+			LSM.param.normal_size_factor=
+			get_size_factor(LSM.param.LEVELN, LSM.param.mapping_num);
+		LSM.param.version_number=LSM.param.LEVELN*LSM.param.normal_size_factor;
 	}
 	else if(sizef_setting){
 		EPRINT("size factor cannot be set", true);
@@ -243,9 +251,9 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 			printf("L[%d] - run_num:%u\n",i, LSM.disk[i]->max_run_num);
 		}
 		else{
-			LSM.disk[i]=level_init(now_level_size, 1, false, i);
+			LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, true, i);
 			now_level_size*=LSM.param.normal_size_factor;
-			printf("L[%d] - size:%u\n",i, LSM.disk[i]->max_sst_num);
+			printf("L[%d] - size:%u data:%.2lf(%%)\n",i, LSM.disk[i]->max_sst_num, (double)LSM.disk[i]->max_sst_num*KP_IN_PAGE/RANGE*100);
 		}
 		rwlock_init(&LSM.level_rwlock[i]);
 	}
@@ -345,9 +353,9 @@ static void lsmtree_monitor_print(){
 			(double)usage_bit/8/1024/1024
 			);
 	printf("  memory breakdown\n\tleveling:%lu (%.2lf)\n\ttiering:%lu (%.2lf)\n\tversion_bit:%lu (%.2lf)\n\n",
-			leveling_memory/8, (double)leveling_memory/usage_bit,
-			tiering_memory/8, (double)tiering_memory/usage_bit,
-			(uint64_t)(RANGE*ceil(log2(LSM.param.version_number)))/8, (double)RANGE*ceil(log2(LSM.param.version_number))/usage_bit	
+			leveling_memory, (double)leveling_memory/usage_bit,
+			tiering_memory, (double)tiering_memory/usage_bit,
+			(uint64_t)(RANGE*ceil(log2(LSM.param.version_number))), (double)RANGE*ceil(log2(LSM.param.version_number))/usage_bit	
 			);
 
 	tiering_memory=0;
@@ -360,10 +368,10 @@ static void lsmtree_monitor_print(){
 			(double)usage_bit/8,
 			(double)usage_bit/8/1024/1024
 			);
-	printf("  memory breakdown\n\tleveling:%lu (%.2lf)\n\ttiering:%lu (%.2lf)\n\tversion_bit:%lu (%.2lf)\n\n",
-			leveling_memory/8, (double)leveling_memory/usage_bit,
-			tiering_memory/8, (double)tiering_memory/usage_bit,
-			(uint64_t)(RANGE*ceil(log2(LSM.param.version_number)))/8, (double)RANGE*ceil(log2(LSM.param.version_number))/usage_bit	
+	printf("  memory breakdown\n\tleveling:%lu (%.2lf , %.3lf)\n\ttiering:%lu (%.2lf , %.3lf)\n\tversion_bit:%lu (%.2lf)\n\n",
+			leveling_memory, (double)leveling_memory/usage_bit, (double)leveling_memory/(RANGE*48),
+			tiering_memory, (double)tiering_memory/usage_bit, (double)tiering_memory/(RANGE*48),
+			(uint64_t)(RANGE*ceil(log2(LSM.param.version_number))), (double)RANGE*ceil(log2(LSM.param.version_number))/usage_bit	
 			);
 
 

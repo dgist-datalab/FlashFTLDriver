@@ -594,10 +594,10 @@ static void read_params_setting(read_issue_arg *read_arg1, read_issue_arg *read_
 	read_param_init(read_arg2);
 }
 
-level* compaction_leveling(compaction_master *cm, level *src, level *des){
+level* compaction_LW2LW(compaction_master *cm, level *src, level *des){
 	static uint32_t debug_cnt_flag=0;
 	_cm=cm;
-	level *res=level_init(des->max_sst_num, des->run_num, des->istier, des->idx);
+	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
 	if(!level_check_overlap(src, des)){
 		trivial_move(NULL,src, des, res);
 		return res;
@@ -927,9 +927,103 @@ static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num,
 	return new_run;
 }
 
-level* compaction_level_to_tiering(compaction_master *cm, level *src, level *des){ /*move to last level*/
+level *compaction_wisckey_to_normal(compaction_master *cm, level *src){
 	_cm=cm;
+	read_issue_arg read_arg;
+	read_arg.des=src;
+	read_arg_container thread_arg;
+	thread_arg.end_req=comp_alreq_end_req;
+	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg));
+	thread_arg.arg_set[0]=&read_arg;
+	thread_arg.set_num=1;
 
+	sst_pf_out_stream *pos;
+	sst_bf_out_stream *bos=sst_bos_init(read_done_check, false);
+	sst_bf_in_stream *bis=tiering_new_bis();
+
+	uint32_t total_num=(start_sst_file_idx==UINT32_MAX?src->now_sst_num:src->now_sst_num-(start_sst_file_idx+1));
+	
+	start_sst_file_idx=(start_sst_file_idx==UINT32_MAX?0:start_sst_file_idx);
+
+	uint32_t start_idx=start_sst_file_idx;
+	uint32_t tier_compaction_tags=COMPACTION_TAGS/COMPACTION_LEVEL_NUM;
+	uint32_t round=total_num/tier_compaction_tags+(total_num%tier_compaction_tags?1:0);
+
+	uint32_t total_moved_num=0;
+
+	uint32_t j=0;
+	bool temp_final=false;
+	for(uint32_t i=0; i<round; i++){
+		read_arg.from=start_idx+i*tier_compaction_tags;
+		if(i!=round-1){
+			read_arg.to=start_idx+(i+1)*tier_compaction_tags-1;
+		}
+		else{
+			read_arg.to=src->now_sst_num-1;	
+		}
+		read_param_init(&read_arg);
+
+		needed_seg_num=(TARGETREADNUM(read_arg)*KP_IN_PAGE/L2PGAP+TARGETREADNUM(read_arg))/_PPS+1+1;
+		if(page_manager_get_total_remain_page(LSM.pm, false) <needed_seg_num * _PPS){ 
+			__do_gc(LSM.pm, false, needed_seg_num*_PPS);
+		}
+
+		if(i==0){
+			pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param, 
+					read_arg.to-read_arg.from+1, read_done_check, file_done);
+		}
+		else{
+			sst_pos_add_sst(pos, LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
+					read_arg.to-read_arg.from+1);
+		}
+
+		read_sst_job((void*)&thread_arg,-1);
+		
+		uint32_t round2_tier_compaction_tags, picked_kv_num;
+
+		do{ 
+			round2_tier_compaction_tags=cm->read_param_queue->size();
+			picked_kv_num=issue_read_kv_for_bos(bos, pos, round2_tier_compaction_tags, target_ridx, 
+					true);
+			LSM.monitor.tiering_valid_entry_cnt+=picked_kv_num;
+			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
+			total_moved_num+=picked_kv_num;
+			temp_final=((i==round-1 && sst_pos_is_empty(pos)));
+			issue_write_kv_for_bis(&bis, bos, new_run, round2_tier_compaction_tags, target_ridx, 
+					temp_final);
+			j++;
+		}
+		while(!temp_final && !sst_pos_is_empty(pos));
+	}
+
+	//finishing bis
+	sst_file *last_file;
+	if((last_file=bis_to_sst_file(bis))){
+		lsmtree_gc_unavailable_set(&LSM, last_file, UINT32_MAX);
+		run_append_sstfile_move_originality(new_run, last_file);
+		sst_free(last_file, LSM.pm);
+	}
+	
+	if(bis->seg->used_page_num!=_PPS){
+		if(LSM.pm->temp_data_segment){
+			EPRINT("should be NULL", true);
+		}
+		LSM.pm->temp_data_segment=bis->seg;
+	}
+
+	if(!total_moved_num){
+		EPRINT("no data moved", false);
+	}
+
+	LSM.monitor.tiering_total_entry_cnt+=pos->total_poped_num;
+	sst_pos_free(pos);
+	sst_bis_free(bis);
+	sst_bos_free(bos, _cm);
+	free(thread_arg.arg_set);
+}
+
+level* compaction_LW2TI(compaction_master *cm, level *src, level *des){ /*move to last level*/
+	_cm=cm;
 	LSM.monitor.compaction_cnt[des->idx]++;
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
 	uint32_t start_sst_file_idx=UINT32_MAX;
@@ -1103,6 +1197,16 @@ level* compaction_level_to_tiering(compaction_master *cm, level *src, level *des
 	/*finish logic*/
 	return res;
 }
+
+level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
+	_cm=cm;
+	if(!level_check_overlap(src, des)){
+		level *res=compaction_LW2TI(cm, src, des);
+		
+	}
+	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
+}
+
 void *comp_alreq_end_req(algo_req *req){
 	inter_read_alreq_param *r_param;
 	value_set *vs;

@@ -103,7 +103,7 @@ bool bf_set_insert(bf_set *bfs, uint32_t lba, uint32_t piece_ppa){
 			cbf_put_lba(((bp_pair*)bfs->array)[bfs->now].bf, lba);
 			((bp_pair*)(bfs->array))[bfs->now].piece_ppa=piece_ppa;
 			bfs->memory_usage_bit+=
-				((bp_pair*)bfs->array)[bfs->now].bf->bits+sizeof(uint32_t);
+				((bp_pair*)bfs->array)[bfs->now].bf->bits+48;
 			break;
 		case BLOOM_ONLY:
 			if(lba==debug_lba){

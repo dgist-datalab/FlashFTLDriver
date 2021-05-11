@@ -47,6 +47,7 @@ typedef struct lsmtree_parameter{
 	uint32_t last_size_factor;
 	uint32_t normal_size_factor;
 	uint32_t read_helper_type;
+	uint32_t write_buffer_ent;
 	float read_amplification;
 	read_helper_param leveling_rhp;
 	read_helper_param tiering_rhp;
