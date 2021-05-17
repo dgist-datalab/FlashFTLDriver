@@ -78,7 +78,7 @@ sst_file *run_retrieve_close_sst(run *r, uint32_t lba){
 	}
 }
 
-void run_append_sstfile_move_originality(run *_run, sst_file *sstfile){
+static inline void __do_run_append_sstfile(run *_run, sst_file *sstfile, bool moved_originality){
 	if(_run->now_sst_file_num>=_run->max_sst_file_num){
 		/*EPRINT("over sst file", true);*/
 		sst_file *new_sst_set=(sst_file*)calloc(_run->max_sst_file_num*2, sizeof(sst_file));
@@ -90,9 +90,23 @@ void run_append_sstfile_move_originality(run *_run, sst_file *sstfile){
 	if(_run->now_sst_file_num && !(sstfile->start_lba > _run->start_lba && sstfile->start_lba>_run->end_lba)){
 		EPRINT("cannot append!", true);
 	}
-	sst_shallow_copy_move_originality(&_run->sst_set[_run->now_sst_file_num], sstfile);
+	if(moved_originality){
+		sst_shallow_copy_move_originality(&_run->sst_set[_run->now_sst_file_num], sstfile);
+	}
+	else{
+		sst_shallow_copy(&_run->sst_set[_run->now_sst_file_num], sstfile);
+	}
 	update_range(_run, sstfile->start_lba, sstfile->end_lba);
 	_run->now_sst_file_num++;
+
+}
+
+void run_append_sstfile_move_originality(run *_run, sst_file *sstfile){
+	__do_run_append_sstfile(_run, sstfile, true);
+}
+
+void run_append_sstfile(run *_run, sst_file *sstfile){
+	__do_run_append_sstfile(_run, sstfile, false);
 }
 
 void run_deep_append_sstfile(run *_run, sst_file *sstfile){

@@ -47,7 +47,7 @@ int main(int argc,char* argv[]){
 		//bench_add(VECTOREDRSET,0,RANGE,RANGE*3);
 		//bench_add(VECTOREDRSET,0,RANGE/2,RANGE/2);
 		//bench_add(VECTOREDRW,0,RANGE/2/100*99,RANGE/100*99);
-		bench_add(VECTOREDRW,0,RANGE,RANGE*6);
+		bench_add(VECTOREDRW,0,RANGE,RANGE*4);
 	}
 	printf("range: %lu!\n",RANGE);
 

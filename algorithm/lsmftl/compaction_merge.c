@@ -106,7 +106,7 @@ static void  bulk_invalidation(run *r, uint32_t* border_idx, uint32_t border_lba
 	(*border_idx)=i;
 }
 
-static uint32_t issue_read_kv_for_bos_merge(sst_bf_out_stream *bos, std::queue<key_ptr_pair> *kpq,
+uint32_t issue_read_kv_for_bos_normal(sst_bf_out_stream *bos, std::queue<key_ptr_pair> *kpq,
 		bool round_final, uint32_t newer_version, uint32_t older_version){
 	key_value_wrapper *read_target;
 	uint32_t res=0;
@@ -208,7 +208,7 @@ void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_l
 level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	_cm=cm;
 
-	version_get_merge_target(LSM.last_run_version, idx_set);
+	version_get_merge_target(LSM.last_run_version, idx_set, des->idx);
 	run *new_run=run_init(des->max_sst_num/des->max_run_num, UINT32_MAX, 0);
 
 	LSM.now_merging_run[0]=idx_set[0];
@@ -220,7 +220,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	LSM.monitor.compaction_cnt[des->idx+1]++;
 
 	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
-		version_unpopulate_run(LSM.last_run_version, idx_set[i]);
+		version_unpopulate_run(LSM.last_run_version, idx_set[i], des->idx);
 	}
 	version_reinit_early_invalidation(LSM.last_run_version, MERGED_RUN_NUM, idx_set);
 
@@ -244,7 +244,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	uint32_t older_borderline=0;
 	uint32_t border_lba;
 
-	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version);
+	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version, des->idx);
 	sst_pf_out_stream *os_set[MERGED_RUN_NUM]={0,};
 
 	sst_bf_out_stream *bos=NULL;
@@ -406,7 +406,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 			bis=tiering_new_bis();
 		}
 
-		uint32_t entry_num=issue_read_kv_for_bos_merge(bos, kpq, last_round_check, idx_set[1], idx_set[0]);
+		uint32_t entry_num=issue_read_kv_for_bos_normal(bos, kpq, last_round_check, idx_set[1], idx_set[0]);
 		border_lba=issue_write_kv_for_bis(&bis, bos, new_run, entry_num, 
 				target_ridx, last_round_check);
 
@@ -453,7 +453,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	delete kpq;
 	free(thread_arg.arg_set);
 
-	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
 	//level_run_reinit(des, idx_set[1]);
 
 	run *rptr; uint32_t ridx;
@@ -466,7 +466,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	}
 
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
-	version_populate_run(LSM.last_run_version, target_ridx);
+	version_populate_run(LSM.last_run_version, target_ridx, des->idx);
 
 	sst_file *temp_sptr;
 	uint32_t temp_sidx;
@@ -567,8 +567,7 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, sst_pf_out_stream **po
 level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 	_cm=cm;
 	run *new_run=run_init(src->max_sst_num, UINT32_MAX, 0);
-	uint32_t target_ridx=(des->idx==LSM.param.LEVELN?version_get_empty_ridx(LSM.last_run_version):
-			des->idx*LSM.param.normal_size_factor+des->run_num);
+	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version, des->idx);
 	uint32_t stream_num=src->run_num;
 	run **target_run_set=(run**)calloc(stream_num, sizeof(run*));
 	for(uint32_t i=0; i<src->run_num; i++){
@@ -639,7 +638,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 		}
 	}
 
-	level *res=level_init(des->max_sst_num, des->max_run_num, des->istier, des->idx);
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
 	//level_run_reinit(des, idx_set[1]);
 
 	for_each_run_max(des, rptr, ridx){
@@ -655,6 +654,12 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 		for_each_sst(rptr, sptr, sidx){
 			lsmtree_gc_unavailable_unset(&LSM, sptr, UINT32_MAX);
 		}
+	}
+
+	version_populate_run(LSM.last_run_version, target_ridx, des->idx);
+	for(uint32_t i=0; i<src->run_num; i++){
+		uint32_t upper_ridx=version_pop_oldest_ridx(LSM.last_run_version, src->idx);
+		version_unpopulate_run(LSM.last_run_version, upper_ridx, src->idx);
 	}
 
 	run_free(new_run);

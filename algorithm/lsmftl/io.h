@@ -26,4 +26,5 @@ void io_manager_issue_read(uint32_t ppa, value_set *value, algo_req *req, bool s
 void io_manager_free();
 
 void io_manager_test_read(uint32_t ppa, char *data, uint32_t type);
+void io_manager_test_write(uint32_t ppa, char *data, uint32_t type);
 #endif

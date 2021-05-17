@@ -5,5 +5,6 @@
 
 uint32_t inf_vector_make_req(char *buf, void * (*end_req)(void*), uint32_t mark);
 void *vectored_main(void *);
+void inf_algorithm_testing();
 
 #endif

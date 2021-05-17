@@ -41,6 +41,7 @@ sst_file *run_retrieve_close_sst(run *r, uint32_t lba);
 void run_space_init(run *,uint32_t map_num, uint32_t start_lba, uint32_t end_lba);
 void run_reinit(run *r);
 void run_append_sstfile_move_originality(run *_run, sst_file *sstfile);
+void run_append_sstfile(run *_run, sst_file *sstfile);
 void run_deep_append_sstfile(run *_run, sst_file *sstfile);
 void run_free(run *_run);
 void run_print(run *r);

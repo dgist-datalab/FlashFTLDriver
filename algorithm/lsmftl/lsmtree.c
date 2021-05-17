@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <math.h>
 #include "function_test.h"
+#include "segment_level_manager.h"
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -25,6 +26,7 @@ struct algorithm lsm_ftl={
 	.write=lsmtree_write,
 	.flush=lsmtree_flush,
 	.remove=lsmtree_remove,
+	.test=lsmtree_testing,
 };
 
 static void print_help(){
@@ -258,8 +260,11 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 		rwlock_init(&LSM.level_rwlock[i]);
 	}
 
-	LSM.last_run_version=version_init(LSM.disk[LSM.param.LEVELN-1]->max_run_num, LSM.param.version_number, 
-			LSM.param.last_size_factor,RANGE);
+	LSM.last_run_version=version_init(LSM.disk[LSM.param.LEVELN-1]->max_run_num,
+			LSM.param.version_number, 
+			LSM.param.last_size_factor,RANGE,
+			LSM.disk,
+			LSM.param.LEVELN);
 
 	printf("--------version number test---------\n");
 	printf("level idx to version\n");
@@ -480,7 +485,7 @@ retry:
 		*rptr=&(*lptr)->array[0];
 	}
 
-	if(!(*lptr)->istier){
+	if((*lptr)->level_type!=TIERING){
 		*sptr=level_retrieve_sst(*lptr, lba);
 	}
 	else{
@@ -733,7 +738,7 @@ read_helper_check_again:
 	}
 	else{
 		/*issue map read!*/
-		read_target_ppa=target->istier?
+		read_target_ppa=target->level_type==TIERING?
 			sst_find_map_addr(sptr, req->key):sptr->file_addr.map_ppa;
 		if(read_target_ppa==UINT32_MAX){
 			goto notfound;
@@ -962,7 +967,7 @@ uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *ti
 			for_each_sst(rptr, sptr, sidx){
 				if(sptr->_read_helper){
 					now_bit=read_helper_memory_usage(sptr->_read_helper, lba_unit);
-					if(lev->istier){
+					if(lev->level_type==TIERING){
 						(*tiering)+=now_bit;
 					}
 					else{
@@ -994,5 +999,26 @@ void lsmtree_tiered_level_all_print(){
 			}
 		}
 		dprintf(tiered_level_fd, "\n");
+	}
+}
+typedef std::unordered_map<uint32_t, slm_node*> seg_map;
+typedef std::unordered_map<uint32_t, slm_node*>::iterator seg_map_iter;
+typedef std::pair<uint32_t, slm_node*> seg_map_pair;
+
+void lsmtree_gc_lock_level(lsmtree *lsm, uint32_t level_idx){
+	seg_map *t_map=slm_get_target_map(level_idx);
+	seg_map_iter t_iter=t_map->begin();
+
+	for(; t_iter!=t_map->end(); t_iter++){
+		lsmtree_gc_unavailable_set(lsm, NULL, t_iter->second->seg_idx);
+	}
+}
+
+void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx){
+	seg_map *t_map=slm_get_target_map(level_idx);
+	seg_map_iter t_iter=t_map->begin();
+
+	for(; t_iter!=t_map->end(); t_iter++){
+		lsmtree_gc_unavailable_unset(lsm, NULL, t_iter->second->seg_idx);
 	}
 }

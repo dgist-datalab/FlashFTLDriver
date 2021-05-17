@@ -20,6 +20,7 @@ SRCS +=\
 	   compaction_early_invalidation.c\
 	   compaction_sst_convert.c\
 	   gc_helper.c\
+	   lsmtree_testing.c\
 #	   gc.c\
 #	   helper_algorithm/bf_set.c\
 #	   helper_algorithm/compressed_bloomfilter.c

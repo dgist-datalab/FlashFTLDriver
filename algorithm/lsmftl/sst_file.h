@@ -54,6 +54,12 @@ static inline void sst_shallow_copy_move_originality(sst_file *des, sst_file *sr
 	src->ismoved_originality=true;
 }
 
+static inline void sst_shallow_copy(sst_file *des, sst_file *src){
+	*des=*src;
+	//des->_read_helper=src->_read_helper;
+	des->ismoved_originality=true;
+}
+
 void sst_set_file_map(sst_file *, uint32_t, map_range*);
 uint32_t sst_find_map_addr(sst_file *, uint32_t lba);
 sst_file *sst_MR_to_sst_file(map_range *mr);

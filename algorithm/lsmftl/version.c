@@ -5,25 +5,42 @@
 
 extern lsmtree LSM;
 
-version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, uint32_t last_level_version_sidx, uint32_t LBA_num){
+version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, 
+		uint32_t last_level_version_sidx, uint32_t LBA_num, level **disk, uint32_t leveln){
 	version *res=(version*)malloc(sizeof(version));
 	res->start_hand=res->end_hand=0;
 	res->key_version=(uint8_t*)calloc(LBA_num, sizeof(uint8_t));
 	memset(res->key_version, -1, sizeof(uint8_t)*LBA_num);
 	res->valid_version_num=0;
 	res->max_valid_version_num=max_valid_version_num;
-
-	res->ridx_empty_queue=new std::queue<uint32_t>();
 	printf("max_version idx:%u\n", max_valid_version_num);
-	for(uint32_t i=0; i<max_valid_version_num; i++){
-		res->ridx_empty_queue->push(i);
-	//	printf("version:%u \n", i);
+
+	res->ridx_empty_queue=new std::queue<uint32_t>*[leveln];
+	uint32_t ridx=0;
+	for(uint32_t i=0; i<leveln; i++){
+		res->ridx_empty_queue[i]=new std::queue<uint32_t>();
+		switch(disk[i]->level_type){
+			case LEVELING:
+			case LEVELING_WISCKEY:
+				res->ridx_empty_queue[i]->push(ridx++);
+				break;
+			case TIERING:
+				for(uint32_t j=0; j<LSM.param.normal_size_factor; j++){
+					res->ridx_empty_queue[i]->push(ridx++);
+				}
+				break;
+		}
+	}
+
+
+	res->ridx_populate_queue=new std::queue<uint32_t>*[leveln];
+	for(uint32_t i=0; i<leveln; i++){
+		res->ridx_populate_queue[i]=new std::queue<uint32_t>();
 	}
 
 	res->total_version_number=total_version_number;
 	res->version_invalidation_cnt=(uint32_t*)calloc(res->total_version_number+1, sizeof(uint32_t));
 	res->version_early_invalidate=(bool*)calloc(res->total_version_number+1, sizeof(bool));
-	res->ridx_populate_queue=new std::queue<uint32_t>();
 	res->memory_usage_bit=ceil(log2(max_valid_version_num))*LBA_num;
 	res->poped_version_num=0;
 	fdriver_mutex_init(&res->version_lock);
@@ -31,34 +48,43 @@ version *version_init(uint8_t max_valid_version_num, uint8_t total_version_numbe
 	return res;
 }
 
-uint32_t version_get_empty_ridx(version *v){
-	if(v->ridx_empty_queue->empty()){
+uint32_t version_get_empty_ridx(version *v, uint32_t level){
+	if(v->ridx_empty_queue[level]->empty()){
 		EPRINT("should merge before empty ridx", true);
 	}
-	uint32_t res=v->ridx_empty_queue->front();
-	v->ridx_empty_queue->pop();
+	uint32_t res=v->ridx_empty_queue[level]->front();
+	v->ridx_empty_queue[level]->pop();
 	return res;
 }
 
-void version_get_merge_target(version *v, uint32_t *ridx_set){
+void version_get_merge_target(version *v, uint32_t *ridx_set, uint32_t level){
 	for(uint32_t i=0; i<(1+1); i++){
-		ridx_set[i]=v->ridx_populate_queue->front();
-		v->ridx_populate_queue->pop();
+		ridx_set[i]=v->ridx_populate_queue[level]->front();
+		v->ridx_populate_queue[level]->pop();
 	}
 }
 
-void version_unpopulate_run(version *v, uint32_t ridx){
-	v->ridx_empty_queue->push(ridx);
+void version_unpopulate_run(version *v, uint32_t ridx, uint32_t level_idx){
+	v->ridx_empty_queue[level_idx]->push(ridx);
 }
 
-void version_populate_run(version *v, uint32_t ridx){
-	v->ridx_populate_queue->push(ridx);
-	version_enable_ealry_invalidation(v,ridx);
+void version_populate_run(version *v, uint32_t ridx, uint32_t level_idx){
+	v->ridx_populate_queue[level_idx]->push(ridx);
+	if(level_idx==LSM.param.LEVELN-1){
+		version_enable_ealry_invalidation(v,ridx);
+	}
 }
 
 void version_sanity_checker(version *v){
-	uint32_t remain_empty_size=v->ridx_empty_queue->size();
-	uint32_t populate_size=v->ridx_populate_queue->size();
+	uint32_t remain_empty_size=0;
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		remain_empty_size+=v->ridx_empty_queue[i]->size();
+	}
+
+	uint32_t populate_size=0;
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		populate_size+=v->ridx_populate_queue[i]->size();
+	}
 	if(remain_empty_size+populate_size!=v->max_valid_version_num){
 		printf("error log : empty-size(%d) populate-size(%d)\n", remain_empty_size, populate_size);
 		EPRINT("version sanity error", true);
@@ -66,8 +92,13 @@ void version_sanity_checker(version *v){
 }
 
 void version_free(version *v){
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		delete v->ridx_empty_queue[i];
+		delete v->ridx_populate_queue[i];
+	}
 	delete v->ridx_empty_queue;
 	delete v->ridx_populate_queue;
+
 	free(v->version_early_invalidate);
 	free(v->version_invalidation_cnt);
 	free(v->key_version);

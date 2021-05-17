@@ -166,7 +166,7 @@ struct algorithm{
 	uint32_t (*write)(request *const);
 	uint32_t (*flush)(request *const);
 	uint32_t (*remove)(request *const);
-
+	uint32_t (*test)();
 	lower_info* li;
 	struct blockmanager *bm;
 	void *algo_body;

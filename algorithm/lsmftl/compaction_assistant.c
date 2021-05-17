@@ -47,7 +47,7 @@ void compaction_issue_req(compaction_master *cm, compaction_req *req){
 
 static inline void disk_change(level **up, level *src, level** des, uint32_t* idx_set){
 	if(up!=NULL){
-		level *new_up=level_init((*up)->max_sst_num, (*up)->max_run_num, (*up)->istier, (*up)->idx);
+		level *new_up=level_init((*up)->max_sst_num, (*up)->max_run_num, (*up)->level_type, (*up)->idx);
 		level_free(*up, LSM.pm);
 		*up=new_up;
 	}
@@ -55,8 +55,123 @@ static inline void disk_change(level **up, level *src, level** des, uint32_t* id
 	level *delete_target_level=*des;
 	(*des)=src;
 	level_free(delete_target_level, LSM.pm);
+}
 
-	//lsmtree_level_summary(&LSM);
+static inline void first_level_slm_coupling(key_ptr_pair *kp_set, compaction_req *req){
+	uint32_t end_idx=kp_end_idx((char*)kp_set);
+	uint32_t prev_seg=UINT32_MAX;
+	uint32_t prev_piece_ppa;
+
+	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[end_idx].piece_ppa)){
+		slm_coupling_level_seg(0, SEGNUM(kp_set[end_idx].piece_ppa), SEGPIECEOFFSET(kp_set[end_idx].piece_ppa), req->gc_data);
+	}
+	else{
+		for(uint32_t i=0; i<=end_idx; i++){
+			if(prev_seg==UINT32_MAX){
+				prev_seg=SEGNUM(kp_set[i].piece_ppa);
+				prev_piece_ppa=kp_set[i].piece_ppa;
+				continue;
+			}
+			uint32_t now_seg=SEGNUM(kp_set[i].piece_ppa);
+			if(now_seg==prev_seg){
+				prev_piece_ppa=kp_set[i].piece_ppa;
+			}
+			else{
+				slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), req->gc_data);
+				prev_seg=now_seg;
+				prev_piece_ppa=kp_set[i].piece_ppa;
+			}
+		}
+
+		if(!slm_invalidate_enable(0, kp_set[end_idx].piece_ppa)){
+			slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), req->gc_data);	
+		}
+	}
+}
+
+static inline key_ptr_pair* flush_memtable(write_buffer *wb, uint32_t tag){
+	key_ptr_pair *kp_set;
+	if(page_manager_get_total_remain_page(LSM.pm, false) < (KP_IN_PAGE/L2PGAP)){
+		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
+	}
+
+	rwlock_write_lock(&LSM.flush_wait_wb_lock);
+	rwlock_write_lock(&LSM.flushed_kp_set_lock);
+	kp_set=write_buffer_flush(wb, false);
+	write_buffer_free(wb);
+	LSM.flushed_kp_set[tag]=kp_set;
+	LSM.flush_wait_wb=NULL;
+	//printf("kp_set set\n");
+	rwlock_write_unlock(&LSM.flush_wait_wb_lock);
+	rwlock_write_unlock(&LSM.flushed_kp_set_lock);
+	return kp_set;
+}
+
+static inline void do_compaction(compaction_master *cm, compaction_req *req, 
+		key_ptr_pair *kp_set, uint32_t start_idx, uint32_t end_idx){
+	level *lev;
+	if(kp_set){
+		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
+	}else{
+		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
+		rwlock_write_lock(&LSM.level_rwlock[start_idx]);
+	}
+	
+	if(kp_set){
+		lev=compaction_first_leveling(cm, kp_set, LSM.disk[0]);
+	}
+	else{
+		uint32_t end_type=LSM.disk[end_idx]->level_type;
+		switch(LSM.disk[start_idx]->level_type){
+			case LEVELING:
+				if(end_type==LEVELING){
+					//compaction_LE2LE(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+				}
+				else{
+					//compaction_LE2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+				}
+				break;
+			case LEVELING_WISCKEY:
+				switch(end_type){
+					case LEVELING_WISCKEY:
+						compaction_LW2LW(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+						break;
+					case LEVELING:
+						compaction_LW2LE(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+						break;
+					case TIERING:
+						compaction_LW2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+						break;
+				}
+				break;
+			case TIERING:
+				compaction_TI2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+				break;
+		}
+	}
+	disk_change(kp_set?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
+
+	if(end_idx==LSM.param.LEVELN-1){
+		slm_empty_level(start_idx);
+	}
+	else if(end_idx==0){
+		first_level_slm_coupling(kp_set, req);
+	}
+	else{
+		slm_move(start_idx, end_idx);
+	}
+
+	if(kp_set){
+		rwlock_write_unlock(&LSM.level_rwlock[end_idx]);
+		rwlock_write_lock(&LSM.flushed_kp_set_lock);
+		LSM.flushed_kp_set[req->tag]=NULL;
+		free(kp_set);
+		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
+	}
+	else{
+		rwlock_write_unlock(&LSM.level_rwlock[end_idx]);
+		rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
+	}
 }
 
 void* compaction_main(void *_cm){
@@ -67,103 +182,18 @@ void* compaction_main(void *_cm){
 		if(!req) continue;
 again:
 		level *src;
+		key_ptr_pair *kp_set=NULL;
 		if(req->start_level==-1 && req->end_level==0){
-			key_ptr_pair *kp_set;
-			rwlock_write_lock(&LSM.level_rwlock[req->end_level]);
 			if(req->wb){
-				if(page_manager_get_total_remain_page(LSM.pm, false) < (KP_IN_PAGE/L2PGAP)){
-					__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
-				}
-
-				rwlock_write_lock(&LSM.flush_wait_wb_lock);
-				rwlock_write_lock(&LSM.flushed_kp_set_lock);
-				kp_set=write_buffer_flush(req->wb, false);
-				write_buffer_free(req->wb);
-				LSM.flushed_kp_set[req->tag]=kp_set;
-				LSM.flush_wait_wb=NULL;
-				//printf("kp_set set\n");
-				rwlock_write_unlock(&LSM.flush_wait_wb_lock);
-				rwlock_write_unlock(&LSM.flushed_kp_set_lock);
+				kp_set=flush_memtable(req->wb, req->tag);
 			}
 			else{
 				kp_set=req->target;
 			}
-
 			req->target=kp_set;
-
-		//	uint32_t last_piece_ppa=kp_set[kp_end_idx((char*)kp_set)].piece_ppa;
-		//	uint32_t first_piece_ppa=kp_set[0].piece_ppa;
-
-			src=compaction_first_tiering(cm, kp_set, LSM.disk[0]);
-#if 0
-			src=compaction_first_leveling(cm, kp_set, LSM.disk[0]);
-#endif
-
-			uint32_t end_idx=kp_end_idx((char*)kp_set);
-			uint32_t prev_seg=UINT32_MAX;
-			uint32_t prev_piece_ppa;
-
-			if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[end_idx].piece_ppa)){
-				slm_coupling_level_seg(0, SEGNUM(kp_set[end_idx].piece_ppa), SEGPIECEOFFSET(kp_set[end_idx].piece_ppa), req->gc_data);
-			}
-			else{
-				for(uint32_t i=0; i<=end_idx; i++){
-					if(prev_seg==UINT32_MAX){
-						prev_seg=SEGNUM(kp_set[i].piece_ppa);
-						prev_piece_ppa=kp_set[i].piece_ppa;
-						continue;
-					}
-					uint32_t now_seg=SEGNUM(kp_set[i].piece_ppa);
-					if(now_seg==prev_seg){
-						prev_piece_ppa=kp_set[i].piece_ppa;
-					}
-					else{
-						slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), req->gc_data);
-						prev_seg=now_seg;
-						prev_piece_ppa=kp_set[i].piece_ppa;
-					}
-				}
-
-				if(!slm_invalidate_enable(0, kp_set[end_idx].piece_ppa)){
-					slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), req->gc_data);	
-				}
-			}
-
-		}
-		else if(req->end_level==LSM.param.LEVELN-1){
-			rwlock_write_lock(&LSM.level_rwlock[req->end_level]);
-			rwlock_write_lock(&LSM.level_rwlock[req->start_level]);
-			
-			src=compaction_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
-#if 0
-			src=compaction_leveling_wisckey_to_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
-#endif
-			slm_empty_level(req->start_level);
-		}
-		else{
-			rwlock_write_lock(&LSM.level_rwlock[req->end_level]);
-			rwlock_write_lock(&LSM.level_rwlock[req->start_level]);
-			src=compaction_tiering(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
-#if 0
-			src=compaction_leveling_wisckey(cm, LSM.disk[req->start_level], LSM.disk[req->end_level]);
-#endif
-			slm_move(req->end_level, req->start_level);
 		}
 
-		if(req->start_level==-1){
-			disk_change(NULL, src, &LSM.disk[req->end_level], NULL);
-			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
-
-			rwlock_write_lock(&LSM.flushed_kp_set_lock);
-			LSM.flushed_kp_set[req->tag]=NULL;
-			free(req->target);
-			rwlock_write_unlock(&LSM.flushed_kp_set_lock);
-		}
-		else{
-			disk_change(&LSM.disk[req->start_level], src, &LSM.disk[req->end_level], NULL);
-			rwlock_write_unlock(&LSM.level_rwlock[req->start_level]);
-			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
-		}
+		do_compaction(cm, req, kp_set, req->start_level, req->end_level);
 
 		if(req->end_level != LSM.param.LEVELN-1 && (
 				(req->end_level==0 && level_is_full(LSM.disk[req->end_level])) ||
@@ -180,17 +210,7 @@ again:
 			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
 			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
 		}
-/*
-		uint64_t level_bit, tiering_bit;
-		uint64_t temp_memory_usage_bit=lsmtree_all_memory_usage(&LSM, &level_bit, &tiering_bit, 48)+RANGE*ceil(log2(LSM.param.last_size_factor));
-		if(LSM.monitor.max_memory_usage_bit < temp_memory_usage_bit){
-			printf("update max memory!\n");
-			printf("level print\n");
-			lsmtree_level_summary(&LSM);
-			printf("memory_usage:%.2lf\n", (double)temp_memory_usage_bit/(RANGE*48));
-			LSM.monitor.max_memory_usage_bit=temp_memory_usage_bit;
-		}
-*/
+
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);
 	}

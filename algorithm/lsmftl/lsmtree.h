@@ -32,9 +32,9 @@ typedef struct lsmtree_monitor{
 
 	uint64_t merge_total_entry_cnt;
 	uint64_t merge_valid_entry_cnt;
-	uint64_t tiering_total_entry_cnt;
 	uint64_t tiering_valid_entry_cnt;
 	uint64_t max_memory_usage_bit;
+	uint64_t tiering_total_entry_cnt;
 
 	/*time*/
 	MeasureTime RH_check_stopwatch[2]; //0 -> leveling 1-> tiering
@@ -136,6 +136,9 @@ void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm);
 uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t* , uint64_t *, uint32_t);
 void lsmtree_tiered_level_all_print();
+void lsmtree_gc_lock_level(lsmtree *lsm, uint32_t level_idx);
+void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
+uint32_t lsmtree_testing();
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 
 #define MAKE_L0COMP_REQ(wb, kp_set, param, is_gc_data)\

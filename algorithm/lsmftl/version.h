@@ -21,18 +21,27 @@ typedef struct version{
 	uint32_t last_level_version_sidx;
 	bool *version_early_invalidate;
 	fdriver_lock_t version_lock;
-	std::queue<uint32_t> *ridx_empty_queue;
-	std::queue<uint32_t> *ridx_populate_queue;
+	std::queue<uint32_t> **ridx_empty_queue;
+	std::queue<uint32_t> **ridx_populate_queue;
 	uint32_t memory_usage_bit;
 	int32_t poped_version_num;
 }version;
 
 version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, 
-		uint32_t last_level_version_sidx, uint32_t LBA_num);
-uint32_t version_get_empty_ridx(version *v);
-void version_get_merge_target(version *v, uint32_t *ridx_set);
-void version_unpopulate_run(version *v, uint32_t ridx);
-void version_populate_run(version *v, uint32_t ridx);
+		uint32_t last_level_version_sidx, uint32_t LBA_num, level **disk, uint32_t leveln);
+uint32_t version_get_empty_ridx(version *v, uint32_t level);
+static inline uint32_t version_pop_oldest_ridx(version *v, uint32_t level){
+	uint32_t res=v->ridx_populate_queue[level]->front();
+	v->ridx_populate_queue[level]->pop();
+	return res;
+}
+static inline uint32_t version_pick_oldest_ridx(version *v, uint32_t level){
+	return v->ridx_populate_queue[level]->front();
+}
+void version_get_merge_target(version *v, uint32_t *ridx_set, uint32_t level);
+
+void version_unpopulate_run(version *v, uint32_t ridx, uint32_t level_idx);
+void version_populate_run(version *v, uint32_t ridx, uint32_t level_idx);
 void version_sanity_checker(version *v);
 void version_free(version *v);
 void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx);

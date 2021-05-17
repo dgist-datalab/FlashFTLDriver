@@ -80,16 +80,16 @@ void compaction_free(compaction_master *cm);
 void compaction_issue_req(compaction_master *cm, compaction_req *);
 void compaction_wait(compaction_master *cm);
 level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
-level* compaction_LW2LW(compaction_master *cm, level *src, level *des); //done
-level* compaction_LW2TI(compaction_master *cm, level *src, level *des); //done
+level* compaction_LW2LW(compaction_master *cm, level *src, level *des); //done and debug
+level* compaction_LW2TI(compaction_master *cm, level *src, level *des); //done and debug
 level* compaction_LW2LE(compaction_master *cm, level *src, level *des);
 level* compaction_LE2LE(compaction_master *cm, level *src, level *des);
-level* compaction_LE2TI(compaction_master *cm, level *src, level *des);
+level* compaction_LE2TI(compaction_master *cm, level *src, level *des);	
 level* compaction_TI2TI(compaction_master *cm, level *src, level *des); //done
-level* compaction_wisckey_to_normal(compaction_master *cm, level *src);
-level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx);
-
-
+level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx); //done and debug
+run *compaction_wisckey_to_normal(compaction_master *cm, level *src, 
+		run *previous_run, uint32_t *moved_entry_num, 
+		uint32_t start_sst_file_idx, uint32_t target_ridx);
 
 sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *);
 
@@ -117,6 +117,10 @@ int issue_read_kv_for_bos(struct sst_bf_out_stream *bos, struct sst_pf_out_strea
 		uint32_t target_num, uint32_t version, bool round_final);
 uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, struct sst_bf_out_stream *bos, run *new_run,
 		int32_t entry_num, uint32_t target_ridx, bool final);
+
+uint32_t issue_read_kv_for_bos_normal(sst_bf_out_stream *bos, std::queue<key_ptr_pair> *kpq,
+		bool round_final, uint32_t newer_version, uint32_t older_version);
+
 void *comp_alreq_end_req(algo_req *req);
 
 static inline compaction_req * alloc_comp_req(int8_t start, int8_t end, write_buffer *wb, key_ptr_pair *target,
