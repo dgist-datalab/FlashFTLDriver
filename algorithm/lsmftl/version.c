@@ -5,20 +5,23 @@
 
 extern lsmtree LSM;
 
-version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, 
+version *version_init(uint8_t total_version_number, 
 		uint32_t last_level_version_sidx, uint32_t LBA_num, level **disk, uint32_t leveln){
 	version *res=(version*)malloc(sizeof(version));
 	res->start_hand=res->end_hand=0;
 	res->key_version=(uint8_t*)calloc(LBA_num, sizeof(uint8_t));
 	memset(res->key_version, -1, sizeof(uint8_t)*LBA_num);
 	res->valid_version_num=0;
-	res->max_valid_version_num=max_valid_version_num;
-	printf("max_version idx:%u\n", max_valid_version_num);
+	res->max_valid_version_num=total_version_number;
+	printf("max_version idx:%u\n", total_version_number);
 
 	res->ridx_empty_queue=new std::queue<uint32_t>*[leveln];
+	res->start_vidx_of_level=(uint32_t*)malloc(sizeof(uint32_t)*leveln);
+
 	uint32_t ridx=0;
-	for(uint32_t i=0; i<leveln; i++){
+	for(int32_t i=leveln-1; i>=0; i--){
 		res->ridx_empty_queue[i]=new std::queue<uint32_t>();
+		res->start_vidx_of_level[i]=ridx;
 		switch(disk[i]->level_type){
 			case LEVELING:
 			case LEVELING_WISCKEY:
@@ -41,7 +44,7 @@ version *version_init(uint8_t max_valid_version_num, uint8_t total_version_numbe
 	res->total_version_number=total_version_number;
 	res->version_invalidation_cnt=(uint32_t*)calloc(res->total_version_number+1, sizeof(uint32_t));
 	res->version_early_invalidate=(bool*)calloc(res->total_version_number+1, sizeof(bool));
-	res->memory_usage_bit=ceil(log2(max_valid_version_num))*LBA_num;
+	res->memory_usage_bit=ceil(log2(res->max_valid_version_num))*LBA_num;
 	res->poped_version_num=0;
 	fdriver_mutex_init(&res->version_lock);
 	res->last_level_version_sidx=last_level_version_sidx;
@@ -99,6 +102,7 @@ void version_free(version *v){
 	delete v->ridx_empty_queue;
 	delete v->ridx_populate_queue;
 
+	free(v->start_vidx_of_level);
 	free(v->version_early_invalidate);
 	free(v->version_invalidation_cnt);
 	free(v->key_version);
@@ -125,6 +129,7 @@ void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx){
 
 
 void version_reinit_early_invalidation(version *v, uint32_t ridx_num, uint32_t *ridx){
+	printf("should I need it?\n");
 	for(uint32_t i=0; i<ridx_num; i++){
 		v->version_invalidation_cnt[ridx[i]]=0;
 		v->version_early_invalidate[ridx[i]]=false;
@@ -132,6 +137,7 @@ void version_reinit_early_invalidation(version *v, uint32_t ridx_num, uint32_t *
 }
 
 uint32_t version_get_early_invalidation_target(version *v){
+	printf("should I need it?\n");
 	/*
 	static int cnt=0;
 	printf("-------------%d------------------\n",cnt++);
@@ -139,6 +145,7 @@ uint32_t version_get_early_invalidation_target(version *v){
 		printf("%u -> ridx:%u -> %s\n", i, version_to_run(v,i), 
 				v->version_early_invalidate[version_to_run(v,i)]?"true":"false");
 	}*/
+
 	for(uint32_t i=0; i<v->max_valid_version_num; i++){
 		if(v->version_early_invalidate[version_to_run(v,i)]){
 			return version_to_run(v,i);
@@ -148,6 +155,7 @@ uint32_t version_get_early_invalidation_target(version *v){
 }
 
 static bool early_invalidate_available_check(uint32_t ridx){
+	printf("should I need it?\n");
 	run *r=&LSM.disk[LSM.param.LEVELN-1]->array[ridx];
 	sst_file *sptr;
 	map_range *mptr;
@@ -163,6 +171,7 @@ static bool early_invalidate_available_check(uint32_t ridx){
 }
 
 uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num){
+	printf("should I need it?\n");
 	uint32_t target_ridx=UINT32_MAX;
 	uint32_t target_invalidation_cnt=0;
 	for(uint32_t i=v->last_level_version_sidx; i<v->max_valid_version_num; i++){
@@ -211,21 +220,13 @@ uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_
 }
 
 void version_make_early_invalidation_enable_old(version *v){
+	printf("should I need it?\n");
 	for(uint32_t i=0; i<v->max_valid_version_num-1; i++){
 		v->version_early_invalidate[version_to_run(v,i)]=true;
 	}
 }
 
 
-uint32_t version_level_to_start_version(level *lev){
-	uint32_t above_run=0;
-	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
-		if(LSM.disk[i]==lev){
-			return above_run+1;
-		}
-		else{
-			above_run+=(i==LSM.param.LEVELN-1?LSM.param.last_size_factor:LSM.param.normal_size_factor);
-		}
-	}
-	return above_run;
+uint32_t version_level_to_start_version(version *v, uint32_t start_idx){
+	return v->start_vidx_of_level[start_idx];
 }

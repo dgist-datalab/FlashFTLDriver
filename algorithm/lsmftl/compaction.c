@@ -49,7 +49,7 @@ static inline void compaction_error_check
 		kp_get_end_lba((char*)kp_set);
 	}
 
-	uint32_t target_version=version_level_idx_to_version(LSM.last_run_version, des->idx, LSM.param.LEVELN);
+	uint32_t target_version=version_level_to_start_version(LSM.last_run_version, des->idx);
 	if(!(GET_LEV_START_LBA(res) <= min_lba)){
 		if(target_version==version_map_lba(LSM.last_run_version, min_lba)){
 			if(src){
@@ -260,9 +260,6 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 	uint32_t all_empty_check=0;
 	uint32_t sorting_idx=0;
 	//uint32_t target_version=UINT32_MAX;
-	if(des){
-		//version_level_idx_to_version(LSM.last_run_version, des->idx, LSM.param.LEVELN);
-	}
 
 	while(!((all_empty_stop && all_empty_check==((1<<stream_num)-1)) || (!all_empty_stop && one_empty))){
 		key_ptr_pair target_pair;
@@ -375,7 +372,8 @@ static sst_file *key_ptr_to_sst_file(key_ptr_pair *kp_set, bool should_flush){
 	return sstfile;
 }
 
-static void trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des){
+static void leveling_trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des, 
+		uint32_t from_ridx, uint32_t to_ridx){
 	uint32_t ridx, sidx;
 	LSM.monitor.trivial_move_cnt++;
 	run *rptr; sst_file *sptr;
@@ -398,12 +396,9 @@ static void trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des
 				}
 			}
 		}
-		/*
-		version_update_for_trivial_move(LSM.last_run_version, kp_set[0].lba, 
-				kp_get_end_lba((char*)kp_set),TOTALRUNIDX, TOTALRUNIDX-1);*/
 
 		for(uint32_t i=0; i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++){
-			version_coupling_lba_ridx(LSM.last_run_version, kp_set[i].lba, LSM.last_run_version->total_version_number-1);
+			version_coupling_lba_ridx(LSM.last_run_version, kp_set[i].lba, to_ridx);
 		}
 		sst_free(file, LSM.pm);
 	}
@@ -432,9 +427,7 @@ static void trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des
 		}
 
 		version_update_for_trivial_move(LSM.last_run_version, FIRST_RUN_PTR(up)->start_lba, 
-				LAST_RUN_PTR(up)->end_lba,
-				version_level_idx_to_version(LSM.last_run_version, up->idx, LSM.param.LEVELN),
-				version_level_idx_to_version(LSM.last_run_version, down->idx, LSM.param.LEVELN));
+				LAST_RUN_PTR(up)->end_lba, from_ridx, to_ridx);
 	}
 }
 
@@ -462,8 +455,8 @@ static void compaction_move_unoverlapped_sst
 		version_update_for_trivial_move(LSM.last_run_version, 
 				sptr->start_lba, 
 				sptr->end_lba,
-				up? version_level_idx_to_version(LSM.last_run_version, up->idx, LSM.param.LEVELN):UINT32_MAX,
-				version_level_idx_to_version(LSM.last_run_version, down->idx, LSM.param.LEVELN));
+				up? version_level_to_start_version(LSM.last_run_version, up->idx):UINT32_MAX,
+				version_level_to_start_version(LSM.last_run_version, down->idx));
 	}
 	if(is_close_target){
 		sst_file *sptr=LEVELING_SST_AT_PTR(down, _start_idx);
@@ -471,8 +464,8 @@ static void compaction_move_unoverlapped_sst
 		version_update_for_trivial_move(LSM.last_run_version, 
 				sptr->start_lba, 
 				sptr->end_lba,
-				up?version_level_idx_to_version(LSM.last_run_version, up->idx, LSM.param.LEVELN):UINT32_MAX,
-				version_level_idx_to_version(LSM.last_run_version, down->idx, LSM.param.LEVELN));
+				up?version_level_to_start_version(LSM.last_run_version, up->idx):UINT32_MAX,
+				version_level_to_start_version(LSM.last_run_version, down->idx));
 		_start_idx++;
 	}
 
@@ -486,7 +479,8 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 
 	if(!level_check_overlap_keyrange(kp_set[0].lba, kp_get_end_lba((char*)kp_set), des)){
 
-		trivial_move(kp_set,NULL,  des, res);
+		leveling_trivial_move(kp_set,NULL,  des, res, UINT32_MAX, 
+				version_level_to_start_version(LSM.last_run_version, des->idx));
 		//level_print(res);
 		return res;
 	}
@@ -541,7 +535,7 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 
 		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, is, NULL, i==round-1, 
 				MIN(LEVELING_SST_AT(des,read_arg.to).end_lba, kp_set[LAST_KP_IDX].lba),
-				version_level_idx_to_version(LSM.last_run_version, res->idx, LSM.param.LEVELN),
+				version_level_to_start_version(LSM.last_run_version, res->idx),
 				false,
 				leveling_invalidation_function);
 
@@ -600,7 +594,9 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des){
 	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
 
 	if(!level_check_overlap(src, des)){
-		trivial_move(NULL,src, des, res);
+		leveling_trivial_move(NULL,src, des, res, 
+			version_level_to_start_version(LSM.last_run_version, src->idx),
+			version_level_to_start_version(LSM.last_run_version, des->idx));
 		return res;
 	}
 
@@ -668,7 +664,7 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des){
 
 		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, is, NULL, sidx==src->now_sst_num-1, 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba),
-				version_level_idx_to_version(LSM.last_run_version, res->idx, LSM.param.LEVELN),
+				version_level_to_start_version(LSM.last_run_version, res->idx),
 				false,
 				leveling_invalidation_function
 				);
@@ -721,7 +717,7 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
 		}
 
-		if(version_map_lba(LSM.last_run_version, target_pair.lba) > version_level_idx_to_version(LSM.last_run_version, LSM.param.LEVELN-(1+1), LSM.param.LEVELN)){
+		if(version_map_lba(LSM.last_run_version, target_pair.lba) > version_level_to_start_version(LSM.last_run_version, LSM.param.LEVELN-(1+1))){
 			/*	
 				above level
 				LSM.param.LEVELN-(1+1) (last leveling)
@@ -917,7 +913,7 @@ static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num,
 		version_update_for_trivial_move(LSM.last_run_version, 
 				sptr->start_lba, 
 				sptr->end_lba,
-				version_level_idx_to_version(LSM.last_run_version, src->idx, LSM.param.LEVELN),
+				version_level_to_start_version(LSM.last_run_version, src->idx),
 				target_ridx);
 	}
 
@@ -1122,7 +1118,7 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des){ /*move t
 
 level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 	_cm=cm;
-	uint32_t target_ridx=version_level_to_start_version(des);
+	uint32_t target_ridx=version_level_to_start_version(LSM.last_run_version, des->idx);
 	if(!level_check_overlap(src, des)){ //sequential
 		if(!des->now_sst_num){
 			version_populate_run(LSM.last_run_version, 
@@ -1151,6 +1147,8 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 			}	
 		}
 		run_free(new_run);
+		version_unpopulate_run(LSM.last_run_version, 
+			version_pop_oldest_ridx(LSM.last_run_version, src->idx), src->idx);
 		/*insert keeping order into level*/
 		return res;
 	}
@@ -1222,7 +1220,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 
 		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, NULL, kpq, final_flag, 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba),
-				version_level_idx_to_version(LSM.last_run_version, res->idx, LSM.param.LEVELN),
+				version_level_to_start_version(LSM.last_run_version, res->idx),
 				false,
 				leveling_invalidation_function
 				);
@@ -1275,6 +1273,12 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 	sst_pos_free(os_set[1]);
 	delete kpq;
 	free(thread_arg.arg_set);
+	if(!des->now_sst_num){
+		version_populate_run(LSM.last_run_version, 
+				version_get_empty_ridx(LSM.last_run_version, des->idx), des->idx);
+	}
+	version_unpopulate_run(LSM.last_run_version, 
+			version_pop_oldest_ridx(LSM.last_run_version, src->idx), src->idx);
 	return res;
 }
 

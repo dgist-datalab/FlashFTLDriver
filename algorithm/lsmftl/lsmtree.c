@@ -35,7 +35,7 @@ static void print_help(){
 	printf("-L: set total levels of LSM-tree\n");
 	printf("-S: set size factor of LSM-tree\n");
 	printf("-a: set read amplification (float type)\n");
-	printf("-v: set number of version\n");
+	//printf("-v: set number of version\n");
 	printf("-b: bit num for plr line\n");
 	printf("-r: error lange for plr\n");
 
@@ -101,7 +101,7 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 	int c;
 	bool leveln_setting=false, sizef_setting=false, reada_setting=false, rh_setting=false;
 	bool version_setting=false;
-	while((c=getopt(argc,argv,"LSRahbvr"))!=-1){
+	while((c=getopt(argc,argv,"LSRahbr"))!=-1){
 		switch(c){
 			case 'h':
 				print_help();
@@ -129,19 +129,11 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 				LSM.param.read_amplification=atof(argv[optind]);
 				reada_setting=true;
 				break;
-			case 'v':
-				LSM.param.version_number=atoi(argv[optind]);
-				version_setting=true;
-				break;
 		}
 	}
 
 
 	printf("------------------------------------------\n");
-	if(!version_setting){
-		LSM.param.version_number=32;
-		printf("no version setting, it is set as 32\n");
-	}
 	/*rhp setting*/
 	if((leveln_setting && sizef_setting)){
 		EPRINT("it cannot setting levelnum and sizefactor\n", true);
@@ -156,7 +148,7 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		LSM.param.last_size_factor=
 			LSM.param.normal_size_factor=
 			get_size_factor(LSM.param.LEVELN, LSM.param.mapping_num);
-		LSM.param.version_number=LSM.param.LEVELN*LSM.param.normal_size_factor;
+//		LSM.param.version_number=LSM.param.LEVELN*LSM.param.normal_size_factor;
 	}
 	else if(leveln_setting){
 	//	LSM.param.last_size_factor=32-1-LSM.param.LEVELN;
@@ -166,7 +158,7 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 		LSM.param.last_size_factor=
 			LSM.param.normal_size_factor=
 			get_size_factor(LSM.param.LEVELN, LSM.param.mapping_num);
-		LSM.param.version_number=LSM.param.LEVELN*LSM.param.normal_size_factor;
+	//	LSM.param.version_number=LSM.param.LEVELN*LSM.param.normal_size_factor;
 	}
 	else if(sizef_setting){
 		EPRINT("size factor cannot be set", true);
@@ -247,29 +239,33 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
 
 	uint32_t now_level_size=LSM.param.normal_size_factor;
+	uint32_t version_number=0;
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
 		if(i==LSM.param.LEVELN-1){
-			LSM.disk[i]=level_init(now_level_size, LSM.param.last_size_factor, true, i);		
+			LSM.disk[i]=level_init(now_level_size, LSM.param.last_size_factor, TIERING, i);		
 			printf("L[%d] - run_num:%u\n",i, LSM.disk[i]->max_run_num);
+			version_number+=LSM.param.normal_size_factor;
 		}
 		else{
-			LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, true, i);
+			LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, LEVELING, i);
 			now_level_size*=LSM.param.normal_size_factor;
 			printf("L[%d] - size:%u data:%.2lf(%%)\n",i, LSM.disk[i]->max_sst_num, (double)LSM.disk[i]->max_sst_num*KP_IN_PAGE/RANGE*100);
+			version_number++;
 		}
 		rwlock_init(&LSM.level_rwlock[i]);
 	}
 
-	LSM.last_run_version=version_init(LSM.disk[LSM.param.LEVELN-1]->max_run_num,
-			LSM.param.version_number, 
-			LSM.param.last_size_factor,RANGE,
+	LSM.param.version_number=version_number;
+
+	LSM.last_run_version=version_init(LSM.param.version_number, 
+			LSM.param.last_size_factor, RANGE,
 			LSM.disk,
 			LSM.param.LEVELN);
 
 	printf("--------version number test---------\n");
 	printf("level idx to version\n");
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
-		printf("\t%u -> %u\n", i, version_level_idx_to_version(LSM.last_run_version, i, LSM.param.LEVELN));
+		printf("\t%u -> %u\n", i, version_level_to_start_version(LSM.last_run_version, i));
 	}
 	printf("version to level idx\n");
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){

@@ -552,7 +552,7 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, sst_pf_out_stream **po
 			pos_set[i]=sst_pos_init_mr(&mr_set[i][read_arg_set[i].from], 
 					read_arg_set[i].param, TARGETREADNUM(read_arg_set[i]), 
 					read_map_done_check, map_done);
-			pos_set[i]->version_idx=version_level_to_start_version(src)+i;
+			pos_set[i]->version_idx=version_level_to_start_version(LSM.last_run_version, src->idx)+i;
 		}
 		else{
 			read_arg_set[i].from=read_arg_set[i].to+1;

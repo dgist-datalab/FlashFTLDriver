@@ -20,6 +20,7 @@ typedef struct version{
 	uint32_t *version_invalidation_cnt;
 	uint32_t last_level_version_sidx;
 	bool *version_early_invalidate;
+	uint32_t *start_vidx_of_level;
 	fdriver_lock_t version_lock;
 	std::queue<uint32_t> **ridx_empty_queue;
 	std::queue<uint32_t> **ridx_populate_queue;
@@ -27,8 +28,8 @@ typedef struct version{
 	int32_t poped_version_num;
 }version;
 
-version *version_init(uint8_t max_valid_version_num, uint8_t total_version_number, 
-		uint32_t last_level_version_sidx, uint32_t LBA_num, level **disk, uint32_t leveln);
+version *version_init(uint8_t total_version_number, uint32_t last_level_version_sidx,
+		uint32_t LBA_num, level **disk, uint32_t leveln);
 uint32_t version_get_empty_ridx(version *v, uint32_t level);
 static inline uint32_t version_pop_oldest_ridx(version *v, uint32_t level){
 	uint32_t res=v->ridx_populate_queue[level]->front();
@@ -50,7 +51,7 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, uint32_t original_version, uint32_t target_version);
 uint32_t version_get_early_invalidation_target(version *v);
 void version_make_early_invalidation_enable_old(version *v);
-uint32_t version_level_to_start_version(level *lev);
+uint32_t version_level_to_start_version(version *v, uint32_t start_idx);
 static inline void version_enable_ealry_invalidation(version *v, uint32_t r_idx){
 	v->version_early_invalidate[r_idx]=true;
 }
@@ -86,17 +87,25 @@ static inline void version_poped_update(version *v){
 	v->poped_version_num+=MERGED_RUN_NUM;
 	v->poped_version_num%=v->max_valid_version_num;
 }
-
+/*
 static inline uint32_t version_level_idx_to_version(version *v, uint32_t lev_idx, uint32_t level_num){
 	return level_num-lev_idx+v->max_valid_version_num-2;
 }
-
+*/
 static inline uint32_t version_to_level_idx(version *v, uint32_t version, uint32_t level_num){
+	for(uint32_t i=0; i<level_num-1; i++){
+		if(v->start_vidx_of_level[i]<=version &&
+				version<v->start_vidx_of_level[i+1]){
+			return i;	
+		}
+	}
+	return level_num-1;
+	/*
 	if(version<v->max_valid_version_num){
 		return level_num-1;
 	}
 	else
-		return level_num-version+v->max_valid_version_num-2;
+		return level_num-version+v->max_valid_version_num-2;*/
 }
 
 static inline bool version_is_early_invalidate(version *v, uint32_t version){

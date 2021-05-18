@@ -143,20 +143,25 @@ level *making_tiering(uint32_t run_num, uint32_t sst_num, uint32_t populate_run_
 }
 
 uint32_t lsmtree_testing(){
+	level *temp_disk[2]=NULL;
 	/*small issequential test*/
 	{
 		/*LW2LE*/
 		{
 			level *lw=making_leveling(10, 9, true, 0, true);
 			level *le=making_leveling(100, 1, true, 1, false);
-			compaction_LW2LE(LSM.cm, lw, le);
+			level_free(compaction_LW2LE(LSM.cm, lw, le), LSM.pm);
+			level_free(lw, LSM.pm);
+			level_free(le, LSM.pm);
 		}
 
 		/*TI2TI*/
 		{
 			level *ti1=making_tiering(10, 10, 9, true, 0);
 			level *ti2=making_tiering(10, 100, 1, true, 1);
-			compaction_TI2TI(LSM.cm, ti1, ti2);
+			level_free(compaction_TI2TI(LSM.cm, ti1, ti2), LSM.pm);	
+			level_free(ti1, LSM.pm);
+			level_free(ti2, LSM.pm);
 		}
 	}
 	/*small random test*/
@@ -165,14 +170,18 @@ uint32_t lsmtree_testing(){
 		{
 			level *lw=making_leveling(10, 9, false, 0, true);
 			level *le=making_leveling(100, 1, false, 1, false);
-			compaction_LW2LE(LSM.cm, lw, le);
+			level_free(compaction_LW2LE(LSM.cm, lw, le), LSM.pm);
+			level_free(lw, LSM.pm);
+			level_free(le, LSM.pm);
 		}
 
 		/*TI2TI*/
 		{
 			level *ti1=making_tiering(10, 10, 9, false, 0);
 			level *ti2=making_tiering(10, 100, 1, false, 1);
-			compaction_TI2TI(LSM.cm, ti1, ti2);
+			level_free(compaction_TI2TI(LSM.cm, ti1, ti2), LSM.pm);
+			level_free(ti1, LSM.pm);
+			level_free(ti2, LSM.pm);
 		}
 
 	}
@@ -182,14 +191,18 @@ uint32_t lsmtree_testing(){
 		{
 			level *lw=making_leveling(10, 9, true, 0, true);
 			level *le=making_leveling(100, 80, true, 1, false);
-			compaction_LW2LE(LSM.cm, lw, le);
+			level_free(compaction_LW2LE(LSM.cm, lw, le), LSM.pm);
+			level_free(lw, LSM.pm);
+			level_free(le, LSM.pm);
 		}
 
 		/*TI2TI*/
 		{
 			level *ti1=making_tiering(10, 10, 9, true, 0);
 			level *ti2=making_tiering(10, 100, 8, true, 1);
-			compaction_TI2TI(LSM.cm, ti1, ti2);
+			level_free(compaction_TI2TI(LSM.cm, ti1, ti2), LSM.pm);
+			level_free(ti1, LSM.pm);
+			level_free(ti2, LSM.pm);
 		}
 	}
 	/*big random test*/
@@ -198,14 +211,18 @@ uint32_t lsmtree_testing(){
 		{
 			level *lw=making_leveling(10, 9, false, 0, true);
 			level *le=making_leveling(100, 80, false, 1, false);
-			compaction_LW2LE(LSM.cm, lw, le);
+			level_free(compaction_LW2LE(LSM.cm, lw, le), LSM.pm);
+			level_free(lw, LSM.pm);
+			level_free(le, LSM.pm);
 		}
 
 		/*TI2TI*/
 		{
 			level *ti1=making_tiering(10, 10, 9, false, 0);
 			level *ti2=making_tiering(10, 100, 8, false, 1);
-			compaction_TI2TI(LSM.cm, ti1, ti2);
+			level_free(compaction_TI2TI(LSM.cm, ti1, ti2), LSM.pm);
+			level_free(ti1, LSM.pm);
+			level_free(ti2, LSM.pm);
 		}
 	}
 	return 1;
