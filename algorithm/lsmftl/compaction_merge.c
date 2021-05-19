@@ -166,7 +166,7 @@ static bool merge_invalidation_function(level *des, uint32_t stream_id, uint32_t
 		uint32_t a, b;
 		a=version_map_lba(LSM.last_run_version, kp.lba);
 		b=version;
-		if(version_compare(LSM.last_run_version, a, b) > 0){
+		if(version_compare(LSM.last_run_version, a, b, des->idx) > 0){
 			if(version_is_early_invalidate(LSM.last_run_version, b)){
 				invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, false);
 			}

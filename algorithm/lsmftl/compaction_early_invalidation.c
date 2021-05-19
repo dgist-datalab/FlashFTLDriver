@@ -20,7 +20,8 @@ static uint32_t stream_invalidation(sst_pf_out_stream *os, uint32_t ridx){
 		if(kp.lba!=UINT32_MAX){
 			a=version_map_lba(LSM.last_run_version, kp.lba);
 			b=ridx;
-			if(version_compare(LSM.last_run_version, a, b) > 0){
+			if(version_compare(LSM.last_run_version, a, b, 
+						version_to_level_idx(LSM.last_run_version, ridx, LSM.param.LEVELN)) > 0){
 				if(invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, false)){
 					res++;
 				}

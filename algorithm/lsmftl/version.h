@@ -71,14 +71,16 @@ static inline int version_to_run(version *v, int32_t a){
 		v->max_valid_version_num? a+v->poped_version_num-v->max_valid_version_num:
 		a+v->poped_version_num;
 }
-static inline int version_compare(version *v, int32_t a, int32_t b){
+static inline int version_compare(version *v, int32_t a, int32_t b, uint32_t lev_idx){
 	//a: recent version
 	//b: noew version
 	if(b > v->max_valid_version_num){
 		EPRINT("not valid comparing", true);
 	}
-	//int a_=a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a-v->max_valid_version_num;
-	//int b_=b-v->poped_version_num<0?b-v->poped_version_num+v->max_valid_version_num:b-v->max_valid_version_num;
+
+	if(lev_idx < v->leveln-1){
+		return a-b;
+	}
 
 	int a_=a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a-v->poped_version_num;
 	int b_=b-v->poped_version_num<0?b-v->poped_version_num+v->max_valid_version_num:b-v->poped_version_num;

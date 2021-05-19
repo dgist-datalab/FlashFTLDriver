@@ -893,7 +893,8 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 					recent_version=version_map_lba(LSM.last_run_version, oob_lba[i]);
 					/*should figure out map ppa*/
-					if(version_compare(LSM.last_run_version, recent_version, target_version)<=0){
+					if(version_compare(LSM.last_run_version, recent_version, target_version, 
+								version_to_level_idx(LSM.last_run_version, target_version, LSM.param.LEVELN))<=0){
 						if(!prev_sptr){
 							prev_sptr=sptr;
 							gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, sptr_idx, target_version);
