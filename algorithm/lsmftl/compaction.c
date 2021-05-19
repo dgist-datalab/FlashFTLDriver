@@ -292,7 +292,12 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 						invalidate_function(des, i, os_set[i]->version_idx, now);
 					}
 					else{
-						EPRINT("error!", true);
+						if(kpq){
+							invalidate_function(des, -1, target_version, now);
+						}
+						else{
+							EPRINT("error!", true);
+						}
 					}
 
 					sst_pos_pop(os_set[i]);
@@ -432,11 +437,10 @@ static void leveling_trivial_move(key_ptr_pair *kp_set,level *up, level *down, l
 }
 
 static void compaction_move_unoverlapped_sst
-(key_ptr_pair* kp_set, level*up, uint32_t up_start_sidx, 
+(key_ptr_pair* kp_set, level *up, uint32_t up_start_sidx, 
  level *down, level *des, uint32_t* start_idx){
 	bool is_close_target=false;
 	uint32_t target_start_lba=kp_set?kp_set[0].lba:(LEVELING_SST_AT_PTR(up, up_start_sidx))->start_lba;
-
 	sst_file *start_sst_file=level_retrieve_sst(down, target_start_lba);
 	if(!start_sst_file){
 		is_close_target=true;
@@ -717,7 +721,7 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
 		}
 
-		if(version_map_lba(LSM.last_run_version, target_pair.lba) > version_level_to_start_version(LSM.last_run_version, LSM.param.LEVELN-(1+1))){
+		if(version_map_lba(LSM.last_run_version, target_pair.lba) > version+1){
 			/*	
 				above level
 				LSM.param.LEVELN-(1+1) (last leveling)
@@ -1153,14 +1157,15 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 		return res;
 	}
 
-	uint32_t closed_from=0, closed_to=0;
+	uint32_t closed_upper_from=0, closed_upper_to=0;
 
 	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
-	bool trivial_move=leveling_get_sst_overlap_range(src, des, &closed_from, &closed_to);
+	/*move unoverlapped sst of above level*/
+	bool trivial_move=leveling_get_sst_overlap_range(src, des, &closed_upper_from, &closed_upper_to);
 	run *new_run=NULL;
-	if(trivial_move){//move unoverlapped sst of above level;
-		level *temp_level=level_split_lw_run_to_lev(&src->array[0], 0, closed_from-1);
-		new_run=compaction_wisckey_to_normal(cm, temp_level, NULL, NULL, closed_from, target_ridx);
+	if(trivial_move){
+		level *temp_level=level_split_lw_run_to_lev(&src->array[0], 0, closed_upper_from-1);
+		new_run=compaction_wisckey_to_normal(cm, temp_level, NULL, NULL, closed_upper_from, target_ridx);
 		sst_file *sptr;
 		uint32_t sidx;
 		for_each_sst(new_run, sptr, sidx){
@@ -1177,10 +1182,14 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 
 	uint32_t des_start_idx=0;
 	uint32_t des_end_idx=0;
-	compaction_move_unoverlapped_sst(NULL, src, closed_from, des, res, &des_start_idx);
+	/*move unoverlapped sst of below level*/
+	compaction_move_unoverlapped_sst(NULL, src, closed_upper_from, des, res, &des_start_idx);
 
 	read_issue_arg read_arg1={0,}, read_arg2={0,};
+	read_arg1.des=src;
+
 	read_arg_container thread_arg;
+	thread_arg.end_req=comp_alreq_end_req;
 	thread_arg.arg_set=(read_issue_arg**)malloc(sizeof(read_issue_arg*)*MERGED_RUN_NUM);
 	thread_arg.arg_set[0]=&read_arg1;
 	thread_arg.arg_set[1]=&read_arg2;
@@ -1192,8 +1201,11 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 	std::queue<key_ptr_pair> *kpq=new std::queue<key_ptr_pair>();
 
 	sst_file *sptr; run *rptr;
-	uint32_t ridx, sidx=closed_from;
-	level *temp_des_level=level_convert_normal_run_to_lev(&des->array[0], LSM.pm, closed_from, closed_to);
+	uint32_t ridx, sidx=closed_upper_from;
+	level *temp_des_level=level_convert_normal_run_to_lev(&des->array[0], LSM.pm, des_start_idx, 
+			des->now_sst_num-1);
+	read_arg2.des=temp_des_level;
+
 	bool isstart=true;
 	uint32_t stream_cnt=0;
 	for_each_sst_level_at(src, rptr, ridx, sptr, sidx){
@@ -1205,13 +1217,13 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 		if(isstart){
 			os_set[0]=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg1.from), read_arg1.param, 
 					read_arg1.to-read_arg1.from+1, read_done_check, file_done);
-			os_set[1]=sst_pos_init_sst(LEVELING_SST_AT_PTR(des, read_arg2.from), read_arg2.param, 
+			os_set[1]=sst_pos_init_sst(LEVELING_SST_AT_PTR(temp_des_level, read_arg2.from), read_arg2.param, 
 					read_arg2.to-read_arg2.from+1, read_done_check, file_done);
 		}
 		else{
 			sst_pos_add_sst(os_set[0], LEVELING_SST_AT_PTR(src, read_arg1.from), read_arg1.param,
 					read_arg1.to-read_arg1.from+1);
-			sst_pos_add_sst(os_set[1], LEVELING_SST_AT_PTR(des, read_arg2.from), read_arg2.param,
+			sst_pos_add_sst(os_set[1], LEVELING_SST_AT_PTR(temp_des_level, read_arg2.from), read_arg2.param,
 					read_arg2.to-read_arg2.from+1);
 		}
 
@@ -1219,7 +1231,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
 
 		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, NULL, kpq, final_flag, 
-				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba),
+				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(temp_des_level,read_arg2.to).end_lba),
 				version_level_to_start_version(LSM.last_run_version, res->idx),
 				false,
 				leveling_invalidation_function

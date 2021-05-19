@@ -97,6 +97,7 @@ typedef struct lsmtree{
 	lsmtree_parameter param;
 	lsmtree_monitor monitor;
 	bool global_debug_flag;
+	bool function_test_flag;
 
 	rwlock flush_wait_wb_lock;
 	write_buffer *flush_wait_wb;

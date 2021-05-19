@@ -131,7 +131,7 @@ uint32_t page_manager_get_new_ppa(page_manager *pm, bool is_map, uint32_t type){
 	bool temp_used=false;
 	__segment *seg;
 retry:
-	if(pm->temp_data_segment && !is_map){
+	if(!LSM.function_test_flag && pm->temp_data_segment && !is_map){
 		temp_used=true;
 		seg=pm->temp_data_segment;
 	}
@@ -315,6 +315,9 @@ uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 		return _PPS-pm->current_segment[MAP_S]->used_page_num;
 	}
 	else{
+		if(!pm->current_segment[DATA_S]){
+			return 0;
+		}
 		return _PPS-pm->current_segment[DATA_S]->used_page_num;
 	}
 }

@@ -91,8 +91,8 @@ void io_manager_test_write(uint32_t ppa, char *data, uint32_t type){
 	test_req->type=type;
 	test_req->end_req=NULL;
 	value_set *vs=inf_get_valueset(NULL,FS_MALLOC_R, PAGESIZE);
-	memcpy(data, vs->value, PAGESIZE);
-	io_manager_issue_internal_read(ppa, vs, test_req, true);
+	memcpy(vs->value, data, PAGESIZE);
+	io_manager_issue_internal_write(ppa, vs, test_req, true);
 	inf_free_valueset(vs, FS_MALLOC_R);
 	free(test_req);
 }

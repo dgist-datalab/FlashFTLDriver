@@ -6,6 +6,7 @@
 #include <queue>
 #include <list>
 #include <stdlib.h>
+#include <map>
 extern compaction_master *_cm;
 extern lsmtree LSM;
 extern uint32_t debug_lba;
@@ -15,7 +16,7 @@ void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 	uint32_t param_idx=0;
 	for(int i=read_arg->from; i<=read_arg->to; i++){
 		//param=compaction_get_read_param(_cm);
-		param=(inter_read_alreq_param*)calloc(1,sizeof(inter_read_alreq_param));
+		param=(inter_read_alreq_param*)calloc(1, sizeof(inter_read_alreq_param));
 		param->map_target=&mr[i];
 		mr[i].data=NULL;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
@@ -530,7 +531,7 @@ static uint32_t issue_read_kv_for_bos_tiering(sst_bf_out_stream *bos, std::queue
 	return res;
 }
 
-uint32_t update_read_arg_tiering(uint32_t read_done_flag, sst_pf_out_stream **pos_set, 
+uint32_t update_read_arg_tiering(uint32_t read_done_flag, bool isfirst,sst_pf_out_stream **pos_set, 
 		map_range **mr_set, read_issue_arg *read_arg_set, uint32_t stream_num, level *src){
 	uint32_t remain_num=0;
 	for(uint32_t i=0; i<stream_num; i++){
@@ -540,14 +541,16 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, sst_pf_out_stream **po
 
 	for(uint32_t i=0; i<stream_num; i++){
 		if(read_done_flag & (1<<i)) continue;
-		if(read_arg_set[i].to==src->array[i].now_sst_file_num){
+		if(!isfirst && read_arg_set[i].from==src->array[i].now_sst_file_num){
 			read_done_flag|=(1<<i);
-			sst_pos_free(pos_set[i]);
-			pos_set[i]=NULL;
+	//		sst_pos_free(pos_set[i]);
+	//		pos_set[i]=NULL;
+			continue;
 		}
 
-		if(!read_done_flag){
-			read_arg_set[i].to=read_arg_set[i].from+COMPACTION_TAGS/remain_num;
+		if(isfirst){
+			read_arg_set[i].to=MIN(read_arg_set[i].from+COMPACTION_TAGS/remain_num, 
+					read_arg_set[i].max_num-1);
 			read_map_param_init(&read_arg_set[i], mr_set[i]);
 			pos_set[i]=sst_pos_init_mr(&mr_set[i][read_arg_set[i].from], 
 					read_arg_set[i].param, TARGETREADNUM(read_arg_set[i]), 
@@ -556,7 +559,8 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, sst_pf_out_stream **po
 		}
 		else{
 			read_arg_set[i].from=read_arg_set[i].to+1;
-			read_arg_set[i].to=MIN(read_arg_set[i].from+COMPACTION_TAGS/remain_num, src->array[i].now_sst_file_num);
+			read_arg_set[i].to=MIN(read_arg_set[i].from+COMPACTION_TAGS/remain_num, 
+					read_arg_set[i].max_num-1);
 			sst_pos_add_mr(pos_set[i], &mr_set[i][read_arg_set[i].from], 
 					read_arg_set[i].param, TARGETREADNUM(read_arg_set[i]));
 		}
@@ -564,14 +568,64 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, sst_pf_out_stream **po
 	return read_done_flag;
 }
 
+run* tiering_trivial_move(level *src){
+	run *src_rptr; uint32_t src_idx;
+	for_each_run(src, src_rptr, src_idx){
+		run *comp_rptr; uint32_t comp_idx=src_idx+1;
+		for_each_run_at(src, comp_rptr, comp_idx){
+			if((src_rptr->start_lba > comp_rptr->end_lba) ||
+				(src_rptr->end_lba<comp_rptr->start_lba)){
+				continue;
+			}
+			else{
+				return NULL;
+			}
+		}
+	}
+
+	std::map<uint32_t, run*> temp_run;
+	for_each_run(src, src_rptr, src_idx){
+		temp_run.insert(std::pair<uint32_t, run*>(src_rptr->start_lba, src_rptr));
+	}
+
+	run *res=run_init(src->max_sst_num, UINT32_MAX, 0);
+	std::map<uint32_t, run*>::iterator iter;
+	for(iter=temp_run.begin(); iter!=temp_run.end(); iter++){
+		run *rptr=iter->second;
+		sst_file *sptr; uint32_t sidx;
+		for_each_sst(rptr, sptr, sidx){	
+			run_append_sstfile_move_originality(res, sptr);
+		}
+	}
+	return res;
+}
+
 level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 	_cm=cm;
-	run *new_run=run_init(src->max_sst_num, UINT32_MAX, 0);
+	run *new_run=NULL;
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version, des->idx);
 	uint32_t stream_num=src->run_num;
-	run **target_run_set=(run**)calloc(stream_num, sizeof(run*));
-	for(uint32_t i=0; i<src->run_num; i++){
-		target_run_set[i]=&src->array[i];
+	
+	if((new_run=tiering_trivial_move(src))){
+		level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
+		run *rptr; uint32_t ridx;
+		for_each_run_max(des, rptr, ridx){
+			if(rptr->now_sst_file_num){
+				level_append_run_copy_move_originality(res, rptr, ridx);
+			}
+		}
+
+		level_update_run_at_move_originality(res, target_ridx, new_run, true);
+		version_populate_run(LSM.last_run_version, target_ridx, des->idx);
+		for(uint32_t i=0; i<src->run_num; i++){
+			uint32_t upper_ridx=version_pop_oldest_ridx(LSM.last_run_version, src->idx);
+			version_unpopulate_run(LSM.last_run_version, upper_ridx, src->idx);
+		}
+		run_free(new_run);
+		return res;
+	}
+	else{
+		new_run=run_init(src->max_sst_num, UINT32_MAX, 0);
 	}
 
 	run *rptr; uint32_t ridx;
@@ -585,7 +639,10 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 	read_issue_arg *read_arg_set=(read_issue_arg*)calloc(stream_num, sizeof(read_issue_arg));
 	read_arg_container thread_arg;
 	thread_arg.end_req=merge_end_req;
-	thread_arg.arg_set=&read_arg_set;
+	thread_arg.arg_set=(read_issue_arg**)calloc(stream_num, sizeof(read_issue_arg*));
+	for(uint32_t i=0; i<stream_num; i++){
+		thread_arg.arg_set[i]=&read_arg_set[i];
+	}
 	thread_arg.set_num=stream_num;
 
 	map_range **mr_set=(map_range **)calloc(stream_num, sizeof(map_range*));
@@ -595,7 +652,8 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 		for(uint32_t j=0; j<sst_file_num; j++){
 			map_num+=src->array[i].sst_set[j].map_num;
 		}
-		mr_set[i]=make_mr_set(src->array[i].sst_set, 0, src->array[i].now_sst_file_num, map_num);
+		read_arg_set[i].max_num=map_num;
+		mr_set[i]=make_mr_set(src->array[i].sst_set, 0, src->array[i].now_sst_file_num-1, map_num);
 	}
 
 	std::queue<key_ptr_pair> *kpq=new std::queue<key_ptr_pair>();
@@ -604,9 +662,11 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 	sst_pf_out_stream **pos_set=(sst_pf_out_stream **)calloc(stream_num, sizeof(sst_pf_out_stream*));
 	sst_bf_out_stream *bos=NULL;
 	sst_bf_in_stream *bis=NULL;
+	bool isfirst=true;
 	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
-		uint32_t border_lba;
-		read_done=update_read_arg_tiering(read_done, pos_set, mr_set, read_arg_set, stream_num, src);
+		uint32_t border_lba=UINT32_MAX;
+		read_done=update_read_arg_tiering(read_done, isfirst, pos_set, mr_set,
+				read_arg_set, stream_num, src);
 		bool last_round=(read_done==(1<<stream_num)-1);
 	
 		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
@@ -636,6 +696,19 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 				sorting_done |=(1<<i);
 			}
 		}
+		isfirst=false;
+	}
+
+
+	sst_file *last_file;
+	if((last_file=bis_to_sst_file(bis))){
+		lsmtree_gc_unavailable_set(&LSM, last_file, UINT32_MAX);
+		run_append_sstfile_move_originality(new_run, last_file);
+		sst_free(last_file, LSM.pm);
+	}
+
+	for(uint32_t i=0; i<stream_num; i++){
+		sst_pos_free(pos_set[i]);
 	}
 
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
@@ -671,9 +744,10 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 	}
 
 	delete kpq;
+	free(pos_set);
 	free(mr_set);
+	free(thread_arg.arg_set);
 	free(read_arg_set);
-	free(target_run_set);
 	return res;
 }
 

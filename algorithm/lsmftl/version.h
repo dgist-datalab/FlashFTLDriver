@@ -26,6 +26,7 @@ typedef struct version{
 	std::queue<uint32_t> **ridx_populate_queue;
 	uint32_t memory_usage_bit;
 	int32_t poped_version_num;
+	uint32_t leveln;
 }version;
 
 version *version_init(uint8_t total_version_number, uint32_t last_level_version_sidx,

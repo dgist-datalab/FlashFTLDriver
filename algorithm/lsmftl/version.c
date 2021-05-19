@@ -48,6 +48,7 @@ version *version_init(uint8_t total_version_number,
 	res->poped_version_num=0;
 	fdriver_mutex_init(&res->version_lock);
 	res->last_level_version_sidx=last_level_version_sidx;
+	res->leveln=leveln;
 	return res;
 }
 
@@ -95,12 +96,12 @@ void version_sanity_checker(version *v){
 }
 
 void version_free(version *v){
-	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+	for(uint32_t i=0; i<v->leveln; i++){
 		delete v->ridx_empty_queue[i];
 		delete v->ridx_populate_queue[i];
 	}
-	delete v->ridx_empty_queue;
-	delete v->ridx_populate_queue;
+//	delete v->ridx_empty_queue;
+//	delete v->ridx_populate_queue;
 
 	free(v->start_vidx_of_level);
 	free(v->version_early_invalidate);

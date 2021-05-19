@@ -33,6 +33,7 @@ typedef struct{
 	level *des;
 	int32_t from;
 	uint32_t to;
+	uint32_t max_num;
 	inter_read_alreq_param *param[COMPACTION_TAGS];
 }read_issue_arg;
 

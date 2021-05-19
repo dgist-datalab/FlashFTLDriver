@@ -56,9 +56,10 @@ level *level_convert_normal_run_to_lev(run *r, page_manager *pm,
 	map_range *map_ptr;
 	uint32_t sidx=closed_from, midx;
 	uint32_t target_sst_file_num=0;
-	for_each_sst(r, sptr, sidx){
+	for_each_sst_at(r, sptr, sidx){
 		target_sst_file_num+=sptr->map_num;
 	}
+	sidx=closed_from;
 	level *res=level_init(target_sst_file_num, 1, false, UINT32_MAX);
 	for_each_sst_at(r, sptr, sidx){
 		for_each_map_range(sptr, map_ptr, midx){

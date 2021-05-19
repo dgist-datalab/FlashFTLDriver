@@ -35,7 +35,35 @@ static inline bool kp_data_check(char *data, uint32_t lev_idx, uint32_t run_idx,
 		}
 
 		io_manager_test_read(PIECETOPPA(kp_ptr->piece_ppa), value_data, TEST_IO);
-		if(kp_ptr->lba!=*(uint32_t*)&value_data[L2PGAP*(kp_ptr->piece_ppa%L2PGAP)]){
+		if(kp_ptr->lba!=*(uint32_t*)&value_data[LPAGESIZE*(kp_ptr->piece_ppa%L2PGAP)]){
+			EPRINT("data fail", true);
+		}
+
+	}
+	return false;
+}
+
+static inline bool kp_data_consistency_check(char *data){
+
+	key_ptr_pair *kp_ptr; uint32_t kp_idx;
+	uint32_t prev=UINT32_MAX;
+	char value_data[PAGESIZE];
+	for_each_kp(data, kp_ptr, kp_idx){
+		if(prev==UINT32_MAX){
+			prev=kp_ptr->lba;
+		}
+		else{
+			if(prev>=kp_ptr->lba){
+				EPRINT("sorting fail!", true);
+			}
+		}	
+
+		if(kp_ptr->lba==UINT32_MAX) break;
+
+		io_manager_test_read(PIECETOPPA(kp_ptr->piece_ppa), value_data, TEST_IO);
+		uint32_t temp_data=*(uint32_t*)&value_data[LPAGESIZE*(kp_ptr->piece_ppa%L2PGAP)];
+		if(kp_ptr->lba!=temp_data){
+			printf("map data:%u,%u real data:%u\n", kp_ptr->lba, kp_ptr->piece_ppa, temp_data);
 			EPRINT("data fail", true);
 		}
 
@@ -134,4 +162,54 @@ bool LSM_level_find_lba(level *lev, uint32_t lba){
 		}
 	}
 	return false;
+}
+
+void level_consistency_check(level *lev){
+	run *rptr; uint32_t r_idx;
+
+	for_each_run(lev, rptr, r_idx){
+		sst_file *sptr; uint32_t s_idx;
+		uint32_t prev_sst_start=UINT32_MAX;
+		uint32_t prev_sst_end=UINT32_MAX;
+		for_each_sst(rptr, sptr, s_idx){
+			uint32_t start_lba=UINT32_MAX, end_lba=0;
+			char map_data[PAGESIZE];
+			if(sptr->type==PAGE_FILE){
+				io_manager_test_read(sptr->file_addr.map_ppa, map_data, TEST_IO);
+				
+				uint32_t temp_lba=((key_ptr_pair*)map_data)[0].lba;
+				start_lba=start_lba>temp_lba?temp_lba:start_lba;
+
+				temp_lba=kp_get_end_lba(map_data);
+				end_lba=end_lba<temp_lba?temp_lba:end_lba;
+
+				kp_data_consistency_check(map_data);
+			}
+			else{
+				map_range *mr;
+				for(uint32_t mr_idx=0; mr_idx<sptr->map_num; mr_idx++){
+					mr=&sptr->block_file_map[mr_idx];
+					io_manager_test_read(mr->ppa, map_data, TEST_IO);
+
+					uint32_t temp_lba=((key_ptr_pair*)map_data)[0].lba;
+					start_lba=start_lba>temp_lba?temp_lba:start_lba;
+
+					temp_lba=kp_get_end_lba(map_data);
+					end_lba=end_lba<temp_lba?temp_lba:end_lba;
+
+					kp_data_consistency_check(map_data);
+				}
+			}
+
+			if(prev_sst_start!=UINT32_MAX){
+				if(!(start_lba>prev_sst_end)){
+					EPRINT("error!", true);
+				}
+			}
+			prev_sst_start=start_lba;
+			prev_sst_end=end_lba;
+
+		}
+	}	
+
 }
