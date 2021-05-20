@@ -41,20 +41,32 @@ typedef struct lsmtree_monitor{
 	MeasureTime RH_make_stopwatch[2]; //0 -> leveling 1-> tiering
 }lsmtree_monitor;
 
+typedef struct tree_param{
+	bool isinvalid;
+	uint32_t size_factor;
+	uint32_t num_of_level;
+	uint32_t border_of_leveling;
+	uint32_t border_of_wisckey;
+	uint32_t border_of_bf;
+	uint64_t memory_usage_bit;
+	uint64_t run_num;
+	uint32_t WAF;
+}tree_param;
+
 typedef struct lsmtree_parameter{
 	uint32_t LEVELN;
 	uint32_t mapping_num;
 	uint32_t last_size_factor;
 	uint32_t normal_size_factor;
-	uint32_t read_helper_type;
 	uint32_t write_buffer_ent;
 	float read_amplification;
-	read_helper_param leveling_rhp;
-	read_helper_param tiering_rhp;
+
+	read_helper_param bf_ptr_guard_rhp;
+	read_helper_param bf_guard_rhp;
+	read_helper_param plr_rhp;
+
 	bool version_enable;
-	uint32_t plr_bit;
-	uint32_t error_range;
-	uint32_t version_number;
+	tree_param tr;
 }lsmtree_parameter;
 
 enum{
@@ -119,7 +131,7 @@ typedef struct page_read_buffer{
 	char buffer_value[PAGESIZE];
 }page_read_buffer;
 
-
+lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit);
 uint32_t lsmtree_argument_set(int argc, char *argv[]);
 uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *);
 void lsmtree_destroy(lower_info *li, algorithm *);

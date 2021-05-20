@@ -50,7 +50,7 @@ uint32_t level_append_sstfile(level *lev, sst_file *sptr, bool move_originality)
 	return 0;
 }
 
-level *level_convert_normal_run_to_lev(run *r, page_manager *pm, 
+level *level_convert_normal_run_to_LW(run *r, page_manager *pm, 
 		uint32_t closed_from, uint32_t closed_to){
 	sst_file *sptr, *new_sptr;
 	map_range *map_ptr;
@@ -421,3 +421,23 @@ void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
 	r->now_sst_file_num--;
 }
 
+run *level_LE_to_run(level *lev, bool move_originality){
+	if(lev->level_type!=LEVELING){
+		EPRINT("the lev should be LEVELING", true);
+	}
+
+	run *res=run_init(lev->max_sst_num, UINT32_MAX, 0);
+
+	run *rptr;
+	sst_file *sptr;
+	uint32_t ridx, sidx;
+	for_each_sst_level(lev, rptr, ridx, sptr, sidx){
+		if(move_originality){
+			run_append_sstfile_move_originality(res, sptr);
+		}
+		else{
+			run_append_sstfile(res, sptr);
+		}
+	}
+	return res;
+}

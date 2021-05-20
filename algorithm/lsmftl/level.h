@@ -80,11 +80,13 @@ sst_file* level_retrieve_sst(level *, uint32_t lba);
 sst_file* level_retrieve_sst_with_check(level *, uint32_t lba);
 sst_file* level_retrieve_close_sst(level *, uint32_t lba);
 void level_free(level *, page_manager *);
-level *level_convert_normal_run_to_lev(run *r, page_manager *pm, 
+level *level_convert_normal_run_to_LW(run *r, page_manager *pm, 
 		uint32_t closed_from, uint32_t closed_to);
 
 level *level_split_lw_run_to_lev(run *rptr, 
 		uint32_t closed_from, uint32_t closed_to);
+
+run *level_LE_to_run(level *lev, bool move_originality);
 
 sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t ppa, uint32_t *version, uint32_t *sptr_idx);
 void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr);

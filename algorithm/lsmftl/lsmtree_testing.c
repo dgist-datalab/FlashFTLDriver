@@ -188,37 +188,55 @@ uint32_t lsmtree_testing(){
 	dummy_data=(char*)malloc(PAGESIZE);
 	LSM.param.normal_size_factor=10;
 	LSM.function_test_flag=true;
-	/*big random test*/
+	/*big sequential test*/
 	{
-		/*LW2LE*/
+		/*LE2LE
 		{
-			temp_disk[0]->level_type=LEVELING_WISCKEY;
+			temp_disk[0]->level_type=LEVELING;
 			temp_disk[1]->level_type=LEVELING;
 			version *now_version=version_init(2, 2, RANGE, temp_disk, 2);
 			version *temp_version=LSM.last_run_version;
 			LSM.last_run_version=now_version;
-			disk[0]=making_leveling(10, 9, false, 0, true);
-			disk[1]=making_leveling(100, 80, false, 1, false);
-			compaction_test(disk, compaction_LW2LE);
+			disk[0]=making_leveling(10, 9, true, 0, false);
+			disk[1]=making_leveling(100, 80, true, 1, false);
+			compaction_test(disk, compaction_LE2LE);
 			LSM.last_run_version=temp_version;
 			version_free(now_version);
-			printf("big random test of LW2LE is passed\n");
-		}
+			printf("big sequential test of LE2LE is passed\n");
+		}*/
+	}
 
-		/*TI2TI*/
+	/*big random test*/
+	{
+		/*LE2LE*/
 		{
-			temp_disk[0]->level_type=TIERING;
-			temp_disk[1]->level_type=TIERING;
-
-			version *now_version=version_init(20, 20, RANGE, temp_disk, 2);
+			temp_disk[0]->level_type=LEVELING;
+			temp_disk[1]->level_type=LEVELING;
+			version *now_version=version_init(2, 2, RANGE, temp_disk, 2);
 			version *temp_version=LSM.last_run_version;
 			LSM.last_run_version=now_version;
-			disk[0]=making_tiering(10, 10, 9, false, 0);
-			disk[1]=making_tiering(10, 100, 8, false, 1);
-			compaction_test(disk, compaction_TI2TI);
+			disk[0]=making_leveling(10, 9, false, 0, false);
+			disk[1]=making_leveling(100, 90, false, 1, false);
+			compaction_test(disk, compaction_LE2LE);
 			LSM.last_run_version=temp_version;
 			version_free(now_version);
-			printf("big random test of TI2TI is passed\n");
+			printf("big random test of LE2LE is passed\n");
+		}
+
+		/*LE2TI*/
+		{
+			temp_disk[0]->level_type=LEVELING;
+			temp_disk[1]->level_type=TIERING;
+			version *now_version=version_init(11, 10, RANGE, temp_disk, 2);
+			version *temp_version=LSM.last_run_version;
+			LSM.last_run_version=now_version;
+			disk[0]=making_leveling(10, 9, false, 0, false);
+			disk[1]=making_tiering(10, 100, 8, false, 1);
+
+			compaction_test(disk, compaction_LE2TI);
+			LSM.last_run_version=temp_version;
+			version_free(now_version);
+			printf("big random test of LE2TI is passed\n");
 		}
 	}
 	free(dummy_data);

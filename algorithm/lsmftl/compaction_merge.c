@@ -751,6 +751,37 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 	return res;
 }
 
+/*
+	This function returnsa  new level by merging inserted two levels by the tiered compaction manner.
+	Since the above level should be leveled level, it does not need to sort the above level.
+	In this function, the above level just moves to the next level's empty run.
+	There is no special logic for sequential workload.
+ */
+level *compaction_LE2TI(compaction_master *cm, level *src, level *des){
+	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version, des->idx);
+	run *new_run=level_LE_to_run(src, true);
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
+	//level_run_reinit(des, idx_set[1]);
+	run *rptr;
+	uint32_t ridx;
+	for_each_run_max(des, rptr, ridx){
+		if(rptr->now_sst_file_num){
+			level_append_run_copy_move_originality(res, rptr, ridx);
+		}
+	}
+
+	level_update_run_at_move_originality(res, target_ridx, new_run, true);
+
+	version_populate_run(LSM.last_run_version, target_ridx, des->idx);
+	for(uint32_t i=0; i<src->run_num; i++){
+		uint32_t upper_ridx=version_pop_oldest_ridx(LSM.last_run_version, src->idx);
+		version_unpopulate_run(LSM.last_run_version, upper_ridx, src->idx);
+	}
+
+	run_free(new_run);
+	return res;
+}
+
 void *merge_end_req(algo_req *req){
 	inter_read_alreq_param *r_param;
 	key_value_wrapper *kv_wrapper;

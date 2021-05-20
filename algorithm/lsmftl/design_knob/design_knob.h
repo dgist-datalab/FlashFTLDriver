@@ -11,6 +11,8 @@ typedef struct tlog{
 }tlog_;
 
 typedef struct tlog design_knob;
-design_knob design_knob_find_opt(uint32_t memory_target);
-
+void init_memory_info(uint32_t error);
+double bf_memory_per_ent(double ratio);
+double plr_memory_per_ent(double ratio);
+void destroy_memory_info();
 #endif
