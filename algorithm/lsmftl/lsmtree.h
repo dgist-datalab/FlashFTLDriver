@@ -153,7 +153,7 @@ void lsmtree_gc_lock_level(lsmtree *lsm, uint32_t level_idx);
 void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
 uint32_t lsmtree_testing();
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
-
+read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);
 #define MAKE_L0COMP_REQ(wb, kp_set, param, is_gc_data)\
 	alloc_comp_req(-1,0,(wb), (kp_set),lsmtree_compaction_end_req, (void*)(param), (is_gc_data))
 

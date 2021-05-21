@@ -628,7 +628,7 @@ static gc_sptr_node * gc_sptr_node_init(sst_file *sptr, uint32_t validate_num, u
 	gc_sptr_node *res=(gc_sptr_node*)malloc(sizeof(gc_sptr_node));
 	//res->gc_kv_node=new std::queue<key_value_pair>();
 	res->sptr=sptr;
-	res->wb=write_buffer_init_for_gc(_PPS*L2PGAP, LSM.pm, GC_WB,LSM.param.tiering_rhp);
+	res->wb=write_buffer_init_for_gc(_PPS*L2PGAP, LSM.pm, GC_WB,LSM.param.plr_rhp);
 	res->sidx=sidx;
 	res->ridx=ridx;
 	return res;

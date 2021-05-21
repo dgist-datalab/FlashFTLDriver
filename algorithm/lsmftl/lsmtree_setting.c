@@ -5,6 +5,7 @@
 #include <math.h>
 #include "function_test.h"
 #include "segment_level_manager.h"
+#include "./design_knob/design_knob.h"
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -30,20 +31,18 @@ void lsmtree_param_defualt_setting(){
 
 static void print_level_param(){
 	printf("[param] # of level: %u\n", LSM.param.LEVELN);
-	printf("[param] normal size factor: %u\n", LSM.param.normal_size_factor);
-	printf("[param] last size factor: %u\n", LSM.param.last_size_factor);
-	printf("[param] read amplification: %f\n", LSM.param.read_amplification);
-	printf("[param] read_helper_type: L-(%s) T-(%s)\n", 
-			read_helper_type(LSM.param.leveling_rhp.type),
-			read_helper_type(LSM.param.tiering_rhp.type));
-	printf("[param] target FPR for BF :%lf\n", LSM.param.read_amplification);
-	if(LSM.param.tiering_rhp.type==HELPER_PLR){
-		printf("\tPLR slope_bit:%lu\n", LSM.param.tiering_rhp.slop_bit);
-		printf("\tPLR error_range:%u\n", LSM.param.tiering_rhp.range);
-	}
-	printf("[param] version number :%u\n", LSM.param.version_number);
+	/*print summary*/
+	tree_param tr=LSM.param.tr;
+	printf("[param] border of leveling: %u\n",tr.border_of_leveling);
+	printf("[param] border of wisckey: %u\n",tr.border_of_wisckey);
+	printf("[param] border of bf: %u\n",tr.border_of_bf);
 
-	printf("[PERF] WAF:%.3lf+GC\n", (double)(LSM.param.normal_size_factor*(LSM.param.LEVELN-1))/KP_IN_PAGE+1+1);
+	printf("[param] normal size factor: %u\n", LSM.param.normal_size_factor);
+	printf("[param] read amplification: %f\n", LSM.param.read_amplification+1);
+	printf("[param] version number :%lu\n", tr.run_num);
+	printf("[param] write_buffer ent: %u\n", LSM.param.write_buffer_ent);
+
+	printf("[PERF] WAF:%u+GC\n", tr.WAF);
 	printf("[PERF] RAF:%.3lf\n", LSM.param.read_amplification+1);
 }
 
@@ -88,16 +87,18 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 	printf("------------------------------------------\n");
 	print_level_param();
 	printf("------------------------------------------\n");
+	return 1;
 }
 
 lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	lsmtree_parameter res;
-	uint32_t write_buffer_memory_bit=LBA_size*48/256;
+	uint32_t write_buffer_memory_bit=RANGE*48/256;
 	uint32_t buffered_ent=write_buffer_memory_bit/(48+48);
 	uint32_t chunk_num=RANGE/buffered_ent+(RANGE%buffered_ent?1:0);
 	uint32_t max_level=get_level(2, chunk_num);
+
 	
-	lsm_struct_set *settings=(lsm_struct_set*)calloc(max_level, sizeof(lsm_struct_set));
+	tree_param *settings=(tree_param*)calloc(max_level, sizeof(tree_param));
 	/*start all leveling*/
 	for(uint32_t i=1; i<=max_level; i++){
 		settings[i].size_factor=get_size_factor(i, chunk_num);
@@ -122,6 +123,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 		if(settings[i].memory_usage_bit > memory_limit_bit){
 			settings[i].isinvalid=true;
 		}
+
 	}
 
 	/*change tiering from bottom*/
@@ -133,7 +135,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			uint64_t level_size=buffered_ent * pow(settings[i].size_factor, j);
 			uint64_t run_size=buffered_ent * pow(settings[i].size_factor, j-1);
 			
-			double level_coverage_ratio=(double)level_size/num_ragne;
+			double level_coverage_ratio=(double)level_size/num_range;
 			double run_coverage_ratio=(double)run_size/num_range;
 			
 			uint64_t level_memory_usage_bit= level_size *
@@ -168,7 +170,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			uint64_t level_size=buffered_ent * pow(settings[i].size_factor, j);
 			if(settings[i].memory_usage_bit + level_size * 48 < memory_limit_bit){
 				settings[i].memory_usage_bit+=level_size * 48;
-				settings[i].WAF-=(j<=settings[i].border_of_leveling ? size_facotr: 1);
+				settings[i].WAF-=(j<=settings[i].border_of_leveling ? settings[i].size_factor: 1);
 				settings[i].border_of_wisckey=j;
 			}
 		}

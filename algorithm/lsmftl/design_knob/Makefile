@@ -2,6 +2,7 @@ SRCS +=\
 	   lsmtree_param_module.c\
 	   bf_memory_calculator.c\
 	   plr_memory_calculator.c\
+	   design_knob.c\
 
 	
 OBJS :=\

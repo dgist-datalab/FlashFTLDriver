@@ -384,7 +384,9 @@ static void leveling_trivial_move(key_ptr_pair *kp_set,level *up, level *down, l
 	run *rptr; sst_file *sptr;
 	if(kp_set){ // L0
 		sst_file *file=key_ptr_to_sst_file(kp_set, true);
-		file->_read_helper=read_helper_kpset_to_rh(LSM.param.leveling_rhp, kp_set);
+		file->_read_helper=read_helper_kpset_to_rh(
+				lsmtree_get_target_rhp(des->idx), 
+				kp_set);
 		if(down->now_sst_num==0){
 			level_append_sstfile(des, file, true);
 		}
@@ -506,7 +508,8 @@ level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *kp_set, le
 
 	sst_pf_out_stream *os_set[COMPACTION_LEVEL_NUM]={NULL,};
 	sst_pf_out_stream *os;
-	sst_pf_in_stream *is=sst_pis_init(true, LSM.param.leveling_rhp);
+	sst_pf_in_stream *is=sst_pis_init(true, 
+			lsmtree_get_target_rhp(des->idx));
 
 	uint32_t start_idx=0;
 	compaction_move_unoverlapped_sst(kp_set, NULL, 0, des, res, &start_idx);
@@ -619,7 +622,9 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des){
 	thread_arg.set_num=COMPACTION_LEVEL_NUM;
 
 	sst_pf_out_stream *os_set[COMPACTION_LEVEL_NUM];
-	sst_pf_in_stream *is=sst_pis_init(true, LSM.param.leveling_rhp);
+	sst_pf_in_stream *is=sst_pis_init(true, 
+			lsmtree_get_target_rhp(des->idx)
+			);
 	
 	uint32_t des_start_idx=0;
 	uint32_t des_end_idx=0;
@@ -811,9 +816,9 @@ int issue_read_kv_for_bos(sst_bf_out_stream *bos, sst_pf_out_stream *pos,
 	return res;
 }
 
-sst_bf_in_stream *tiering_new_bis(){
+sst_bf_in_stream *tiering_new_bis(uint32_t level_idx){
 	__segment *seg=page_manager_get_seg_for_bis(LSM.pm, DATASEG);
-	read_helper_param temp_rhp=LSM.param.tiering_rhp;
+	read_helper_param temp_rhp=lsmtree_get_target_rhp(level_idx);
 	temp_rhp.member_num=(_PPS-seg->used_page_num)*L2PGAP;
 	sst_bf_in_stream *bis=sst_bis_init(seg, LSM.pm, true, temp_rhp);
 	return bis;
@@ -840,6 +845,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 	uint32_t last_lba=UINT32_MAX;
 
 	fdriver_lock(&LSM.flush_lock);
+	uint32_t level_idx=version_to_level_idx(LSM.last_run_version, target_ridx, LSM.param.LEVELN);
 	while(!sst_bos_is_empty(bos)){
 		key_value_wrapper *target=NULL;
 
@@ -871,7 +877,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 			run_append_sstfile_move_originality(new_run, sptr);
 			sst_free(sptr, LSM.pm);
 			sst_bis_free(*bis);
-			*bis=tiering_new_bis();
+			*bis=tiering_new_bis(level_idx);
 		}
 		inserted_entry_num++;
 	}
@@ -883,7 +889,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 	return last_lba;
 }
 
-static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num, uint32_t target_ridx, uint32_t* start_sst_file_idx){
+static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num, uint32_t target_ridx, uint32_t* start_sst_file_idx, uint32_t des_idx){
 	run *new_run=run_init(max_sst_file_num, UINT32_MAX, 0);
 	bool moved=false;
 	run *rptr;
@@ -904,7 +910,7 @@ static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num,
 				pf_queue->push(sptr);
 			}
 			else{
-				sst_file *block_file=compaction_seq_pagesst_to_blocksst(pf_queue);
+				sst_file *block_file=compaction_seq_pagesst_to_blocksst(pf_queue, des_idx);
 				run_append_sstfile_move_originality(new_run, block_file);
 				sst_free(block_file, LSM.pm);
 				delete pf_queue;
@@ -922,7 +928,7 @@ static inline run *filter_sequential_file(level *src, uint32_t max_sst_file_num,
 	}
 
 	if(pf_queue){
-		sst_file *block_file=compaction_seq_pagesst_to_blocksst(pf_queue);
+		sst_file *block_file=compaction_seq_pagesst_to_blocksst(pf_queue, des_idx);
 		run_append_sstfile_move_originality(new_run, block_file);
 		sst_free(block_file, LSM.pm);
 		delete pf_queue;
@@ -949,7 +955,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 
 	sst_pf_out_stream *pos;
 	sst_bf_out_stream *bos=sst_bos_init(read_done_check, false);
-	sst_bf_in_stream *bis=tiering_new_bis();
+	sst_bf_in_stream *bis=tiering_new_bis(src->idx+1);
 
 	uint32_t total_num=(start_sst_file_idx==UINT32_MAX?src->now_sst_num:src->now_sst_num-(start_sst_file_idx+1));
 	start_sst_file_idx=(start_sst_file_idx==UINT32_MAX?0:start_sst_file_idx);
@@ -1041,7 +1047,7 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des){ /*move t
 	LSM.monitor.compaction_cnt[des->idx]++;
 	uint32_t target_ridx=version_get_empty_ridx(LSM.last_run_version, des->idx);
 	uint32_t start_sst_file_idx=UINT32_MAX;
-	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_ridx, &start_sst_file_idx);
+	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_ridx, &start_sst_file_idx, des->idx);
 
 	if(start_sst_file_idx!=UINT32_MAX && start_sst_file_idx==src->now_sst_num-1){ //all sequential_file
 		level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
@@ -1245,7 +1251,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des){
 			bos=sst_bos_init(read_map_done_check, true);
 		}
 		if(bis==NULL){
-			bis=tiering_new_bis();
+			bis=tiering_new_bis(des->idx);
 		}
 
 		uint32_t entry_num=issue_read_kv_for_bos_normal(bos, kpq, final_flag,
@@ -1417,7 +1423,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des){
 			bos=sst_bos_init(read_map_done_check, true);
 		}
 		if(bis==NULL){
-			bis=tiering_new_bis();
+			bis=tiering_new_bis(des->idx);
 		}
 
 		uint32_t entry_num=issue_read_kv_for_bos_normal(bos, kpq, final_flag,

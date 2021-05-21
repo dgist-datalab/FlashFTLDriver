@@ -404,7 +404,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 			bos=sst_bos_init(read_map_done_check, true);
 		}
 		if(bis==NULL){
-			bis=tiering_new_bis();
+			bis=tiering_new_bis(des->idx);
 		}
 
 		uint32_t entry_num=issue_read_kv_for_bos_normal(bos, kpq, last_round_check, idx_set[1], idx_set[0]);
@@ -680,7 +680,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des){
 			bos=sst_bos_init(read_map_done_check, true);
 		}
 		if(bis==NULL){
-			bis=tiering_new_bis();	
+			bis=tiering_new_bis(des->idx);	
 		}
 
 		for(uint32_t moved_num=0; moved_num<sorted_entry_num; ){

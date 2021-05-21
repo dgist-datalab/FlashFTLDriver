@@ -83,7 +83,7 @@ static uint32_t stream_make_rh(sst_pf_out_stream *os, sst_file *file){
 	return res;
 }
 
-sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q){
+sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q, uint32_t des_idx){
 	sst_file *res=NULL;
 	read_issue_arg read_arg;
 	read_arg_container thread_arg;
@@ -103,7 +103,7 @@ sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q){
 	res=pf_queue_to_sstfile(pf_q);
 	map_range *target_mr_set=res->block_file_map;
 
-	read_helper_param temp_rhp=LSM.param.tiering_rhp;
+	read_helper_param temp_rhp=lsmtree_get_target_rhp(des_idx);
 	temp_rhp.member_num=(res->map_num*KP_IN_PAGE);
 	res->_read_helper=read_helper_init(temp_rhp);
 

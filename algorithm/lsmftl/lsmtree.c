@@ -80,23 +80,10 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 		rwlock_init(&LSM.level_rwlock[i]);
 	}
 
-	LSM.param.version_number=version_number;
-
-	LSM.last_run_version=version_init(LSM.param.version_number, 
+	LSM.last_run_version=version_init(version_number, 
 			LSM.param.last_size_factor, RANGE,
 			LSM.disk,
 			LSM.param.LEVELN);
-
-	printf("--------version number test---------\n");
-	printf("level idx to version\n");
-	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
-		printf("\t%u -> %u\n", i, version_level_to_start_version(LSM.last_run_version, i));
-	}
-	printf("version to level idx\n");
-	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
-		printf("\t%u -> %u\n", LSM.param.version_number-i-1, 
-				version_to_level_idx(LSM.last_run_version, LSM.param.version_number-i-1, LSM.param.LEVELN));
-	}
 
 	memset(all_set_page, -1, PAGESIZE);
 	LSM.monitor.compaction_cnt=(uint32_t*)calloc(LSM.param.LEVELN+1, sizeof(uint32_t));
@@ -104,20 +91,15 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	fdriver_mutex_init(&LSM.flush_lock);
 
 
-	/*read helper prepair*/
-	if(LSM.param.leveling_rhp.type!=HELPER_PLR){
-		read_helper_prepare(
-				LSM.param.leveling_rhp.target_prob, 
-				LSM.param.leveling_rhp.member_num, 
-				BLOOM_PTR_PAIR);
-	}
+	read_helper_prepare(
+			LSM.param.bf_ptr_guard_rhp.target_prob, 
+			LSM.param.bf_ptr_guard_rhp.member_num, 
+			BLOOM_PTR_PAIR);
 
-	if(LSM.param.tiering_rhp.type!=HELPER_PLR){
-		read_helper_prepare(
-				LSM.param.tiering_rhp.target_prob,
-				LSM.param.tiering_rhp.member_num,
-				BLOOM_ONLY);
-	}
+	read_helper_prepare(
+			LSM.param.bf_guard_rhp.target_prob,
+			LSM.param.bf_guard_rhp.member_num,
+			BLOOM_ONLY);
 
 	rwlock_init(&LSM.flushed_kp_set_lock);
 	LSM.flushed_kp_set=(key_ptr_pair**)malloc(sizeof(key_ptr_pair*)*COMPACTION_REQ_MAX_NUM);
@@ -160,16 +142,16 @@ static void lsmtree_monitor_print(){
 			(double)LSM.monitor.tiering_valid_entry_cnt/LSM.monitor.tiering_total_entry_cnt,
 			LSM.monitor.tiering_valid_entry_cnt,
 			LSM.monitor.tiering_total_entry_cnt);
-
 	printf("\n");
 
 	printf("level print\n");
 	lsmtree_level_summary(&LSM);
-
 	printf("\n");
+
+	uint32_t version_number=LSM.last_run_version->total_version_number;
 	uint64_t tiering_memory=0;
 	uint64_t leveling_memory=0;
-	uint64_t usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 32) + RANGE*ceil(log2(LSM.param.version_number));
+	uint64_t usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 32) + RANGE*ceil(log2(version_number));
 	uint64_t showing_size=RANGE*32/8; //for 48 bit
 	//printf("sw size:%lu\n", showing_size);
 	printf("[32-BIT] memory usage: %.2lf for PFTL\n\t%lu(bit)\n\t%.2lf(byte)\n\t%.2lf(MB)\n",
@@ -181,12 +163,12 @@ static void lsmtree_monitor_print(){
 	printf("  memory breakdown\n\tleveling:%lu (%.2lf)\n\ttiering:%lu (%.2lf)\n\tversion_bit:%lu (%.2lf)\n\n",
 			leveling_memory, (double)leveling_memory/usage_bit,
 			tiering_memory, (double)tiering_memory/usage_bit,
-			(uint64_t)(RANGE*ceil(log2(LSM.param.version_number))), (double)RANGE*ceil(log2(LSM.param.version_number))/usage_bit	
+			(uint64_t)(RANGE*ceil(log2(version_number))), (double)RANGE*ceil(log2(version_number))/usage_bit	
 			);
 
 	tiering_memory=0;
 	leveling_memory=0;
-	usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 48) + RANGE*ceil(log2(LSM.param.version_number));
+	usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 48) + RANGE*ceil(log2(version_number));
 	showing_size=RANGE*48/8; //for 48 bit
 	printf("\n[48-BIT] memory usage: %.2lf for PFTL\n\t%lu(bit)\n\t%.2lf(byte)\n\t%.2lf(MB)\n",
 			(double)usage_bit/8/(showing_size),
@@ -197,7 +179,7 @@ static void lsmtree_monitor_print(){
 	printf("  memory breakdown\n\tleveling:%lu (%.2lf , %.3lf)\n\ttiering:%lu (%.2lf , %.3lf)\n\tversion_bit:%lu (%.2lf)\n\n",
 			leveling_memory, (double)leveling_memory/usage_bit, (double)leveling_memory/(RANGE*48),
 			tiering_memory, (double)tiering_memory/usage_bit, (double)tiering_memory/(RANGE*48),
-			(uint64_t)(RANGE*ceil(log2(LSM.param.version_number))), (double)RANGE*ceil(log2(LSM.param.version_number))/usage_bit	
+			(uint64_t)(RANGE*ceil(log2(version_number))), (double)RANGE*ceil(log2(version_number))/usage_bit	
 			);
 
 
@@ -842,4 +824,24 @@ void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx){
 	for(; t_iter!=t_map->end(); t_iter++){
 		lsmtree_gc_unavailable_unset(lsm, NULL, t_iter->second->seg_idx);
 	}
+}
+
+read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
+	if(level_idx<=LSM.param.tr.border_of_bf){
+		if(level_idx<=LSM.param.tr.border_of_wisckey){
+			return LSM.param.bf_ptr_guard_rhp;
+		}
+		else{
+			return LSM.param.bf_guard_rhp;
+		}
+	}
+	else{
+		if(level_idx<=LSM.param.tr.border_of_wisckey){
+			EPRINT("?????", true);
+		}
+		else{
+			return LSM.param.plr_rhp;
+		}
+	}
+	return LSM.param.plr_rhp;
 }

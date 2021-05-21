@@ -9,6 +9,7 @@
 #include "plr_memory_calculator.h"
 #include "bf_memory_calculator.h"
 #include "../helper_algorithm/guard_bf_set.h"
+#include "../../../include/settings.h"
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriver/algorithm/lsmftl/design_knob"
 double *plr_dp;
@@ -28,7 +29,7 @@ void init_memory_info(uint32_t error){
     }   
     lseek(fd,0,SEEK_SET);
 	if(new_file){
-		EPRINT("please add new table for fpr");
+		EPRINT("please add new table for fpr", true);
 		exit(1);
 	}
 

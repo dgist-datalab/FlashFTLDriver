@@ -92,7 +92,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		run *previous_run, uint32_t *moved_entry_num, 
 		uint32_t start_sst_file_idx, uint32_t target_ridx);
 
-sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *);
+sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *, uint32_t des_idx);
 
 uint32_t compaction_read_param_remain_num(compaction_master *cm);
 inter_read_alreq_param *compaction_get_read_param(compaction_master *cm);
@@ -112,7 +112,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_strea
 
 
 sst_file *bis_to_sst_file(struct sst_bf_in_stream *bis);
-struct sst_bf_in_stream *tiering_new_bis();
+struct sst_bf_in_stream *tiering_new_bis(uint32_t level_idx);
 
 int issue_read_kv_for_bos(struct sst_bf_out_stream *bos, struct sst_pf_out_stream *pos, 
 		uint32_t target_num, uint32_t version, bool round_final);
