@@ -1,6 +1,7 @@
 #include "compaction.h"
 #include "lsmtree.h"
 #include "segment_level_manager.h"
+#include "io.h"
 #include <math.h>
 extern lsmtree LSM;
 
@@ -57,13 +58,13 @@ static inline void disk_change(level **up, level *src, level** des, uint32_t* id
 	level_free(delete_target_level, LSM.pm);
 }
 
-static inline void first_level_slm_coupling(key_ptr_pair *kp_set, compaction_req *req){
+static inline void first_level_slm_coupling(key_ptr_pair *kp_set, bool is_gc_data){
 	uint32_t end_idx=kp_end_idx((char*)kp_set);
 	uint32_t prev_seg=UINT32_MAX;
 	uint32_t prev_piece_ppa;
 
 	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[end_idx].piece_ppa)){
-		slm_coupling_level_seg(0, SEGNUM(kp_set[end_idx].piece_ppa), SEGPIECEOFFSET(kp_set[end_idx].piece_ppa), req->gc_data);
+		slm_coupling_level_seg(0, SEGNUM(kp_set[end_idx].piece_ppa), SEGPIECEOFFSET(kp_set[end_idx].piece_ppa), is_gc_data);
 	}
 	else{
 		for(uint32_t i=0; i<=end_idx; i++){
@@ -77,95 +78,152 @@ static inline void first_level_slm_coupling(key_ptr_pair *kp_set, compaction_req
 				prev_piece_ppa=kp_set[i].piece_ppa;
 			}
 			else{
-				slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), req->gc_data);
+				slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), is_gc_data);
 				prev_seg=now_seg;
 				prev_piece_ppa=kp_set[i].piece_ppa;
 			}
 		}
 
 		if(!slm_invalidate_enable(0, kp_set[end_idx].piece_ppa)){
-			slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), req->gc_data);	
+			slm_coupling_level_seg(0, prev_seg, SEGPIECEOFFSET(prev_piece_ppa), is_gc_data);	
 		}
 	}
 }
+extern char all_set_page[PAGESIZE];
+static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set, 
+		std::map<uint32_t, uint32_t>::iterator *temp_iter){
+	if(temp_iter && *temp_iter==flushed_kp_set->end()){
+		return NULL;
+	}
+	value_set *vs=inf_get_valueset(all_set_page, FS_MALLOC_W, PAGESIZE);
+	key_ptr_pair *kp_set=(key_ptr_pair*)vs->value;
 
-static inline key_ptr_pair* flush_memtable(write_buffer *wb, uint32_t tag){
-	key_ptr_pair *kp_set;
-	if(page_manager_get_total_remain_page(LSM.pm, false) < (KP_IN_PAGE/L2PGAP)){
+	std::map<uint32_t, uint32_t>::iterator iter=temp_iter?*temp_iter:flushed_kp_set->begin();
+	uint32_t i=0;
+	read_helper *rh=read_helper_init(
+			lsmtree_get_target_rhp(0));
+	for(; iter!=flushed_kp_set->end() && i<KP_IN_PAGE; i++, iter++ ){
+		kp_set[i].lba=iter->first;
+		kp_set[i].piece_ppa=iter->second;
+		read_helper_stream_insert(rh, kp_set[i].lba, kp_set[i].piece_ppa);
+	}
+	*temp_iter=iter;
+
+	uint32_t map_ppa=page_manager_get_new_ppa(LSM.pm, false, DATASEG); //DATASEG for sequential tiering 
+	validate_map_ppa(LSM.pm->bm, map_ppa, kp_set[0].lba,  kp_set[i].lba, true);
+	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
+	write_req->type=MAPPINGW;
+	write_req->param=(void*)vs;
+	write_req->end_req=comp_alreq_end_req;
+	io_manager_issue_internal_write(map_ppa, vs, write_req, false);
+
+	sst_file *res=sst_init_empty(PAGE_FILE);
+	res->file_addr.map_ppa=map_ppa;
+
+	res->start_lba=kp_set[0].lba;
+	res->end_lba=kp_set[i].lba;
+	res->_read_helper=rh;
+
+	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[i].piece_ppa) && 
+			SEGNUM(kp_set[0].piece_ppa)==map_ppa/_PPS){
+		res->sequential_file=true;
+	}
+	return res;
+}
+
+static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
+	if(page_manager_get_total_remain_page(LSM.pm, false) < wb->buffered_entry_num/L2PGAP){
 		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
 	}
-
+	
 	rwlock_write_lock(&LSM.flush_wait_wb_lock);
 	rwlock_write_lock(&LSM.flushed_kp_set_lock);
-	kp_set=write_buffer_flush(wb, false);
+	if(LSM.flushed_kp_set==NULL){
+		LSM.flushed_kp_set=new std::map<uint32_t, uint32_t>();
+	}
+	while(wb->buffered_entry_num){
+		key_ptr_pair *temp_kp_set=write_buffer_flush(wb, false);
+		for(uint32_t i=0; i<KP_IN_PAGE && temp_kp_set[i].lba!=UINT32_MAX; i++){
+			LSM.flushed_kp_set->insert(
+					std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));	
+		}
+		free(temp_kp_set);
+	}
 	write_buffer_free(wb);
-	LSM.flushed_kp_set[tag]=kp_set;
 	LSM.flush_wait_wb=NULL;
-	//printf("kp_set set\n");
-	rwlock_write_unlock(&LSM.flush_wait_wb_lock);
 	rwlock_write_unlock(&LSM.flushed_kp_set_lock);
-	return kp_set;
+	rwlock_write_unlock(&LSM.flush_wait_wb_lock);
+
+	if(LSM.flushed_kp_set->size()>=LSM.param.write_buffer_ent){
+		level *res=level_init(LSM.param.write_buffer_ent/KP_IN_PAGE, 1, LEVELING_WISCKEY, 0);
+		sst_file *sptr=NULL;
+		std::map<uint32_t, uint32_t>::iterator *iter=NULL;
+		while((sptr=kp_to_sstfile(LSM.flushed_kp_set, iter))){
+			level_append_sstfile(res, sptr, true);
+		}
+		return res;
+	}
+	else{
+		return NULL;
+	}
 }
 
 static inline void do_compaction(compaction_master *cm, compaction_req *req, 
-		key_ptr_pair *kp_set, uint32_t start_idx, uint32_t end_idx){
-	level *lev;
-	if(kp_set){
+		level *temp_level, uint32_t start_idx, uint32_t end_idx){
+	level *lev=NULL;
+	if(temp_level){
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 	}else{
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 		rwlock_write_lock(&LSM.level_rwlock[start_idx]);
 	}
-	
-	if(kp_set){
-		lev=compaction_first_leveling(cm, kp_set, LSM.disk[0]);
+
+	uint32_t end_type=LSM.disk[end_idx]->level_type;
+	switch(start_idx!=-1?LSM.disk[start_idx]->level_type:LSM.disk[0]->level_type){
+		case LEVELING:
+			if(end_type==LEVELING){
+				lev=compaction_LE2LE(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+			}
+			else{
+				lev=compaction_LE2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+			}
+			break;
+		case LEVELING_WISCKEY:
+			switch(end_type){
+				case LEVELING_WISCKEY:
+					lev=compaction_LW2LW(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+					break;
+				case LEVELING:
+					lev=compaction_LW2LE(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+					break;
+				case TIERING:
+					lev=compaction_LW2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+					break;
+			}
+			break;
+		case TIERING:
+			lev=compaction_TI2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+			break;
 	}
-	else{
-		uint32_t end_type=LSM.disk[end_idx]->level_type;
-		switch(LSM.disk[start_idx]->level_type){
-			case LEVELING:
-				if(end_type==LEVELING){
-					//compaction_LE2LE(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
-				}
-				else{
-					//compaction_LE2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
-				}
-				break;
-			case LEVELING_WISCKEY:
-				switch(end_type){
-					case LEVELING_WISCKEY:
-						compaction_LW2LW(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
-						break;
-					case LEVELING:
-						compaction_LW2LE(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
-						break;
-					case TIERING:
-						compaction_LW2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
-						break;
-				}
-				break;
-			case TIERING:
-				compaction_TI2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
-				break;
-		}
-	}
-	disk_change(kp_set?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
+
+	disk_change(temp_level?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
 
 	if(end_idx==LSM.param.LEVELN-1){
 		slm_empty_level(start_idx);
 	}
 	else if(end_idx==0){
-		first_level_slm_coupling(kp_set, req);
+	//	first_level_slm_coupling(kp_set, req);
 	}
 	else{
 		slm_move(start_idx, end_idx);
 	}
 
-	if(kp_set){
+	if(temp_level){
 		rwlock_write_unlock(&LSM.level_rwlock[end_idx]);
 		rwlock_write_lock(&LSM.flushed_kp_set_lock);
-		LSM.flushed_kp_set[req->tag]=NULL;
-		free(kp_set);
+		std::map<uint32_t, uint32_t> *temp_map=LSM.flushed_kp_set;
+		delete temp_map;
+		LSM.flushed_kp_set=NULL;
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 	}
 	else{
@@ -182,18 +240,21 @@ void* compaction_main(void *_cm){
 		if(!req) continue;
 again:
 		level *src;
-		key_ptr_pair *kp_set=NULL;
+		level *temp_level=NULL;
 		if(req->start_level==-1 && req->end_level==0){
 			if(req->wb){
-				kp_set=flush_memtable(req->wb, req->tag);
+				temp_level=flush_memtable(req->wb, false);
 			}
 			else{
-				kp_set=req->target;
+				EPRINT("wtf", true);
 			}
-			req->target=kp_set;
 		}
 
-		do_compaction(cm, req, kp_set, req->start_level, req->end_level);
+		if(req->start_level==-1 && !temp_level){
+			goto end;
+		}
+
+		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
 
 		if(req->end_level != LSM.param.LEVELN-1 && (
 				(req->end_level==0 && level_is_full(LSM.disk[req->end_level])) ||
@@ -210,7 +271,7 @@ again:
 			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
 			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
 		}
-
+end:
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);
 	}

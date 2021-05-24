@@ -55,7 +55,7 @@ typedef struct key_value_wrapper{ //for data read!
 typedef struct compaction_req{
 	int8_t start_level;
 	int8_t end_level;
-	key_ptr_pair *target;
+	//key_ptr_pair *target;
 	write_buffer *wb;
 	void (*end_req)(struct compaction_req* req);
 	void *param;
@@ -124,13 +124,12 @@ uint32_t issue_read_kv_for_bos_normal(sst_bf_out_stream *bos, std::queue<key_ptr
 
 void *comp_alreq_end_req(algo_req *req);
 
-static inline compaction_req * alloc_comp_req(int8_t start, int8_t end, write_buffer *wb, key_ptr_pair *target,
+static inline compaction_req * alloc_comp_req(int8_t start, int8_t end, write_buffer *wb,
 		void (*end_req)(compaction_req *), void *param, bool is_gc_data){
 	compaction_req *res=(compaction_req*)malloc(sizeof(compaction_req));
 	res->start_level=start; 
 	res->end_level=end;
 	res->wb=wb;
-	res->target=target;
 	res->end_req=end_req;
 	res->param=param;
 	res->gc_data=is_gc_data;

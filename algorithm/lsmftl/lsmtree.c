@@ -53,7 +53,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 	//	LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
-		LSM.wb_array[i]=write_buffer_init(LSM.param.write_buffer_ent-L2PGAP, LSM.pm, NORMAL_WB);
+		LSM.wb_array[i]=write_buffer_init(QDEPTH, LSM.pm, NORMAL_WB);
 	}
 
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
@@ -108,7 +108,6 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 			BLOOM_ONLY);
 
 	rwlock_init(&LSM.flushed_kp_set_lock);
-	LSM.flushed_kp_set=(key_ptr_pair**)malloc(sizeof(key_ptr_pair*)*COMPACTION_REQ_MAX_NUM);
 
 	rwlock_init(&LSM.flush_wait_wb_lock);
 	LSM.flush_wait_wb=NULL;
@@ -227,7 +226,7 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	
 	rwlock_destroy(&LSM.flushed_kp_set_lock);
 	rwlock_destroy(&LSM.flush_wait_wb_lock);
-	free(LSM.flushed_kp_set);
+	delete LSM.flushed_kp_set;
 
 	free(LSM.gc_unavailable_seg);
 
@@ -433,27 +432,22 @@ uint32_t lsmtree_read(request *const req){
 		rwlock_read_unlock(&LSM.flush_wait_wb_lock);
 
 		uint32_t target_piece_ppa=UINT32_MAX;
-		uint32_t i;
-		rwlock_read_lock(&LSM.flushed_kp_set_lock);
-		for(i=0; i<COMPACTION_REQ_MAX_NUM; i++){
-			if(LSM.flushed_kp_set[i]){
-				if((target_piece_ppa=kp_find_piece_ppa(req->key, (char*)LSM.flushed_kp_set[i]))!=UINT32_MAX){
-					break;
-				}
+		
+		if(LSM.flushed_kp_set){
+			rwlock_read_lock(&LSM.flushed_kp_set_lock);
+			std::map<uint32_t, uint32_t>::iterator iter=LSM.flushed_kp_set->find(req->key);
+			if(iter!=LSM.flushed_kp_set->end()){
+				rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
+				target_piece_ppa=iter->second;
+				r_param->target_level_rw_lock=NULL;
+				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
+				read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+				return 1;
 			}
-		}
-
-		if(target_piece_ppa==UINT32_MAX){
-			rwlock_read_unlock(&LSM.flushed_kp_set_lock);
-			//not_found_process(req);
-			//return 0;
-		}
-		else{
-			rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
-			r_param->target_level_rw_lock=&LSM.flushed_kp_set_lock;
-			algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
-			read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
-			return 1;
+			else{
+				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+			}
 		}
 	}
 	else{
@@ -566,7 +560,7 @@ retry:
 		LSM.flush_wait_wb=LSM.wb_array[LSM.now_wb];
 		rwlock_write_unlock(&LSM.flush_wait_wb_lock);
 
-		compaction_req *temp_req=MAKE_L0COMP_REQ(wb, NULL, NULL, false);
+		compaction_req *temp_req=MAKE_L0COMP_REQ(wb, NULL, false);
 		compaction_issue_req(LSM.cm, temp_req);
 
 
@@ -604,7 +598,10 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 
 	if(r_param->use_read_helper && 
 			read_helper_data_checking(r_param->rh, LSM.pm, piece_ppa, parents->key, &r_param->read_helper_idx,&offset, r_param->prev_sf)){
-		rwlock_read_unlock(r_param->target_level_rw_lock);
+
+		if(r_param->target_level_rw_lock){
+			rwlock_read_unlock(r_param->target_level_rw_lock);
+		}
 		if(offset>=L2PGAP){
 			EPRINT("can't be plz checking oob_lba_checker", true);
 		}
@@ -615,7 +612,10 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	}
 	else if(page_manager_oob_lba_checker(LSM.pm, piece_ppa, 
 				parents->key, &offset)){
-		rwlock_read_unlock(r_param->target_level_rw_lock);
+		if(r_param->target_level_rw_lock){
+			rwlock_read_unlock(r_param->target_level_rw_lock);
+		}
+
 		if(offset>=L2PGAP){
 			EPRINT("can't be plz checking oob_lba_checker", true);
 		}

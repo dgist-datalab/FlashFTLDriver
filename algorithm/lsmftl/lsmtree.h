@@ -109,7 +109,7 @@ typedef struct lsmtree{
 	write_buffer *flush_wait_wb;
 
 	rwlock flushed_kp_set_lock;
-	key_ptr_pair **flushed_kp_set;
+	std::map<uint32_t, uint32_t> *flushed_kp_set;
 
 	uint32_t* gc_unavailable_seg;
 
@@ -148,7 +148,7 @@ void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
 uint32_t lsmtree_testing();
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);
-#define MAKE_L0COMP_REQ(wb, kp_set, param, is_gc_data)\
-	alloc_comp_req(-1,0,(wb), (kp_set),lsmtree_compaction_end_req, (void*)(param), (is_gc_data))
+#define MAKE_L0COMP_REQ(wb, param, is_gc_data)\
+	alloc_comp_req(-1,0,(wb),lsmtree_compaction_end_req, (void*)(param), (is_gc_data))
 
 #endif

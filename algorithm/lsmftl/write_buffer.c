@@ -104,11 +104,11 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 	value_set* target_value=NULL;
 	uint32_t ppa=-1;
 	char *oob=NULL;
-	key_ptr_pair *res=(key_ptr_pair*)malloc(PAGESIZE);
-	memset(res, -1, PAGESIZE);
+	key_ptr_pair *res=(key_ptr_pair*)malloc((wb->data->size()+1)*sizeof(key_ptr_pair));
 	fdriver_lock(&LSM.flush_lock);
 
-	for(uint32_t i=0; it!=wb->data->end(); i++, it++){
+	uint32_t i=0;
+	for(;it!=wb->data->end() && i<KP_IN_PAGE; i++){
 		uint8_t inter_idx=i%L2PGAP;
 		if(inter_idx==0){
 			ppa=page_manager_get_new_ppa(wb->pm, false, SEPDATASEG);
@@ -137,9 +137,12 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 			oob=NULL;
 			target_value=NULL;
 		}
-	//	wb->buffered_entry_num--;
-	//	wb->data->erase(it++);
+		wb->buffered_entry_num--;
+		wb->data->erase(it++);
 	}
+
+	res[i].lba=UINT32_MAX;
+	res[i].piece_ppa=UINT32_MAX;
 
 	if(sync){
 		fdriver_lock(&wb->sync_lock);
