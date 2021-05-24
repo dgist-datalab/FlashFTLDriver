@@ -78,6 +78,10 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 			case 'M':
 				percentage=atoi(argv[optind]);		
 				break;
+			default:
+				printf("invalid parameters\n");
+				exit(1);
+				break;
 		}
 	}
 	

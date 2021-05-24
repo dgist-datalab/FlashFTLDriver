@@ -772,12 +772,10 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	sst_file *sptr=NULL;
 	uint32_t recent_version, target_version;
 	uint32_t sptr_idx=0;
-#ifdef PINKGC
-	std::queue<gc_mapping_check_node*> *gc_mapping_queue=new std::queue<gc_mapping_check_node*>();
-#else
+
 	write_buffer *leveling_node_wb=NULL;
 	std::map<uint32_t, gc_mapping_check_node *> *gc_kv_map=new std::map<uint32_t, gc_mapping_check_node*>();
-#endif
+
 	gc_mapping_check_node *gmc=NULL;
 
 	sst_file *prev_sptr=NULL;
@@ -866,18 +864,12 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					gmc->map_ppa=UINT32_MAX;
 					gmc->type=MAP_CHECK_FLUSHED_KP;
 					gmc->level=LSM.param.LEVELN-(1+1);
-#ifdef PINKGC
-					fdriver_lock_init(&gmc->done_lock, 0);
-					gmc->mapping_data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
-					gc_mapping_queue->push(gmc);
-#else
 					if(!leveling_node_wb){
 						leveling_node_wb=write_buffer_init(_PPS*L2PGAP, pm, GC_WB);	
 					}
 					gmc->mapping_data=NULL;
 					write_buffer_insert_for_gc(leveling_node_wb, gmc->lba, gmc->data_ptr);
 					gc_kv_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
-#endif
 				}
 				else{
 					//sptr->trimed_sst_file=true;
@@ -928,21 +920,12 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		}
 	}
 
-#ifdef PINKGC
-	if(gc_mapping_queue->size()){
-		printf("[%u] victim invalidation cnt:%u GMC target cnt:%lu ", LSM.monitor.gc_data,victim->invalidate_number, gc_mapping_queue->size());
-		EPRINT("debug", false);
-		//LSM.global_debug_flag=true;
-	}
-	gc_helper_for_pink(gc_mapping_queue);
-#else
 	if(gc_kv_map->size()){
 		printf("[%u] victim invalidation cnt:%u GMC target cnt:%lu ", LSM.monitor.gc_data,victim->invalidate_number, gc_kv_map->size());
 		EPRINT("debug", false);
 		//LSM.global_debug_flag=true;
 	}
 	gc_helper_for_normal(gc_kv_map, leveling_node_wb, victim->seg_idx); 
-#endif
 
 	bm->trim_segment(bm, victim, bm->li);
 	page_manager_change_reserve(pm, false);
@@ -951,15 +934,10 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		inf_free_valueset(free_target[i], FS_MALLOC_R);
 	}
 	free(free_target);
-#ifdef PINKGC
-	delete gc_mapping_queue;
-	delete gc_target_queue;
-#else
+
 	delete gc_kv_map;
 	if(leveling_node_wb){
 		write_buffer_free(leveling_node_wb);
 	}
-#endif
-
 	return false;
 }

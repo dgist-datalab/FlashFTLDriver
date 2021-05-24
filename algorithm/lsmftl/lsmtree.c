@@ -52,35 +52,41 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * WRITEBUFFER_NUM);
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
-		LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
+	//	LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
+		LSM.wb_array[i]=write_buffer_init(LSM.param.write_buffer_ent-L2PGAP, LSM.pm, NORMAL_WB);
 	}
-	
-#ifdef PINKGC
-	LSM.moved_kp_set=new std::deque<key_ptr_pair*>();
-	fdriver_mutex_init(&LSM.moved_kp_lock);
-#endif
 
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
 
 	uint32_t now_level_size=LSM.param.normal_size_factor;
-	uint32_t version_number=0;
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
-		if(i==LSM.param.LEVELN-1){
-			LSM.disk[i]=level_init(now_level_size, LSM.param.last_size_factor, TIERING, i);		
-			printf("L[%d] - run_num:%u\n",i, LSM.disk[i]->max_run_num);
-			version_number+=LSM.param.normal_size_factor;
+		if(i<=LSM.param.tr.border_of_leveling){
+			if(i<=LSM.param.tr.border_of_wisckey){
+				LSM.disk[i]=level_init(now_level_size, 1, LEVELING_WISCKEY, i);
+				printf("LW[%d] - size:%u data:%.2lf(%%)\n",i, LSM.disk[i]->max_sst_num, 
+						(double)LSM.disk[i]->max_sst_num*KP_IN_PAGE/RANGE*100);
+			}
+			else{
+				LSM.disk[i]=level_init(now_level_size, 1, LEVELING, i);
+				printf("L[%d] - size:%u data:%.2lf(%%)\n",i, LSM.disk[i]->max_sst_num, 
+						(double)LSM.disk[i]->max_sst_num*KP_IN_PAGE/RANGE*100);	
+			}
 		}
 		else{
-			LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, LEVELING, i);
-			now_level_size*=LSM.param.normal_size_factor;
-			printf("L[%d] - size:%u data:%.2lf(%%)\n",i, LSM.disk[i]->max_sst_num, (double)LSM.disk[i]->max_sst_num*KP_IN_PAGE/RANGE*100);
-			version_number++;
+			if(i<=LSM.param.tr.border_of_wisckey){
+				EPRINT("tiering wisckey", true);
+			}
+			else{
+				LSM.disk[i]=level_init(now_level_size, 1, TIERING, i);
+				printf("TI[%d] - run_num:%u\n",i, LSM.disk[i]->max_run_num);
+			}
 		}
+		now_level_size*=LSM.param.normal_size_factor;
 		rwlock_init(&LSM.level_rwlock[i]);
 	}
 
-	LSM.last_run_version=version_init(version_number, 
+	LSM.last_run_version=version_init(LSM.param.tr.run_num, 
 			LSM.param.last_size_factor, RANGE,
 			LSM.disk,
 			LSM.param.LEVELN);
@@ -218,9 +224,6 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	version_free(LSM.last_run_version);
 
 	page_manager_free(LSM.pm);
-#ifdef PINKGC
-	delete LSM.moved_kp_set;
-#endif
 	
 	rwlock_destroy(&LSM.flushed_kp_set_lock);
 	rwlock_destroy(&LSM.flush_wait_wb_lock);
@@ -440,19 +443,6 @@ uint32_t lsmtree_read(request *const req){
 			}
 		}
 
-#ifdef PINKGC
-		if(target_piece_ppa==UINT32_MAX){
-			std::deque<key_ptr_pair*>::iterator moved_kp_it=LSM.moved_kp_set->begin();
-			for(;moved_kp_it!=LSM.moved_kp_set->end(); moved_kp_it++){
-				key_ptr_pair *temp_pair=*moved_kp_it;
-				target_piece_ppa=kp_find_piece_ppa(req->key, (char*)temp_pair);
-				if(target_piece_ppa!=UINT32_MAX){
-					break;
-				}
-			}
-		}
-#endif
-
 		if(target_piece_ppa==UINT32_MAX){
 			rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 			//not_found_process(req);
@@ -561,30 +551,11 @@ normal_end:
 }
 
 
-void lsmtree_compaction_reinsert_end_req(compaction_req *req){
-
-}
-
 uint32_t lsmtree_write(request *const req){
 	write_buffer *wb=LSM.wb_array[LSM.now_wb];
 	write_buffer_insert(wb, req->key, req->value);
-//	printf("write lba:%u\n", req->key);
-
-	//version_coupling_lba_ridx(LSM.last_run_version, req->key, TOTALRUNIDX);
 
 	if(write_buffer_isfull(wb)){
-#ifdef PINKGC
-		fdriver_lock(&LSM.moved_kp_lock);
-		while(!LSM.moved_kp_set->empty()){
-
-			key_ptr_pair *kp_set=LSM.moved_kp_set->front();
-	
-			compaction_issue_req(LSM.cm,MAKE_L0COMP_REQ(NULL, kp_set, NULL, true));
-			LSM.moved_kp_set->pop_front();
-		}
-		fdriver_unlock(&LSM.moved_kp_lock);
-#endif
-	
 retry:
 		rwlock_write_lock(&LSM.flush_wait_wb_lock);
 		if(LSM.flush_wait_wb){

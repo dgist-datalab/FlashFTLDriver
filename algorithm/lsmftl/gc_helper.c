@@ -24,8 +24,8 @@ void gc_issue_mapcheck_read(gc_mapping_check_node *gmc, lower_info *li){
 	req->type=GCMR_DGC;
 	li->read(gmc->map_ppa, PAGESIZE, gmc->mapping_data, ASYNC, req);
 }
-
-#ifdef PINKGC
+#if 0
+//#ifdef PINKGC
 void gc_helper_for_pink(std::queue<gc_mapping_check_node*>* gc_mapping_queue){
 	page_manager *pm=LSM.pm;
 	write_buffer *gc_wb=write_buffer_init(_PPS*L2PGAP, pm, GC_WB);

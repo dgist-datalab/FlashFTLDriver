@@ -91,12 +91,6 @@ typedef struct lsmtree{
 	page_manager *pm;
 	struct compaction_master *cm;
 	uint32_t now_merging_run[1+1];
-	//page_manager *pm_map;
-
-#ifdef PINKGC
-	fdriver_lock_t moved_kp_lock;
-	std::deque<key_ptr_pair*>* moved_kp_set;
-#endif
 
 	uint32_t now_wb;
 	write_buffer **wb_array;

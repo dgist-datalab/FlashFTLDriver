@@ -75,9 +75,6 @@ uint32_t page_manager_get_new_ppa_from_seg(page_manager *pm, __segment *seg);
 uint32_t page_manager_pick_new_ppa_from_seg(page_manager *pm, __segment *seg);
 __segment *page_manager_get_seg(page_manager *pm, bool ismap, uint32_t type);
 __segment *page_manager_get_seg_for_bis(page_manager *pm,  uint32_t type);
-#ifdef PINKGC
-void gc_helper_for_pink(std::queue<gc_mapping_check_node*>*);
-#endif
 void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*>*, 
 		struct write_buffer *wb, uint32_t seg_idx);
 #endif
