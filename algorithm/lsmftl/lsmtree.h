@@ -41,23 +41,31 @@ typedef struct lsmtree_monitor{
 	MeasureTime RH_make_stopwatch[2]; //0 -> leveling 1-> tiering
 }lsmtree_monitor;
 
+typedef struct level_param{
+	uint32_t level_type;
+	bool is_wisckey;
+	bool is_bf;
+}level_param;
+
 typedef struct tree_param{
 	bool isinvalid;
-	uint32_t size_factor;
+	double size_factor;
 	uint32_t num_of_level;
+	/*
 	uint32_t border_of_leveling;
 	uint32_t border_of_wisckey;
-	uint32_t border_of_bf;
+	uint32_t border_of_bf;*/
+	level_param *lp;
 	uint64_t memory_usage_bit;
 	uint64_t run_num;
-	uint32_t WAF;
+	double WAF;
 }tree_param;
 
 typedef struct lsmtree_parameter{
 	uint32_t LEVELN;
 	uint32_t mapping_num;
-	uint32_t last_size_factor;
-	uint32_t normal_size_factor;
+	double last_size_factor;
+	double normal_size_factor;
 	uint32_t write_buffer_ent;
 	float read_amplification;
 

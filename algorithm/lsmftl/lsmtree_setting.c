@@ -33,16 +33,13 @@ static void print_level_param(){
 	printf("[param] # of level: %u\n", LSM.param.LEVELN);
 	/*print summary*/
 	tree_param tr=LSM.param.tr;
-	printf("[param] border of leveling: %u\n",tr.border_of_leveling);
-	printf("[param] border of wisckey: %u\n",tr.border_of_wisckey);
-	printf("[param] border of bf: %u\n",tr.border_of_bf);
 
-	printf("[param] normal size factor: %u\n", LSM.param.normal_size_factor);
+	printf("[param] normal size factor: %f\n", LSM.param.normal_size_factor);
 	printf("[param] read amplification: %f\n", LSM.param.read_amplification+1);
 	printf("[param] version number :%lu\n", tr.run_num);
 	printf("[param] write_buffer ent: %u\n", LSM.param.write_buffer_ent);
 
-	printf("[PERF] WAF:%u+GC\n", tr.WAF);
+	printf("[PERF] WAF:%.2lf+GC\n", tr.WAF);
 	printf("[PERF] RAF:%.3lf\n", LSM.param.read_amplification+1);
 }
 
@@ -84,7 +81,10 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 				break;
 		}
 	}
-	
+
+	uint32_t error=TARGETFPR * 100;
+	init_memory_info(error);
+
 	target_memory_usage_bit=(uint64_t)((double)RANGE*48/100*percentage);
 	LSM.param=lsmtree_memory_limit_to_setting(target_memory_usage_bit);
 
@@ -94,28 +94,40 @@ uint32_t lsmtree_argument_set(int argc, char *argv[]){
 	return 1;
 }
 
+void print_tree_param(tree_param *set, uint32_t number){
+	for(uint32_t i=1; i<=number; i++){
+		printf("[%u] WAF:%.2lf size_factor:%.2lf run_num:%lu memory:%.2lf\n", 
+				i, set[i].WAF, set[i].size_factor, set[i].run_num,
+				(double)set[i].memory_usage_bit/(RANGE*48));
+	}
+}
+
 lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	lsmtree_parameter res;
-	uint32_t write_buffer_memory_bit=RANGE*48/256;
+	uint32_t write_buffer_memory_bit=RANGE*48/512;
 	uint32_t buffered_ent=write_buffer_memory_bit/(48+48);
 	uint32_t chunk_num=RANGE/buffered_ent+(RANGE%buffered_ent?1:0);
 	uint32_t max_level=get_level(2, chunk_num);
 
-	
-	tree_param *settings=(tree_param*)calloc(max_level, sizeof(tree_param));
+	memory_limit_bit-=write_buffer_memory_bit;
+	tree_param *settings=(tree_param*)calloc(max_level+1, sizeof(tree_param));
 	/*start all leveling*/
 	for(uint32_t i=1; i<=max_level; i++){
 		settings[i].size_factor=get_size_factor(i, chunk_num);
+		printf("level:%u size_factor %lf\n", i, settings[i].size_factor);
 		settings[i].num_of_level=i;
-		settings[i].border_of_leveling=i;
 		settings[i].memory_usage_bit=0;
-		settings[i].border_of_wisckey=0;
+		settings[i].lp=(level_param*)calloc(i+1, sizeof(level_param));
 		for(uint32_t j=i; j>=1; j--){
 			uint64_t num_range=RANGE;
-			uint64_t covered_range=buffered_ent * pow(settings[i].size_factor, j);
+			uint64_t covered_range=buffered_ent * ceil(pow(settings[i].size_factor, j));
+			covered_range=covered_range>RANGE?RANGE:covered_range;
 			double coverage_ratio=(double)covered_range/num_range;
+			settings[i].lp[j].level_type=LEVELING;
+			settings[i].lp[j].is_wisckey=false;
+			settings[i].lp[j].is_bf=false;
 			if(bf_memory_per_ent(coverage_ratio) < plr_memory_per_ent(coverage_ratio)){
-				settings[i].border_of_bf=j;
+				settings[i].lp[j].is_bf=true;
 			}
 			settings[i].memory_usage_bit+= covered_range * 
 				MIN(bf_memory_per_ent(coverage_ratio), plr_memory_per_ent(coverage_ratio));
@@ -127,8 +139,10 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 		if(settings[i].memory_usage_bit > memory_limit_bit){
 			settings[i].isinvalid=true;
 		}
-
 	}
+	/*
+	printf("after_leveling\n");
+	print_tree_param(settings, max_level);*/
 
 	/*change tiering from bottom*/
 	for(uint32_t i=1; i<=max_level; i++){
@@ -138,6 +152,9 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			uint64_t num_range=RANGE;
 			uint64_t level_size=buffered_ent * pow(settings[i].size_factor, j);
 			uint64_t run_size=buffered_ent * pow(settings[i].size_factor, j-1);
+
+			level_size=level_size>RANGE?RANGE:level_size;
+			run_size=run_size>RANGE?RANGE:run_size;
 			
 			double level_coverage_ratio=(double)level_size/num_range;
 			double run_coverage_ratio=(double)run_size/num_range;
@@ -148,13 +165,13 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 				MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
 			
 			uint64_t prev_table_memory_bit=RANGE*ceil(log2(now_run_num));
-			uint64_t table_memory_bit=RANGE * ceil(log2(now_run_num-1+settings[i].size_factor));
+			uint64_t table_memory_bit=RANGE * ceil(log2(now_run_num-1+ceil(settings[i].size_factor)));
 			
 			if(settings[i].memory_usage_bit - prev_table_memory_bit - level_memory_usage_bit 
 					+ table_memory_bit + run_memory_usage_bit < memory_limit_bit){
-				settings[i].border_of_leveling=j-1; //update leveling border
+				settings[i].lp[j].level_type=TIERING;
 				if(bf_memory_per_ent(run_coverage_ratio) < plr_memory_per_ent(run_coverage_ratio)){
-					settings[i].border_of_bf=j; //update border of bf
+					settings[i].lp[j].is_bf=true;
 				}
 				settings[i].WAF-=(settings[i].size_factor-1); //changing leveling to tiering;
 				if(j==i){
@@ -162,11 +179,13 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 				}
 				settings[i].memory_usage_bit=settings[i].memory_usage_bit-prev_table_memory_bit-level_memory_usage_bit 
 					+table_memory_bit+run_memory_usage_bit; //update memory usage
-				settings[i].run_num=settings[i].run_num-1+settings[i].size_factor; //update run_num
+				settings[i].run_num=settings[i].run_num-1+ceil(settings[i].size_factor); //update run_num
 			}
 		}
 	}
-
+	/*
+	printf("after_tiering\n");
+	print_tree_param(settings, max_level);*/
 	/*changing wisckey from top*/
 	for(uint32_t i=1; i<=max_level; i++){
 		if(settings[i].isinvalid) continue;
@@ -174,19 +193,29 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			uint64_t level_size=buffered_ent * pow(settings[i].size_factor, j);
 			if(settings[i].memory_usage_bit + level_size * 48 < memory_limit_bit){
 				settings[i].memory_usage_bit+=level_size * 48;
-				settings[i].WAF-=(j<=settings[i].border_of_leveling ? settings[i].size_factor: 1);
-				settings[i].border_of_wisckey=j;
+				settings[i].WAF-=(settings[i].lp[j].level_type==LEVELING ? settings[i].size_factor: 1);
+				settings[i].lp[j].is_wisckey=true;
+				settings[i].lp[j].level_type=settings[i].lp[j].level_type==TIERING?TIERING_WISCKEY:LEVELING_WISCKEY;
 			}
 		}
 	}
-
-	uint32_t min_WAF=UINT32_MAX;
+	/*
+	printf("after_wisckey\n");
+	print_tree_param(settings, max_level);*/
+	double min_WAF=UINT32_MAX;
 	uint32_t target_level=0;
 	/*find min WAF and setting params*/
 	for(uint32_t i=1; i<=max_level; i++){
+		if(settings[i].isinvalid) continue;
 		if(min_WAF > settings[i].WAF){
 			min_WAF=settings[i].WAF;
 			target_level=i;
+		}
+	}
+
+	for(uint32_t i=1; i<=max_level; i++){
+		if(i!=target_level){
+			free(settings[i].lp);
 		}
 	}
 
@@ -212,6 +241,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	res.last_size_factor=res.normal_size_factor=res.tr.size_factor;
 	res.version_enable=true;
 	res.write_buffer_ent=buffered_ent;
+	res.read_amplification=TARGETFPR;
 
 	free(settings);
 	return res;

@@ -80,13 +80,16 @@ compaction_master *compaction_init(uint32_t compaction_queue_num);
 void compaction_free(compaction_master *cm);
 void compaction_issue_req(compaction_master *cm, compaction_req *);
 void compaction_wait(compaction_master *cm);
-level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
-level* compaction_LW2LW(compaction_master *cm, level *src, level *des); //done and debug
-level* compaction_LW2TI(compaction_master *cm, level *src, level *des); //done and debug
-level* compaction_LW2LE(compaction_master *cm, level *src, level *des);
-level* compaction_LE2LE(compaction_master *cm, level *src, level *des);
-level* compaction_LE2TI(compaction_master *cm, level *src, level *des);	
-level* compaction_TI2TI(compaction_master *cm, level *src, level *des); //done
+//level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
+level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t target_version); //done and debug
+level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version); //done and debug
+level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t target_version);
+level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version);
+level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t target_version);
+level* compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version);	
+level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t target_version); //done
+level *compaction_TW_convert_LW(compaction_master *cm, level *src);
+
 level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx); //done and debug
 run *compaction_wisckey_to_normal(compaction_master *cm, level *src, 
 		run *previous_run, uint32_t *moved_entry_num, 
@@ -108,7 +111,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_strea
 		struct sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
 		bool all_empty_stop, uint32_t limit, uint32_t version,
 		bool merge_flag,
-		bool (*invalidate_function)(level *des, uint32_t taget_idx, uint32_t target_ridx, key_ptr_pair kp));
+		bool (*invalidate_function)(level *des, uint32_t taget_idx, uint32_t target_version, key_ptr_pair kp, bool merge));
 
 
 sst_file *bis_to_sst_file(struct sst_bf_in_stream *bis);

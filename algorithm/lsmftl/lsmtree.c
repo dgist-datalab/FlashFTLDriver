@@ -44,6 +44,7 @@ static inline void lsmtree_monitor_init(){
 	measure_init(&LSM.monitor.RH_make_stopwatch[1]);
 }
 
+#define ENTRY_TO_SST_PF(entry_num) ((entry_num)/KP_IN_PAGE+((entry_num)%KP_IN_PAGE?1:0))
 uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 //	tiered_level_fd_open();
 	io_manager_init(li);
@@ -59,30 +60,44 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
 
-	uint32_t now_level_size=LSM.param.normal_size_factor;
+	uint32_t now_level_size=LSM.param.normal_size_factor * LSM.param.write_buffer_ent;
+	read_helper_param rhp;
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
-		if(i<=LSM.param.tr.border_of_leveling){
-			if(i<=LSM.param.tr.border_of_wisckey){
-				LSM.disk[i]=level_init(now_level_size, 1, LEVELING_WISCKEY, i);
-				printf("LW[%d] - size:%u data:%.2lf(%%)\n",i, LSM.disk[i]->max_sst_num, 
-						(double)LSM.disk[i]->max_sst_num*KP_IN_PAGE/RANGE*100);
-			}
-			else{
-				LSM.disk[i]=level_init(now_level_size, 1, LEVELING, i);
-				printf("L[%d] - size:%u data:%.2lf(%%)\n",i, LSM.disk[i]->max_sst_num, 
-						(double)LSM.disk[i]->max_sst_num*KP_IN_PAGE/RANGE*100);	
-			}
+		rhp=lsmtree_get_target_rhp(i);
+		
+		switch(LSM.param.tr.lp[i+1].level_type){
+			case LEVELING:
+				LSM.disk[i]=level_init(
+						ENTRY_TO_SST_PF(now_level_size), 1, LEVELING, i);
+				printf("L[%d] - size:%u data:%.2lf(%%)H:%s\n",i, LSM.disk[i]->max_sst_num, 
+						(double)now_level_size/RANGE*100,
+						read_helper_type(rhp.type));	
+				break;
+			case LEVELING_WISCKEY:
+				LSM.disk[i]=level_init(
+						ENTRY_TO_SST_PF(now_level_size), 1, LEVELING_WISCKEY, i);
+				printf("LW[%d] - size:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_sst_num, 
+						(double)now_level_size/RANGE*100,
+						read_helper_type(rhp.type));
+				break;
+			case TIERING:
+				LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, TIERING, i);
+				printf("TI[%d] - run_num:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_run_num, 
+						(double)now_level_size/RANGE*100,
+						read_helper_type(rhp.type));
+
+				break;
+			case TIERING_WISCKEY:
+				LSM.disk[i]=level_init(
+						ENTRY_TO_SST_PF(now_level_size), LSM.param.normal_size_factor, TIERING_WISCKEY, i);
+				printf("TW[%d] - run_num:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_run_num,
+						(double)now_level_size/RANGE*100,
+						read_helper_type(rhp.type));
+				break;
 		}
-		else{
-			if(i<=LSM.param.tr.border_of_wisckey){
-				EPRINT("tiering wisckey", true);
-			}
-			else{
-				LSM.disk[i]=level_init(now_level_size, 1, TIERING, i);
-				printf("TI[%d] - run_num:%u\n",i, LSM.disk[i]->max_run_num);
-			}
-		}
+
 		now_level_size*=LSM.param.normal_size_factor;
+		now_level_size=now_level_size>RANGE?RANGE:now_level_size;
 		rwlock_init(&LSM.level_rwlock[i]);
 	}
 
@@ -220,6 +235,8 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 		rwlock_destroy(&LSM.level_rwlock[i]);
 	}	
 
+	free(LSM.param.tr.lp);
+
 	version_free(LSM.last_run_version);
 
 	page_manager_free(LSM.pm);
@@ -261,7 +278,8 @@ retry:
 		return false;
 	}
 
-	if(r_param->prev_level==LSM.param.LEVELN-1){
+	if(LSM.disk[r_param->prev_level]->level_type==TIERING ||
+		LSM.disk[r_param->prev_level]->level_type==TIERING_WISCKEY){
 		if(LSM.param.version_enable){
 			if(r_param->prev_run==UINT32_MAX){
 				r_param->prev_run=r_param->version;
@@ -269,6 +287,10 @@ retry:
 			else{
 				return false;
 			}
+			*lptr=LSM.disk[r_param->prev_level];
+			uint32_t start_version_number=version_level_to_start_version(LSM.last_run_version, 
+					r_param->prev_level);
+			*rptr=&(*lptr)->array[r_param->prev_run-start_version_number];
 		}
 		else{
 			if(r_param->prev_run==UINT32_MAX){
@@ -280,17 +302,18 @@ retry:
 				}
 				r_param->prev_run--;
 			}
+
+			*lptr=LSM.disk[r_param->prev_level];
+			*rptr=&(*lptr)->array[r_param->prev_run];
 		}
 
-		*lptr=LSM.disk[r_param->prev_level];
-		*rptr=&(*lptr)->array[r_param->prev_run];
 	}
 	else{
 		*lptr=LSM.disk[r_param->prev_level];
 		*rptr=&(*lptr)->array[0];
 	}
 
-	if((*lptr)->level_type!=TIERING){
+	if((*lptr)->level_type!=TIERING  && (*lptr)->level_type!=TIERING_WISCKEY){
 		*sptr=level_retrieve_sst(*lptr, lba);
 	}
 	else{
@@ -525,7 +548,7 @@ read_helper_check_again:
 	}
 	else{
 		/*issue map read!*/
-		read_target_ppa=target->level_type==TIERING?
+		read_target_ppa=target->level_type==TIERING || target->level_type==TIERING_WISCKEY?
 			sst_find_map_addr(sptr, req->key):sptr->file_addr.map_ppa;
 		if(read_target_ppa==UINT32_MAX){
 			goto notfound;
@@ -564,7 +587,7 @@ retry:
 		compaction_issue_req(LSM.cm, temp_req);
 
 
-		LSM.wb_array[LSM.now_wb]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
+		LSM.wb_array[LSM.now_wb]=write_buffer_init(QDEPTH, LSM.pm, NORMAL_WB);
 		if(++LSM.now_wb==WRITEBUFFER_NUM){
 			LSM.now_wb=0;
 		}
@@ -798,8 +821,9 @@ void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx){
 }
 
 read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
-	if(level_idx<=LSM.param.tr.border_of_bf){
-		if(level_idx<=LSM.param.tr.border_of_wisckey){
+	level_idx++;
+	if(LSM.param.tr.lp[level_idx].is_bf){
+		if(LSM.param.tr.lp[level_idx].is_wisckey){
 			return LSM.param.bf_ptr_guard_rhp;
 		}
 		else{
@@ -807,8 +831,8 @@ read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
 		}
 	}
 	else{
-		if(level_idx<=LSM.param.tr.border_of_wisckey){
-			EPRINT("?????", true);
+		if(LSM.param.tr.lp[level_idx].is_wisckey){
+			EPRINT("need plr_ptr",true);
 		}
 		else{
 			return LSM.param.plr_rhp;

@@ -15,30 +15,32 @@ version *version_init(uint8_t total_version_number,
 	res->max_valid_version_num=total_version_number;
 	printf("max_version idx:%u\n", total_version_number);
 
-	res->ridx_empty_queue=new std::queue<uint32_t>*[leveln];
+	res->version_empty_queue=new std::queue<uint32_t>*[leveln];
 	res->start_vidx_of_level=(uint32_t*)malloc(sizeof(uint32_t)*leveln);
 
-	uint32_t ridx=0;
+	uint32_t version=0;
 	for(int32_t i=leveln-1; i>=0; i--){
-		res->ridx_empty_queue[i]=new std::queue<uint32_t>();
-		res->start_vidx_of_level[i]=ridx;
+		res->version_empty_queue[i]=new std::queue<uint32_t>();
+		res->start_vidx_of_level[i]=version;
+		uint32_t limit=i==leveln-1?LSM.param.last_size_factor:LSM.param.normal_size_factor;
 		switch(disk[i]->level_type){
 			case LEVELING:
 			case LEVELING_WISCKEY:
-				res->ridx_empty_queue[i]->push(ridx++);
+				res->version_empty_queue[i]->push(version++);
 				break;
+			case TIERING_WISCKEY:
 			case TIERING:
-				for(uint32_t j=0; j<LSM.param.normal_size_factor; j++){
-					res->ridx_empty_queue[i]->push(ridx++);
+				for(uint32_t j=0; j<limit; j++){
+					res->version_empty_queue[i]->push(version++);
 				}
 				break;
 		}
 	}
 
 
-	res->ridx_populate_queue=new std::queue<uint32_t>*[leveln];
+	res->version_populate_queue=new std::queue<uint32_t>*[leveln];
 	for(uint32_t i=0; i<leveln; i++){
-		res->ridx_populate_queue[i]=new std::queue<uint32_t>();
+		res->version_populate_queue[i]=new std::queue<uint32_t>();
 	}
 
 	res->total_version_number=total_version_number;
@@ -52,42 +54,42 @@ version *version_init(uint8_t total_version_number,
 	return res;
 }
 
-uint32_t version_get_empty_ridx(version *v, uint32_t level){
-	if(v->ridx_empty_queue[level]->empty()){
-		EPRINT("should merge before empty ridx", true);
+uint32_t version_get_empty_version(version *v, uint32_t level){
+	if(v->version_empty_queue[level]->empty()){
+		EPRINT("should merge before empty version", true);
 	}
-	uint32_t res=v->ridx_empty_queue[level]->front();
-	v->ridx_empty_queue[level]->pop();
+	uint32_t res=v->version_empty_queue[level]->front();
+	v->version_empty_queue[level]->pop();
 	return res;
 }
 
-void version_get_merge_target(version *v, uint32_t *ridx_set, uint32_t level){
+void version_get_merge_target(version *v, uint32_t *version_set, uint32_t level){
 	for(uint32_t i=0; i<(1+1); i++){
-		ridx_set[i]=v->ridx_populate_queue[level]->front();
-		v->ridx_populate_queue[level]->pop();
+		version_set[i]=v->version_populate_queue[level]->front();
+		v->version_populate_queue[level]->pop();
 	}
 }
 
-void version_unpopulate_run(version *v, uint32_t ridx, uint32_t level_idx){
-	v->ridx_empty_queue[level_idx]->push(ridx);
+void version_unpopulate(version *v, uint32_t version, uint32_t level_idx){
+	v->version_empty_queue[level_idx]->push(version);
 }
 
-void version_populate_run(version *v, uint32_t ridx, uint32_t level_idx){
-	v->ridx_populate_queue[level_idx]->push(ridx);
+void version_populate(version *v, uint32_t version, uint32_t level_idx){
+	v->version_populate_queue[level_idx]->push(version);
 	if(level_idx==LSM.param.LEVELN-1){
-		version_enable_ealry_invalidation(v,ridx);
+		version_enable_ealry_invalidation(v,version);
 	}
 }
 
 void version_sanity_checker(version *v){
 	uint32_t remain_empty_size=0;
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
-		remain_empty_size+=v->ridx_empty_queue[i]->size();
+		remain_empty_size+=v->version_empty_queue[i]->size();
 	}
 
 	uint32_t populate_size=0;
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
-		populate_size+=v->ridx_populate_queue[i]->size();
+		populate_size+=v->version_populate_queue[i]->size();
 	}
 	if(remain_empty_size+populate_size!=v->max_valid_version_num){
 		printf("error log : empty-size(%d) populate-size(%d)\n", remain_empty_size, populate_size);
@@ -97,11 +99,11 @@ void version_sanity_checker(version *v){
 
 void version_free(version *v){
 	for(uint32_t i=0; i<v->leveln; i++){
-		delete v->ridx_empty_queue[i];
-		delete v->ridx_populate_queue[i];
+		delete v->version_empty_queue[i];
+		delete v->version_populate_queue[i];
 	}
-//	delete v->ridx_empty_queue;
-//	delete v->ridx_populate_queue;
+//	delete v->version_empty_queue;
+//	delete v->version_populate_queue;
 
 	free(v->start_vidx_of_level);
 	free(v->version_early_invalidate);
@@ -110,30 +112,30 @@ void version_free(version *v){
 	free(v);
 }
 extern uint32_t debug_lba;
-void version_coupling_lba_ridx(version *v, uint32_t lba, uint8_t ridx){
-	if(ridx>v->total_version_number){
+void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version){
+	if(version>v->total_version_number){
 		EPRINT("over version num", true);
 	}
 	if(lba==debug_lba){
 		if(LSM.global_debug_flag){
 			EPRINT("debug point", false);
 		}
-		printf("[version_map] lba:%u->%u\n",lba, ridx);
+		printf("[version_map] lba:%u->%u\n",lba, version);
 	}
 	fdriver_lock(&v->version_lock);
 	if(v->key_version[lba]!=UINT8_MAX){
 		v->version_invalidation_cnt[v->key_version[lba]]++;
 	}
-	v->key_version[lba]=ridx;
+	v->key_version[lba]=version;
 	fdriver_unlock(&v->version_lock);
 }
 
 
-void version_reinit_early_invalidation(version *v, uint32_t ridx_num, uint32_t *ridx){
+void version_reinit_early_invalidation(version *v, uint32_t version_num, uint32_t *version){
 	printf("should I need it?\n");
-	for(uint32_t i=0; i<ridx_num; i++){
-		v->version_invalidation_cnt[ridx[i]]=0;
-		v->version_early_invalidate[ridx[i]]=false;
+	for(uint32_t i=0; i<version_num; i++){
+		v->version_invalidation_cnt[version[i]]=0;
+		v->version_early_invalidate[version[i]]=false;
 	}
 }
 
@@ -143,7 +145,7 @@ uint32_t version_get_early_invalidation_target(version *v){
 	static int cnt=0;
 	printf("-------------%d------------------\n",cnt++);
 	for(uint32_t i=0; i<v->max_valid_version_num; i++){
-		printf("%u -> ridx:%u -> %s\n", i, version_to_run(v,i), 
+		printf("%u -> version:%u -> %s\n", i, version_to_run(v,i), 
 				v->version_early_invalidate[version_to_run(v,i)]?"true":"false");
 	}*/
 
@@ -155,9 +157,9 @@ uint32_t version_get_early_invalidation_target(version *v){
 	return UINT32_MAX;
 }
 
-static bool early_invalidate_available_check(uint32_t ridx){
+static bool early_invalidate_available_check(uint32_t version){
 	printf("should I need it?\n");
-	run *r=&LSM.disk[LSM.param.LEVELN-1]->array[ridx];
+	run *r=&LSM.disk[LSM.param.LEVELN-1]->array[version];
 	sst_file *sptr;
 	map_range *mptr;
 	uint32_t sidx, midx;
@@ -173,20 +175,20 @@ static bool early_invalidate_available_check(uint32_t ridx){
 
 uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num){
 	printf("should I need it?\n");
-	uint32_t target_ridx=UINT32_MAX;
+	uint32_t target_version=UINT32_MAX;
 	uint32_t target_invalidation_cnt=0;
 	for(uint32_t i=v->last_level_version_sidx; i<v->max_valid_version_num; i++){
 		if(v->version_early_invalidate[i]) continue;
 		if(LSM.now_merging_run[0]==i || LSM.now_merging_run[1]==i) continue;
 		if(target_invalidation_cnt<v->version_invalidation_cnt[i]){
 			if(early_invalidate_available_check(i)){
-				target_ridx=i;
+				target_version=i;
 				target_invalidation_cnt=v->version_invalidation_cnt[i];
 			}	
 		}
 	}
-	if(target_ridx==UINT32_MAX){
-		return target_ridx;
+	if(target_version==UINT32_MAX){
+		return target_version;
 	}
 
 	if(invalidated_num){
@@ -194,20 +196,21 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 	}
 	if(avg_invalidated_num){
 		*avg_invalidated_num=(target_invalidation_cnt/
-			LSM.disk[LSM.param.LEVELN-1]->array[target_ridx].now_sst_file_num);
+			LSM.disk[LSM.param.LEVELN-1]->array[target_version].now_sst_file_num);
 	}
 
-	return target_ridx;
+	return target_version;
 }
 
 uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, 
-		uint32_t original_version, uint32_t target_version){
+		uint32_t level_idx, uint32_t target_version){
 	for(uint32_t i=start_lba; i<=end_lba; i++){
-		if(original_version==UINT32_MAX || version_map_lba(v, i)==original_version){
+		if(level_idx==UINT32_MAX || 
+				version_to_level_idx(v, version_map_lba(v, i), v->leveln)==level_idx){
 			if(i==debug_lba){
 				EPRINT("target lba's version is updated",false);
 			}
-			version_coupling_lba_ridx(v, i, target_version);
+			version_coupling_lba_version(v, i, target_version);
 		}
 		else{
 			if(i==debug_lba){
@@ -228,6 +231,6 @@ void version_make_early_invalidation_enable_old(version *v){
 }
 
 
-uint32_t version_level_to_start_version(version *v, uint32_t start_idx){
-	return v->start_vidx_of_level[start_idx];
+uint32_t version_level_to_start_version(version *v, uint32_t lev_idx){
+	return v->start_vidx_of_level[lev_idx];
 }

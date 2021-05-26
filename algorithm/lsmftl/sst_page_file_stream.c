@@ -314,7 +314,9 @@ value_set *sst_pis_get_result(sst_pf_in_stream *is,
 	is->now->end_lba=((key_ptr_pair*)is->now->data)[is->idx-1].lba;
 	*result_ptr=is->now;
 	is->now->_read_helper=is->rh;
-	read_helper_insert_done(is->rh);
+	if(is->rh){
+		read_helper_insert_done(is->rh);
+	}	
 	is->rh=NULL;
 	is->vs=NULL;
 	is->now=NULL;

@@ -108,26 +108,31 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		read_helper_stream_insert(rh, kp_set[i].lba, kp_set[i].piece_ppa);
 	}
 	*temp_iter=iter;
+	
+	uint32_t last_idx=i-1;
 
 	uint32_t map_ppa=page_manager_get_new_ppa(LSM.pm, false, DATASEG); //DATASEG for sequential tiering 
-	validate_map_ppa(LSM.pm->bm, map_ppa, kp_set[0].lba,  kp_set[i].lba, true);
+	validate_map_ppa(LSM.pm->bm, map_ppa, kp_set[0].lba,  kp_set[last_idx].lba, true);
+
+	sst_file *res=sst_init_empty(PAGE_FILE);
+	res->file_addr.map_ppa=map_ppa;
+
+	res->start_lba=kp_set[0].lba;
+	res->end_lba=kp_set[last_idx].lba;
+	res->_read_helper=rh;
+
+	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[last_idx].piece_ppa) && 
+			SEGNUM(kp_set[0].piece_ppa)==map_ppa/_PPS){
+		res->sequential_file=true;
+	}
+
 	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 	write_req->type=MAPPINGW;
 	write_req->param=(void*)vs;
 	write_req->end_req=comp_alreq_end_req;
 	io_manager_issue_internal_write(map_ppa, vs, write_req, false);
 
-	sst_file *res=sst_init_empty(PAGE_FILE);
-	res->file_addr.map_ppa=map_ppa;
-
-	res->start_lba=kp_set[0].lba;
-	res->end_lba=kp_set[i].lba;
-	res->_read_helper=rh;
-
-	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[i].piece_ppa) && 
-			SEGNUM(kp_set[0].piece_ppa)==map_ppa/_PPS){
-		res->sequential_file=true;
-	}
+	
 	return res;
 }
 
@@ -144,6 +149,11 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	while(wb->buffered_entry_num){
 		key_ptr_pair *temp_kp_set=write_buffer_flush(wb, false);
 		for(uint32_t i=0; i<KP_IN_PAGE && temp_kp_set[i].lba!=UINT32_MAX; i++){
+			std::map<uint32_t, uint32_t>::iterator find_iter=LSM.flushed_kp_set->find(temp_kp_set[i].lba);
+			if(find_iter!=LSM.flushed_kp_set->end()){
+				invalidate_piece_ppa(LSM.pm->bm, find_iter->second, true);
+				LSM.flushed_kp_set->erase(find_iter);
+			}
 			LSM.flushed_kp_set->insert(
 					std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));	
 		}
@@ -154,11 +164,11 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 	rwlock_write_unlock(&LSM.flush_wait_wb_lock);
 
-	if(LSM.flushed_kp_set->size()>=LSM.param.write_buffer_ent){
-		level *res=level_init(LSM.param.write_buffer_ent/KP_IN_PAGE, 1, LEVELING_WISCKEY, 0);
+	if(LSM.flushed_kp_set->size()+QDEPTH>=LSM.param.write_buffer_ent){
+		level *res=level_init(LSM.param.write_buffer_ent/KP_IN_PAGE, 1, LEVELING_WISCKEY, UINT32_MAX);
 		sst_file *sptr=NULL;
-		std::map<uint32_t, uint32_t>::iterator *iter=NULL;
-		while((sptr=kp_to_sstfile(LSM.flushed_kp_set, iter))){
+		std::map<uint32_t, uint32_t>::iterator iter=LSM.flushed_kp_set->begin();
+		while((sptr=kp_to_sstfile(LSM.flushed_kp_set, &iter))){
 			level_append_sstfile(res, sptr, true);
 		}
 		return res;
@@ -166,6 +176,31 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	else{
 		return NULL;
 	}
+}
+
+static inline level *TW_compaction(compaction_master *cm, level *src, level *des,
+		uint32_t target_version){
+	if(des->idx==2){
+		LSM.global_debug_flag=true;
+	}
+	level *res=NULL;
+	level *temp=compaction_TW_convert_LW(cm, src);
+	switch(des->level_type){
+		case LEVELING:
+			res=compaction_LW2LE(cm, temp, des, target_version);
+			break;
+		case LEVELING_WISCKEY:
+			res=compaction_LW2LW(cm, temp, des, target_version);
+			break;
+		case TIERING:
+			res=compaction_LW2TI(cm, temp, des, target_version);
+			break;
+		case TIERING_WISCKEY:
+			res=compaction_LW2TW(cm, temp, des, target_version);
+			break;
+	}
+	level_free(temp, LSM.pm);
+	return res;
 }
 
 static inline void do_compaction(compaction_master *cm, compaction_req *req, 
@@ -179,31 +214,80 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 	}
 
 	uint32_t end_type=LSM.disk[end_idx]->level_type;
-	switch(start_idx!=-1?LSM.disk[start_idx]->level_type:LSM.disk[0]->level_type){
+	level *src_lev=temp_level?temp_level:LSM.disk[start_idx];
+	level *des_lev=LSM.disk[end_idx];
+	uint32_t target_version;
+	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
+		target_version=version_level_to_start_version(LSM.last_run_version, des_lev->idx);
+	}
+	else{	
+		target_version=version_get_empty_version(LSM.last_run_version, des_lev->idx);
+	}
+
+	LSM.monitor.compaction_cnt[end_idx]++;
+	switch(src_lev->level_type){
 		case LEVELING:
 			if(end_type==LEVELING){
-				lev=compaction_LE2LE(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+				lev=compaction_LE2LE(cm, src_lev, des_lev, target_version);
 			}
 			else{
-				lev=compaction_LE2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+				if(LSM.disk[end_idx]->level_type!=TIERING){
+					EPRINT("wtf??", true);
+				}
+				lev=compaction_LE2TI(cm, src_lev, des_lev, target_version);
 			}
 			break;
 		case LEVELING_WISCKEY:
 			switch(end_type){
 				case LEVELING_WISCKEY:
-					lev=compaction_LW2LW(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+					lev=compaction_LW2LW(cm, src_lev, des_lev, target_version);
 					break;
 				case LEVELING:
-					lev=compaction_LW2LE(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+					lev=compaction_LW2LE(cm, src_lev, des_lev, target_version);
+					break;
+				case TIERING_WISCKEY:
+					lev=compaction_LW2TW(cm, src_lev, des_lev, target_version);
 					break;
 				case TIERING:
-					lev=compaction_LW2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+					lev=compaction_LW2TI(cm, src_lev, des_lev, target_version);
 					break;
 			}
 			break;
 		case TIERING:
-			lev=compaction_TI2TI(cm, LSM.disk[start_idx], LSM.disk[end_idx]);
+			if(LSM.disk[end_idx]->level_type!=TIERING){
+				EPRINT("wtf??", true);
+			}
+			lev=compaction_TI2TI(cm, src_lev, LSM.disk[end_idx], target_version);
 			break;
+		case TIERING_WISCKEY:
+			lev=TW_compaction(cm, src_lev, LSM.disk[end_idx], target_version);
+			break;
+	}
+
+	/*populate version*/
+	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
+		if(!LSM.last_run_version->version_populate_queue[des_lev->idx]->size()){
+			version_populate(LSM.last_run_version, target_version, des_lev->idx);
+		}
+	}
+	else{	
+		version_populate(LSM.last_run_version, target_version, des_lev->idx);
+	}
+
+	/*unpopulate_version*/
+	if(!temp_level){
+		if(src_lev->level_type==LEVELING || src_lev->level_type==LEVELING_WISCKEY){
+			version_unpopulate(LSM.last_run_version,
+					version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
+					src_lev->idx);
+		}
+		else{
+			for(uint32_t i=0; i<src_lev->run_num; i++){
+				version_unpopulate(LSM.last_run_version,
+						version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
+						src_lev->idx);
+			}
+		}
 	}
 
 	disk_change(temp_level?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
@@ -269,6 +353,7 @@ again:
 			rwlock_write_lock(&LSM.level_rwlock[req->end_level]);
 			src=compaction_merge(cm, LSM.disk[req->end_level], merged_idx_set);
 			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
+			LSM.monitor.compaction_cnt[req->end_level+1]++;
 			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
 		}
 end:

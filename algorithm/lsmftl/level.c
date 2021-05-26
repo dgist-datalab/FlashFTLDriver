@@ -11,7 +11,7 @@ level *level_init(uint32_t max_sst_num, uint32_t max_run_num, uint32_t level_typ
 		run_space_init(&res->array[i], max_sst_num/max_run_num, -1, 0);
 	}
 	res->level_type=level_type;
-	if(res->level_type!=TIERING){
+	if(res->level_type!=TIERING && res->level_type!=TIERING_WISCKEY){
 		res->run_num=1;
 	}
 	res->now_sst_num=0;
@@ -21,7 +21,7 @@ level *level_init(uint32_t max_sst_num, uint32_t max_run_num, uint32_t level_typ
 }
 
 uint32_t level_append_sstfile(level *lev, sst_file *sptr, bool move_originality){
-	if(lev->level_type==TIERING){
+	if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
 		EPRINT("it can't be", true);
 		/*
 		if(sptr->type!=BLOCK_FILE){
@@ -85,7 +85,7 @@ level *level_split_lw_run_to_lev(run *rptr,
 }
 
 uint32_t level_deep_append_sstfile(level *lev, sst_file *sptr){
-	if(lev->level_type==TIERING){
+	if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
 		EPRINT("it can't be", true);
 		/*
 		if(sptr->type!=BLOCK_FILE){
@@ -130,7 +130,7 @@ void level_trivial_move_run(level *des, level *src, uint32_t from, uint32_t to, 
 }
 
 uint32_t level_append_run_copy_move_originality(level *lev, run *r, uint32_t ridx){
-	if(lev->level_type!=TIERING){
+	if(lev->level_type!=TIERING && lev->level_type!=TIERING_WISCKEY){
 		EPRINT("it must be tiering level", true);
 	}
 	if(lev->run_num >= lev->max_run_num){
@@ -139,12 +139,13 @@ uint32_t level_append_run_copy_move_originality(level *lev, run *r, uint32_t rid
 
 	run_shallow_copy_move_originality(&lev->array[ridx], r);
 	lev->run_num++;
+	lev->now_sst_num+=r->now_sst_file_num;
 	//run_copy_src_empty(&lev->array[lev->run_num++], r);
 	return 1;
 }
 
 uint32_t level_deep_append_run(level *lev, run *r){
-	if(lev->level_type!=TIERING){
+	if(lev->level_type!=TIERING && lev->level_type!=TIERING_WISCKEY){
 		EPRINT("it must be tiering level", true);
 	}
 	if(lev->run_num >= lev->max_run_num){
@@ -156,21 +157,21 @@ uint32_t level_deep_append_run(level *lev, run *r){
 }
 
 sst_file* level_retrieve_sst(level *lev, uint32_t lba){
-	if(lev->level_type==TIERING){
+	if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
 		EPRINT("Tier level not allowed!", true);
 	}
 	return run_retrieve_sst(&lev->array[0], lba);
 }
 
 sst_file* level_retrieve_close_sst(level *lev, uint32_t lba){
-	if(lev->level_type==TIERING){
+	if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
 		EPRINT("Tier level not allowed!", true);
 	}
 	return run_retrieve_close_sst(&lev->array[0], lba);
 }
 
 sst_file* level_retrieve_sst_with_check(level *lev, uint32_t lba){
-	if(lev->level_type==TIERING){
+	if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
 		EPRINT("Tier level not allowed!", true);
 	}
 	sst_file *res=run_retrieve_sst(&lev->array[0], lba);
@@ -188,7 +189,7 @@ sst_file* level_retrieve_sst_with_check(level *lev, uint32_t lba){
 }
 
 sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa, uint32_t *target_ridx, uint32_t *sptr_idx){
-	if(lev->level_type!=TIERING){
+	if(lev->level_type!=TIERING && lev->level_type != TIERING_WISCKEY){
 		EPRINT("tiering only",true);
 	}
 
@@ -232,12 +233,14 @@ void level_free(level *lev, page_manager *pm){
 }
 
 uint32_t level_update_run_at_move_originality(level *lev, uint32_t idx, run *r, bool new_run){
-	if(lev->level_type!=TIERING){
+	if(lev->level_type!=TIERING && lev->level_type !=TIERING_WISCKEY){
 		EPRINT("it must be tiering level", true);
 	}
+
 	if(lev->run_num > lev->max_run_num){
 		EPRINT("over run in level", true);
 	}
+
 	run_shallow_copy_move_originality(&lev->array[idx], r);
 	if(new_run){
 		lev->now_sst_num+=r->now_sst_file_num;
@@ -255,7 +258,7 @@ void level_print(level *lev){
 		content_num+=read_helper_get_cnt(sptr->_read_helper);
 	}
 	if(lev->now_sst_num){
-		if(lev->level_type==TIERING){
+		if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
 			printf("level idx:%d run %u/%u content_num: %u (%.2lf %%)\n",
 					lev->idx,
 					lev->run_num, lev->max_run_num,
@@ -303,7 +306,7 @@ void level_run_reinit(level *lev, uint32_t idx){
 }
 
 void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr){
-	if(lev->level_type!=TIERING){
+	if(lev->level_type!=TIERING && lev->level_type!=TIERING_WISCKEY){
 		EPRINT("only tier available", true);
 	}
 	
@@ -343,7 +346,7 @@ void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 }
 
 void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr){
-	if(lev->level_type!=TIERING){
+	if(lev->level_type!=TIERING && lev->level_type!=TIERING_WISCKEY){
 		EPRINT("only tier available", true);
 	}
 
@@ -406,7 +409,7 @@ void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 }
 
 void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
-	if(lev->level_type!=TIERING){
+	if(lev->level_type!=TIERING && lev->level_type!=TIERING_WISCKEY){
 		EPRINT("only tier available", true);
 	}
 	
@@ -422,7 +425,7 @@ void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
 }
 
 run *level_LE_to_run(level *lev, bool move_originality){
-	if(lev->level_type!=LEVELING){
+	if(lev->level_type!=LEVELING && lev->level_type!=LEVELING_WISCKEY){
 		EPRINT("the lev should be LEVELING", true);
 	}
 

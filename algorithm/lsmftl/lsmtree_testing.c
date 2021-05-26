@@ -87,8 +87,8 @@ level *making_leveling(uint32_t sst_num, uint32_t populate_sst_num, bool isseque
 	std::set<uint32_t>* lba_set[100];
 	uint32_t version_idx;
 	if(populate_sst_num){
-		version_idx=version_get_empty_ridx(LSM.last_run_version, idx);
-		version_populate_run(LSM.last_run_version, version_idx, idx);
+		version_idx=version_get_empty_version(LSM.last_run_version, idx);
+		version_populate(LSM.last_run_version, version_idx, idx);
 		sorted_set=get_lba_set(0, RANGE, KP_IN_PAGE * populate_sst_num, issequential);
 	}
 	if(wisckey){
@@ -125,8 +125,8 @@ level *making_leveling(uint32_t sst_num, uint32_t populate_sst_num, bool isseque
 }
 
 level *making_tiering(uint32_t run_num, uint32_t sst_num, uint32_t populate_run_num, 
-	bool issequential, uint32_t idx){
-	level *res=level_init(sst_num, run_num, TIERING, idx);
+	bool issequential, uint32_t idx, bool wisckey){
+	level *res=level_init(sst_num, run_num, wisckey?TIERING_WISCKEY:TIERING, idx);
 	std::set<uint32_t> *run_set[100];
 	std::set<uint32_t>* lba_set[100];
 	for(uint32_t i=0; i<populate_run_num; i++){
@@ -136,8 +136,8 @@ level *making_tiering(uint32_t run_num, uint32_t sst_num, uint32_t populate_run_
 	for(uint32_t i=0; i<populate_run_num; i++){
 		uint32_t run_per_sst_num=sst_num/run_num;
 		run *new_run=run_init(run_per_sst_num, UINT32_MAX, 0);
-		uint32_t version_idx=version_get_empty_ridx(LSM.last_run_version, idx);
-		version_populate_run(LSM.last_run_version, version_idx, idx);
+		uint32_t version_idx=version_get_empty_version(LSM.last_run_version, idx);
+		version_populate(LSM.last_run_version, version_idx, idx);
 
 		uint32_t total_lba=KP_IN_PAGE * run_per_sst_num;
 		uint32_t round=(total_lba+run_per_sst_num)/_PPS+((total_lba+run_per_sst_num)%_PPS?1:0);
@@ -153,10 +153,21 @@ level *making_tiering(uint32_t run_num, uint32_t sst_num, uint32_t populate_run_
 				lba_set[sst_cnt_consume+sum_prev_sst+k]=split_lba_set(run_set[i], KP_IN_PAGE);
 			}
 
-			sst_file *sptr=get_dummy_block_sst(&lba_set[sst_cnt_consume+sum_prev_sst], 
+			sst_file *sptr;
+			sptr=get_dummy_block_sst(&lba_set[sst_cnt_consume+sum_prev_sst], 
 					now_sst_num, now_sst_num*KP_IN_PAGE, version_idx);
-
-			run_append_sstfile_move_originality(new_run, sptr);
+			if(wisckey){
+				map_range *mptr;
+				uint32_t midx;
+				for_each_map_range(sptr, mptr, midx){
+					sst_file *temp_sptr=sst_MR_to_sst_file(mptr);
+					run_append_sstfile_move_originality(new_run, temp_sptr);
+					sst_free(temp_sptr, LSM.pm);
+				}
+			}
+			else{
+				run_append_sstfile_move_originality(new_run, sptr);
+			}
 			sst_free(sptr, LSM.pm);
 			sum_prev_sst+=now_sst_num;
 		}
@@ -188,55 +199,27 @@ uint32_t lsmtree_testing(){
 	dummy_data=(char*)malloc(PAGESIZE);
 	LSM.param.normal_size_factor=10;
 	LSM.function_test_flag=true;
-	/*big sequential test*/
-	{
-		/*LE2LE
-		{
-			temp_disk[0]->level_type=LEVELING;
-			temp_disk[1]->level_type=LEVELING;
-			version *now_version=version_init(2, 2, RANGE, temp_disk, 2);
-			version *temp_version=LSM.last_run_version;
-			LSM.last_run_version=now_version;
-			disk[0]=making_leveling(10, 9, true, 0, false);
-			disk[1]=making_leveling(100, 80, true, 1, false);
-			compaction_test(disk, compaction_LE2LE);
-			LSM.last_run_version=temp_version;
-			version_free(now_version);
-			printf("big sequential test of LE2LE is passed\n");
-		}*/
-	}
 
 	/*big random test*/
 	{
-		/*LE2LE*/
+		/*CONVERT TW2LW*/
 		{
 			temp_disk[0]->level_type=LEVELING;
-			temp_disk[1]->level_type=LEVELING;
-			version *now_version=version_init(2, 2, RANGE, temp_disk, 2);
-			version *temp_version=LSM.last_run_version;
-			LSM.last_run_version=now_version;
-			disk[0]=making_leveling(10, 9, false, 0, false);
-			disk[1]=making_leveling(100, 90, false, 1, false);
-			compaction_test(disk, compaction_LE2LE);
-			LSM.last_run_version=temp_version;
-			version_free(now_version);
-			printf("big random test of LE2LE is passed\n");
-		}
-
-		/*LE2TI*/
-		{
-			temp_disk[0]->level_type=LEVELING;
-			temp_disk[1]->level_type=TIERING;
+			temp_disk[1]->level_type=TIERING_WISCKEY;
 			version *now_version=version_init(11, 10, RANGE, temp_disk, 2);
 			version *temp_version=LSM.last_run_version;
 			LSM.last_run_version=now_version;
-			disk[0]=making_leveling(10, 9, false, 0, false);
-			disk[1]=making_tiering(10, 100, 8, false, 1);
+			disk[1]=making_tiering(10, 90, 8, false, 1, true);
+			
+			level *temp=compaction_TW_convert_LW(LSM.cm, disk[1]);
+			level_consistency_check(temp);
+			level_free(temp, LSM.pm);
+			level_free(disk[1], LSM.pm);
 
-			compaction_test(disk, compaction_LE2TI);
+
 			LSM.last_run_version=temp_version;
 			version_free(now_version);
-			printf("big random test of LE2TI is passed\n");
+			printf("big random test of LE2LE is passed\n");
 		}
 	}
 	free(dummy_data);
@@ -292,7 +275,7 @@ static char *flush_set(std::set<uint32_t> *target, bool map_write_same_block, ui
 
 		*(uint32_t*)&dummy_data[LPAGESIZE*(mapping[cnt].piece_ppa%L2PGAP)]=mapping[cnt].lba;
 
-		version_coupling_lba_ridx(LSM.last_run_version, mapping[cnt].lba, version_idx);
+		version_coupling_lba_version(LSM.last_run_version, mapping[cnt].lba, version_idx);
 
 		validate_piece_ppa(LSM.pm->bm, 1, &mapping[cnt].piece_ppa, 
 				&mapping[cnt].lba, true);

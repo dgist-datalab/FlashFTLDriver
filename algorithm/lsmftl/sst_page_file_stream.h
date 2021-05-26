@@ -40,11 +40,15 @@ typedef struct sst_pf_in_stream{
 }sst_pf_in_stream;
 
 sst_pf_out_stream* sst_pos_init_sst(sst_file *, struct inter_read_alreq_param **,
-		uint32_t set_number, bool(*check_done)( struct inter_read_alreq_param*, bool), 
+		uint32_t set_number,
+		uint32_t version_number,
+		bool(*check_done)( struct inter_read_alreq_param*, bool), 
 		bool (*file_done)(struct inter_read_alreq_param *));
 
 sst_pf_out_stream* sst_pos_init_mr(map_range *, struct inter_read_alreq_param **,
-		uint32_t set_number, bool(*check_done)( struct inter_read_alreq_param*, bool), 
+		uint32_t set_number, 
+		uint32_t version_number,
+		bool(*check_done)( struct inter_read_alreq_param*, bool), 
 		bool (*file_done)(struct inter_read_alreq_param *));
 
 sst_pf_out_stream *sst_pos_init_kp(key_ptr_pair *data);

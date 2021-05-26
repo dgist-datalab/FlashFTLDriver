@@ -1,7 +1,7 @@
 #include "run.h"
 
 run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
-	run *res=(run*)malloc(sizeof(run));
+	run *res=(run*)calloc(1,sizeof(run));
 	res->now_sst_file_num=0;
 	res->max_sst_file_num=sst_file_num;
 	res->start_lba=start_lba;
@@ -141,4 +141,17 @@ void run_content_print(run *r, bool print_sst){
 			sst_print(sptr);
 		}
 	}
+}
+
+map_range *run_to_MR(run *r){
+	map_range *res=(map_range*)malloc(sizeof(map_range) * r->now_sst_file_num);
+	sst_file *sptr;
+	uint32_t i;
+	for_each_sst(r, sptr, i){
+		res[i].start_lba=sptr->start_lba;
+		res[i].end_lba=sptr->end_lba;
+		res[i].ppa=sptr->file_addr.map_ppa;
+		res[i].data=NULL;
+	}
+	return res;
 }

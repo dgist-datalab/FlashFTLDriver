@@ -48,6 +48,8 @@ double bf_memory_per_ent(double ratio){
 
 double plr_memory_per_ent(double ratio){
 	uint32_t temp=ratio*1000;
+	if(temp==0) 
+		return 48;
 	return plr_dp[temp];
 }
 

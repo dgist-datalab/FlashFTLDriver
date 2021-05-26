@@ -38,6 +38,7 @@ static inline uint32_t run_file_size(run *r){
 run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba);
 sst_file *run_retrieve_sst(run *r, uint32_t lba);
 sst_file *run_retrieve_close_sst(run *r, uint32_t lba);
+map_range *run_to_MR(run *r);
 void run_space_init(run *,uint32_t map_num, uint32_t start_lba, uint32_t end_lba);
 void run_reinit(run *r);
 void run_append_sstfile_move_originality(run *_run, sst_file *sstfile);
@@ -66,7 +67,6 @@ static inline void run_deep_copy(run *des, run *src){
 }
 
 static inline void run_shallow_copy_move_originality(run *des, run *src){
-
 	if(src->max_sst_file_num!=des->max_sst_file_num){
 		if(src->max_sst_file_num > des->max_sst_file_num){
 			sst_file *new_sst_set=(sst_file*)calloc(src->max_sst_file_num, sizeof(sst_file));

@@ -3,7 +3,7 @@
 #include "run.h"
 #include "page_manager.h"
 
-enum {LEVELING, LEVELING_WISCKEY, TIERING};
+enum {LEVELING, LEVELING_WISCKEY, TIERING, TIERING_WISCKEY};
 
 
 typedef struct level{
@@ -150,6 +150,7 @@ static inline bool level_is_full(level *lev){
 		case LEVELING_WISCKEY:
 		case LEVELING:
 			return !(lev->now_sst_num<lev->max_sst_num);
+		case TIERING_WISCKEY:
 		case TIERING:
 			return !(lev->run_num<lev->max_run_num);
 	}

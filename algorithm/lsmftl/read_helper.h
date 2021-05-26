@@ -61,7 +61,7 @@ static inline char *read_helper_type(uint32_t i){
 		case HELPER_NONE: return "NONE";
 		case HELPER_BF_PTR:
 		case HELPER_BF_ONLY: return "BF";
-		case HELPER_BF_PTR_GUARD:
+		case HELPER_BF_PTR_GUARD: return "BF_PTR_GUARD";
 		case HELPER_BF_ONLY_GUARD:
 		case HELPER_GUARD: return "BF_GUARD";
 		case HELPER_PLR: return "PLR";

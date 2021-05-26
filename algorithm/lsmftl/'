@@ -220,14 +220,19 @@ static void write_sst_file(sst_pf_in_stream *is, level *des){ //for page file
 }
 
 static bool leveling_invalidation_function(level *des, uint32_t stream_id, uint32_t version, 
-		key_ptr_pair kp, bool overlap){
-	if(overlap){
+		key_ptr_pair kp){
+	if(stream_id==UINT32_MAX){
 		if(slm_invalidate_enable(des->idx, kp.piece_ppa)){
 			invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, true);
 			return false;
 		}
 	}
 	else{
+		/*
+		   latest -> above_src
+		   target_version+1 -> src
+		   target_version  ->des
+		 */
 		uint32_t lba_version=version_map_lba(LSM.last_run_version, kp.lba);
 		if(lba_version!=UINT8_MAX && lba_version > version+1){
 			if(stream_id==0 && des->idx!=0 && slm_invalidate_enable(des->idx-1, kp.piece_ppa)){
@@ -245,7 +250,8 @@ static bool leveling_invalidation_function(level *des, uint32_t stream_id, uint3
 uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_set, 
 		sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
 		bool all_empty_stop, uint32_t limit, uint32_t target_version,
-		bool (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_version, key_ptr_pair kp, bool overlap)){
+		bool merge_flag,
+		bool (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_ridx, key_ptr_pair kp)){
 	bool one_empty=false;
 	if(stream_num >= 32){
 		EPRINT("too many stream!!", true);
@@ -279,18 +285,18 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 				else if(target_pair.lba!=UINT32_MAX && target_pair.lba==now.lba){
 					if(is && !merge_flag){
 						if(invalidate_function){
-							invalidate_function(des, i, target_version, now, true);
+							invalidate_function(des, -1, target_version, now);
 						}
 					}
 					else if(merge_flag){
-						invalidate_function(des, i, os_set[i]->version_idx, now, true);
+						invalidate_function(des, i, os_set[i]->version_idx, now);
 					}
 					else{
 						if(kpq){
-							invalidate_function(des, i, target_version, now, true);
+							invalidate_function(des, -1, target_version, now);
 						}
 						else{
-							invalidate_function(des, i, os_set[i]->version_idx, now, true);
+							EPRINT("error!", true);
 						}
 					}
 
@@ -310,20 +316,20 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 		}
 
 		if(target_pair.lba!=UINT32_MAX){
-			/*
 			if(!merge_flag){
 				compaction_debug_func(target_pair.lba, target_pair.piece_ppa, target_version, des);
-			}*/
+			}
+
 			if(kpq){
 				if(invalidate_function && 
-						invalidate_function(des, target_idx, os_set[target_idx]->version_idx, target_pair, false)){
+						invalidate_function(des, target_idx, os_set[target_idx]->version_idx, target_pair)){
 					sorting_idx++;
 					kpq->push(target_pair);
 				}
 			}
 			else if(is){
 				if(invalidate_function && 
-						invalidate_function(des, target_idx, target_version, target_pair, false)){
+						invalidate_function(des, target_idx, target_version, target_pair)){
 					version_coupling_lba_version(LSM.last_run_version, target_pair.lba, target_version);	
 					sorting_idx++;
 					if(sst_pis_insert(is, target_pair)){
@@ -515,6 +521,8 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t 
 		return res;
 	}
 
+	LSM.monitor.compaction_cnt[des->idx]++;
+	//printf("LSM.monitor_compactino_cnt :%u\n", LSM.monitor.compaction_cnt[des->idx]);
 
 	read_issue_arg read_arg1, read_arg2;
 	read_arg1.des=src;
@@ -944,6 +952,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 
 level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){ /*move to last level*/
 	_cm=cm;
+	LSM.monitor.compaction_cnt[des->idx]++;
 	uint32_t start_sst_file_idx=UINT32_MAX;
 	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_version, 
 			&start_sst_file_idx, des->idx); //version_update

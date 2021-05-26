@@ -18,8 +18,8 @@ static inline int checking(uint32_t level, uint32_t size_factor, uint32_t blockn
 	else return 0;
 }
 
-uint32_t get_size_factor(uint32_t level,  uint32_t blocknumber){
-	uint32_t target=(uint32_t)(std::ceil((std::pow(blocknumber, (double)1.0/level))));
+double get_size_factor(uint32_t level,  uint32_t blocknumber){
+	double target=(std::pow(blocknumber, (double)1.0/level));
 	int result;
 	int retry_cnt=0;
 retry:
