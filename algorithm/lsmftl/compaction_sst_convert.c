@@ -118,7 +118,8 @@ sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q, uint32_t des_idx){
 		read_map_param_init(&read_arg, target_mr_set);
 
 		if(i==0){
-			pos=sst_pos_init_mr(&target_mr_set[read_arg.from], read_arg.param, 
+			pos=sst_pos_init_mr(&target_mr_set[read_arg.from], read_arg.param,
+					UINT32_MAX,
 					TARGETREADNUM(read_arg), read_map_done_check, early_map_done);
 		}
 		else{

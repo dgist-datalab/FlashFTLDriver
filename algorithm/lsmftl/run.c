@@ -2,8 +2,8 @@
 
 run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
 	run *res=(run*)calloc(1,sizeof(run));
-	res->now_sst_file_num=0;
-	res->max_sst_file_num=sst_file_num;
+	res->now_sst_num=0;
+	res->max_sst_num=sst_file_num;
 	res->start_lba=start_lba;
 	res->end_lba=end_lba;
 	res->sst_set=(sst_file*)calloc(sst_file_num, sizeof(sst_file));
@@ -11,15 +11,15 @@ run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
 }
 
 void run_space_init(run *res, uint32_t map_num, uint32_t start_lba, uint32_t end_lba){
-	res->max_sst_file_num=map_num;
-	res->now_sst_file_num=0;
+	res->max_sst_num=map_num;
+	res->now_sst_num=0;
 	res->start_lba=start_lba;
 	res->end_lba=end_lba;
 	res->sst_set=(sst_file*)calloc(map_num, sizeof(sst_file));
 }
 
 void run_reinit(run *res){
-	res->now_sst_file_num=0;
+	res->now_sst_num=0;
 	res->start_lba=UINT32_MAX;
 	res->end_lba=0;
 	uint32_t sidx;
@@ -36,7 +36,7 @@ static inline void update_range(run *_run, uint32_t start, uint32_t end){
 
 
 sst_file *run_retrieve_sst(run *r, uint32_t lba){
-	int s=0, e=r->now_sst_file_num-1;
+	int s=0, e=r->now_sst_num-1;
 	while(s<=e){
 		int mid=(s+e)/2;
 		if(r->sst_set[mid].start_lba<=lba && r->sst_set[mid].end_lba>=lba){
@@ -53,7 +53,7 @@ sst_file *run_retrieve_sst(run *r, uint32_t lba){
 }
 
 sst_file *run_retrieve_close_sst(run *r, uint32_t lba){
-	int s=0, e=r->now_sst_file_num-1;
+	int s=0, e=r->now_sst_num-1;
 	int mid;
 	bool is_right=false;
 	while(s<=e){
@@ -79,25 +79,25 @@ sst_file *run_retrieve_close_sst(run *r, uint32_t lba){
 }
 
 static inline void __do_run_append_sstfile(run *_run, sst_file *sstfile, bool moved_originality){
-	if(_run->now_sst_file_num>=_run->max_sst_file_num){
+	if(_run->now_sst_num>=_run->max_sst_num){
 		/*EPRINT("over sst file", true);*/
-		sst_file *new_sst_set=(sst_file*)calloc(_run->max_sst_file_num*2, sizeof(sst_file));
-		memcpy(new_sst_set, _run->sst_set, sizeof(sst_file) * _run->now_sst_file_num);
+		sst_file *new_sst_set=(sst_file*)calloc(_run->max_sst_num*2, sizeof(sst_file));
+		memcpy(new_sst_set, _run->sst_set, sizeof(sst_file) * _run->now_sst_num);
 		free(_run->sst_set);
 		_run->sst_set=new_sst_set;
-		_run->max_sst_file_num=_run->max_sst_file_num*2;
+		_run->max_sst_num=_run->max_sst_num*2;
 	}
-	if(_run->now_sst_file_num && !(sstfile->start_lba > _run->start_lba && sstfile->start_lba>_run->end_lba)){
+	if(_run->now_sst_num && !(sstfile->start_lba > _run->start_lba && sstfile->start_lba>_run->end_lba)){
 		EPRINT("cannot append!", true);
 	}
 	if(moved_originality){
-		sst_shallow_copy_move_originality(&_run->sst_set[_run->now_sst_file_num], sstfile);
+		sst_shallow_copy_move_originality(&_run->sst_set[_run->now_sst_num], sstfile);
 	}
 	else{
-		sst_shallow_copy(&_run->sst_set[_run->now_sst_file_num], sstfile);
+		sst_shallow_copy(&_run->sst_set[_run->now_sst_num], sstfile);
 	}
 	update_range(_run, sstfile->start_lba, sstfile->end_lba);
-	_run->now_sst_file_num++;
+	_run->now_sst_num++;
 
 }
 
@@ -110,15 +110,15 @@ void run_append_sstfile(run *_run, sst_file *sstfile){
 }
 
 void run_deep_append_sstfile(run *_run, sst_file *sstfile){
-	if(_run->now_sst_file_num>_run->max_sst_file_num){
+	if(_run->now_sst_num>_run->max_sst_num){
 		EPRINT("over sst file", true);
 	}
-	if(_run->now_sst_file_num && !(sstfile->start_lba > _run->start_lba && sstfile->start_lba>_run->end_lba)){
+	if(_run->now_sst_num && !(sstfile->start_lba > _run->start_lba && sstfile->start_lba>_run->end_lba)){
 		EPRINT("cannot append!", true);
 	}
-	sst_deep_copy(&_run->sst_set[_run->now_sst_file_num], sstfile);
+	sst_deep_copy(&_run->sst_set[_run->now_sst_num], sstfile);
 	update_range(_run, sstfile->start_lba, sstfile->end_lba);
-	_run->now_sst_file_num++;
+	_run->now_sst_num++;
 }
 
 void run_free(run *_run){
@@ -128,7 +128,7 @@ void run_free(run *_run){
 
 void run_print(run *rptr){
 	printf("lba:%u~%u sst_file num:%u/%u\n",rptr->start_lba, rptr->end_lba,
-			rptr->now_sst_file_num, rptr->max_sst_file_num);
+			rptr->now_sst_num, rptr->max_sst_num);
 }
 
 void run_content_print(run *r, bool print_sst){
@@ -144,7 +144,7 @@ void run_content_print(run *r, bool print_sst){
 }
 
 map_range *run_to_MR(run *r){
-	map_range *res=(map_range*)malloc(sizeof(map_range) * r->now_sst_file_num);
+	map_range *res=(map_range*)malloc(sizeof(map_range) * r->now_sst_num);
 	sst_file *sptr;
 	uint32_t i;
 	for_each_sst(r, sptr, i){

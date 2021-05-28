@@ -6,7 +6,8 @@
 
 extern lsmtree LSM;
 
-sst_pf_out_stream* sst_pos_init_sst(sst_file *sst_set, inter_read_alreq_param **param, uint32_t set_num, 
+sst_pf_out_stream* sst_pos_init_sst(sst_file *sst_set, inter_read_alreq_param **param, 
+		uint32_t set_num, uint32_t version_number,
 		bool(*check_done)(inter_read_alreq_param *, bool), bool (*file_done)(inter_read_alreq_param*)){
 	sst_pf_out_stream *res=(sst_pf_out_stream*)calloc(1, sizeof(sst_pf_out_stream));
 	res->type=SST_PAGE_FILE_STREAM;
@@ -22,12 +23,12 @@ sst_pf_out_stream* sst_pos_init_sst(sst_file *sst_set, inter_read_alreq_param **
 	res->idx=0;
 	res->now_file_empty=true;
 	res->file_set_empty=false;
-	res->version_idx=UINT32_MAX;
+	res->version_idx=version_number;
 	return res;
 }
 
-sst_pf_out_stream* sst_pos_init_mr(map_range *mr_set, 
-		inter_read_alreq_param **param, uint32_t set_num, 
+sst_pf_out_stream* sst_pos_init_mr(map_range *mr_set, inter_read_alreq_param **param, 
+		uint32_t set_num, uint32_t version_number,
 		bool(*check_done)(inter_read_alreq_param *, bool), 
 		bool (*file_done)(inter_read_alreq_param*)){
 	sst_pf_out_stream *res=(sst_pf_out_stream*)calloc(1, sizeof(sst_pf_out_stream));
@@ -45,7 +46,7 @@ sst_pf_out_stream* sst_pos_init_mr(map_range *mr_set,
 	res->idx=0;
 	res->now_file_empty=true;
 	res->file_set_empty=false;
-	res->version_idx=UINT32_MAX;
+	res->version_idx=version_number;
 	return res;
 }
 

@@ -38,6 +38,10 @@ void init_memory_info(uint32_t error){
 	}else{
 		printf("???\n");
 	}
+/*
+	for(uint32_t i=1; i<=1000; i++){
+		printf("%u : %lf\n", i, plr_dp[i]);
+	}*/
 	gbf_set_prepare((float)error/100, 1000000, BLOOM_ONLY);
 	close(fd);
 }

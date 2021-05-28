@@ -12,16 +12,15 @@ bool early_map_done(inter_read_alreq_param *param){
 	return true;
 }
 
-static uint32_t stream_invalidation(sst_pf_out_stream *os, uint32_t ridx){
+static uint32_t stream_invalidation(sst_pf_out_stream *os, uint32_t version){
 	uint32_t res=0;
 	uint32_t a, b;
 	while(1){
 		key_ptr_pair kp=sst_pos_pick(os);
 		if(kp.lba!=UINT32_MAX){
 			a=version_map_lba(LSM.last_run_version, kp.lba);
-			b=ridx;
-			if(version_compare(LSM.last_run_version, a, b, 
-						version_to_level_idx(LSM.last_run_version, ridx, LSM.param.LEVELN)) > 0){
+			b=version;
+			if(version_compare(LSM.last_run_version, a, b) > 0){
 				if(invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, false)){
 					res++;
 				}
@@ -57,22 +56,21 @@ static map_range *get_run_maprange(run *r, uint32_t *total_num){
 	return res;
 }
 
-uint32_t compaction_early_invalidation(uint32_t input_ridx){
+uint32_t compaction_early_invalidation(uint32_t target_version){
 	uint32_t total_invalidation_cnt=0;
 	_cm=LSM.cm;
 	/*check gc unavailable*/
 	uint32_t target_invalidation_cnt=0;
-	uint32_t target_ridx=input_ridx;
 	version *v=LSM.last_run_version;
-	if(target_ridx==UINT32_MAX){
-		target_ridx=version_get_max_invalidation_target(v, &target_invalidation_cnt, NULL);
+	if(target_version==UINT32_MAX){
+		target_version=version_get_max_invalidation_target(v, &target_invalidation_cnt, NULL);
 	}
 
-	if(target_ridx==UINT32_MAX) return 0;
+	if(target_version==UINT32_MAX) return 0;
 
 	LSM.monitor.compaction_early_invalidation_cnt++;
 
-	printf("early_invalidation:%u target_ridx:%u\n", LSM.monitor.compaction_early_invalidation_cnt, target_ridx);
+	printf("early_invalidation:%u target_version:%u\n", LSM.monitor.compaction_early_invalidation_cnt, target_version);
 
 	read_issue_arg read_arg;
 	read_arg_container thread_arg;
@@ -83,7 +81,8 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 
 	sst_pf_out_stream *pos=NULL;
 
-	run *target_r=&LSM.disk[LSM.param.LEVELN-1]->array[target_ridx];
+	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, target_version, LSM.param.LEVELN-1);
+	run *target_r=&LSM.disk[LSM.param.LEVELN-1]->array[target_run_idx];
 
 	uint32_t start_idx=0;
 	uint32_t total_num=0;
@@ -104,7 +103,9 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 
 		if(i==0){
 			pos=sst_pos_init_mr(&target_mr_set[read_arg.from], read_arg.param, 
-					TARGETREADNUM(read_arg), read_map_done_check, early_map_done);
+					TARGETREADNUM(read_arg), 
+					target_version,
+					read_map_done_check, early_map_done);
 		}
 		else{
 			sst_pos_add_mr(pos, &target_mr_set[read_arg.from], read_arg.param, 
@@ -112,7 +113,7 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 		}
 
 		thpool_add_work(_cm->issue_worker, read_sst_job, (void*)&thread_arg);
-		total_invalidation_cnt+=stream_invalidation(pos, target_ridx);
+		total_invalidation_cnt+=stream_invalidation(pos, target_version);
 	}
 
 	if(pos){
@@ -120,7 +121,8 @@ uint32_t compaction_early_invalidation(uint32_t input_ridx){
 	}
 	free(thread_arg.arg_set);
 	free(target_mr_set);
-	version_set_early_invalidation(LSM.last_run_version, target_ridx);
+
+	version_set_early_invalidation(LSM.last_run_version, target_run_idx);
 	printf("invalidation_number:%u early compaction done!\n", total_invalidation_cnt);
 
 	return total_invalidation_cnt;

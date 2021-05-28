@@ -102,8 +102,8 @@ void version_free(version *v){
 		delete v->version_empty_queue[i];
 		delete v->version_populate_queue[i];
 	}
-//	delete v->version_empty_queue;
-//	delete v->version_populate_queue;
+	delete[] v->version_empty_queue;
+	delete[] v->version_populate_queue;
 
 	free(v->start_vidx_of_level);
 	free(v->version_early_invalidate);
@@ -117,9 +117,6 @@ void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version){
 		EPRINT("over version num", true);
 	}
 	if(lba==debug_lba){
-		if(LSM.global_debug_flag){
-			EPRINT("debug point", false);
-		}
 		printf("[version_map] lba:%u->%u\n",lba, version);
 	}
 	fdriver_lock(&v->version_lock);
@@ -196,7 +193,7 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 	}
 	if(avg_invalidated_num){
 		*avg_invalidated_num=(target_invalidation_cnt/
-			LSM.disk[LSM.param.LEVELN-1]->array[target_version].now_sst_file_num);
+			LSM.disk[LSM.param.LEVELN-1]->array[target_version].now_sst_num);
 	}
 
 	return target_version;

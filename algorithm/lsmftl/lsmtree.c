@@ -653,6 +653,7 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 			LSM.li->req_type_cnt[DATAR]--;
 			LSM.li->req_type_cnt[MISSDATAR]++;
 			parents->type_ftl++;
+			free(req);
 		}
 		if(!inf_assign_try(parents)){
 			EPRINT("why cannot retry?", true);
@@ -757,7 +758,7 @@ uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *ti
 		run *rptr;
 		uint32_t ridx;
 		for_each_run_max(lev, rptr, ridx){
-			if(!rptr->now_sst_file_num) continue;
+			if(!rptr->now_sst_num) continue;
 			sst_file *sptr;
 			uint32_t sidx;
 			uint32_t now_bit;

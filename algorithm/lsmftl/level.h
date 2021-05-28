@@ -29,6 +29,10 @@ typedef struct level{
 	for(idx=0, (run_ptr)=&(level_ptr)->array[0]; idx<(level_ptr)->run_num; \
 			idx++, (run_ptr)=&(level_ptr)->array[idx])
 
+#define for_each_run_reverse(level_ptr, run_ptr, idx)\
+	for(idx=(level_ptr)->run_num-1, (run_ptr)=&(level_ptr)->array[idx]; (int)idx>=0; \
+			idx--, (run_ptr)=&(level_ptr)->array[idx])
+
 #define for_each_run_at(level_ptr, run_ptr, idx)\
 	for((run_ptr)=&(level_ptr)->array[idx]; idx<(level_ptr)->run_num; \
 			idx++, (run_ptr)=&(level_ptr)->array[idx])

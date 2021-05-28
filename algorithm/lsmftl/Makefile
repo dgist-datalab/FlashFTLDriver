@@ -19,6 +19,7 @@ SRCS +=\
 	   compaction_merge.c\
 	   compaction_early_invalidation.c\
 	   compaction_sst_convert.c\
+	   compaction_data_move.c\
 	   gc_helper.c\
 	   lsmtree_testing.c\
 	   lsmtree_setting.c\

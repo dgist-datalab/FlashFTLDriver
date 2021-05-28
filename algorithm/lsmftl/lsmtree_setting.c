@@ -114,7 +114,6 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	/*start all leveling*/
 	for(uint32_t i=1; i<=max_level; i++){
 		settings[i].size_factor=get_size_factor(i, chunk_num);
-		printf("level:%u size_factor %lf\n", i, settings[i].size_factor);
 		settings[i].num_of_level=i;
 		settings[i].memory_usage_bit=0;
 		settings[i].lp=(level_param*)calloc(i+1, sizeof(level_param));

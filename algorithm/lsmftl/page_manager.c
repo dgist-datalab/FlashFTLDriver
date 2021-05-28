@@ -7,7 +7,7 @@
 #include<queue>
 
 extern lsmtree LSM;
-//uint32_t debug_piece_ppa=2490458;
+//uint32_t debug_piece_ppa=16705;
 uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
@@ -464,7 +464,7 @@ bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_num){
 	std::queue<uint32_t> diff_type_queue;
 	uint32_t seg_idx;
 	uint32_t remain_page=0;
-	uint32_t target_ridx=0;
+	uint32_t target_version=0;
 retry:
 	victim_target=pm->bm->get_gc_target(pm->bm);
 	seg_idx=victim_target->seg_idx;
@@ -522,8 +522,8 @@ out:
 		case DATASEG:
 		case SEPDATASEG:
 			if(	victim_target->invalidate_number < L2PGAP &&
-					(target_ridx=version_get_early_invalidation_target(LSM.last_run_version))!=UINT32_MAX){
-				compaction_early_invalidation(target_ridx);
+					(target_version=version_get_early_invalidation_target(LSM.last_run_version))!=UINT32_MAX){
+				compaction_early_invalidation(target_version);
 				free(victim_target);
 				pm->bm->reinsert_segment(pm->bm, seg_idx);
 				goto retry;	
@@ -884,9 +884,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					}
 
 					recent_version=version_map_lba(LSM.last_run_version, oob_lba[i]);
+
 					/*should figure out map ppa*/
-					if(version_compare(LSM.last_run_version, recent_version, target_version, 
-								version_to_level_idx(LSM.last_run_version, target_version, LSM.param.LEVELN))<=0){
+					if(version_compare(LSM.last_run_version, recent_version, target_version)<=0){
 						if(!prev_sptr){
 							prev_sptr=sptr;
 							gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, sptr_idx, target_version);

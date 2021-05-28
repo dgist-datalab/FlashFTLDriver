@@ -77,26 +77,11 @@ static inline int version_to_run(version *v, int32_t a){
 		a+v->poped_version_num;
 }
 
-static inline int version_compare(version *v, int32_t a, int32_t b, uint32_t lev_idx){
-	//a: recent version
-	//b: noew version
-	if(b > v->max_valid_version_num){
-		EPRINT("not valid comparing", true);
-	}
-
-	if(lev_idx < v->leveln-1){
-		return a-b;
-	}
-
-	int a_=a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a-v->poped_version_num;
-	int b_=b-v->poped_version_num<0?b-v->poped_version_num+v->max_valid_version_num:b-v->poped_version_num;
-	return a_-b_;
-}
 
 static inline bool version_belong_level(version *v, int32_t a, uint32_t lev_idx){
-	uint32_t start_v=v->start_vidx_of_level(v, lev_idx);
+	uint32_t start_v=v->start_vidx_of_level[lev_idx];
 	uint32_t end_v=(lev_idx!=0?
-			v->start_vidx_of_level(v, lev_idx-1)-1:
+			v->start_vidx_of_level[lev_idx-1]-1:
 			v->max_valid_version_num-1);
 	if(start_v<=a && a<=end_v){
 		return true;
@@ -104,6 +89,22 @@ static inline bool version_belong_level(version *v, int32_t a, uint32_t lev_idx)
 	return false;
 }
 
+static inline int version_compare(version *v, int32_t a, int32_t b){
+	//a: recent version
+	//b: noew version
+	if(b > v->max_valid_version_num){
+		EPRINT("not valid comparing", true);
+	}
+	int a_;
+	int b_;
+	if(version_belong_level(v, a, v->leveln-1)){ //check 
+		a_=a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a-v->poped_version_num;
+	}
+	else if(version_belong_level(v, b, v->leveln-1)){
+		b_=b-v->poped_version_num<0?b-v->poped_version_num+v->max_valid_version_num:b-v->poped_version_num;
+	}
+	return a_-b_;
+}
 static inline void version_poped_update(version *v){
 	v->poped_version_num+=MERGED_RUN_NUM;
 	v->poped_version_num%=v->max_valid_version_num;

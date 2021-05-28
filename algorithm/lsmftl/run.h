@@ -10,8 +10,8 @@
  d(start_data_physical_address)-d-d-d-d-d-...-d-m-m...
  */
 typedef struct run{
-	uint32_t now_sst_file_num;
-	uint32_t max_sst_file_num;
+	uint32_t now_sst_num;
+	uint32_t max_sst_num;
 	uint32_t start_lba;
 	uint32_t end_lba;
 	uint32_t start_data_physical_address;
@@ -23,15 +23,15 @@ static inline uint32_t run_file_size(run *r){
 	return r->pair_num*LPAGESIZE+r->map_num*PAGESIZE;
 }
 */
-#define LAST_SST_PTR(run_ptr) (&run_ptr->sst_set[run_ptr->now_sst_file_num-1])
+#define LAST_SST_PTR(run_ptr) (&run_ptr->sst_set[run_ptr->now_sst_num-1])
 #define FIRST_SST_PTR(run_ptr) (&run_ptr->sst_set[0])
 
 #define for_each_sst(run_ptr, sst_ptr, idx)\
-	for(idx=0, (sst_ptr)=&(run_ptr)->sst_set[0]; idx<(run_ptr)->now_sst_file_num; \
+	for(idx=0, (sst_ptr)=&(run_ptr)->sst_set[0]; idx<(run_ptr)->now_sst_num; \
 			idx++, (sst_ptr)=&(run_ptr)->sst_set[idx])
 
 #define for_each_sst_at(run_ptr, sst_ptr, idx)\
-	for((sst_ptr)=&(run_ptr)->sst_set[idx]; idx<(run_ptr)->now_sst_file_num; \
+	for((sst_ptr)=&(run_ptr)->sst_set[idx]; idx<(run_ptr)->now_sst_num; \
 			idx++, (sst_ptr)=&(run_ptr)->sst_set[idx])
 
 
@@ -67,13 +67,13 @@ static inline void run_deep_copy(run *des, run *src){
 }
 
 static inline void run_shallow_copy_move_originality(run *des, run *src){
-	if(src->max_sst_file_num!=des->max_sst_file_num){
-		if(src->max_sst_file_num > des->max_sst_file_num){
-			sst_file *new_sst_set=(sst_file*)calloc(src->max_sst_file_num, sizeof(sst_file));
-			memcpy(new_sst_set, des->sst_set, des->now_sst_file_num);
+	if(src->max_sst_num!=des->max_sst_num){
+		if(src->max_sst_num > des->max_sst_num){
+			sst_file *new_sst_set=(sst_file*)calloc(src->max_sst_num, sizeof(sst_file));
+			memcpy(new_sst_set, des->sst_set, des->now_sst_num);
 			free(des->sst_set);
 			des->sst_set=new_sst_set;
-			des->max_sst_file_num=src->max_sst_file_num;
+			des->max_sst_num=src->max_sst_num;
 		}
 		else{
 			EPRINT("how can be?", true);

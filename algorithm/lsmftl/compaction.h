@@ -92,8 +92,8 @@ level *compaction_TW_convert_LW(compaction_master *cm, level *src);
 
 level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx); //done and debug
 run *compaction_wisckey_to_normal(compaction_master *cm, level *src, 
-		run *previous_run, uint32_t *moved_entry_num, 
-		uint32_t start_sst_file_idx, uint32_t target_ridx);
+		run *previous_run, uint32_t *moved_entry_num,  
+		uint32_t start_sst_file_idx, uint32_t target_ridx, bool demote);
 
 sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *, uint32_t des_idx);
 
@@ -102,7 +102,7 @@ inter_read_alreq_param *compaction_get_read_param(compaction_master *cm);
 void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *);
 key_value_wrapper *compaction_get_kv_wrapper(uint32_t ppa);
 void compaction_free_kv_wrapper(key_value_wrapper *kv_wrap);
-uint32_t compaction_early_invalidation(uint32_t target_ridx);
+uint32_t compaction_early_invalidation(uint32_t target_version);
 void read_sst_job(void *arg, int th_num);
 void read_map_param_init(read_issue_arg *read_arg, map_range *mr);
 bool read_map_done_check(inter_read_alreq_param *param, bool check_page_sst);
@@ -116,14 +116,22 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_strea
 
 sst_file *bis_to_sst_file(struct sst_bf_in_stream *bis);
 struct sst_bf_in_stream *tiering_new_bis(uint32_t level_idx);
+uint32_t issue_read_kv_for_bos_sorted_set(struct sst_bf_out_stream *bos, 
+		std::queue<key_ptr_pair> *kpq,
+		bool merge, uint32_t merge_newer_version, uint32_t merge_older_version,
+		bool round_final);
 
-int issue_read_kv_for_bos(struct sst_bf_out_stream *bos, struct sst_pf_out_stream *pos, 
-		uint32_t target_num, uint32_t version, bool round_final);
+int issue_read_kv_for_bos_stream(struct sst_bf_out_stream *bos, 
+		sst_pf_out_stream *pos, 
+		uint32_t target_num, 
+		uint32_t now_level,
+		bool demote,
+		bool round_final);
+
 uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, struct sst_bf_out_stream *bos, run *new_run,
 		int32_t entry_num, uint32_t target_ridx, bool final);
 
-uint32_t issue_read_kv_for_bos_normal(sst_bf_out_stream *bos, std::queue<key_ptr_pair> *kpq,
-		bool round_final, uint32_t newer_version, uint32_t older_version);
+void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des);
 
 void *comp_alreq_end_req(algo_req *req);
 

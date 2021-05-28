@@ -139,7 +139,7 @@ uint32_t level_append_run_copy_move_originality(level *lev, run *r, uint32_t rid
 
 	run_shallow_copy_move_originality(&lev->array[ridx], r);
 	lev->run_num++;
-	lev->now_sst_num+=r->now_sst_file_num;
+	lev->now_sst_num+=r->now_sst_num;
 	//run_copy_src_empty(&lev->array[lev->run_num++], r);
 	return 1;
 }
@@ -197,7 +197,7 @@ sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa
 	uint32_t ridx;
 	sst_file *sptr;
 	for_each_run_max(lev, run_ptr, ridx){
-		if(run_ptr->now_sst_file_num==0) continue;
+		if(run_ptr->now_sst_num==0) continue;
 		sptr=run_retrieve_sst(run_ptr, lba);
 		if(sptr && sptr->file_addr.piece_ppa<=piece_ppa &&
 				sptr->end_ppa*L2PGAP>=piece_ppa){
@@ -215,12 +215,12 @@ static inline void level_destroy_content(level *lev, page_manager *pm){
 	uint32_t idx;
 	/*assigned level*/
 	for_each_run_max(lev, run_ptr, idx){
-		if(run_ptr->now_sst_file_num){
+		if(run_ptr->now_sst_num){
 			run_destroy_content(run_ptr, pm);
 		}
 	}
 	for_each_run_max(lev, run_ptr, idx){
-		if(!run_ptr->now_sst_file_num){
+		if(!run_ptr->now_sst_num){
 			free(run_ptr->sst_set);
 		}
 	}
@@ -243,7 +243,7 @@ uint32_t level_update_run_at_move_originality(level *lev, uint32_t idx, run *r, 
 
 	run_shallow_copy_move_originality(&lev->array[idx], r);
 	if(new_run){
-		lev->now_sst_num+=r->now_sst_file_num;
+		lev->now_sst_num+=r->now_sst_num;
 		lev->run_num++;
 	}
 	return 1;
@@ -319,7 +319,7 @@ void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 
 	sst_file *nxt_sstfile, *prev_sstfile;
 	if(sptr_idx==0){
-		if(lev->array[ridx].now_sst_file_num -1 >=sptr_idx+1){
+		if(lev->array[ridx].now_sst_num -1 >=sptr_idx+1){
 			nxt_sstfile=&lev->array[ridx].sst_set[sptr_idx+1];
 			if(sptr->end_lba < nxt_sstfile->start_lba){}
 			else{
@@ -330,7 +330,7 @@ void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	else{
 		prev_sstfile=&lev->array[ridx].sst_set[sptr_idx-1];
 
-		if(lev->array[ridx].now_sst_file_num -1 >= sptr_idx+1){
+		if(lev->array[ridx].now_sst_num -1 >= sptr_idx+1){
 			nxt_sstfile=&lev->array[ridx].sst_set[sptr_idx+1];
 			if(sptr->end_lba < nxt_sstfile->start_lba){}
 			else{
@@ -353,7 +353,7 @@ void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	/*range check*/
 	sst_file *nxt_sstfile, *prev_sstfile;
 	if(sptr_idx==0){
-		if(lev->array[ridx].now_sst_file_num -1 >= sptr_idx+1){
+		if(lev->array[ridx].now_sst_num -1 >= sptr_idx+1){
 			nxt_sstfile=&lev->array[ridx].sst_set[sptr_idx+1];
 			if(sptr->end_lba < nxt_sstfile->start_lba){}
 			else{
@@ -364,14 +364,14 @@ void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	else{
 		prev_sstfile=&lev->array[ridx].sst_set[sptr_idx-1];
 
-		if(lev->array[ridx].now_sst_file_num-1 >= sptr_idx+1){
+		if(lev->array[ridx].now_sst_num-1 >= sptr_idx+1){
 			nxt_sstfile=&lev->array[ridx].sst_set[sptr_idx+1];
 			if(sptr->end_lba < nxt_sstfile->start_lba){}
 			else{
 				EPRINT("range error", true);
 			}
 		}
-		else if(lev->array[ridx].now_sst_file_num == sptr_idx){
+		else if(lev->array[ridx].now_sst_num == sptr_idx){
 		
 		}
 
@@ -382,30 +382,30 @@ void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	}
 
 
-	uint32_t target_num=lev->array[ridx].now_sst_file_num-sptr_idx;
-	if(sptr_idx+1+target_num >= lev->array[ridx].max_sst_file_num){
+	uint32_t target_num=lev->array[ridx].now_sst_num-sptr_idx;
+	if(sptr_idx+1+target_num >= lev->array[ridx].max_sst_num){
 		run *now_r=&lev->array[ridx];
 		sst_file *new_sst_set;
-		new_sst_set=(sst_file*)calloc(now_r->max_sst_file_num+1, sizeof(sst_file));
-		memcpy(new_sst_set, now_r->sst_set, sizeof(sst_file)*now_r->max_sst_file_num);
+		new_sst_set=(sst_file*)calloc(now_r->max_sst_num+1, sizeof(sst_file));
+		memcpy(new_sst_set, now_r->sst_set, sizeof(sst_file)*now_r->max_sst_num);
 		free(now_r->sst_set);
 
-		now_r->max_sst_file_num++;
+		now_r->max_sst_num++;
 		now_r->sst_set=new_sst_set;
 		//		run_print(&lev->array[ridx]);
 		//		EPRINT("over run", true);
 	}
 
-	if(sptr_idx<=lev->array[ridx].now_sst_file_num-1){
+	if(sptr_idx<=lev->array[ridx].now_sst_num-1){
 		memmove(&lev->array[ridx].sst_set[sptr_idx+1],&lev->array[ridx].sst_set[sptr_idx], sizeof(sst_file) *target_num);
 	}
-	else if(sptr_idx!=lev->array[ridx].now_sst_file_num){
+	else if(sptr_idx!=lev->array[ridx].now_sst_num){
 		EPRINT("how can't be", true);
 	}
 
 	//free(org_sptr->block_file_map);
 	lev->array[ridx].sst_set[sptr_idx]=(*sptr);
-	lev->array[ridx].now_sst_file_num++;
+	lev->array[ridx].now_sst_num++;
 }
 
 void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
@@ -414,14 +414,14 @@ void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
 	}
 	
 	run *r=&lev->array[ridx];
-	if(r->now_sst_file_num==0 || r->now_sst_file_num <=sptr_idx){
+	if(r->now_sst_num==0 || r->now_sst_num <=sptr_idx){
 		EPRINT("?????", true);
 	}
 
-	uint32_t target_num_sst_file=r->now_sst_file_num-sptr_idx-1;
+	uint32_t target_num_sst_file=r->now_sst_num-sptr_idx-1;
 	memmove(&r->sst_set[sptr_idx], &r->sst_set[sptr_idx+1], sizeof(sst_file) * target_num_sst_file);
-	memset(&r->sst_set[r->now_sst_file_num-1], 0, sizeof(sst_file));
-	r->now_sst_file_num--;
+	memset(&r->sst_set[r->now_sst_num-1], 0, sizeof(sst_file));
+	r->now_sst_num--;
 }
 
 run *level_LE_to_run(level *lev, bool move_originality){

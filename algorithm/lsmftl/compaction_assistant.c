@@ -132,7 +132,6 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	write_req->end_req=comp_alreq_end_req;
 	io_manager_issue_internal_write(map_ppa, vs, write_req, false);
 
-	
 	return res;
 }
 
@@ -170,6 +169,10 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 		std::map<uint32_t, uint32_t>::iterator iter=LSM.flushed_kp_set->begin();
 		while((sptr=kp_to_sstfile(LSM.flushed_kp_set, &iter))){
 			level_append_sstfile(res, sptr, true);
+			sst_free(sptr, LSM.pm);
+		}
+		if(res->now_sst_num==0){
+			printf("???\n");
 		}
 		return res;
 	}
@@ -180,9 +183,6 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 
 static inline level *TW_compaction(compaction_master *cm, level *src, level *des,
 		uint32_t target_version){
-	if(des->idx==2){
-		LSM.global_debug_flag=true;
-	}
 	level *res=NULL;
 	level *temp=compaction_TW_convert_LW(cm, src);
 	switch(des->level_type){
@@ -225,6 +225,7 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 	}
 
 	LSM.monitor.compaction_cnt[end_idx]++;
+
 	switch(src_lev->level_type){
 		case LEVELING:
 			if(end_type==LEVELING){
@@ -340,13 +341,31 @@ again:
 
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
 
-		if(req->end_level != LSM.param.LEVELN-1 && (
-				(req->end_level==0 && level_is_full(LSM.disk[req->end_level])) ||
-				(req->end_level!=0 && !level_is_appendable(LSM.disk[req->end_level], LSM.disk[req->end_level-1]->max_sst_num)))
-				){
-			req->start_level=req->end_level;
-			req->end_level++;
-			goto again;
+		if(req->end_level != LSM.param.LEVELN-1){
+
+			if(level_is_full(LSM.disk[req->end_level])){
+				req->start_level=req->end_level;
+				req->end_level++;
+				if(temp_level){
+					level_free(temp_level, LSM.pm);
+					temp_level=NULL;
+				}
+				goto again;
+			}
+			
+			/*this path will test leveling level*/
+			uint32_t above_sst_num=req->end_level==0? 
+				temp_level->max_sst_num:
+				LSM.disk[req->end_level-1]->max_sst_num; 
+			if(!level_is_appendable(LSM.disk[req->end_level], above_sst_num)){
+				req->start_level=req->end_level;
+				req->end_level++;
+				if(temp_level){
+					level_free(temp_level, LSM.pm);
+					temp_level=NULL;
+				}
+				goto again;
+			}
 		}
 		else if(req->end_level==LSM.param.LEVELN-1 && level_is_full(LSM.disk[req->end_level])){
 			uint32_t merged_idx_set[MERGED_RUN_NUM];
@@ -355,6 +374,9 @@ again:
 			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
 			LSM.monitor.compaction_cnt[req->end_level+1]++;
 			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
+		}
+		if(temp_level){
+			level_free(temp_level, LSM.pm);
 		}
 end:
 		tag_manager_free_tag(cm->tm,req->tag);
