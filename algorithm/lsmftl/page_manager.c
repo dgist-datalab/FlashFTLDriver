@@ -322,17 +322,18 @@ uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 	}
 }
 
-uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap){
+uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap, bool include_inv_block){
 	if(ismap){
 		return pm->bm->remain_free_page(pm->bm, pm->current_segment[MAP_S]);
 	}
 	else{
+		uint32_t inv_blk_num=include_inv_block?pm->bm->get_invalidate_blk_number(pm->bm):0;
 		if(pm->current_segment[DATA_S]){
 			return (pm->bm->remain_free_page(pm->bm, pm->current_segment[DATA_S])+
-					(pm->temp_data_segment?_PPS-pm->temp_data_segment->used_page_num:0));
+					(pm->temp_data_segment?_PPS-pm->temp_data_segment->used_page_num:0))+inv_blk_num*_PPS;
 		}
 		else{
-			return pm->bm->remain_free_page(pm->bm, pm->temp_data_segment);
+			return pm->bm->remain_free_page(pm->bm, pm->temp_data_segment)+inv_blk_num*_PPS;
 		}
 	}
 }
@@ -534,7 +535,7 @@ out:
 				diff_type_queue.pop();
 			}
 			res=__gc_data(pm, pm->bm, victim_target);
-			remain_page=page_manager_get_total_remain_page(LSM.pm, false);
+			remain_page=page_manager_get_total_remain_page(LSM.pm, false, false);
 			break;
 		case MAPSEG:
 			while(diff_type_queue.size()){
@@ -543,7 +544,7 @@ out:
 				diff_type_queue.pop();
 			}
 			res=__gc_mapping(pm, pm->bm, victim_target);
-			remain_page=page_manager_get_total_remain_page(LSM.pm, true);
+			remain_page=page_manager_get_total_remain_page(LSM.pm, true, false);
 			break;
 	}
 	while(temp_queue.size()){

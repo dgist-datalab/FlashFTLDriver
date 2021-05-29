@@ -21,6 +21,7 @@ typedef struct level{
 #define FIRST_RUN_PTR(lev_ptr) (&(lev_ptr)->array[0])
 #define LEVELING_SST_AT_PTR(lev_ptr, idx) &(((lev_ptr)->array[0]).sst_set[idx]) 
 #define LEVELING_SST_AT(lev_ptr, idx) (((lev_ptr)->array[0]).sst_set[idx]) 
+#define LEVEL_RUN_AT_PTR(lev_ptr, idx) (&(lev_ptr)->array[idx])
 #define GET_SST_IDX(lev, sptr) ((sptr)-(lev)->array[0].sst_set)
 #define GET_LEV_START_LBA(lev) ((lev)->array[0].start_lba)
 #define GET_LEV_END_LBA(lev) ((lev)->array[0].end_lba)

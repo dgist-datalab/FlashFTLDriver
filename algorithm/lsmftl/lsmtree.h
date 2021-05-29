@@ -51,10 +51,6 @@ typedef struct tree_param{
 	bool isinvalid;
 	double size_factor;
 	uint32_t num_of_level;
-	/*
-	uint32_t border_of_leveling;
-	uint32_t border_of_wisckey;
-	uint32_t border_of_bf;*/
 	level_param *lp;
 	uint64_t memory_usage_bit;
 	uint64_t run_num;
@@ -67,6 +63,7 @@ typedef struct lsmtree_parameter{
 	double last_size_factor;
 	double normal_size_factor;
 	uint32_t write_buffer_ent;
+	uint32_t reclaim_ppa_target;
 	float read_amplification;
 
 	read_helper_param bf_ptr_guard_rhp;

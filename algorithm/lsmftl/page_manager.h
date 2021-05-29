@@ -61,7 +61,7 @@ bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page, bool is_m
 bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t lba, uint32_t *idx);
 uint32_t page_manager_get_new_ppa(page_manager *pm, bool ismap, uint32_t type);
 uint32_t page_manager_pick_new_ppa(page_manager *pm, bool ismap, uint32_t type);
-uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap);
+uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap, bool include_invalid_block);
 uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap);
 void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t* piece_ppa, uint32_t *lba, bool);
 bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool);

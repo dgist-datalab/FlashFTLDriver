@@ -745,7 +745,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		read_param_init(&read_arg);
 
 		needed_seg_num=(TARGETREADNUM(read_arg)*KP_IN_PAGE/L2PGAP+TARGETREADNUM(read_arg))/_PPS+1+1;
-		if(page_manager_get_total_remain_page(LSM.pm, false) <needed_seg_num * _PPS){ 
+		if(page_manager_get_total_remain_page(LSM.pm, false, false) <needed_seg_num * _PPS){ 
 			__do_gc(LSM.pm, false, needed_seg_num*_PPS);
 		}
 
@@ -1013,7 +1013,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 				false, UINT32_MAX, UINT32_MAX, final_flag);
 
 		uint32_t needed_seg_num=(entry_num/L2PGAP+1)/_PPS+1;
-		if(page_manager_get_total_remain_page(LSM.pm, false) < needed_seg_num * _PPS){
+		if(page_manager_get_total_remain_page(LSM.pm, false, false) < needed_seg_num * _PPS){
 			__do_gc(LSM.pm, false, needed_seg_num *_PPS);
 		}
 		
@@ -1175,7 +1175,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 				final_flag);
 
 		uint32_t needed_seg_num=(entry_num/L2PGAP+1)/_PPS+1;
-		if(page_manager_get_total_remain_page(LSM.pm, false) < needed_seg_num * _PPS){
+		if(page_manager_get_total_remain_page(LSM.pm, false, false) < needed_seg_num * _PPS){
 			__do_gc(LSM.pm, false, needed_seg_num *_PPS);
 		}
 		

@@ -91,6 +91,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 level *compaction_TW_convert_LW(compaction_master *cm, level *src);
 
 level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx); //done and debug
+run* compaction_reclaim_run(compaction_master *cm, run *r, uint32_t version);
 run *compaction_wisckey_to_normal(compaction_master *cm, level *src, 
 		run *previous_run, uint32_t *moved_entry_num,  
 		uint32_t start_sst_file_idx, uint32_t target_ridx, bool demote);

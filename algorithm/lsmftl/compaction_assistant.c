@@ -136,7 +136,7 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 }
 
 static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
-	if(page_manager_get_total_remain_page(LSM.pm, false) < wb->buffered_entry_num/L2PGAP){
+	if(page_manager_get_total_remain_page(LSM.pm, false, false) < wb->buffered_entry_num/L2PGAP){
 		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
 	}
 	
@@ -317,6 +317,39 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 	}
 }
 
+static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
+	if(target_lev->level_type!=TIERING){
+		EPRINT("cannot do GC", true);
+	}
+	level *res;
+	uint32_t merged_idx_set[MERGED_RUN_NUM];
+	version_get_merge_target(LSM.last_run_version, merged_idx_set, LSM.param.LEVELN-1);
+	res=compaction_merge(cm, target_lev, merged_idx_set);
+
+	if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
+		return res;
+	}
+
+	uint32_t old_version=version_pick_oldest_version(LSM.last_run_version, LSM.param.LEVELN-1);
+	uint32_t ridx=version_to_ridx(LSM.last_run_version, old_version, LSM.param.LEVELN-1);
+	run *rptr;
+	for(uint32_t num=0; num<res->max_run_num; num++){
+		rptr=LEVEL_RUN_AT_PTR(res, ridx);
+		if(rptr->now_sst_num){
+			run *new_run=compaction_reclaim_run(cm, rptr, old_version+num);
+			run_destroy_content(rptr, LSM.pm);
+			level_update_run_at_move_originality(res, ridx, new_run, true);
+			run_free(new_run);
+		}
+
+		if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
+			break;
+		}
+		ridx++;
+	}
+	return res;
+}
+
 void* compaction_main(void *_cm){
 	compaction_master *cm=(compaction_master*)_cm;
 	queue *req_q=(queue*)cm->req_q;
@@ -370,7 +403,10 @@ again:
 		else if(req->end_level==LSM.param.LEVELN-1 && level_is_full(LSM.disk[req->end_level])){
 			uint32_t merged_idx_set[MERGED_RUN_NUM];
 			rwlock_write_lock(&LSM.level_rwlock[req->end_level]);
-			src=compaction_merge(cm, LSM.disk[req->end_level], merged_idx_set);
+
+			//src=compaction_merge(cm, LSM.disk[req->end_level], merged_idx_set);
+			src=do_reclaim_level(cm, LSM.disk[req->end_level]);
+
 			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
 			LSM.monitor.compaction_cnt[req->end_level+1]++;
 			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
