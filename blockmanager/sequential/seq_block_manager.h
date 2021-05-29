@@ -24,6 +24,7 @@ typedef struct seq_bm_private{
 	uint32_t free_block;
 	int pnum;
 	queue **free_logical_seg_q_pt;
+	queue *invalid_block_q;
 	uint8_t *seg_populate_bit;
 	mh **max_heap_pt;
 }sbm_pri;
@@ -55,6 +56,7 @@ uint32_t seq_map_ppa(struct blockmanager* , uint32_t lpa);
 void seq_free_segment(struct blockmanager *, __segment *);
 void seq_invalidate_number_decrease(struct blockmanager *bm, uint32_t ppa);
 uint32_t seq_get_invalidate_number(struct blockmanager *bm, uint32_t seg_idx);
+uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm);
 
 
 uint32_t seq_pt_create(struct blockmanager *, int, int*, lower_info *);

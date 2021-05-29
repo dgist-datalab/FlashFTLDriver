@@ -30,6 +30,7 @@ struct blockmanager seq_bm={
 	.remain_free_page=seq_remain_free_page,
 	.invalidate_number_decrease=seq_invalidate_number_decrease,
 	.get_invalidate_number=seq_get_invalidate_number,
+	.get_invalidate_blk_number=seq_get_invalidate_blk_number,
 
 	.pt_create=seq_pt_create,
 	.pt_destroy=seq_pt_destroy,
@@ -98,6 +99,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 
 	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt);
 	q_init(&p->free_logical_segment_q, _NOS);
+	q_init(&p->invalid_block_q, _NOS);
 	
 	for(uint32_t i=0; i<_NOS; i++){
 		q_enqueue((void*)&p->logical_segment[i], p->free_logical_segment_q);
@@ -218,9 +220,14 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 	__gsegment* res=(__gsegment*)malloc(sizeof(__gsegment));
 	res->invalidate_number=0;
 
-
-	mh_construct(p->max_heap);
-	block_set* target=(block_set*)mh_get_max(p->max_heap);
+	block_set *target=NULL;
+	if(p->invalid_block_q->size){
+		target=(block_set*)q_dequeue(p->invalid_block_q);
+	}
+	else{
+		mh_construct(p->max_heap);
+		target=(block_set*)mh_get_max(p->max_heap);
+	}
 
 	memcpy(res->blocks, target->blocks, sizeof(__block*)*BPS);
 	res->now=res->max=0;
@@ -249,6 +256,27 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 		}
 		EPRINT("dev full", false);*/
 		mh_construct(p->max_heap);
+	}
+
+	return res;
+}
+
+uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	mh_construct(p->max_heap);
+	uint32_t res=0;
+	while(1){
+		block_set* target=(block_set*)mh_get_max(p->max_heap);
+
+		if(target->total_invalid_number==_PPS*L2PGAP){
+			q_enqueue((void*)target, p->invalid_block_q);
+			res++;
+		}
+		else{
+			uint32_t seg_idx=target->blocks[0]->block_num/BPS;
+			seq_reinsert_segment(bm, seg_idx);
+			break;
+		}
 	}
 
 	return res;

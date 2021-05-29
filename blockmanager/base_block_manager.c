@@ -27,6 +27,7 @@ struct blockmanager base_bm={
 	.remain_free_page=NULL,
 	.invalidate_number_decrease=NULL,
 	.get_invalidate_number=NULL,
+	.get_invalidate_blk_number=NULL,
 
 	.pt_create=NULL,
 	.pt_destroy=NULL,
