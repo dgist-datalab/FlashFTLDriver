@@ -113,11 +113,13 @@ void version_free(version *v){
 }
 extern uint32_t debug_lba;
 void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version){
-	if(version>v->total_version_number){
+	if(version!=UINT8_MAX && version>v->total_version_number){
 		EPRINT("over version num", true);
 	}
+
 	if(lba==debug_lba){
-		printf("[version_map] lba:%u->%u\n",lba, version);
+		printf("[version_map] lba:%u->%u lev:%u\n",lba, version, 
+				version_to_level_idx(v, version, v->leveln));
 	}
 	fdriver_lock(&v->version_lock);
 	if(v->key_version[lba]!=UINT8_MAX){
@@ -200,13 +202,20 @@ uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_n
 }
 
 uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, 
-		uint32_t level_idx, uint32_t target_version){
+		uint32_t src_level_idx, uint32_t des_level_idx, uint32_t target_version){
 	for(uint32_t i=start_lba; i<=end_lba; i++){
-		if(level_idx==UINT32_MAX || 
-				version_to_level_idx(v, version_map_lba(v, i), v->leveln)==level_idx){
+		if(src_level_idx==UINT32_MAX){
+			uint8_t now_version=version_map_lba(v,i);
+			if(now_version!=(uint8_t)-1){
+				continue;
+			}
+			version_coupling_lba_version(v, i, target_version);
+		}
+		else if(version_to_level_idx(v, version_map_lba(v, i), v->leveln)==src_level_idx){
+			/*
 			if(i==debug_lba){
 				EPRINT("target lba's version is updated",false);
-			}
+			}*/
 			version_coupling_lba_version(v, i, target_version);
 		}
 		else{

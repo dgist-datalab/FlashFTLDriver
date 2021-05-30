@@ -21,9 +21,6 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 		if(piece_ppa[i]==debug_piece_ppa){
 			printf("%u ", should_abort?++cnt:cnt);
 			EPRINT("validate piece here!\n", false);	
-			if(cnt==4){
-				EPRINT("break point",false);
-			}
 		}
 
 		if(!bm->populate_bit(bm, piece_ppa[i]) && should_abort){
@@ -828,6 +825,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 				/*for wisckey level*/
 				if(sptr==NULL || !(sptr && sptr->file_addr.piece_ppa<=piece_ppa && sptr->end_ppa*L2PGAP>=piece_ppa)){
+					lsmtree_level_summary(&LSM);
 					EPRINT("should I implement?", true);
 				
 					/*checking other level*/

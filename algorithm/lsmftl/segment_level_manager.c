@@ -12,11 +12,11 @@ typedef std::pair<uint32_t, slm_node*> map_pair;
 //#define MAPPRINT
 
 void slm_init(uint32_t leveling_level_num){
-	slm_manager.body=(map**)malloc(sizeof(map*)*leveling_level_num);
-	for(uint32_t i=0; i<leveling_level_num; i++){
+	slm_manager.body=(map**)malloc(sizeof(map*)*(leveling_level_num+1));
+	for(uint32_t i=0; i<leveling_level_num+1; i++){
 		slm_manager.body[i]=new map();
 	}
-	slm_manager.level_num=leveling_level_num;
+	slm_manager.level_num=leveling_level_num+1;
 }
 
 static void map_print(map *m){
@@ -35,13 +35,20 @@ void slm_coupling_level_seg(uint32_t level_idx, uint32_t seg_idx, uint32_t seg_p
 	it=target->find(seg_idx);
 	if(it!=target->end()){
 		//update
-		if(it->second->piece_offset >= seg_piece_offset){
-			if(!is_gc_data){
-				map_print(target);
-				EPRINT("append only error", true);
+		if(level_idx==slm_manager.level_num-1){
+			if(it->second->piece_offset<seg_piece_offset){
+				it->second->piece_offset=seg_piece_offset;
 			}
 		}
-		it->second->piece_offset=seg_piece_offset;
+		else{
+			if(it->second->piece_offset >= seg_piece_offset){
+				if(!is_gc_data){
+					map_print(target);
+					EPRINT("append only error", true);
+				}
+			}
+			it->second->piece_offset=seg_piece_offset;
+		}
 	}
 	else{
 		slm_node *sn=(slm_node*)malloc(sizeof(slm_node));
@@ -55,6 +62,13 @@ void slm_coupling_level_seg(uint32_t level_idx, uint32_t seg_idx, uint32_t seg_p
 #endif
 }
 
+void slm_coupling_mem_lev_seg(uint32_t seg_idx, uint32_t seg_piece_offset){
+	slm_coupling_level_seg(slm_manager.level_num-1, seg_idx, seg_piece_offset, false);
+}
+
+void slm_move_mem_lev_seg(uint32_t des_lev_idx){
+	slm_move(des_lev_idx, slm_manager.level_num-1);
+}
 void slm_move(uint32_t des_lev_idx, uint32_t src_lev_idx){
 	if(des_lev_idx > slm_manager.level_num-1){
 		EPRINT("overflow!", true);

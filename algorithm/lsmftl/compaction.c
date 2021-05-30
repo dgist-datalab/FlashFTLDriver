@@ -10,27 +10,25 @@ extern lsmtree LSM;
 
 compaction_master *_cm;
 extern uint32_t test_key;
-//uint32_t debug_lba=1549288;
-uint32_t debug_lba=UINT32_MAX;
+uint32_t debug_lba=133282;
+//uint32_t debug_lba=UINT32_MAX;
 
 extern uint32_t debug_piece_ppa;
 
-void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des){
+void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t version, level *des){
 	static int cnt=0;
 	if(lba==debug_lba){
+		if(cnt>=8){
+			printf("break!\n");
+		}
 		if(piece_ppa==debug_piece_ppa){
 			printf("[GOLDEN-same_pice_ppa]");
 		}
 		if(des){
-			if(des->idx==LSM.param.LEVELN-1){
-				printf("[%d]%u,%u (l,p) -> %u run-number:%u\n",++cnt, lba,piece_ppa, des->idx, target_ridx);
-			}
-			else{
-				printf("[%d]%u,%u (l,p) -> %u\n",++cnt, lba,piece_ppa, des->idx);
-			}
+			printf("[%d] %u,%u (l,p) -> version-number:%u lev:%u\n",++cnt, lba,piece_ppa, version, des->idx);
 		}
 		else{
-			printf("[%d]%u,%u (l,p) -> merging to %u\n",++cnt, lba,piece_ppa, target_ridx);
+			printf("[%d] %u,%u (l,p) -> merging to %u\n",++cnt, lba,piece_ppa, version);
 		}
 	}
 }
@@ -292,10 +290,9 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 		}
 
 		if(target_pair.lba!=UINT32_MAX){
-			/*
-			if(!merge_flag){
-				compaction_debug_func(target_pair.lba, target_pair.piece_ppa, target_version, des);
-			}*/
+			
+			compaction_debug_func(target_pair.lba, target_pair.piece_ppa, target_version, des);
+		
 			uint32_t query_version=merge_flag?os_set[target_idx]->version_idx: target_version;
 			if(invalidate_function(des, target_idx, query_version, target_pair, false)){
 				if(kpq){
@@ -405,7 +402,7 @@ static void leveling_trivial_move(key_ptr_pair *kp_set,level *up, level *down, l
 		}
 
 		version_update_for_trivial_move(LSM.last_run_version, FIRST_RUN_PTR(up)->start_lba, 
-				LAST_RUN_PTR(up)->end_lba, up->idx, to_ridx);
+				LAST_RUN_PTR(up)->end_lba, up->idx, down->idx, to_ridx);
 	}
 }
 
@@ -433,6 +430,7 @@ static void compaction_move_unoverlapped_sst
 				sptr->start_lba, 
 				sptr->end_lba,
 				up? version_level_to_start_version(LSM.last_run_version, up->idx):UINT32_MAX,
+				down->idx,
 				version_level_to_start_version(LSM.last_run_version, down->idx));
 	}
 	if(is_close_target){
@@ -442,6 +440,7 @@ static void compaction_move_unoverlapped_sst
 				sptr->start_lba, 
 				sptr->end_lba,
 				up?version_level_to_start_version(LSM.last_run_version, up->idx):UINT32_MAX,
+				down->idx,
 				version_level_to_start_version(LSM.last_run_version, down->idx));
 		_start_idx++;
 	}
@@ -639,9 +638,10 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t 
 	return res;
 }
 
-sst_bf_in_stream *tiering_new_bis(std::queue<uint32_t> *locked_seq_q, uint32_t level_idx){
+sst_bf_in_stream *tiering_new_bis(std::queue<uint32_t> *locked_seg_q, uint32_t level_idx){
 	__segment *seg=page_manager_get_seg_for_bis(LSM.pm, DATASEG);
 	lsmtree_gc_unavailable_set(&LSM, NULL, seg->seg_idx);
+	locked_seg_q->push(seg->seg_idx);
 	read_helper_param temp_rhp=lsmtree_get_target_rhp(level_idx);
 	temp_rhp.member_num=(_PPS-seg->used_page_num)*L2PGAP;
 	sst_bf_in_stream *bis=sst_bis_init(seg, LSM.pm, true, temp_rhp);
@@ -683,6 +683,7 @@ static inline run *filter_sequential_file(level *src, uint32_t max_sst_num,
 		version_update_for_trivial_move(LSM.last_run_version, 
 				sptr->start_lba, 
 				sptr->end_lba,
+				des_idx,
 				version_level_to_start_version(LSM.last_run_version, src->idx),
 				target_version);
 	}
@@ -1256,7 +1257,7 @@ level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	uint32_t start_lba=src->array[0].start_lba;
 	uint32_t end_lba=src->array[0].end_lba;
 	version_update_for_trivial_move(LSM.last_run_version, start_lba, end_lba,
-			src->idx, target_version);
+			src->idx, des->idx,  target_version);
 
 	uint32_t target_ridx=target_version-version_level_to_start_version(LSM.last_run_version, des->idx);
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
@@ -1280,7 +1281,7 @@ level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t 
 	uint32_t start_lba=src->array[0].start_lba;
 	uint32_t end_lba=src->array[0].end_lba;
 	version_update_for_trivial_move(LSM.last_run_version, start_lba, end_lba,
-			src->idx, target_version);
+			src->idx, des->idx, target_version);
 
 	uint32_t target_ridx=target_version-version_level_to_start_version(LSM.last_run_version, des->idx);
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);

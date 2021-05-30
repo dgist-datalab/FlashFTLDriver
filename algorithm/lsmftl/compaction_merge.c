@@ -136,7 +136,7 @@ typedef struct mr_free_set{
 }mr_free_set;
 
 static inline mr_free_set making_MFS(read_issue_arg *arg, map_range *mr_set, run *rptr){
-	mr_free_set res={mr_set, rptr, (uint32_t)arg->from, arg->to, arg->max_num};
+	mr_free_set res={mr_set, rptr, (uint32_t)arg->from, arg->to, arg->max_num-1};
 	return res;
 }
 
@@ -149,7 +149,7 @@ static inline void map_range_preprocessing(mr_free_set free_set, std::list<mr_fr
 	mr_list->push_back(free_set);
 }
 
-static inline void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_lba, bool last){
+static inline void map_range_postprocessing(std::list<mr_free_set>* mr_list,  uint32_t bound_lba, bool last, bool should_free){
 	std::list<mr_free_set>::iterator mr_iter=mr_list->begin();
 	for(;mr_iter!=mr_list->end(); ){
 		mr_free_set now=*mr_iter;
@@ -157,7 +157,9 @@ static inline void map_range_postprocessing(std::list<mr_free_set>* mr_list,  ui
 			for(uint32_t i=now.start_idx; i<=now.end_idx; i++){
 				lsmtree_gc_unavailable_unset(&LSM, &now.r->sst_set[i], UINT32_MAX);
 			}
-			free(now.mr_set);
+			if(should_free){
+				free(now.mr_set);
+			}
 			mr_list->erase(mr_iter++);
 		}
 		else{
@@ -346,8 +348,8 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 //		bulk_invalidation(newer, &newer_borderline, border_lba);
 //		bulk_invalidation(older, &older_borderline, border_lba);
 
-		map_range_postprocessing(new_range_set, border_lba, last_round_check);
-		map_range_postprocessing(old_range_set, border_lba, last_round_check);
+		map_range_postprocessing(new_range_set, border_lba, last_round_check, true);
+		map_range_postprocessing(old_range_set, border_lba, last_round_check, true);
 
 		newer_sst_idx=newer_sst_idx_end+1;
 		older_sst_idx=older_sst_idx_end+1;
@@ -592,8 +594,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		}
 
 		for(uint32_t k=0; k<stream_num; k++){
-			if(read_done & (1<<k)) continue;
-			map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round);
+			map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round, false);
 		}
 
 		for(uint32_t i=0; i<stream_num; i++){

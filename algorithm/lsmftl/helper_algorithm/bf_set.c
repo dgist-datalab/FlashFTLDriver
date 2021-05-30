@@ -97,18 +97,12 @@ bool bf_set_insert(bf_set *bfs, uint32_t lba, uint32_t piece_ppa){
 
 	switch(bfs->type){
 		case BLOOM_PTR_PAIR:
-			if(lba==debug_lba){
-				printf("%u is inser bfs->now:%u\n", debug_lba, bfs->now);
-			}
 			cbf_put_lba(((bp_pair*)bfs->array)[bfs->now].bf, lba);
 			((bp_pair*)(bfs->array))[bfs->now].piece_ppa=piece_ppa;
 			bfs->memory_usage_bit+=
 				((bp_pair*)bfs->array)[bfs->now].bf->bits+48;
 			break;
 		case BLOOM_ONLY:
-			if(lba==debug_lba){
-				printf("%u is inser bfs->now:%u\n", debug_lba, bfs->now);
-			}
 			cbf_put_lba(((c_bf**)(bfs->array))[bfs->now], lba);
 			bfs->memory_usage_bit+=
 				((c_bf**)bfs->array)[bfs->now]->bits;

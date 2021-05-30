@@ -4,6 +4,7 @@
 #include "io.h"
 #include <math.h>
 extern lsmtree LSM;
+extern uint32_t debug_lba;
 
 void* compaction_main(void *);
 static volatile bool compaction_stop_flag;
@@ -106,6 +107,7 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		kp_set[i].lba=iter->first;
 		kp_set[i].piece_ppa=iter->second;
 		read_helper_stream_insert(rh, kp_set[i].lba, kp_set[i].piece_ppa);
+		slm_coupling_mem_lev_seg(SEGNUM(kp_set[i].piece_ppa), SEGPIECEOFFSET(kp_set[i].piece_ppa));
 	}
 	*temp_iter=iter;
 	
@@ -134,7 +136,6 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 
 	return res;
 }
-
 static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	if(page_manager_get_total_remain_page(LSM.pm, false, false) < wb->buffered_entry_num/L2PGAP){
 		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
@@ -150,11 +151,15 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 		for(uint32_t i=0; i<KP_IN_PAGE && temp_kp_set[i].lba!=UINT32_MAX; i++){
 			std::map<uint32_t, uint32_t>::iterator find_iter=LSM.flushed_kp_set->find(temp_kp_set[i].lba);
 			if(find_iter!=LSM.flushed_kp_set->end()){
+				if(debug_lba==find_iter->first){
+					printf("target hit in mem level: %u, %u\n", find_iter->first, find_iter->second);
+				}
 				invalidate_piece_ppa(LSM.pm->bm, find_iter->second, true);
 				LSM.flushed_kp_set->erase(find_iter);
 			}
 			LSM.flushed_kp_set->insert(
 					std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));	
+			version_coupling_lba_version(LSM.last_run_version, temp_kp_set[i].lba, UINT8_MAX);
 		}
 		free(temp_kp_set);
 	}
@@ -305,11 +310,11 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 	if(end_idx==LSM.param.LEVELN-1){
 		slm_empty_level(start_idx);
 	}
-	else if(end_idx==0){
-	//	first_level_slm_coupling(kp_set, req);
+	else if(temp_level){
+		slm_move_mem_lev_seg(end_idx);
 	}
 	else{
-		slm_move(start_idx, end_idx);
+		slm_move(end_idx, start_idx);
 	}
 
 	if(temp_level){

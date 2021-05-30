@@ -71,10 +71,6 @@ read_helper *read_helper_kpset_to_rh(read_helper_param rhp, key_ptr_pair *kp_set
 }
 uint32_t read_helper_stream_insert(read_helper *rh, uint32_t lba, uint32_t piece_ppa){
 	if(!rh) return 1;
-	if(lba==debug_lba){
-		EPRINT("debug point", false);
-		printf("\tpiece_ppa:%u rh:%p\n", piece_ppa, rh);
-	}
 #ifdef TIMERESULT
 	if(rh->type & HELPER_BF_PTR){
 		measure_start(&LSM.monitor.RH_make_stopwatch[0]);

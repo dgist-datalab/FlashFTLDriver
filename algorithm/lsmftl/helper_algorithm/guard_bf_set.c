@@ -118,19 +118,10 @@ bool gbf_set_insert(guard_bf_set *gbf, uint32_t lba, uint32_t piece_ppa){
 	switch(type){
 		case BLOOM_PTR_PAIR:
 			idx=gbf->now/BP_sub_member_num;
-			if(lba==debug_lba){
-				printf("guard idx:%u\n",idx);
-				if(idx==11){
-					EPRINT("break", false);
-				}
-			}
 			bf_set_insert((bf_set*)gbf->body[idx].array, lba, piece_ppa);
 			break;
 		case BLOOM_ONLY:
 			idx=gbf->now/BO_sub_member_num;
-			if(lba==debug_lba){
-				printf("guard idx:%u\n",idx);
-			}
 			bf_set_insert((bf_set*)gbf->body[idx].array, lba, piece_ppa);
 			break;
 	}

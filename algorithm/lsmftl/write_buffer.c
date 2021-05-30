@@ -124,7 +124,7 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 		res[i].lba=it->first;
 
 		if(res[i].lba==debug_lba){
-			printf("map target:%u -> %u in buffer", res[i].lba, res[i].piece_ppa);
+			printf("map target:%u -> %u in buffer\n", res[i].lba, res[i].piece_ppa);
 		}
 
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);

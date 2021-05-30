@@ -10,6 +10,7 @@
 extern lsmtree LSM;
 extern compaction_master *_cm;
 static void *compaction_data_read_end_req(algo_req *req);
+extern uint32_t debug_lba, debug_piece_ppa;
 
 uint32_t issue_read_kv_for_bos_sorted_set(sst_bf_out_stream *bos, 
 		std::queue<key_ptr_pair> *kpq,
@@ -81,6 +82,10 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
+		if(kv_wrapper->piece_ppa==debug_piece_ppa){
+			printf("break!\n");
+		}
+
 		if(slm_invalidate_enable(now_level, kv_wrapper->piece_ppa)){
 			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
 		}
@@ -124,14 +129,17 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 	return res;
 }
 
-void issue_bis_result(sst_bf_in_stream *bis, uint32_t target_ridx, bool final){
+void issue_bis_result(sst_bf_in_stream *bis, uint32_t target_version, bool final){
 	uint32_t debug_idx=0;
 	key_ptr_pair debug_kp[L2PGAP];
 	value_set *result=sst_bis_get_result(bis, final, &debug_idx, debug_kp);
+
+	uint32_t level_idx=version_to_level_idx(LSM.last_run_version, target_version, LSM.param.LEVELN);
 	for(uint32_t i=0; i<debug_idx; i++){
-		compaction_debug_func(debug_kp[i].lba, debug_kp[i].piece_ppa, target_ridx,
-				LSM.disk[LSM.param.LEVELN-1]);
+		compaction_debug_func(debug_kp[i].lba, debug_kp[i].piece_ppa, target_version,
+				LSM.disk[level_idx]);
 	}
+
 	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 	write_req->type=COMPACTIONDATAW;
 	write_req->param=(void*)result;

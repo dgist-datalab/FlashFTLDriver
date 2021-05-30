@@ -49,7 +49,8 @@ void version_free(version *v);
 void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version);
 void version_reinit_early_invalidation(version *v, uint32_t version_num, uint32_t *version);
 uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num);
-uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, uint32_t original_version, uint32_t target_version);
+uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, 
+		uint32_t src_level_idx, uint32_t des_level_idx, uint32_t target_version);
 uint32_t version_get_early_invalidation_target(version *v);
 void version_make_early_invalidation_enable_old(version *v);
 uint32_t version_level_to_start_version(version *v, uint32_t level_idx);
