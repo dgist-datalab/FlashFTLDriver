@@ -20,7 +20,6 @@ typedef struct sst_bf_out_stream{
 	uint8_t version_idx;
 	struct key_value_wrapper *kv_wrap_buffer[L2PGAP];
 	bool no_inter_param_alloc;
-	
 	/*for pop*/
 //	struct key_value_wrapper* now_kv_wrap;
 
@@ -59,6 +58,7 @@ sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(struct inter_read_alreq_par
 struct key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos, struct key_value_wrapper *, struct compaction_master *cm);
 struct key_value_wrapper *sst_bos_get_pending(sst_bf_out_stream *bos, struct compaction_master *cm);
 key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool);
+uint32_t sst_bos_size(sst_bf_out_stream *bos, bool include_pending);
 bool sst_bos_is_empty(sst_bf_out_stream *bos);
 void sst_bos_pop(sst_bf_out_stream *bos, struct compaction_master *);
 void sst_bos_free(sst_bf_out_stream *bos, struct compaction_master *);

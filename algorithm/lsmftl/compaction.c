@@ -493,7 +493,6 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t 
 		return res;
 	}
 
-
 	read_issue_arg read_arg1, read_arg2;
 	read_arg1.des=src;
 	read_arg2.des=des;
@@ -640,15 +639,14 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t 
 	return res;
 }
 
-sst_bf_in_stream *tiering_new_bis(uint32_t level_idx){
+sst_bf_in_stream *tiering_new_bis(std::queue<uint32_t> *locked_seq_q, uint32_t level_idx){
 	__segment *seg=page_manager_get_seg_for_bis(LSM.pm, DATASEG);
+	lsmtree_gc_unavailable_set(&LSM, NULL, seg->seg_idx);
 	read_helper_param temp_rhp=lsmtree_get_target_rhp(level_idx);
 	temp_rhp.member_num=(_PPS-seg->used_page_num)*L2PGAP;
 	sst_bf_in_stream *bis=sst_bis_init(seg, LSM.pm, true, temp_rhp);
 	return bis;
 }
-
-
 
 static inline run *filter_sequential_file(level *src, uint32_t max_sst_num, 
 		uint32_t target_version, uint32_t* start_sst_file_idx, uint32_t des_idx){
@@ -718,7 +716,8 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 
 	sst_pf_out_stream *pos=NULL;
 	sst_bf_out_stream *bos=sst_bos_init(read_done_check, false);
-	sst_bf_in_stream *bis=tiering_new_bis(src->idx+1);
+	std::queue<uint32_t>* locked_seg_q=new std::queue<uint32_t>();
+	sst_bf_in_stream *bis=tiering_new_bis(locked_seg_q, src->idx+1);
 
 	uint32_t total_num=(start_sst_file_idx==UINT32_MAX?src->now_sst_num:src->now_sst_num-(start_sst_file_idx+1));
 	start_sst_file_idx=(start_sst_file_idx==UINT32_MAX?0:start_sst_file_idx);
@@ -733,7 +732,9 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 
 	uint32_t j=0;
 	bool temp_final=false;
-	uint32_t needed_seg_num=0;
+
+	lsmtree_gc_lock_level(&LSM, src->idx);
+
 	for(uint32_t i=0; i<round; i++){
 		read_arg.from=start_idx+i*tier_compaction_tags;
 		if(i!=round-1){
@@ -743,11 +744,6 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 			read_arg.to=src->now_sst_num-1;	
 		}
 		read_param_init(&read_arg);
-
-		needed_seg_num=(TARGETREADNUM(read_arg)*KP_IN_PAGE/L2PGAP+TARGETREADNUM(read_arg))/_PPS+1+1;
-		if(page_manager_get_total_remain_page(LSM.pm, false, false) <needed_seg_num * _PPS){ 
-			__do_gc(LSM.pm, false, needed_seg_num*_PPS);
-		}
 
 		if(i==0){
 			pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
@@ -771,7 +767,9 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
 			total_moved_num+=picked_kv_num;
 			temp_final=((i==round-1 && sst_pos_is_empty(pos)));
-			issue_write_kv_for_bis(&bis, bos, new_run, round2_tier_compaction_tags, target_version, 
+			issue_write_kv_for_bis(&bis, bos, 
+					locked_seg_q, new_run, 
+					round2_tier_compaction_tags, target_version, 
 					temp_final);
 			j++;
 		}
@@ -782,7 +780,6 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 	//finishing bis
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
-		lsmtree_gc_unavailable_set(&LSM, last_file, UINT32_MAX);
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
@@ -802,6 +799,9 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		*moved_entry_num=total_moved_num;
 	}
 
+	lsmtree_gc_unlock_level(&LSM, src->idx);
+
+	release_locked_seg_q(locked_seg_q);
 	sst_pos_free(pos);
 	sst_bis_free(bis);
 	sst_bos_free(bos, _cm);
@@ -873,17 +873,31 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		EPRINT("no data move", true);
 	}
 
-	sst_file *temp_sptr;
-	uint32_t temp_sidx;
-	for_each_sst(new_run, temp_sptr, temp_sidx){
-		if(!temp_sptr->sequential_file){
-			lsmtree_gc_unavailable_unset(&LSM, temp_sptr, UINT32_MAX);
-		}
-	}
 	run_free(new_run);
-//	lsmtree_gc_unavailable_sanity_check(&LSM);
 	/*finish logic*/
 	return res;
+}
+
+void compaction_leveling_gc_lock(level *lev, uint32_t from, uint32_t to){
+	for(uint32_t i=from; i<=to; i++){
+		lsmtree_gc_unavailable_set(&LSM, LEVELING_SST_AT_PTR(lev, i), UINT32_MAX);
+	}
+}
+
+void compaction_leveling_gc_unlock(level *lev, uint32_t *unlocked_idx, uint32_t to, 
+		uint32_t border_lba, bool last){
+	for(uint32_t i=*unlocked_idx; i<=to; i++){
+		sst_file *sptr=LEVELING_SST_AT_PTR(lev, i);
+		if(last){
+			lsmtree_gc_unavailable_unset(&LSM, sptr, UINT32_MAX);
+		}
+		else if(sptr->end_lba<=border_lba){
+			lsmtree_gc_unavailable_unset(&LSM, sptr, UINT32_MAX);
+			*unlocked_idx=i+1;
+		}
+		else
+			break;
+	}
 }
 
 /*
@@ -963,6 +977,8 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	sst_bf_in_stream *bis=NULL;
 	std::queue<key_ptr_pair> *kpq=new std::queue<key_ptr_pair>();
 
+	std::queue<uint32_t> *locked_seg_q=new std::queue<uint32_t>();
+
 	sst_file *sptr; run *rptr;
 	uint32_t ridx, sidx=closed_upper_from;
 	level *temp_des_level=level_convert_normal_run_to_LW(&des->array[0], LSM.pm, des_start_idx, 
@@ -971,11 +987,15 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 
 	bool isstart=true;
 	uint32_t stream_cnt=0;
+	uint32_t upper_unlocked_idx=0, lower_unlocked_idx=0;
 	for_each_sst_level_at(src, rptr, ridx, sptr, sidx){
 		read_params_setting(&read_arg1, &read_arg2, src, temp_des_level, sptr, &sidx, 
 				des_start_idx, &des_end_idx, compaction_read_param_remain_num(_cm));
 		sidx=read_arg1.to;
 		bool final_flag=sidx==src->now_sst_num-1;
+	
+		compaction_leveling_gc_lock(src, read_arg1.from, read_arg1.to);
+		compaction_leveling_gc_lock(des, read_arg2.from, read_arg2.to);
 
 		if(isstart){
 			os_set[0]=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg1.from), read_arg1.param, 
@@ -991,7 +1011,6 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 			sst_pos_add_sst(os_set[1], LEVELING_SST_AT_PTR(temp_des_level, read_arg2.from), read_arg2.param,
 					read_arg2.to-read_arg2.from+1);
 		}
-
 		/*send read I/O*/
 		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
 
@@ -1006,20 +1025,20 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 			bos=sst_bos_init(read_map_done_check, true);
 		}
 		if(bis==NULL){
-			bis=tiering_new_bis(des->idx);
+			bis=tiering_new_bis(locked_seg_q, des->idx);
 		}
 
 		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, 
 				false, UINT32_MAX, UINT32_MAX, final_flag);
 
-		uint32_t needed_seg_num=(entry_num/L2PGAP+1)/_PPS+1;
-		if(page_manager_get_total_remain_page(LSM.pm, false, false) < needed_seg_num * _PPS){
-			__do_gc(LSM.pm, false, needed_seg_num *_PPS);
-		}
-		
-		//dogc
+		uint32_t border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
+				entry_num, lower_version, final_flag);
 
-		issue_write_kv_for_bis(&bis, bos, new_run, entry_num, lower_version, final_flag);
+		compaction_leveling_gc_unlock(src, &upper_unlocked_idx, read_arg1.to, 
+				border_lba, final_flag);
+		compaction_leveling_gc_unlock(des, &lower_unlocked_idx, read_arg2.to, 
+				border_lba, final_flag);
+
 		isstart=false;
 		des_start_idx=des_end_idx+1;
 		stream_cnt++;
@@ -1042,6 +1061,8 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 		level_append_sstfile(res, sptr, true);
 	}
 	run_free(new_run);
+
+	release_locked_seg_q(locked_seg_q);
 
 	level_free(temp_des_level, LSM.pm);
 	sst_bis_free(bis);
@@ -1129,6 +1150,8 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 
 	run *new_run=run_init(des->now_sst_num+src->now_sst_num, UINT32_MAX, 0);
 
+	std::queue<uint32_t>* locked_seg_q=new std::queue<uint32_t>();
+
 	bool isstart=true;
 	uint32_t stream_cnt=0;
 	for_each_sst_level_at(temp_src_level, rptr, ridx, sptr, sidx){
@@ -1167,21 +1190,15 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 			bos=sst_bos_init(read_map_done_check, true);
 		}
 		if(bis==NULL){
-			bis=tiering_new_bis(des->idx);
+			bis=tiering_new_bis(locked_seg_q, des->idx);
 		}
 
 		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, 
 				false, UINT32_MAX, UINT32_MAX,
 				final_flag);
 
-		uint32_t needed_seg_num=(entry_num/L2PGAP+1)/_PPS+1;
-		if(page_manager_get_total_remain_page(LSM.pm, false, false) < needed_seg_num * _PPS){
-			__do_gc(LSM.pm, false, needed_seg_num *_PPS);
-		}
-		
-		//dogc
-
-		issue_write_kv_for_bis(&bis, bos, new_run, entry_num, lower_version, final_flag);
+		issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
+				entry_num, lower_version, final_flag);
 		isstart=false;
 		des_start_idx=des_end_idx+1;
 		stream_cnt++;
@@ -1205,6 +1222,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	}
 	run_free(new_run);
 
+	release_locked_seg_q(locked_seg_q);
 	level_free(temp_des_level, LSM.pm);
 	level_free(temp_src_level, LSM.pm);
 	sst_bis_free(bis);
@@ -1268,6 +1286,15 @@ level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t 
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
 	run_free(new_run);
 	return res;
+}
+
+void release_locked_seg_q(std::queue<uint32_t> *locked_seg_q){
+	while(locked_seg_q->size()){
+		uint32_t seg_idx=locked_seg_q->front();
+		lsmtree_gc_unavailable_unset(&LSM, NULL, seg_idx);
+		locked_seg_q->pop();
+	}
+	delete locked_seg_q;
 }
 
 void *comp_alreq_end_req(algo_req *req){

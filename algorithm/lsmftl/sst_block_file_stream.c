@@ -116,6 +116,10 @@ key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool should_buffer_chec
 	return target;
 }
 
+uint32_t sst_bos_size(sst_bf_out_stream *bos, bool include_pending){
+	return include_pending?bos->kv_wrapper_q->size()+bos->kv_buf_idx:bos->kv_wrapper_q->size(); 
+}
+
 void sst_bos_pop(sst_bf_out_stream *bos, compaction_master *cm){
 	/*
 	key_value_wrapper *target=bos->kv_wrapper_q->front();
@@ -196,8 +200,6 @@ sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read
 	res->pm=pm;
 	res->buffer=(key_value_wrapper**)malloc(L2PGAP*sizeof(key_value_wrapper*));
 	res->seg=seg;
-
-	lsmtree_gc_unavailable_set(&LSM, NULL, seg->seg_idx);
 
 	res->make_read_helper=make_read_helper;
 
@@ -350,8 +352,6 @@ void sst_bis_free(sst_bf_in_stream *bis){
 		EPRINT("remain data", true);	
 	}
 	
-	lsmtree_gc_unavailable_unset(&LSM, NULL, bis->seg->seg_idx);
-
 	if(bis->seg->used_page_num==_PPS){
 		free(bis->seg);
 	}

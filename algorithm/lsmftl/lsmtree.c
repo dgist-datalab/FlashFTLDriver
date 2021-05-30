@@ -724,6 +724,25 @@ sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa){
 	return res;
 }
 
+
+sst_file *lsmtree_find_target_normal_sst_datagc(uint32_t lba, uint32_t piece_ppa, 
+		uint32_t *lev_idx, uint32_t *target_version, uint32_t *target_sidx){
+	sst_file *res=NULL;
+	uint32_t ridx;
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		level *lev=LSM.disk[i];
+		if(lev->level_type==TIERING_WISCKEY 
+				|| lev->level_type==LEVELING_WISCKEY) continue;
+		res=level_find_target_run_idx(lev, lba, piece_ppa, &ridx, target_sidx);
+		if(res){
+			*lev_idx=i;
+			*target_version=version_level_to_start_version(LSM.last_run_version, i)+ridx;
+			return res;
+		}
+	}
+	return res;
+}
+
 void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
 	if(sptr){
 		lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]++;
@@ -841,3 +860,4 @@ read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
 	}
 	return LSM.param.plr_rhp;
 }
+

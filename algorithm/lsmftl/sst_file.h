@@ -37,6 +37,7 @@ typedef struct sst_file{
 	struct read_helper *_read_helper;
 	
 	map_range *block_file_map;
+	bool is_issue_for_gc;
 	char *data;
 }sst_file;
 

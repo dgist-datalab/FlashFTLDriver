@@ -139,13 +139,23 @@ void issue_bis_result(sst_bf_in_stream *bis, uint32_t target_ridx, bool final){
 	io_manager_issue_write(result->ppa, result, write_req, false);	
 }
 
-uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, run *new_run,
+uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
+		std::queue<uint32_t> *locked_seg_q,run *new_run,
 		int32_t entry_num, uint32_t target_version, bool final){
 	int32_t inserted_entry_num=0;
 	uint32_t last_lba=UINT32_MAX;
 
 	fdriver_lock(&LSM.flush_lock);
 	uint32_t level_idx=version_to_level_idx(LSM.last_run_version, target_version, LSM.param.LEVELN);
+
+	uint32_t kv_pair_num=sst_bos_size(bos, final);
+	uint32_t need_page_num=(kv_pair_num/L2PGAP+(kv_pair_num%L2PGAP?1:0))+
+		(kv_pair_num/KP_IN_PAGE+(kv_pair_num%KP_IN_PAGE?1:0)); //map_num
+	uint32_t need_seg_num=need_page_num/_PPS+(need_page_num%_PPS?1:0);
+	if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
+		__do_gc(LSM.pm, false, need_seg_num*_PPS);
+	}
+
 	while(!sst_bos_is_empty(bos)){
 		key_value_wrapper *target=NULL;
 
@@ -173,11 +183,10 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 
 		if(sst_bis_ppa_empty(*bis)){
 			sst_file *sptr=bis_to_sst_file(*bis);
-			lsmtree_gc_unavailable_set(&LSM, sptr, UINT32_MAX);
 			run_append_sstfile_move_originality(new_run, sptr);
 			sst_free(sptr, LSM.pm);
 			sst_bis_free(*bis);
-			*bis=tiering_new_bis(level_idx);
+			*bis=tiering_new_bis(locked_seg_q, level_idx);
 		}
 		inserted_entry_num++;
 	}

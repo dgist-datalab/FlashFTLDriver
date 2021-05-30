@@ -143,6 +143,9 @@ void lsmtree_level_summary(lsmtree *lsm);
 void lsmtree_content_print(lsmtree *lsm);
 void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param);
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
+sst_file *lsmtree_find_target_normal_sst_datagc(uint32_t lba, uint32_t map_ppa,
+		uint32_t *lev_idx, uint32_t *target_version, uint32_t* target_sidx);
+sst_file **lsmtree_fine_target_wisckey_sst_set(uint32_t lba);
 void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm);
@@ -151,6 +154,7 @@ void lsmtree_tiered_level_all_print();
 void lsmtree_gc_lock_level(lsmtree *lsm, uint32_t level_idx);
 void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
 uint32_t lsmtree_testing();
+
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);
 #define MAKE_L0COMP_REQ(wb, param, is_gc_data)\

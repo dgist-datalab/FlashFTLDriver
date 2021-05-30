@@ -171,9 +171,6 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 			level_append_sstfile(res, sptr, true);
 			sst_free(sptr, LSM.pm);
 		}
-		if(res->now_sst_num==0){
-			printf("???\n");
-		}
 		return res;
 	}
 	else{
@@ -181,15 +178,24 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	}
 }
 
+static inline void managing_remain_space_for_wisckey(level *src, level *des){
+	uint32_t needed_map_page_num=src->now_sst_num+(des?des->now_sst_num:0);
+	if(page_manager_get_total_remain_page(LSM.pm, true, false) < needed_map_page_num){
+		__do_gc(LSM.pm, true, needed_map_page_num);	
+	}
+}
+
 static inline level *TW_compaction(compaction_master *cm, level *src, level *des,
 		uint32_t target_version){
 	level *res=NULL;
+	managing_remain_space_for_wisckey(src, NULL);
 	level *temp=compaction_TW_convert_LW(cm, src);
 	switch(des->level_type){
 		case LEVELING:
 			res=compaction_LW2LE(cm, temp, des, target_version);
 			break;
 		case LEVELING_WISCKEY:
+			managing_remain_space_for_wisckey(temp, des);
 			res=compaction_LW2LW(cm, temp, des, target_version);
 			break;
 		case TIERING:
@@ -202,6 +208,7 @@ static inline level *TW_compaction(compaction_master *cm, level *src, level *des
 	level_free(temp, LSM.pm);
 	return res;
 }
+
 
 static inline void do_compaction(compaction_master *cm, compaction_req *req, 
 		level *temp_level, uint32_t start_idx, uint32_t end_idx){
@@ -241,12 +248,14 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		case LEVELING_WISCKEY:
 			switch(end_type){
 				case LEVELING_WISCKEY:
+					managing_remain_space_for_wisckey(src_lev, des_lev);
 					lev=compaction_LW2LW(cm, src_lev, des_lev, target_version);
 					break;
 				case LEVELING:
 					lev=compaction_LW2LE(cm, src_lev, des_lev, target_version);
 					break;
 				case TIERING_WISCKEY:
+					/*managing_remain_space_for_wisckey(src_lev, des_lev); no need to write data*/
 					lev=compaction_LW2TW(cm, src_lev, des_lev, target_version);
 					break;
 				case TIERING:
@@ -350,14 +359,28 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 	return res;
 }
 
+static void last_level_reclaim(compaction_master *cm, uint32_t level_idx){
+	level *lev=LSM.disk[level_idx];
+	if(lev->level_type!=TIERING) return;
+
+	uint32_t merged_idx_set[MERGED_RUN_NUM];
+	rwlock_write_lock(&LSM.level_rwlock[level_idx]);
+
+	level *src=do_reclaim_level(cm, LSM.disk[level_idx]);
+
+	disk_change(NULL, src, &LSM.disk[level_idx], merged_idx_set);
+	LSM.monitor.compaction_cnt[level_idx+1]++;
+	rwlock_write_unlock(&LSM.level_rwlock[level_idx]);
+}
+
 void* compaction_main(void *_cm){
 	compaction_master *cm=(compaction_master*)_cm;
 	queue *req_q=(queue*)cm->req_q;
+	uint32_t above_sst_num;
 	while(!compaction_stop_flag){
 		compaction_req *req=(compaction_req*)q_dequeue(req_q);
 		if(!req) continue;
 again:
-		level *src;
 		level *temp_level=NULL;
 		if(req->start_level==-1 && req->end_level==0){
 			if(req->wb){
@@ -374,47 +397,44 @@ again:
 
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
 
-		if(req->end_level != LSM.param.LEVELN-1){
-
-			if(level_is_full(LSM.disk[req->end_level])){
-				req->start_level=req->end_level;
-				req->end_level++;
-				if(temp_level){
-					level_free(temp_level, LSM.pm);
-					temp_level=NULL;
-				}
-				goto again;
-			}
-			
-			/*this path will test leveling level*/
-			uint32_t above_sst_num=req->end_level==0? 
-				temp_level->max_sst_num:
-				LSM.disk[req->end_level-1]->max_sst_num; 
-			if(!level_is_appendable(LSM.disk[req->end_level], above_sst_num)){
-				req->start_level=req->end_level;
-				req->end_level++;
-				if(temp_level){
-					level_free(temp_level, LSM.pm);
-					temp_level=NULL;
-				}
-				goto again;
-			}
+		if(req->end_level==LSM.param.LEVELN-1){
+			goto end;
 		}
-		else if(req->end_level==LSM.param.LEVELN-1 && level_is_full(LSM.disk[req->end_level])){
-			uint32_t merged_idx_set[MERGED_RUN_NUM];
-			rwlock_write_lock(&LSM.level_rwlock[req->end_level]);
 
-			//src=compaction_merge(cm, LSM.disk[req->end_level], merged_idx_set);
-			src=do_reclaim_level(cm, LSM.disk[req->end_level]);
-
-			disk_change(NULL, src, &LSM.disk[req->end_level], merged_idx_set);
-			LSM.monitor.compaction_cnt[req->end_level+1]++;
-			rwlock_write_unlock(&LSM.level_rwlock[req->end_level]);
+		if(level_is_full(LSM.disk[req->end_level])){
+			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1])){
+				last_level_reclaim(cm, LSM.param.LEVELN-1);
+			}
+			req->start_level=req->end_level;
+			req->end_level++;
+			if(temp_level){
+				level_free(temp_level, LSM.pm);
+				temp_level=NULL;
+			}
+			goto again;
 		}
+
+		/*this path will test leveling level*/
+		above_sst_num=req->end_level==0? 
+			temp_level->max_sst_num:
+			LSM.disk[req->end_level-1]->max_sst_num; 
+		if(!level_is_appendable(LSM.disk[req->end_level], above_sst_num)){
+			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1])){
+				last_level_reclaim(cm, LSM.param.LEVELN-1);
+			}
+			req->start_level=req->end_level;
+			req->end_level++;
+			if(temp_level){
+				level_free(temp_level, LSM.pm);
+				temp_level=NULL;
+			}
+			goto again;
+		}
+
+end:
 		if(temp_level){
 			level_free(temp_level, LSM.pm);
 		}
-end:
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);
 	}

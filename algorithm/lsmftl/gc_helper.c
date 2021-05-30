@@ -211,6 +211,7 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*> *gkv,
 		uint32_t seg_idx){
 	if(!wb) return;
 
+	EPRINT("should I implement?", true);
 	std::map<uint32_t, gc_mapping_check_node*>::iterator iter=gkv->begin();
 	sst_file *now_check_sst=NULL;
 	blockmanager *bm=LSM.pm->bm;
@@ -227,6 +228,7 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*> *gkv,
 		if(gmn->type!=MAP_CHECK_FLUSHED_KP){
 			EPRINT("it cannpt be", true);
 		}
+
 		if(now_check_sst){
 			if(now_check_sst->start_lba <= gmn->lba && now_check_sst->end_lba>=gmn->lba){
 				gmn->target_sst_file=now_check_sst;
@@ -234,6 +236,7 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*> *gkv,
 				continue;
 			}
 		}
+
 		now_check_sst=NULL;
 		for(uint32_t i=0; i<LSM.param.LEVELN-1; i++){
 			if(slm_invalidate_enable(i, gmn->piece_ppa)){
@@ -246,6 +249,7 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*> *gkv,
 		if(!now_check_sst){
 			EPRINT("wtf!!!", true);
 		}
+
 		gmn->type=MAP_READ_DONE;
 		gmn->mapping_data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		gmn->target_sst_file=now_check_sst;
@@ -279,6 +283,7 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*> *gkv,
 			now_data=head_gmn->mapping_data->value;
 			fdriver_lock(&head_gmn->done_lock);
 		}
+
 		uint32_t idx=kp_find_idx(gmn->lba, now_data);
 		if(((key_ptr_pair*)now_data)[idx].piece_ppa!=gmn->piece_ppa){
 			EPRINT("invalid read", true);

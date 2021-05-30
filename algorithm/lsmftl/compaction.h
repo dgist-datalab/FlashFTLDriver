@@ -116,7 +116,8 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_strea
 
 
 sst_file *bis_to_sst_file(struct sst_bf_in_stream *bis);
-struct sst_bf_in_stream *tiering_new_bis(uint32_t level_idx);
+struct sst_bf_in_stream *tiering_new_bis(std::queue<uint32_t> *locked_seg_q, uint32_t level_idx);
+void release_locked_seg_q(std::queue<uint32_t> *locked_seg_q);
 uint32_t issue_read_kv_for_bos_sorted_set(struct sst_bf_out_stream *bos, 
 		std::queue<key_ptr_pair> *kpq,
 		bool merge, uint32_t merge_newer_version, uint32_t merge_older_version,
@@ -129,7 +130,8 @@ int issue_read_kv_for_bos_stream(struct sst_bf_out_stream *bos,
 		bool demote,
 		bool round_final);
 
-uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, struct sst_bf_out_stream *bos, run *new_run,
+uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, struct sst_bf_out_stream *bos, 
+		std::queue<uint32_t> *locked_seg_q, run *new_run,
 		int32_t entry_num, uint32_t target_ridx, bool final);
 
 void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des);
