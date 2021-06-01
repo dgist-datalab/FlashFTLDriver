@@ -377,13 +377,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		sst_free(last_file, LSM.pm);
 	}
 
-	if(bis->seg->used_page_num!=_PPS){
-		if(LSM.pm->temp_data_segment){
-			EPRINT("should be NULL", true);
-		}
-		LSM.pm->temp_data_segment=bis->seg;
-	}
-
 	sst_bis_free(bis);
 	sst_bos_free(bos, _cm);
 
@@ -657,6 +650,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
+
 
 	for(uint32_t i=0; i<stream_num; i++){
 		sst_pos_free(pos_set[i]);

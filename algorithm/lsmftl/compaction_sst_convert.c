@@ -2,7 +2,13 @@
 #include <stdlib.h>
 extern lsmtree LSM;
 extern compaction_master *_cm;
-extern bool early_map_done(inter_read_alreq_param *param);
+bool early_map_done(inter_read_alreq_param *param){
+	param->map_target->data=NULL;
+	inf_free_valueset(param->data, FS_MALLOC_R);
+	fdriver_destroy(&param->done_lock);
+	free(param);
+	return true;
+}
 static void sst_sanity_checker(sst_file *res){
 	if(res->end_lba < res->start_lba){
 		EPRINT("range error", true);

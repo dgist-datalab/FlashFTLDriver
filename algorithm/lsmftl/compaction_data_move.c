@@ -26,13 +26,7 @@ uint32_t issue_read_kv_for_bos_sorted_set(sst_bf_out_stream *bos,
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
-		if(merge && (version_is_early_invalidate(LSM.last_run_version, merge_newer_version) || 
-				version_is_early_invalidate(LSM.last_run_version, merge_older_version))){
-			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, false);
-		}
-		else{
-			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
-		}
+		invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
 		
 		/*version alread check in stream sorting logci*/
 		if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){

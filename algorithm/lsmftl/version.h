@@ -19,7 +19,7 @@ typedef struct version{
 	int8_t max_valid_version_num;
 	uint32_t *version_invalidation_cnt;
 	uint32_t last_level_version_num;
-	bool *version_early_invalidate;
+	//bool *version_early_invalidate;
 	uint32_t *start_vidx_of_level;
 	fdriver_lock_t version_lock;
 	std::queue<uint32_t> **version_empty_queue;
@@ -49,21 +49,21 @@ void version_populate(version *v, uint32_t version, uint32_t level_idx);
 void version_sanity_checker(version *v);
 void version_free(version *v);
 void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version);
-void version_reinit_early_invalidation(version *v, uint32_t version_num, uint32_t *version);
-uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num);
+//void version_reinit_early_invalidation(version *v, uint32_t version_num, uint32_t *version);
+//uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num);
 uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_t end_lba, 
 		uint32_t src_level_idx, uint32_t des_level_idx, uint32_t target_version);
-uint32_t version_get_early_invalidation_target(version *v);
-void version_make_early_invalidation_enable_old(version *v);
+//uint32_t version_get_early_invalidation_target(version *v);
+//void version_make_early_invalidation_enable_old(version *v);
 uint32_t version_level_to_start_version(version *v, uint32_t level_idx);
 
 static inline uint32_t version_to_ridx(version *v, uint32_t target_version, uint32_t lev_idx){
 	return target_version-version_level_to_start_version(v, lev_idx);
 }
-
+/*
 static inline void version_enable_ealry_invalidation(version *v, uint32_t r_idx){
 	v->version_early_invalidate[r_idx]=true;
-}
+}*/
 
 static inline uint32_t version_map_lba(version *v, uint32_t lba){
 	uint32_t res;
@@ -137,14 +137,15 @@ static inline uint32_t version_to_level_idx(version *v, uint32_t version, uint32
 	else
 		return level_num-version+v->max_valid_version_num-2;*/
 }
-
+/*
 static inline bool version_is_early_invalidate(version *v, uint32_t version){
 	return !v->version_early_invalidate[version];
 }
-
+*/
+/*
 static inline void version_set_early_invalidation(version *v, uint32_t version){
 	v->version_early_invalidate[version]=false;
-}
+}*/
 void version_traversal(version *v);
 
 #define for_each_old_ridx_in_lastlev(v, ridx, cnt)\

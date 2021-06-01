@@ -810,13 +810,6 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
-	
-	if(bis->seg->used_page_num!=_PPS){
-		if(LSM.pm->temp_data_segment){
-			EPRINT("should be NULL", true);
-		}
-		LSM.pm->temp_data_segment=bis->seg;
-	}
 
 	if(!total_moved_num){
 		EPRINT("no data moved", true);
@@ -1077,13 +1070,6 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 		sst_free(last_file, LSM.pm);
 	}
 
-	if(bis->seg->used_page_num!=_PPS){
-		if(LSM.pm->temp_data_segment){
-			EPRINT("should be NULL", true);
-		}
-		LSM.pm->temp_data_segment=bis->seg;
-	}
-
 	for_each_sst(new_run, sptr, sidx){
 		level_append_sstfile(res, sptr, true);
 	}
@@ -1235,13 +1221,6 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	if((last_file=bis_to_sst_file(bis))){
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
-	}
-
-	if(bis->seg->used_page_num!=_PPS){
-		if(LSM.pm->temp_data_segment){
-			EPRINT("should be NULL", true);
-		}
-		LSM.pm->temp_data_segment=bis->seg;
 	}
 
 	for_each_sst(new_run, sptr, sidx){

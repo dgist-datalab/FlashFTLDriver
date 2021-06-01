@@ -158,7 +158,10 @@ retry:
 		if(bm->is_gc_needed(bm)){
 			//EPRINT("before get ppa, try to gc!!\n", true);
 			if(__do_gc(pm,is_map, is_map?1:(1+1))){ //just trim
+				printf("seg->idx:%u\n", seg->seg_idx);
 				free(seg);
+				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+				goto retry;
 			}
 			else{ //copy trim
 				
@@ -470,7 +473,6 @@ bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_num){
 	std::queue<uint32_t> diff_type_queue;
 	uint32_t seg_idx;
 	uint32_t remain_page=0;
-	uint32_t target_version=0;
 retry:
 	victim_target=pm->bm->get_gc_target(pm->bm);
 	seg_idx=victim_target->seg_idx;
@@ -514,26 +516,12 @@ out:
 		goto retry_logic;
 	}
 	if(!victim_target || victim_target->invalidate_number<L2PGAP){
-		/*make invalidation*/
-		if(compaction_early_invalidation(UINT32_MAX)==0){
-			lsmtree_content_print(&LSM);
-			EPRINT("may device has no free block!", true);
-		}
-		else{
-			goto retry_logic;
-		}
+		goto retry_logic;
 	}
 
 	switch(pm->seg_type_checker[seg_idx]){
 		case DATASEG:
 		case SEPDATASEG:
-			if(	victim_target->invalidate_number < L2PGAP &&
-					(target_version=version_get_early_invalidation_target(LSM.last_run_version))!=UINT32_MAX){
-				compaction_early_invalidation(target_version);
-				free(victim_target);
-				pm->bm->reinsert_segment(pm->bm, seg_idx);
-				goto retry;	
-			}
 			while(diff_type_queue.size()){
 				seg_idx=diff_type_queue.front();
 				pm->bm->reinsert_segment(pm->bm, seg_idx);
@@ -898,6 +886,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	}
 	free(free_target);
 
+	delete gc_target_queue;
 	delete gc_kv_map;
 	if(wisckey_node_wb){
 		write_buffer_free(wisckey_node_wb);

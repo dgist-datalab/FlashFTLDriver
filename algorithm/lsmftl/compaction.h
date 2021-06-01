@@ -103,7 +103,7 @@ inter_read_alreq_param *compaction_get_read_param(compaction_master *cm);
 void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *);
 key_value_wrapper *compaction_get_kv_wrapper(uint32_t ppa);
 void compaction_free_kv_wrapper(key_value_wrapper *kv_wrap);
-uint32_t compaction_early_invalidation(uint32_t target_version);
+//uint32_t compaction_early_invalidation(uint32_t target_version);
 void read_sst_job(void *arg, int th_num);
 void read_map_param_init(read_issue_arg *read_arg, map_range *mr);
 bool read_map_done_check(inter_read_alreq_param *param, bool check_page_sst);

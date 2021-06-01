@@ -356,6 +356,13 @@ void sst_bis_free(sst_bf_in_stream *bis){
 	if(bis->seg->used_page_num==_PPS){
 		free(bis->seg);
 	}
+	else{
+		if(LSM.pm->temp_data_segment){
+			EPRINT("should be NULL", true);
+		}
+		LSM.pm->temp_data_segment=bis->seg;
+	//	printf("temp_data_seg:%u\n", bis->seg->seg_idx);
+	}
 
 	delete bis->map_data;
 	free(bis->buffer);

@@ -17,7 +17,6 @@ SRCS +=\
 	   read_helper.c\
 	   segment_level_manager.c\
 	   compaction_merge.c\
-	   compaction_early_invalidation.c\
 	   compaction_sst_convert.c\
 	   compaction_data_move.c\
 	   gc_helper.c\
@@ -27,6 +26,7 @@ SRCS +=\
 #	   helper_algorithm/bf_set.c\
 #	   helper_algorithm/compressed_bloomfilter.c
 #	   helper_algorithm/bloomfilter.c\
+	   compaction_early_invalidation.c\
 
 
 DIRS := $(shell find ./caching/ -type d)
