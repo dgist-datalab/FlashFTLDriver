@@ -127,8 +127,8 @@ level *making_leveling(uint32_t sst_num, uint32_t populate_sst_num, bool isseque
 level *making_tiering(uint32_t run_num, uint32_t sst_num, uint32_t populate_run_num, 
 	bool issequential, uint32_t idx, bool wisckey){
 	level *res=level_init(sst_num, run_num, wisckey?TIERING_WISCKEY:TIERING, idx);
-	std::set<uint32_t> *run_set[100];
-	std::set<uint32_t>* lba_set[100];
+	std::set<uint32_t> **run_set=new std::set<uint32_t>*[run_num];
+	std::set<uint32_t>** lba_set=new std::set<uint32_t>*[sst_num*2];
 	for(uint32_t i=0; i<populate_run_num; i++){
 		run_set[i]=get_lba_set(0, RANGE, (sst_num/run_num)*KP_IN_PAGE, issequential);
 	}
@@ -179,13 +179,15 @@ level *making_tiering(uint32_t run_num, uint32_t sst_num, uint32_t populate_run_
 	for(uint32_t i=0;i<populate_run_num; i++){
 		delete run_set[i];
 	}
+	delete []run_set; 
+	delete []lba_set;
 	return res;
 }
 
 static inline void compaction_test(level **disk,
 		level *(*comp_func)(compaction_master* cm, level *, level *)){
 	level *temp=comp_func(LSM.cm, disk[0], disk[1]);
-	level_consistency_check(temp);
+	level_consistency_check(temp, false);
 	level_free(temp, LSM.pm);
 	level_free(disk[0], LSM.pm);
 	level_free(disk[1], LSM.pm);
@@ -197,29 +199,80 @@ uint32_t lsmtree_testing(){
 	temp_disk[1]=level_init(10, 10, 1, 1);
 	level *disk[2];
 	dummy_data=(char*)malloc(PAGESIZE);
-	LSM.param.normal_size_factor=10;
+	LSM.param.normal_size_factor=LSM.param.last_size_factor=10;
 	LSM.function_test_flag=true;
 
 	/*big random test*/
 	{
-		/*CONVERT TW2LW*/
+		/*compaction merge test
 		{
-			temp_disk[0]->level_type=LEVELING;
-			temp_disk[1]->level_type=TIERING_WISCKEY;
-			version *now_version=version_init(11, 10, RANGE, temp_disk, 2);
+			temp_disk[0]->level_type=TIERING;
+			temp_disk[1]->level_type=TIERING;
+			version *now_version=version_init(20, 10, RANGE, temp_disk, 2);
 			version *temp_version=LSM.last_run_version;
 			LSM.last_run_version=now_version;
-			disk[1]=making_tiering(10, 90, 8, false, 1, true);
-			
-			level *temp=compaction_TW_convert_LW(LSM.cm, disk[1]);
-			level_consistency_check(temp);
-			level_free(temp, LSM.pm);
+			disk[1]=making_tiering(10, 1000, 10, false, 1, false);
+			disk[0]=making_tiering(10, 100, 8, false, 0, false);
+	
+			for(uint32_t i=0; i<3; i++){
+				uint32_t merged_idx_set[MERGED_RUN_NUM];
+				version_get_merge_target(LSM.last_run_version, merged_idx_set, 1);
+				level *temp=compaction_merge(LSM.cm, disk[1], merged_idx_set);
+				level_free(disk[1], LSM.pm);
+				disk[1]=temp;
+			}
+			level_consistency_check(disk[1]);
 			level_free(disk[1], LSM.pm);
-
+			version_traversal(now_version);
 
 			LSM.last_run_version=temp_version;
 			version_free(now_version);
-			printf("big random test of LE2LE is passed\n");
+			lsmtree_gc_unavailable_sanity_check(&LSM);
+			printf("test passed\n");
+		}*/
+
+		/*compaction reclaim test*/
+		{
+			temp_disk[0]->level_type=TIERING;
+			temp_disk[1]->level_type=TIERING;
+			version *now_version=version_init(20, 10, RANGE, temp_disk, 2);
+			version *temp_version=LSM.last_run_version;
+			LSM.last_run_version=now_version;
+			disk[1]=making_tiering(10, 1000, 10, false, 1, false);
+			disk[0]=making_tiering(10, 100, 8, false, 0, false);
+	
+			for(uint32_t i=0; i<3; i++){
+				uint32_t merged_idx_set[MERGED_RUN_NUM];
+				version_get_merge_target(LSM.last_run_version, merged_idx_set, 1);
+				level *temp=compaction_merge(LSM.cm, disk[1], merged_idx_set);
+				level_free(disk[1], LSM.pm);
+				disk[1]=temp;
+			}
+
+			run *rptr;
+			uint32_t ridx, cnt;
+			for_each_old_ridx_in_lastlev(LSM.last_run_version, ridx, cnt){
+				printf("ridx:%u\n", ridx);
+				rptr=LEVEL_RUN_AT_PTR(disk[1], ridx);
+				if(rptr->now_sst_num){
+					run *new_run=compaction_reclaim_run(LSM.cm, rptr, ridx);
+	//				run_destroy_content(rptr, LSM.pm);
+					level_update_run_at_move_originality(disk[1], ridx, new_run, false);
+					run_free(new_run);
+				}
+				if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
+					break;
+				}
+			}
+
+			level_consistency_check(disk[1], true);
+			level_free(disk[1], LSM.pm);
+			version_traversal(now_version);
+
+			LSM.last_run_version=temp_version;
+			version_free(now_version);
+			lsmtree_gc_unavailable_sanity_check(&LSM);
+			printf("test passed\n");
 		}
 	}
 	free(dummy_data);

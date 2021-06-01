@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-
+extern lsmtree LSM;
 static inline bool kp_data_check(char *data, uint32_t lev_idx, uint32_t run_idx, 
 		uint32_t sst_idx, uint32_t find_lba, bool should_print){
 
@@ -43,7 +43,7 @@ static inline bool kp_data_check(char *data, uint32_t lev_idx, uint32_t run_idx,
 	return false;
 }
 
-static inline bool kp_data_consistency_check(char *data){
+static inline bool kp_data_consistency_check(char *data, uint32_t version, bool version_check){
 
 	key_ptr_pair *kp_ptr; uint32_t kp_idx;
 	uint32_t prev=UINT32_MAX;
@@ -62,6 +62,11 @@ static inline bool kp_data_consistency_check(char *data){
 
 		io_manager_test_read(PIECETOPPA(kp_ptr->piece_ppa), value_data, TEST_IO);
 		uint32_t temp_data=*(uint32_t*)&value_data[LPAGESIZE*(kp_ptr->piece_ppa%L2PGAP)];
+
+		if(version_check && version_map_lba(LSM.last_run_version, kp_ptr->lba)!=version){
+			EPRINT("version is not matched!", false);
+		}
+
 		if(kp_ptr->lba!=temp_data){
 			printf("map data:%u,%u real data:%u\n", kp_ptr->lba, kp_ptr->piece_ppa, temp_data);
 			EPRINT("data fail", true);
@@ -164,14 +169,17 @@ bool LSM_level_find_lba(level *lev, uint32_t lba){
 	return false;
 }
 
-void level_consistency_check(level *lev){
+void level_consistency_check(level *lev, bool version_check){
 	run *rptr; uint32_t r_idx;
 
-	for_each_run(lev, rptr, r_idx){
+	for_each_run_max(lev, rptr, r_idx){
 		sst_file *sptr; uint32_t s_idx;
 		uint32_t prev_sst_start=UINT32_MAX;
 		uint32_t prev_sst_end=UINT32_MAX;
+		printf("ridx:%u testing\n", r_idx);
+		uint32_t start_version=version_level_to_start_version(LSM.last_run_version, lev->idx);
 		for_each_sst(rptr, sptr, s_idx){
+			printf("\t sidx:%u testing\n",s_idx);
 			uint32_t start_lba=UINT32_MAX, end_lba=0;
 			char map_data[PAGESIZE];
 			if(sptr->type==PAGE_FILE){
@@ -183,7 +191,7 @@ void level_consistency_check(level *lev){
 				temp_lba=kp_get_end_lba(map_data);
 				end_lba=end_lba<temp_lba?temp_lba:end_lba;
 
-				kp_data_consistency_check(map_data);
+				kp_data_consistency_check(map_data, start_version+r_idx, version_check);
 			}
 			else{
 				map_range *mr;
@@ -197,7 +205,7 @@ void level_consistency_check(level *lev){
 					temp_lba=kp_get_end_lba(map_data);
 					end_lba=end_lba<temp_lba?temp_lba:end_lba;
 
-					kp_data_consistency_check(map_data);
+					kp_data_consistency_check(map_data, start_version+r_idx, version_check);
 				}
 			}
 

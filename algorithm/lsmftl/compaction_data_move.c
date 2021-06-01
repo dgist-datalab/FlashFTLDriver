@@ -82,10 +82,6 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
-		if(kv_wrapper->piece_ppa==debug_piece_ppa){
-			printf("break!\n");
-		}
-
 		if(slm_invalidate_enable(now_level, kv_wrapper->piece_ppa)){
 			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
 		}
@@ -218,3 +214,4 @@ void *compaction_data_read_end_req(algo_req *req){
 	free(req);
 	return NULL;
 }
+

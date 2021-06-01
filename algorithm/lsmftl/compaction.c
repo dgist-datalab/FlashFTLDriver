@@ -10,17 +10,14 @@ extern lsmtree LSM;
 
 compaction_master *_cm;
 extern uint32_t test_key;
-uint32_t debug_lba=133282;
-//uint32_t debug_lba=UINT32_MAX;
+//uint32_t debug_lba=1075799;
+uint32_t debug_lba=UINT32_MAX;
 
 extern uint32_t debug_piece_ppa;
 
 void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t version, level *des){
 	static int cnt=0;
 	if(lba==debug_lba){
-		if(cnt>=8){
-			printf("break!\n");
-		}
 		if(piece_ppa==debug_piece_ppa){
 			printf("[GOLDEN-same_pice_ppa]");
 		}
@@ -346,11 +343,42 @@ static sst_file *key_ptr_to_sst_file(key_ptr_pair *kp_set, bool should_flush){
 	return sstfile;
 }
 
-static void leveling_trivial_move(key_ptr_pair *kp_set,level *up, level *down, level *des, uint32_t to_ridx){
+static void leveling_update_meta_for_trivial_move(level *up, level *down, uint32_t target_version){
+	if(up->idx==UINT32_MAX){
+		std::map<uint32_t, uint32_t>::iterator iter=LSM.flushed_kp_set->begin();
+		uint32_t sidx=0;
+		sst_file *sptr=NULL;
+		uint32_t min_lba, max_lba;
+		for(; iter!=LSM.flushed_kp_set->end(); iter++){
+			if(sptr==NULL || !(min_lba<=iter->first && iter->first<=max_lba)){
+				if(sptr){
+					read_helper_insert_done(sptr->_read_helper);
+				}
+				sptr=LEVELING_SST_AT_PTR(up, sidx);
+				min_lba=sptr->start_lba;
+				max_lba=sptr->end_lba;
+				sptr->_read_helper=read_helper_init(lsmtree_get_target_rhp(down->idx));
+				sidx++;
+			}
+			version_coupling_lba_version(LSM.last_run_version, iter->first, target_version);
+			if(min_lba<=iter->first && iter->first<=max_lba){
+				read_helper_stream_insert(sptr->_read_helper, iter->first, iter->second);
+			}
+		}
+		//for last sptr;
+		read_helper_insert_done(sptr->_read_helper);
+	}
+	else{
+		compaction_trivial_move(&up->array[0], target_version, up->idx, down->idx);
+	}
+}
+
+static void leveling_trivial_move(key_ptr_pair *kp_set,level *up, level *down, 
+		level *des, uint32_t target_version){
 	uint32_t ridx, sidx;
 	LSM.monitor.trivial_move_cnt++;
 	run *rptr; sst_file *sptr;
-	if(kp_set){ // L0
+	if(kp_set){
 		sst_file *file=key_ptr_to_sst_file(kp_set, true);
 		file->_read_helper=read_helper_kpset_to_rh(
 				lsmtree_get_target_rhp(des->idx), 
@@ -373,11 +401,12 @@ static void leveling_trivial_move(key_ptr_pair *kp_set,level *up, level *down, l
 		}
 
 		for(uint32_t i=0; i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++){
-			version_coupling_lba_version(LSM.last_run_version, kp_set[i].lba, to_ridx);
+			version_coupling_lba_version(LSM.last_run_version, kp_set[i].lba, target_version);
 		}
 		sst_free(file, LSM.pm);
 	}
-	else{ //L1~LN-1
+	else{
+		leveling_update_meta_for_trivial_move(up, down, target_version);
 		if(down->now_sst_num==0){
 			for_each_sst_level(up, rptr, ridx, sptr, sidx){
 				level_append_sstfile(des, sptr, true);
@@ -400,9 +429,6 @@ static void leveling_trivial_move(key_ptr_pair *kp_set,level *up, level *down, l
 				}
 			}
 		}
-
-		version_update_for_trivial_move(LSM.last_run_version, FIRST_RUN_PTR(up)->start_lba, 
-				LAST_RUN_PTR(up)->end_lba, up->idx, down->idx, to_ridx);
 	}
 }
 
@@ -1243,6 +1269,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	There is no special logic for sequential workload.
  */
 level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){
+	leveling_update_meta_for_trivial_move(src, des, target_version);
 	run *new_run=level_LE_to_run(src, true);
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
 	//level_run_reinit(des, idx_set[1]);
@@ -1254,10 +1281,6 @@ level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		}
 	}
 
-	uint32_t start_lba=src->array[0].start_lba;
-	uint32_t end_lba=src->array[0].end_lba;
-	version_update_for_trivial_move(LSM.last_run_version, start_lba, end_lba,
-			src->idx, des->idx,  target_version);
 
 	uint32_t target_ridx=target_version-version_level_to_start_version(LSM.last_run_version, des->idx);
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
@@ -1267,6 +1290,7 @@ level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t 
 
 
 level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version){
+	leveling_update_meta_for_trivial_move(src, des, target_version);
 	run *new_run=level_LE_to_run(src, true);
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
 	//level_run_reinit(des, idx_set[1]);
@@ -1278,10 +1302,12 @@ level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t 
 		}
 	}
 
+
+/*
 	uint32_t start_lba=src->array[0].start_lba;
 	uint32_t end_lba=src->array[0].end_lba;
 	version_update_for_trivial_move(LSM.last_run_version, start_lba, end_lba,
-			src->idx, des->idx, target_version);
+			src->idx, des->idx, target_version);*/
 
 	uint32_t target_ridx=target_version-version_level_to_start_version(LSM.last_run_version, des->idx);
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);

@@ -6,7 +6,7 @@
 extern lsmtree LSM;
 
 version *version_init(uint8_t total_version_number, 
-		uint32_t last_level_version_sidx, uint32_t LBA_num, level **disk, uint32_t leveln){
+		uint32_t last_level_version_num, uint32_t LBA_num, level **disk, uint32_t leveln){
 	version *res=(version*)malloc(sizeof(version));
 	res->start_hand=res->end_hand=0;
 	res->key_version=(uint8_t*)calloc(LBA_num, sizeof(uint8_t));
@@ -49,7 +49,7 @@ version *version_init(uint8_t total_version_number,
 	res->memory_usage_bit=ceil(log2(res->max_valid_version_num))*LBA_num;
 	res->poped_version_num=0;
 	fdriver_mutex_init(&res->version_lock);
-	res->last_level_version_sidx=last_level_version_sidx;
+	res->last_level_version_num=last_level_version_num;
 	res->leveln=leveln;
 	return res;
 }
@@ -131,7 +131,7 @@ void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version){
 
 
 void version_reinit_early_invalidation(version *v, uint32_t version_num, uint32_t *version){
-	printf("should I need it?\n");
+	EPRINT("should I need it?\n", false);
 	for(uint32_t i=0; i<version_num; i++){
 		v->version_invalidation_cnt[version[i]]=0;
 		v->version_early_invalidate[version[i]]=false;
@@ -139,7 +139,7 @@ void version_reinit_early_invalidation(version *v, uint32_t version_num, uint32_
 }
 
 uint32_t version_get_early_invalidation_target(version *v){
-	printf("should I need it?\n");
+	EPRINT("should I need it?\n", false);
 	/*
 	static int cnt=0;
 	printf("-------------%d------------------\n",cnt++);
@@ -157,7 +157,7 @@ uint32_t version_get_early_invalidation_target(version *v){
 }
 
 static bool early_invalidate_available_check(uint32_t version){
-	printf("should I need it?\n");
+	EPRINT("should I need it?\n", false);
 	run *r=&LSM.disk[LSM.param.LEVELN-1]->array[version];
 	sst_file *sptr;
 	map_range *mptr;
@@ -173,10 +173,10 @@ static bool early_invalidate_available_check(uint32_t version){
 }
 
 uint32_t version_get_max_invalidation_target(version *v, uint32_t *invalidated_num, uint32_t *avg_invalidated_num){
-	printf("should I need it?\n");
+	EPRINT("should I need it?\n", false);
 	uint32_t target_version=UINT32_MAX;
 	uint32_t target_invalidation_cnt=0;
-	for(uint32_t i=v->last_level_version_sidx; i<v->max_valid_version_num; i++){
+	for(uint32_t i=v->last_level_version_num; i<v->max_valid_version_num; i++){
 		if(v->version_early_invalidate[i]) continue;
 		if(LSM.now_merging_run[0]==i || LSM.now_merging_run[1]==i) continue;
 		if(target_invalidation_cnt<v->version_invalidation_cnt[i]){
@@ -230,13 +230,38 @@ uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_
 }
 
 void version_make_early_invalidation_enable_old(version *v){
-	printf("should I need it?\n");
+	EPRINT("should I need it?\n", false);
 	for(uint32_t i=0; i<v->max_valid_version_num-1; i++){
 		v->version_early_invalidate[version_to_run(v,i)]=true;
 	}
 }
 
-
 uint32_t version_level_to_start_version(version *v, uint32_t lev_idx){
 	return v->start_vidx_of_level[lev_idx];
+}
+
+void version_traversal(version *v){
+	uint32_t* version_array=(uint32_t*)malloc(sizeof(uint32_t)*v->max_valid_version_num);
+	for(uint32_t i=0; i<v->max_valid_version_num; i++){
+		version_array[i]=i;
+	}
+
+	for(uint32_t i=0; i<v->max_valid_version_num-1; i++){
+		uint32_t a=version_array[i];
+		for(uint32_t j=i+1; j<v->max_valid_version_num; j++){
+			uint32_t b=version_array[j];
+			if(version_compare(v, a, b) > 0){
+				uint32_t temp=version_array[i];
+				version_array[i]=version_array[j];
+				version_array[j]=temp;
+			}
+		}
+	}
+
+	printf("version order print\n");
+	for(uint32_t i=0; i<v->max_valid_version_num; i++){
+		printf("%u - %u\n",i, version_array[i]);
+	}
+
+	free(version_array);
 }

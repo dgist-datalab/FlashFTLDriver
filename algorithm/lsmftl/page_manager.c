@@ -565,9 +565,6 @@ out:
 
 bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_mapping++;
-	if(LSM.monitor.gc_mapping==10){
-		EPRINT("break!", false);
-	}
 //	printf("gc_mapping:%u (seg_idx:%u)\n", LSM.monitor.gc_mapping, victim->seg_idx);
 	if(victim->invalidate_number==_PPS*L2PGAP || victim->all_invalid){
 		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
@@ -641,6 +638,11 @@ static gc_sptr_node * gc_sptr_node_init(sst_file *sptr, uint32_t validate_num,
 	res->version=version;
 	res->sidx=sidx;
 	return res;
+}
+
+static inline void gc_sptr_node_free(gc_sptr_node *gsn){
+	write_buffer_free(gsn->wb);
+	free(gsn);
 }
 
 static void insert_target_sptr(gc_sptr_node* gsn, uint32_t lba, char *value){
@@ -719,13 +721,11 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t lev_idx,
 			free(kp_set);
 		}
 	}
-	write_buffer_free(gsn->wb);
-	free(gsn);
+	gc_sptr_node_free(gsn);
 }
 
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_data++;
-	//printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
 	if(victim->invalidate_number==victim->validate_number){
 		/*
 	//	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx || LSM.global_debug_flag){
@@ -738,7 +738,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	else if(victim->invalidate_number>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
-
+	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
 	std::queue<gc_read_node*> *gc_target_queue=new std::queue<gc_read_node*>();
 	uint32_t bidx;
 	uint32_t pidx, page;
@@ -789,7 +789,6 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 	gc_mapping_check_node *gmc=NULL;
 
-	sst_file *prev_sptr=NULL;
 	gc_sptr_node *gsn=NULL;
 	while(!gc_target_queue->empty()){
 		gn=gc_target_queue->front();
@@ -811,16 +810,16 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				/*check invalidation*/
 				if(!sptr || (sptr && sptr->end_ppa*L2PGAP<piece_ppa)){ //first round or new sst_file
 					if(sptr){
-						if(gsn){
+						if(gsn->wb->buffered_entry_num){
 							move_sptr(gsn,victim->seg_idx, gsn->lev_idx, gsn->version, gsn->sidx);
 						}
 						else{
-							level_sptr_remove_at_in_gc(LSM.disk[LSM.param.LEVELN-1], target_version, sptr_idx);
+							level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], gsn->version, gsn->sidx);
+							gc_sptr_node_free(gsn);
 						}
-						gsn=NULL;
-						prev_sptr=NULL;
 					}
 					sptr=lsmtree_find_target_normal_sst_datagc(gn->lba, gn->piece_ppa, &level_idx, &target_version, &sptr_idx);
+					gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, level_idx, target_version, sptr_idx);
 				}
 
 				/*for wisckey level*/
@@ -860,10 +859,6 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 					/*should figure out map ppa*/
 					if(version_compare(LSM.last_run_version, recent_version, target_version)<=0){
-						if(!prev_sptr){
-							prev_sptr=sptr;
-							gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, level_idx, target_version, sptr_idx);
-						}
 						invalidate_piece_ppa(pm->bm, gn->piece_ppa, true);
 						insert_target_sptr(gsn, gn->lba, &gn->data->value[LPAGESIZE*i]);
 					}
@@ -879,11 +874,12 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		gc_target_queue->pop();
 	}
 	if(sptr){
-		if(gsn){
-			move_sptr(gsn, gsn->lev_idx, victim->seg_idx, gsn->version, gsn->sidx);
+		if(gsn->wb->buffered_entry_num){
+			move_sptr(gsn,victim->seg_idx, gsn->lev_idx, gsn->version, gsn->sidx);
 		}
 		else{
-			level_sptr_remove_at_in_gc(LSM.disk[LSM.param.LEVELN], target_version, sptr_idx);
+			level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], gsn->version, gsn->sidx);
+			gc_sptr_node_free(gsn);
 		}
 	}
 

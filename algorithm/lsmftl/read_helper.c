@@ -218,9 +218,6 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 				break;
 			}
 		case HELPER_BF_ONLY_GUARD:
-			if(lba==debug_lba){
-				printf("debug_break!\n");
-			}
 			*piece_ppa_result=gbf_set_get_piece_ppa((guard_bf_set*)rh->body,
 					idx, lba);
 			if(*piece_ppa_result==UINT32_MAX){
@@ -238,9 +235,6 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 				break;
 			}
 		case HELPER_PLR:
-			if(lba==debug_lba){
-				printf("debug_break!\n");
-			}
 			if((*idx)==PLR_SECOND_ROUND){
 				(*idx)=UINT32_MAX;
 				result=false;

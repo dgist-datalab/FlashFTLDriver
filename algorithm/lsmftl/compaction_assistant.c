@@ -92,7 +92,7 @@ static inline void first_level_slm_coupling(key_ptr_pair *kp_set, bool is_gc_dat
 }
 extern char all_set_page[PAGESIZE];
 static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set, 
-		std::map<uint32_t, uint32_t>::iterator *temp_iter){
+		std::map<uint32_t, uint32_t>::iterator *temp_iter, bool make_rh){
 	if(temp_iter && *temp_iter==flushed_kp_set->end()){
 		return NULL;
 	}
@@ -101,12 +101,16 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 
 	std::map<uint32_t, uint32_t>::iterator iter=temp_iter?*temp_iter:flushed_kp_set->begin();
 	uint32_t i=0;
-	read_helper *rh=read_helper_init(
-			lsmtree_get_target_rhp(0));
+	read_helper *rh=NULL;
+	if(make_rh){
+		rh=read_helper_init(lsmtree_get_target_rhp(0));
+	}
 	for(; iter!=flushed_kp_set->end() && i<KP_IN_PAGE; i++, iter++ ){
 		kp_set[i].lba=iter->first;
 		kp_set[i].piece_ppa=iter->second;
-		read_helper_stream_insert(rh, kp_set[i].lba, kp_set[i].piece_ppa);
+		if(make_rh){
+			read_helper_stream_insert(rh, kp_set[i].lba, kp_set[i].piece_ppa);
+		}
 		slm_coupling_mem_lev_seg(SEGNUM(kp_set[i].piece_ppa), SEGPIECEOFFSET(kp_set[i].piece_ppa));
 	}
 	*temp_iter=iter;
@@ -172,7 +176,7 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 		level *res=level_init(LSM.param.write_buffer_ent/KP_IN_PAGE, 1, LEVELING_WISCKEY, UINT32_MAX);
 		sst_file *sptr=NULL;
 		std::map<uint32_t, uint32_t>::iterator iter=LSM.flushed_kp_set->begin();
-		while((sptr=kp_to_sstfile(LSM.flushed_kp_set, &iter))){
+		while((sptr=kp_to_sstfile(LSM.flushed_kp_set, &iter, false))){
 			level_append_sstfile(res, sptr, true);
 			sst_free(sptr, LSM.pm);
 		}
@@ -305,6 +309,10 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		}
 	}
 
+	if(!lev->array[0].sst_set[0]._read_helper){
+		EPRINT("wtf?", true);
+	}
+
 	disk_change(temp_level?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
 
 	if(end_idx==LSM.param.LEVELN-1){
@@ -344,23 +352,21 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 		return res;
 	}
 
-	uint32_t old_version=version_pick_oldest_version(LSM.last_run_version, LSM.param.LEVELN-1);
-	uint32_t ridx=version_to_ridx(LSM.last_run_version, old_version, LSM.param.LEVELN-1);
 	run *rptr;
-	for(uint32_t num=0; num<res->max_run_num; num++){
+	uint32_t ridx, cnt;
+	for_each_old_ridx_in_lastlev(LSM.last_run_version, ridx, cnt){
+		if(ridx==merged_idx_set[0]) continue;
 		rptr=LEVEL_RUN_AT_PTR(res, ridx);
 		if(rptr->now_sst_num){
-			run *new_run=compaction_reclaim_run(cm, rptr, old_version+num);
-			run_destroy_content(rptr, LSM.pm);
-			level_update_run_at_move_originality(res, ridx, new_run, true);
+			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
+			level_update_run_at_move_originality(res, ridx, new_run, false);
 			run_free(new_run);
 		}
-
 		if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
 			break;
 		}
-		ridx++;
 	}
+
 	return res;
 }
 

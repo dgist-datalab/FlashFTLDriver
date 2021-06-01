@@ -282,15 +282,14 @@ retry:
 		LSM.disk[r_param->prev_level]->level_type==TIERING_WISCKEY){
 		if(LSM.param.version_enable){
 			if(r_param->prev_run==UINT32_MAX){
-				r_param->prev_run=r_param->version;
+				r_param->prev_run=version_to_ridx(LSM.last_run_version, 
+						r_param->version, r_param->prev_level);
 			}
 			else{
 				return false;
 			}
 			*lptr=LSM.disk[r_param->prev_level];
-			uint32_t start_version_number=version_level_to_start_version(LSM.last_run_version, 
-					r_param->prev_level);
-			*rptr=&(*lptr)->array[r_param->prev_run-start_version_number];
+			*rptr=&(*lptr)->array[r_param->prev_run];
 		}
 		else{
 			if(r_param->prev_run==UINT32_MAX){
@@ -317,7 +316,7 @@ retry:
 		*sptr=level_retrieve_sst(*lptr, lba);
 	}
 	else{
-		if(r_param->prev_run > ((*lptr)->run_num)){
+		if(!LSM.param.version_enable && r_param->prev_run > ((*lptr)->run_num)){
 			printf("not find :%u ???\n", lba);
 			EPRINT("not found eror!", true);
 		}

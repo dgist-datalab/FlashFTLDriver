@@ -18,7 +18,7 @@ typedef struct version{
 	int8_t total_version_number;
 	int8_t max_valid_version_num;
 	uint32_t *version_invalidation_cnt;
-	uint32_t last_level_version_sidx;
+	uint32_t last_level_version_num;
 	bool *version_early_invalidate;
 	uint32_t *start_vidx_of_level;
 	fdriver_lock_t version_lock;
@@ -29,7 +29,7 @@ typedef struct version{
 	uint32_t leveln;
 }version;
 
-version *version_init(uint8_t total_version_number, uint32_t last_level_version_sidx,
+version *version_init(uint8_t total_version_number, uint32_t last_level_version_num,
 		uint32_t LBA_num, level **disk, uint32_t leveln);
 uint32_t version_get_empty_version(version *v, uint32_t level);
 static inline uint32_t version_pop_oldest_version(version *v, uint32_t level){
@@ -37,9 +37,11 @@ static inline uint32_t version_pop_oldest_version(version *v, uint32_t level){
 	v->version_populate_queue[level]->pop();
 	return res;
 }
+
 static inline uint32_t version_pick_oldest_version(version *v, uint32_t level){
 	return v->version_populate_queue[level]->front();
 }
+
 void version_get_merge_target(version *v, uint32_t *version_set, uint32_t level);
 
 void version_unpopulate(version *v, uint32_t version, uint32_t level_idx);
@@ -96,13 +98,13 @@ static inline int version_compare(version *v, int32_t a, int32_t b){
 	if(b > v->max_valid_version_num){
 		EPRINT("not valid comparing", true);
 	}
-	int a_;
-	int b_;
+	int a_=a;
+	int b_=b;
 	if(version_belong_level(v, a, v->leveln-1)){ //check 
-		a_=a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a-v->poped_version_num;
+		a_=a-v->poped_version_num<0?a-v->poped_version_num+v->last_level_version_num:a-v->poped_version_num;
 	}
-	else if(version_belong_level(v, b, v->leveln-1)){
-		b_=b-v->poped_version_num<0?b-v->poped_version_num+v->max_valid_version_num:b-v->poped_version_num;
+	if(version_belong_level(v, b, v->leveln-1)){
+		b_=b-v->poped_version_num<0?b-v->poped_version_num+v->last_level_version_num:b-v->poped_version_num;
 	}
 	return a_-b_;
 }
@@ -143,5 +145,11 @@ static inline bool version_is_early_invalidate(version *v, uint32_t version){
 static inline void version_set_early_invalidation(version *v, uint32_t version){
 	v->version_early_invalidate[version]=false;
 }
+void version_traversal(version *v);
+
+#define for_each_old_ridx_in_lastlev(v, ridx, cnt)\
+	for(cnt=0, ridx=version_to_ridx(v, version_pick_oldest_version(v, (v)->leveln-1), (v)->leveln-1);\
+			cnt<(v)->last_level_version_num;\
+			cnt++, ridx=(ridx+1)%(v)->last_level_version_num)
 
 #endif

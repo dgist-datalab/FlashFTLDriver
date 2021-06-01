@@ -134,7 +134,11 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, struct sst_bf_out_stream
 		std::queue<uint32_t> *locked_seg_q, run *new_run,
 		int32_t entry_num, uint32_t target_ridx, bool final);
 
+void compaction_trivial_move(run *rptr, uint32_t target_version, 
+		uint32_t from_lev_idx, uint32_t to_lev_idx);
+
 void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des);
+
 
 void *comp_alreq_end_req(algo_req *req);
 

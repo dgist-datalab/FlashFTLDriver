@@ -38,10 +38,6 @@ void gc_helper_for_pink(std::queue<gc_mapping_check_node*>* gc_mapping_queue){
 	gc_mapping_check_node *gmc;
 	while(!gc_mapping_queue->empty()){
 		gmc=gc_mapping_queue->front();
-		/*
-		   if(gmc->piece_ppa==debug_piece_ppa && gmc->lba==debug_lba){
-		   printf("break!\n");
-		   }*/
 		std::deque<key_ptr_pair*>::iterator moved_kp_it;
 		key_ptr_pair *moved_kp_now;
 		bool moved_kp_found=false;
