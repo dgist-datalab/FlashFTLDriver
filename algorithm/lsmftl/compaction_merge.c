@@ -350,7 +350,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 			bis=tiering_new_bis(locked_seg_q, des->idx);
 		}
 
-		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, 
+		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
 				true, idx_set[1], idx_set[0], last_round_check);
 		border_lba=issue_write_kv_for_bis(&bis, bos, 
 				locked_seg_q, new_run, entry_num, 
@@ -511,9 +511,12 @@ run* tiering_trivial_move(level *src, level *des, uint32_t target_version){
 static inline uint32_t get_border_from_read_arg_set(read_issue_arg *arg_set, map_range **mr_set, 
 		uint32_t stream_num, uint32_t read_done){
 	uint32_t res=UINT32_MAX;
+	if(read_done==(1<<stream_num)-1){
+		return res;
+	}
 	for(int i=0; i<stream_num; i++){
 		if(read_done & 1<<i) continue;
-		uint32_t target=mr_set[i][arg_set[i].to].end_lba;
+		uint32_t target=(arg_set[i].to==arg_set[i].max_num-1) ? UINT32_MAX:mr_set[i][arg_set[i].to].end_lba;
 		if(res>target){
 			res=target;
 		}
@@ -583,9 +586,6 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 
 	uint32_t border_lba=UINT32_MAX;
 	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
-		if(!isfirst && des->idx==LSM.param.LEVELN-1){
-			LSM.global_debug_flag=true;
-		}
 		read_done=update_read_arg_tiering(read_done, isfirst, pos_set, mr_set,
 				read_arg_set, true, stream_num, src, UINT32_MAX);
 		
@@ -612,18 +612,31 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		if(bos==NULL){
 			bos=sst_bos_init(read_map_done_check, true);
 		}
+
 		if(bis==NULL){
 			bis=tiering_new_bis(locked_seg_q, des->idx);	
 		}
 		
 		if(last_round && sorted_entry_num==0){
-			uint32_t read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, false, UINT32_MAX, UINT32_MAX, last_round);
+			uint32_t read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
+					false, UINT32_MAX, UINT32_MAX, last_round);
+
+			for(uint32_t k=0; k<stream_num; k++){
+				map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round, false);
+			}
+
 			border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
 					read_num, target_version, last_round);
 		}
 		else{
 			for(uint32_t moved_num=0; moved_num<sorted_entry_num; ){
-				uint32_t read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, false, UINT32_MAX, UINT32_MAX, last_round);
+				uint32_t read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
+						false, UINT32_MAX, UINT32_MAX, last_round);
+
+				for(uint32_t k=0; k<stream_num; k++){
+					map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round, false);
+				}
+
 				border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
 						read_num, target_version, last_round);
 				moved_num+=read_num;
@@ -838,8 +851,8 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 			bis=tiering_new_bis(locked_seg_q, LSM.param.LEVELN-1);	
 		}
 
-		uint32_t read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, false, UINT32_MAX, UINT32_MAX, 
-				last_round);
+		uint32_t read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
+				false, UINT32_MAX, UINT32_MAX, last_round);
 		border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
 				read_num, version, last_round);
 		isfirst=false;

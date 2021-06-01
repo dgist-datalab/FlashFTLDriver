@@ -18,7 +18,7 @@
 #include "sst_page_file_stream.h"
 #include <queue>
 
-#define COMPACTION_TAGS ((QDEPTH)*2)
+#define COMPACTION_TAGS ((QDEPTH)*4)
 #define TARGETREADNUM(read_arg) (read_arg.to-read_arg.from+1)
 #define COMPACTION_LEVEL_NUM (2)
 
@@ -120,6 +120,7 @@ struct sst_bf_in_stream *tiering_new_bis(std::queue<uint32_t> *locked_seg_q, uin
 void release_locked_seg_q(std::queue<uint32_t> *locked_seg_q);
 uint32_t issue_read_kv_for_bos_sorted_set(struct sst_bf_out_stream *bos, 
 		std::queue<key_ptr_pair> *kpq,
+		uint32_t *border_lba,
 		bool merge, uint32_t merge_newer_version, uint32_t merge_older_version,
 		bool round_final);
 

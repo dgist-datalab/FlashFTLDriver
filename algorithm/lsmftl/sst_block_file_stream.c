@@ -35,6 +35,7 @@ static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_w
 			value=res->param->data->value;
 		}
 		kv_wrap_buf[i]->kv_ptr.data=&value[LPAGESIZE*(kv_wrap_buf[i]->piece_ppa%L2PGAP)];
+		bos->last_issue_lba=kv_wrap_buf[i]->kv_ptr.lba;
 		if(i==num-1){
 			kv_wrap_buf[i]->free_target_req=true;
 			kv_wrap_buf[i]->no_inter_param_alloc=bos->no_inter_param_alloc;

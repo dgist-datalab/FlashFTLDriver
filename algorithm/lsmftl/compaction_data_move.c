@@ -14,6 +14,7 @@ extern uint32_t debug_lba, debug_piece_ppa;
 
 uint32_t issue_read_kv_for_bos_sorted_set(sst_bf_out_stream *bos, 
 		std::queue<key_ptr_pair> *kpq,
+		uint32_t *border_lba,
 		bool merge, uint32_t merge_newer_version, uint32_t merge_older_version,
 		bool round_final){
 	key_value_wrapper *read_target;
@@ -27,9 +28,10 @@ uint32_t issue_read_kv_for_bos_sorted_set(sst_bf_out_stream *bos,
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
 		invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
-		
+	
 		/*version alread check in stream sorting logci*/
 		if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){
+			*border_lba=bos->last_issue_lba;
 			if(!read_target->param){
 				EPRINT("can't be",true);
 			}
@@ -46,6 +48,7 @@ uint32_t issue_read_kv_for_bos_sorted_set(sst_bf_out_stream *bos,
 	}
 
 	if(kpq->empty() && round_final){
+		*border_lba=UINT32_MAX;
 		if((read_target=sst_bos_get_pending(bos, _cm))){
 			algo_req *read_req=(algo_req*)malloc(sizeof(algo_req));
 			read_req->type=COMPACTIONDATAR;

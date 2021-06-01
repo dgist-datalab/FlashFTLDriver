@@ -20,6 +20,8 @@ typedef struct sst_bf_out_stream{
 	uint8_t version_idx;
 	struct key_value_wrapper *kv_wrap_buffer[L2PGAP];
 	bool no_inter_param_alloc;
+
+	uint32_t last_issue_lba;
 	/*for pop*/
 //	struct key_value_wrapper* now_kv_wrap;
 

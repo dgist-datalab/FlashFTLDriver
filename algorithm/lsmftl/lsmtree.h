@@ -118,6 +118,7 @@ typedef struct lsmtree{
 	std::map<uint32_t, uint32_t> *flushed_kp_set;
 
 	uint32_t* gc_unavailable_seg;
+	uint32_t gc_locked_seg_num;
 
 	lower_info *li;
 }lsmtree;
@@ -155,6 +156,7 @@ void lsmtree_tiered_level_all_print();
 void lsmtree_gc_lock_level(lsmtree *lsm, uint32_t level_idx);
 void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
 uint32_t lsmtree_testing();
+uint32_t lsmtree_seg_debug(lsmtree *lsm);
 
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);

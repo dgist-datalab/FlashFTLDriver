@@ -138,6 +138,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
 
+	printf("NOS:%lu\n", _NOS);
 	lsmtree_monitor_init();
 	return 1;
 }
@@ -744,18 +745,32 @@ sst_file *lsmtree_find_target_normal_sst_datagc(uint32_t lba, uint32_t piece_ppa
 }
 
 void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
+	uint32_t temp_seg_idx;
 	if(sptr){
 		lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]++;
+		temp_seg_idx=sptr->end_ppa/_PPS;
 	}else{
 		lsm->gc_unavailable_seg[seg_idx]++;
+		temp_seg_idx=seg_idx;
+	}
+
+	if(lsm->gc_unavailable_seg[temp_seg_idx]==1){
+		lsm->gc_locked_seg_num++;
 	}
 }
 
 void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
+	uint32_t temp_seg_idx;
 	if(sptr){
 		lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]--;
+		temp_seg_idx=sptr->end_ppa/_PPS;
 	}else{
 		lsm->gc_unavailable_seg[seg_idx]--;
+		temp_seg_idx=seg_idx;
+	}
+
+	if(lsm->gc_unavailable_seg[temp_seg_idx]==0){
+		lsm->gc_locked_seg_num--;
 	}
 }
 
@@ -861,3 +876,42 @@ read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
 	return LSM.param.plr_rhp;
 }
 
+uint32_t lsmtree_seg_debug(lsmtree *lsm){
+	page_manager *pm=lsm->pm;
+	blockmanager *bm=pm->bm;
+	for(uint32_t i=0; i<_NOS; i++){
+		printf("%u block:%s inv:%u type:%s\n", i, lsm->gc_unavailable_seg[i]?"true":"false",
+				bm->get_invalidate_number(bm, i), 
+				get_seg_type_name(pm, i));
+	}
+
+	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
+		level *lev_ptr=LSM.disk[i];
+		if(lev_ptr->level_type!=TIERING && lev_ptr->level_type!=LEVELING){
+			continue;	
+		}
+		run *rptr;
+		uint32_t ridx;
+		printf("level: %u\n",i);
+		for_each_run_max(lev_ptr, rptr, ridx){
+			printf("\tridx:%u\n", ridx);
+			if(rptr->now_sst_num){
+				sst_file *sptr;
+				uint32_t sidx;
+				uint32_t seg_idx=UINT32_MAX;
+				for_each_sst(rptr, sptr, sidx){
+					uint32_t now_seg_idx=sptr->end_ppa/_PPS;
+					if(seg_idx==UINT32_MAX){
+						printf("\t\tsidx:%u - seg_idx:%u\n", sidx, now_seg_idx);
+						seg_idx=now_seg_idx;
+					}
+					else if(seg_idx!=now_seg_idx){
+						printf("\t\tsidx:%u - seg_idx:%u\n", sidx, now_seg_idx);
+						seg_idx=now_seg_idx;					
+					}
+				}
+			}
+		}
+	}
+	return 1;
+}

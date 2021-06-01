@@ -77,4 +77,13 @@ __segment *page_manager_get_seg(page_manager *pm, bool ismap, uint32_t type);
 __segment *page_manager_get_seg_for_bis(page_manager *pm,  uint32_t type);
 void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*>*, 
 		struct write_buffer *wb, uint32_t seg_idx);
+
+static inline  char *get_seg_type_name(page_manager *pm, uint32_t seg_idx){
+	switch(pm->seg_type_checker[seg_idx]){
+		case SEPDATASEG: return "SEPDATASEG";
+		case DATASEG: return "DATASEG";
+		case MAPSEG: return "MAPSEG";
+	}
+	return NULL;
+}
 #endif

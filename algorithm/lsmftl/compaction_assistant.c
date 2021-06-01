@@ -337,6 +337,7 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		rwlock_write_unlock(&LSM.level_rwlock[end_idx]);
 		rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
 	}
+
 }
 
 static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
@@ -368,7 +369,6 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 			break;
 		}
 	}
-
 	return res;
 }
 

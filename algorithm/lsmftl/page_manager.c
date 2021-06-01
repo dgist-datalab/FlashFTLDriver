@@ -158,7 +158,6 @@ retry:
 		if(bm->is_gc_needed(bm)){
 			//EPRINT("before get ppa, try to gc!!\n", true);
 			if(__do_gc(pm,is_map, is_map?1:(1+1))){ //just trim
-				printf("seg->idx:%u\n", seg->seg_idx);
 				free(seg);
 				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
 				goto retry;
@@ -475,6 +474,9 @@ bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_num){
 	uint32_t remain_page=0;
 retry:
 	victim_target=pm->bm->get_gc_target(pm->bm);
+	if(victim_target==NULL){
+		lsmtree_seg_debug(&LSM);
+	}
 	seg_idx=victim_target->seg_idx;
 
 	if(ismap){
@@ -513,9 +515,11 @@ retry_logic:
 
 out:
 	if(LSM.gc_unavailable_seg[seg_idx]){
+//		if(LSM.global_debug_flag) printf("[%lu] %u is locked\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
-	if(!victim_target || victim_target->invalidate_number<L2PGAP){
+	else if(victim_target->invalidate_number<=L2PGAP*2){
+//		if(LSM.global_debug_flag) printf("[%lu] %u is not enough invalid\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
 

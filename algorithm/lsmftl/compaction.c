@@ -1048,10 +1048,12 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 			bis=tiering_new_bis(locked_seg_q, des->idx);
 		}
 
-		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, 
+		uint32_t border_lba;
+
+		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
 				false, UINT32_MAX, UINT32_MAX, final_flag);
 
-		uint32_t border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
+		border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
 				entry_num, lower_version, final_flag);
 
 		compaction_leveling_gc_unlock(src, &upper_unlocked_idx, read_arg1.to, 
@@ -1206,7 +1208,8 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 			bis=tiering_new_bis(locked_seg_q, des->idx);
 		}
 
-		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, 
+		uint32_t border_lba;
+		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba, 
 				false, UINT32_MAX, UINT32_MAX,
 				final_flag);
 

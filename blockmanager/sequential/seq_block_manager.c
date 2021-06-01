@@ -229,6 +229,8 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 		target=(block_set*)mh_get_max(p->max_heap);
 	}
 
+	if(!target) return NULL;
+
 	memcpy(res->blocks, target->blocks, sizeof(__block*)*BPS);
 	res->now=res->max=0;
 	res->seg_idx=res->blocks[0]->block_num/BPS;
