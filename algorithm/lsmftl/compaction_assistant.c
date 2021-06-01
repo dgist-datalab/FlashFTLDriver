@@ -358,7 +358,9 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 		if(ridx==merged_idx_set[0]) continue;
 		rptr=LEVEL_RUN_AT_PTR(res, ridx);
 		if(rptr->now_sst_num){
+			LSM.monitor.compaction_reclaim_run_num++;
 			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
+			run_empty_content(rptr, LSM.pm);
 			level_update_run_at_move_originality(res, ridx, new_run, false);
 			run_free(new_run);
 		}

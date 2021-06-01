@@ -149,6 +149,7 @@ static void lsmtree_monitor_print(){
 	for(uint32_t i=0; i<=LSM.param.LEVELN; i++){
 		printf("COMPACTION %u cnt: %u\n", i, LSM.monitor.compaction_cnt[i]);
 	}
+	printf("COMPACTION_RECLAIM_RUN_NUM:%u\n", LSM.monitor.compaction_reclaim_run_num);
 	printf("COMPACTION_EARLY_INVALIDATION: %u\n", LSM.monitor.compaction_early_invalidation_cnt);
 	printf("DATA GC cnt:%u\n", LSM.monitor.gc_data);
 	printf("MAPPING GC cnt:%u\n", LSM.monitor.gc_mapping);

@@ -28,6 +28,7 @@ typedef struct lsmtree_monitor{
 	uint32_t gc_data;
 	uint32_t gc_mapping;
 	uint32_t *compaction_cnt;
+	uint32_t compaction_reclaim_run_num;
 	uint32_t compaction_early_invalidation_cnt;
 
 	uint64_t merge_total_entry_cnt;
