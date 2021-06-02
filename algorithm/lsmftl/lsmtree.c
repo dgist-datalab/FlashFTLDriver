@@ -170,10 +170,13 @@ static void lsmtree_monitor_print(){
 	lsmtree_level_summary(&LSM);
 	printf("\n");
 
+	uint64_t *level_memory_breakdown=(uint64_t*)calloc(LSM.param.LEVELN, sizeof(uint64_t));
 	uint32_t version_number=LSM.last_run_version->total_version_number;
+	uint64_t write_buffer_ent=LSM.param.write_buffer_ent;
 	uint64_t tiering_memory=0;
 	uint64_t leveling_memory=0;
-	uint64_t usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 32) + RANGE*ceil(log2(version_number));
+	uint64_t usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 32, level_memory_breakdown) + 
+		RANGE*ceil(log2(version_number)) + write_buffer_ent*(32+32);
 	uint64_t showing_size=RANGE*32/8; //for 48 bit
 	//printf("sw size:%lu\n", showing_size);
 	printf("[32-BIT] memory usage: %.2lf for PFTL\n\t%lu(bit)\n\t%.2lf(byte)\n\t%.2lf(MB)\n",
@@ -182,15 +185,23 @@ static void lsmtree_monitor_print(){
 			(double)usage_bit/8,
 			(double)usage_bit/8/1024/1024
 			);
-	printf("  memory breakdown\n\tleveling:%lu (%.2lf)\n\ttiering:%lu (%.2lf)\n\tversion_bit:%lu (%.2lf)\n\n",
+	printf("  memory breakdown\n\tleveling:%lu (%.2lf)\n\ttiering:%lu (%.2lf)\n\tversion_bit:%lu (%.2lf)\n\twrite_pinned_end: %lu (%.2lf)\n",
 			leveling_memory, (double)leveling_memory/usage_bit,
 			tiering_memory, (double)tiering_memory/usage_bit,
-			(uint64_t)(RANGE*ceil(log2(version_number))), (double)RANGE*ceil(log2(version_number))/usage_bit	
+			(uint64_t)(RANGE*ceil(log2(version_number))), (double)RANGE*ceil(log2(version_number))/usage_bit,
+			write_buffer_ent*(32+32), (double)write_buffer_ent*(32+32)/usage_bit
 			);
+
+	printf("  Memory usage in level\n");	
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		printf("\t %u : %lu (%.3lf)\n", i, level_memory_breakdown[i], (double)level_memory_breakdown[i]/usage_bit);
+	}
+	printf("\n");
 
 	tiering_memory=0;
 	leveling_memory=0;
-	usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 48) + RANGE*ceil(log2(version_number));
+	usage_bit=lsmtree_all_memory_usage(&LSM, &leveling_memory, &tiering_memory, 48, level_memory_breakdown) + 
+		RANGE*ceil(log2(version_number)) + write_buffer_ent*(48+48);
 	showing_size=RANGE*48/8; //for 48 bit
 	printf("\n[48-BIT] memory usage: %.2lf for PFTL\n\t%lu(bit)\n\t%.2lf(byte)\n\t%.2lf(MB)\n",
 			(double)usage_bit/8/(showing_size),
@@ -198,12 +209,17 @@ static void lsmtree_monitor_print(){
 			(double)usage_bit/8,
 			(double)usage_bit/8/1024/1024
 			);
-	printf("  memory breakdown\n\tleveling:%lu (%.2lf , %.3lf)\n\ttiering:%lu (%.2lf , %.3lf)\n\tversion_bit:%lu (%.2lf)\n\n",
+	printf("  memory breakdown\n\tleveling:%lu (%.2lf , %.3lf)\n\ttiering:%lu (%.2lf , %.3lf)\n\tversion_bit:%lu (%.2lf)\n\twrite_pinned_ent: %lu (%.2lf)\n",
 			leveling_memory, (double)leveling_memory/usage_bit, (double)leveling_memory/(RANGE*48),
 			tiering_memory, (double)tiering_memory/usage_bit, (double)tiering_memory/(RANGE*48),
-			(uint64_t)(RANGE*ceil(log2(version_number))), (double)RANGE*ceil(log2(version_number))/usage_bit	
+			(uint64_t)(RANGE*ceil(log2(version_number))), (double)RANGE*ceil(log2(version_number))/usage_bit,
+			write_buffer_ent*(48+48), (double)write_buffer_ent*(48+48)/usage_bit
 			);
-
+	printf("  Memory usage in level\n");	
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		printf("\t %u : %lu (%.3lf)\n", i, level_memory_breakdown[i], (double)level_memory_breakdown[i]/usage_bit);
+	}
+	printf("\n");
 
 	printf("----- Time result ------\n");
 	print_adding_result("leveling RH [make] time :", 
@@ -783,7 +799,7 @@ void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
 	}
 }
 
-uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *tiering, uint32_t lba_unit){
+uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *tiering, uint32_t lba_unit, uint64_t *level_memory){
 	uint64_t bit=0;
 	(*leveling)=0;
 	(*tiering)=0;
@@ -791,6 +807,7 @@ uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *ti
 		level *lev=lsm->disk[i];
 		run *rptr;
 		uint32_t ridx;
+		uint32_t now_level_memory_usage=0;
 		for_each_run_max(lev, rptr, ridx){
 			if(!rptr->now_sst_num) continue;
 			sst_file *sptr;
@@ -799,16 +816,18 @@ uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *ti
 			for_each_sst(rptr, sptr, sidx){
 				if(sptr->_read_helper){
 					now_bit=read_helper_memory_usage(sptr->_read_helper, lba_unit);
-					if(lev->level_type==TIERING){
+					if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
 						(*tiering)+=now_bit;
 					}
 					else{
 						(*leveling)+=now_bit;
 					}
+					now_level_memory_usage+=now_bit;
 					bit+=now_bit;
 				}
 			}	
 		}
+		level_memory[i]=now_level_memory_usage;
 	}
 	return bit;
 }

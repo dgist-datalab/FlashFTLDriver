@@ -1,13 +1,14 @@
 #include "guard_bf_set.h"
 #include <stdlib.h>
 #include <stdio.h>
-static uint32_t BP_sub_member_num=UINT32_MAX;
-static uint32_t BO_sub_member_num=UINT32_MAX;
-static uint32_t prev_bit=UINT32_MAX;
+static volatile uint32_t BP_sub_member_num=UINT32_MAX;
+static volatile uint32_t BO_sub_member_num=UINT32_MAX;
+static volatile uint32_t prev_bit=UINT32_MAX;
 float gbf_min_bit=0.0f;
 extern uint32_t debug_lba;
 
 static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32_t type){
+	member=member>14?1000000:member;
     uint32_t target_number;
     uint32_t target_bit=0;
     float result_each_fpr;
@@ -31,17 +32,9 @@ static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32
         }
         else break;
     }   
-    switch(type){
-        case BLOOM_PTR_PAIR:
-            BP_sub_member_num=target_number;
-            break;
-        case BLOOM_ONLY:
-            BO_sub_member_num=target_number;
-            break;
-        default:
-            EPRINT("no type of gbf_set", true);
-            break;
-    }   
+
+	BP_sub_member_num=BO_sub_member_num=target_number;
+
     if(prev_bit!=target_bit){
         printf("BF target bit:%u fpr:%f member_set:%u target_member:%u min_bit:%f\n", target_bit, 
                 result_each_fpr, result_member_num, target_number, gbf_min_bit);

@@ -4,8 +4,8 @@
 #define ABS(a) (a<0? -a:a)
 #define EPSILON 0.00000000001f
 
-float prev_bf_target_fpr=0.0f;
-float prev_target_fpr=0.0f;
+volatile float prev_bf_target_fpr=0.0f;
+volatile float prev_target_fpr=0.0f;
 uint32_t prev_bits;
 extern uint32_t debug_lba;
 

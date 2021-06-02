@@ -250,6 +250,7 @@ uint32_t level_update_run_at_move_originality(level *lev, uint32_t idx, run *r, 
 }
 
 void level_print(level *lev){
+#ifdef DEBUG
 	uint32_t sidx=0, ridx=0;
 	sst_file *sptr;
 	run *rptr;
@@ -280,6 +281,7 @@ void level_print(level *lev){
 			lev->idx,
 			lev->now_sst_num, lev->max_sst_num);
 	}
+#endif
 }
 
 void level_content_print(level *lev, bool print_sst){

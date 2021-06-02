@@ -63,7 +63,7 @@ static void print_help(){
 uint32_t lsmtree_argument_set(int argc, char *argv[]){
 	int c;
 	uint64_t target_memory_usage_bit=0;
-	uint32_t percentage=30;
+	uint32_t percentage=25;
 	while((c=getopt(argc,argv,"mMhH"))!=-1){
 		switch(c){
 			case 'h':
@@ -119,7 +119,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 		settings[i].lp=(level_param*)calloc(i+1, sizeof(level_param));
 		for(uint32_t j=i; j>=1; j--){
 			uint64_t num_range=RANGE;
-			uint64_t covered_range=buffered_ent * ceil(pow(settings[i].size_factor, j));
+			uint64_t covered_range=buffered_ent * ceil(pow(settings[i].size_factor, j)-pow(settings[i].size_factor, j-1));
 			covered_range=covered_range>RANGE?RANGE:covered_range;
 			double coverage_ratio=(double)covered_range/num_range;
 			settings[i].lp[j].level_type=LEVELING;
@@ -149,7 +149,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 		for(uint32_t j=i; j>=1; j--){
 			uint32_t now_run_num=settings[i].run_num;
 			uint64_t num_range=RANGE;
-			uint64_t level_size=buffered_ent * pow(settings[i].size_factor, j);
+			uint64_t level_size=buffered_ent * ceil(pow(settings[i].size_factor, j)-pow(settings[i].size_factor, j-1));
 			uint64_t run_size=buffered_ent * pow(settings[i].size_factor, j-1);
 
 			level_size=level_size>RANGE?RANGE:level_size;
@@ -198,9 +198,9 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			}
 		}
 	}
-	/*
-	printf("after_wisckey\n");
-	print_tree_param(settings, max_level);*/
+	
+//	printf("after_wisckey\n");
+//	print_tree_param(settings, max_level);
 	double min_WAF=UINT32_MAX;
 	uint32_t target_level=0;
 	/*find min WAF and setting params*/
@@ -217,6 +217,9 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			free(settings[i].lp);
 		}
 	}
+
+	printf("target settings memory usage!\n");
+	print_tree_param(&settings[target_level-1], 1);
 
 	/*setting up lsmtree_parameter*/
 	res.tr=settings[target_level];

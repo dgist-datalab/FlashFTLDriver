@@ -151,7 +151,7 @@ sst_file **lsmtree_fine_target_wisckey_sst_set(uint32_t lba);
 void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx);
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm);
-uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t* , uint64_t *, uint32_t);
+uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t* , uint64_t *, uint32_t, uint64_t *);
 void lsmtree_tiered_level_all_print();
 void lsmtree_gc_lock_level(lsmtree *lsm, uint32_t level_idx);
 void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
