@@ -136,9 +136,6 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 			SEGNUM(kp_set[0].piece_ppa)==map_ppa/_PPS){
 		res->sequential_file=true;
 	}
-	else{
-		printf("break!\n");
-	}
 
 	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 	write_req->type=MAPPINGW;
@@ -148,9 +145,65 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 
 	return res;
 }
-static inline bool check_sequential(){
 
+static inline bool check_sequential(std::map<uint32_t, uint32_t> *kp_set, write_buffer *wb){
+	uint32_t start, end;
+	if(kp_set->size()==0){
+		start=wb->data->begin()->first;
+		end=wb->data->rbegin()->first;	
+		if(end-start+1==wb->buffered_entry_num) return true;
+		else return false;
+	}
+	start=kp_set->begin()->first;
+	end=kp_set->rbegin()->first;
+	if(end-start+1==kp_set->size()){
+		uint32_t prev_end=end;
+		start=wb->data->begin()->first;
+		end=wb->data->rbegin()->first;
+		if(prev_end+1==start && 
+			end-start+1==wb->buffered_entry_num){
+			return true;	
+		}
+		else{
+			return false;
+		}
+	}
+	else{
+		return false;
+	}
 }
+
+static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set, write_buffer *wb, uint32_t flushing_target_num){
+	key_ptr_pair *temp_kp_set=write_buffer_flush(wb, flushing_target_num, false);
+	for(uint32_t i=0; i<KP_IN_PAGE && temp_kp_set[i].lba!=UINT32_MAX; i++){
+		std::map<uint32_t, uint32_t>::iterator find_iter=kp_set->find(temp_kp_set[i].lba);
+		if(find_iter!=kp_set->end()){
+#ifdef LSM_DEBUG
+			if(debug_lba==find_iter->first){
+				printf("target hit in mem level: %u, %u\n", find_iter->first, find_iter->second);
+			}
+#endif
+			invalidate_piece_ppa(LSM.pm->bm, find_iter->second, true);
+			kp_set->erase(find_iter);
+		}
+		kp_set->insert(
+				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));	
+		version_coupling_lba_version(LSM.last_run_version, temp_kp_set[i].lba, UINT8_MAX);
+	}
+	free(temp_kp_set);
+}
+
+static inline level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
+	level *res=level_init(kp_set->size()/KP_IN_PAGE+(kp_set->size()%KP_IN_PAGE?1:0),1, LEVELING_WISCKEY, UINT32_MAX);
+	sst_file *sptr=NULL;
+	std::map<uint32_t, uint32_t>::iterator iter=kp_set->begin();
+	while((sptr=kp_to_sstfile(kp_set, &iter, false))){
+		level_append_sstfile(res, sptr, true);
+		sst_free(sptr, LSM.pm);
+	}
+	return res;
+}
+
 static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	if(page_manager_get_total_remain_page(LSM.pm, false, false) < wb->buffered_entry_num/L2PGAP){
 		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
@@ -162,54 +215,71 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 		LSM.flushed_kp_set=new std::map<uint32_t, uint32_t>();
 		LSM.flushed_kp_temp_set=new std::map<uint32_t, uint32_t>();
 	}
-	while(wb->buffered_entry_num){
+	level *res=NULL;
 
-		bool is_sequential=check_sequential(wb, LSM.flushed_kp_set);
-		if(is_sequential){
-		
-		
-		}
-		
-		key_ptr_pair *temp_kp_set=write_buffer_flush(wb, false);
-		for(uint32_t i=0; i<KP_IN_PAGE && temp_kp_set[i].lba!=UINT32_MAX; i++){
-			std::map<uint32_t, uint32_t>::iterator find_iter=LSM.flushed_kp_set->find(temp_kp_set[i].lba);
-			if(find_iter!=LSM.flushed_kp_set->end()){
-#ifdef LSM_DEBUG
-				if(debug_lba==find_iter->first){
-					printf("target hit in mem level: %u, %u\n", find_iter->first, find_iter->second);
-				}
-#endif
-				invalidate_piece_ppa(LSM.pm->bm, find_iter->second, true);
-				LSM.flushed_kp_set->erase(find_iter);
+	bool is_sequential=check_sequential(LSM.flushed_kp_set, wb);
+	uint32_t now_remain_page_num=UINT32_MAX;
+	uint32_t flushing_entry_num=KP_IN_PAGE;
+	bool making_level;
+	if(is_sequential){
+		now_remain_page_num=page_manager_get_remain_page(LSM.pm, false);
+		uint32_t mapping_num=CEILING_TARGET(LSM.flushed_kp_set->size(), KP_IN_PAGE);
+		uint32_t now_flushing_num=CEILING_TARGET(wb->buffered_entry_num, L2PGAP);
+		uint32_t update_mapping_num=CEILING_TARGET(wb->buffered_entry_num+LSM.flushed_kp_set->size(), KP_IN_PAGE);
+
+		if(now_remain_page_num < now_flushing_num+update_mapping_num){
+			if(now_remain_page_num < mapping_num){
+				EPRINT("sequential_error", true);
 			}
-			LSM.flushed_kp_set->insert(
-					std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));	
-			version_coupling_lba_version(LSM.last_run_version, temp_kp_set[i].lba, UINT8_MAX);
+
+			uint32_t remain_space=now_remain_page_num-mapping_num;
+			uint32_t mapping_remain_space=LSM.flushed_kp_set->size()%KP_IN_PAGE;
+
+			for(uint32_t i=1; i<=wb->buffered_entry_num; i++){
+				uint32_t needed_data_page=CEILING_TARGET(i, L2PGAP);
+				uint32_t needed_map_page=(int)(i-mapping_remain_space) <0 ? 0: CEILING_TARGET(i-mapping_remain_space, KP_IN_PAGE);
+				if(needed_data_page+needed_map_page<=remain_space) continue;
+				else{
+					flushing_entry_num=i-1;
+					break;
+				}
+			}
+			making_level=true;
 		}
-		free(temp_kp_set);
+
+		if(flushing_entry_num==0){
+			res=make_pinned_level(LSM.flushed_kp_set); //aligned previous pinned_level
+			making_level=false;
+		}
+		else{
+			flush_and_move(LSM.flushed_kp_set, wb, flushing_entry_num); //inset data to remain space
+		}
+
+		if(making_level || (!res && LSM.flushed_kp_set->size()>=LSM.param.write_buffer_ent)){
+			if(res){
+				EPRINT("what happen?, 'res' should be NULL", true);
+			}
+			res=make_pinned_level(LSM.flushed_kp_set); //aligned pinned_level
+		}
+	
+		/*insert remain entry to flushed_temp_kp_set*/
+		if(wb->buffered_entry_num){
+			flush_and_move(LSM.flushed_kp_temp_set, wb, wb->buffered_entry_num);
+		}	
 	}
+	else{
+		flush_and_move(LSM.flushed_kp_set, wb, wb->buffered_entry_num);
+		if(LSM.flushed_kp_set->size() >= LSM.param.write_buffer_ent){
+			res=make_pinned_level(LSM.flushed_kp_set);
+		}
+	}
+
 	write_buffer_free(wb);
 	LSM.flush_wait_wb=NULL;
 	rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 	rwlock_write_unlock(&LSM.flush_wait_wb_lock);
-	
-	uint32_t now_remain_page_num=page_manager_get_remain_page(LSM.pm, false);
-	uint32_t nxt_inserted_ent_num=LSM.flushed_kp_set->size()+QDEPTH;
 
-	if(nxt_inserted_ent_num>=LSM.param.write_buffer_ent){
-		level *res=level_init(LSM.param.write_buffer_ent/KP_IN_PAGE+(LSM.param.write_buffer_ent%KP_IN_PAGE?1:0),
-				1, LEVELING_WISCKEY, UINT32_MAX);
-		sst_file *sptr=NULL;
-		std::map<uint32_t, uint32_t>::iterator iter=LSM.flushed_kp_set->begin();
-		while((sptr=kp_to_sstfile(LSM.flushed_kp_set, &iter, false))){
-			level_append_sstfile(res, sptr, true);
-			sst_free(sptr, LSM.pm);
-		}
-		return res;
-	}
-	else{
-		return NULL;
-	}
+	return res;
 }
 
 static inline void managing_remain_space_for_wisckey(level *src, level *des){
@@ -355,7 +425,14 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		rwlock_write_lock(&LSM.flushed_kp_set_lock);
 		std::map<uint32_t, uint32_t> *temp_map=LSM.flushed_kp_set;
 		delete temp_map;
-		LSM.flushed_kp_set=NULL;
+
+		if(LSM.flushed_kp_temp_set->size()){
+			LSM.flushed_kp_set=LSM.flushed_kp_temp_set;
+			LSM.flushed_kp_temp_set=new std::map<uint32_t, uint32_t>();
+		}
+		else{
+			LSM.flushed_kp_set=NULL;
+		}
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 	}
 	else{
@@ -363,6 +440,7 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
 	}
 
+	version_sanity_checker(LSM.last_run_version);
 }
 
 static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
@@ -447,18 +525,20 @@ again:
 			req->end_level++;
 			goto again;
 		}
-
-		/*this path will test leveling level*/
-		above_sst_num=req->end_level==0? 
-			temp_level->max_sst_num:
-			LSM.disk[req->end_level-1]->max_sst_num; 
-		if(!level_is_appendable(LSM.disk[req->end_level], above_sst_num)){
-			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1])){
-				last_level_reclaim(cm, LSM.param.LEVELN-1);
+		else if(LSM.disk[req->end_level]->level_type==LEVELING || 
+				LSM.disk[req->end_level]->level_type==LEVELING_WISCKEY){
+			/*this path will test leveling level*/
+			above_sst_num=req->end_level==0? 
+				temp_level->max_sst_num:
+				LSM.disk[req->end_level-1]->max_sst_num; 
+			if(!level_is_appendable(LSM.disk[req->end_level], above_sst_num)){
+				if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1])){
+					last_level_reclaim(cm, LSM.param.LEVELN-1);
+				}
+				req->start_level=req->end_level;
+				req->end_level++;
+				goto again;
 			}
-			req->start_level=req->end_level;
-			req->end_level++;
-			goto again;
 		}
 
 end:

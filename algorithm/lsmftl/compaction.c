@@ -88,6 +88,7 @@ static inline void compaction_error_check
 
 static inline void tiering_compaction_error_check(level *src, run *r1, run *r2, run *res,
 		uint32_t compaction_num){
+#ifdef LSM_DEBUG
 	uint32_t min_lba, max_lba;
 	if(src){
 		min_lba=GET_LEV_START_LBA(src);
@@ -121,8 +122,8 @@ static inline void tiering_compaction_error_check(level *src, run *r1, run *r2, 
 		}
 		EPRINT("range error", true);
 	}
-out:
-	version_sanity_checker(LSM.last_run_version);
+	out: return;
+#endif
 }
 
 void read_sst_job(void *arg, int th_num){
@@ -863,12 +864,6 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 
 	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, 
 			target_version, des->idx);
-	if(start_sst_file_idx!=UINT32_MAX && start_sst_file_idx==src->now_sst_num-1){ //all sequential_file
-		level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
-		level_update_run_at_move_originality(res, target_run_idx, new_run, true);
-		run_free(new_run);
-		return res;
-	}
 	
 	//level_content_print(LSM.disk[1], true);
 
@@ -878,7 +873,7 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	//	start_sst_file_idx=0;
 	}
 	else{
-		if(src->now_sst_num==start_sst_file_idx){
+		if(src->now_sst_num==start_sst_file_idx){//all_sequential_file
 			level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
 			run *rptr; uint32_t ridx;
 			for_each_run_max(des, rptr, ridx){

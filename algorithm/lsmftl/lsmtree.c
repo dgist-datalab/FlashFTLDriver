@@ -261,12 +261,19 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	
 	rwlock_destroy(&LSM.flushed_kp_set_lock);
 	rwlock_destroy(&LSM.flush_wait_wb_lock);
-	delete LSM.flushed_kp_set;
 
 	free(LSM.gc_unavailable_seg);
 
 	delete rb.pending_req;
 	delete rb.issue_req;
+
+	if(LSM.flushed_kp_set){
+		delete LSM.flushed_kp_set;
+	}
+
+	if(LSM.flushed_kp_temp_set){
+		delete LSM.flushed_kp_temp_set;
+	}
 
 	//lsmtree_tiered_level_all_print();
 }
@@ -475,14 +482,12 @@ uint32_t lsmtree_read(request *const req){
 
 		uint32_t target_piece_ppa=UINT32_MAX;
 		
-		if(LSM.flushed_kp_set){
-			rwlock_read_lock(&LSM.flushed_kp_set_lock);
-			std::map<uint32_t, uint32_t>::iterator iter=LSM.flushed_kp_set->find(req->key);
-
-			LSM.flushed_kp_temp_set;
-
-
-			if(iter!=LSM.flushed_kp_set->end()){
+		rwlock_read_lock(&LSM.flushed_kp_set_lock);
+		for(uint32_t i=0; i<2; i++){
+			std::map<uint32_t, uint32_t> *kp_set=i==0?LSM.flushed_kp_set:LSM.flushed_kp_temp_set;
+			if(!kp_set) continue;
+			std::map<uint32_t, uint32_t>::iterator iter=kp_set->find(req->key);
+			if(iter!=kp_set->end()){
 				rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
 				target_piece_ppa=iter->second;
 				r_param->target_level_rw_lock=NULL;
@@ -491,10 +496,8 @@ uint32_t lsmtree_read(request *const req){
 				read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
 				return 1;
 			}
-			else{
-				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
-			}
 		}
+		rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 	}
 	else{
 		r_param=(lsmtree_read_param*)req->param;

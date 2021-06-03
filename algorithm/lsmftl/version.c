@@ -79,6 +79,7 @@ void version_populate(version *v, uint32_t version, uint32_t level_idx){
 }
 
 void version_sanity_checker(version *v){
+#ifdef LSM_DEBUG
 	uint32_t remain_empty_size=0;
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
 		remain_empty_size+=v->version_empty_queue[i]->size();
@@ -92,6 +93,7 @@ void version_sanity_checker(version *v){
 		printf("error log : empty-size(%d) populate-size(%d)\n", remain_empty_size, populate_size);
 		EPRINT("version sanity error", true);
 	}
+#endif
 }
 
 void version_free(version *v){

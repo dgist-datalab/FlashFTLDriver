@@ -601,6 +601,9 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		}
 
 		border_lba=get_border_from_read_arg_set(read_arg_set, mr_set, stream_num, read_done);
+		if(border_lba==UINT32_MAX){
+			last_round=true;
+		}
 
 		uint32_t sorted_entry_num=stream_sorting(res, stream_num, pos_set, NULL, kpq,
 				last_round,

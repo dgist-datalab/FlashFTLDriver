@@ -21,6 +21,7 @@
 #define COMPACTION_TAGS ((QDEPTH)*4)
 #define TARGETREADNUM(read_arg) (read_arg.to-read_arg.from+1)
 #define COMPACTION_LEVEL_NUM (2)
+#define CEILING_TARGET(N, G) ((N)/(G) + (N%G?1:0))
 
 typedef struct inter_read_alreq_param{
 	fdriver_lock_t done_lock;
