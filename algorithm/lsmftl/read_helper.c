@@ -388,9 +388,6 @@ static inline int PLR_checking_oob(uint32_t lba, uint32_t piece_ppa, uint32_t *l
 
 bool read_helper_data_checking(read_helper *rh, page_manager* pm, uint32_t piece_ppa, 
 		uint32_t lba, uint32_t *rh_idx, uint32_t *offset, sst_file *sptr){
-	if(lba==debug_lba){
-		EPRINT("debug point", false);
-	}
 	uint32_t *lba_set;
 	bool is_map_ppa_flag;
 	switch(rh->type){

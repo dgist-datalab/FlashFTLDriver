@@ -190,7 +190,7 @@ retry:
 	}
 
 
-#ifdef DEBUG
+#ifdef LSM_DEBUG
 	if(!os->isstart){
 		os->isstart=true;
 		os->prev_lba=res.lba;

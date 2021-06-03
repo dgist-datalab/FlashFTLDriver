@@ -99,7 +99,7 @@ static inline uint32_t number_of_write_page(write_buffer *wb){
 	return wb->buffered_entry_num/L2PGAP + (wb->buffered_entry_num%L2PGAP?1:0);
 }
 
-key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
+key_ptr_pair* write_buffer_flush(write_buffer *wb, uint32_t target_num, bool sync){
 	std::map<uint32_t, buffer_entry*>::iterator it=wb->data->begin();
 	value_set* target_value=NULL;
 	uint32_t ppa=-1;
@@ -108,7 +108,8 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 	fdriver_lock(&LSM.flush_lock);
 
 	uint32_t i=0;
-	for(;it!=wb->data->end() && i<KP_IN_PAGE; i++){
+	uint32_t flushed_cnt=MIN(KP_IN_PAGE, target_num);
+	for(;it!=wb->data->end() && i<flushed_cnt; i++){
 		uint8_t inter_idx=i%L2PGAP;
 		if(inter_idx==0){
 			ppa=page_manager_get_new_ppa(wb->pm, false, SEPDATASEG);
@@ -122,10 +123,11 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, bool sync){
 		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
-
+#ifdef LSM_DEBUG
 		if(res[i].lba==debug_lba){
 			printf("map target:%u -> %u in buffer\n", res[i].lba, res[i].piece_ppa);
 		}
+#endif
 
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
 		inf_free_valueset(it->second->data.data, FS_MALLOC_W);
@@ -283,10 +285,12 @@ retry:
 		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
+#ifdef LSM_DEBUG
 		if(debug_lba==res[i].lba){
 			static int cnt=0;
 			printf("[%u] gc %u -> %u\n", cnt++, res[i].lba, res[i].piece_ppa);
 		}
+#endif
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
 		if(wb->rh){
 			read_helper_stream_insert(wb->rh, res[i].lba, res[i].piece_ppa);

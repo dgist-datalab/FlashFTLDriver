@@ -242,7 +242,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	res.mapping_num=chunk_num;
 	res.last_size_factor=res.normal_size_factor=res.tr.size_factor;
 	res.version_enable=true;
-	res.write_buffer_ent=buffered_ent;
+	res.write_buffer_ent=buffered_ent-(buffered_ent/KP_IN_PAGE*L2PGAP);
 	res.read_amplification=TARGETFPR;
 
 	res.reclaim_ppa_target=buffered_ent*ceil(pow(settings[target_level].size_factor, target_level-1));

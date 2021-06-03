@@ -96,7 +96,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		run *previous_run, uint32_t *moved_entry_num,  
 		uint32_t start_sst_file_idx, uint32_t target_ridx, bool demote);
 
-sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *, uint32_t des_idx);
+sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *, uint32_t des_idx, uint32_t target_version);
 
 uint32_t compaction_read_param_remain_num(compaction_master *cm);
 inter_read_alreq_param *compaction_get_read_param(compaction_master *cm);

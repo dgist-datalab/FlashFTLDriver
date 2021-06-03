@@ -23,7 +23,7 @@ typedef struct sst_pf_out_stream{
 	bool file_set_empty;
 	uint32_t version_idx;
 	uint32_t total_poped_num;
-#ifdef DEBUG
+#ifdef LSM_DEBUG
 	bool isstart;
 	uint32_t prev_lba;
 #endif

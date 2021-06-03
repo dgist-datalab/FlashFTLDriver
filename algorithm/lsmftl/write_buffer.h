@@ -49,7 +49,7 @@ typedef struct write_buffer{
 write_buffer *write_buffer_reinit(write_buffer *wb);
 write_buffer *write_buffer_init(uint32_t max_buffered_entry_num, page_manager *pm, uint32_t type);
 write_buffer *write_buffer_init_for_gc(uint32_t max_buffered_entry_num, page_manager *pm, uint32_t type, read_helper_param rhp);
-key_ptr_pair* write_buffer_flush(write_buffer *, bool sync);
+key_ptr_pair* write_buffer_flush(write_buffer *, uint32_t target_num, bool sync);
 uint32_t write_buffer_insert(write_buffer *, uint32_t lba, value_set* value);
 char *write_buffer_get(write_buffer *, uint32_t lba);
 void write_buffer_free(write_buffer*);

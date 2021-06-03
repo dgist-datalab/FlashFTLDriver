@@ -134,6 +134,24 @@ void sst_deep_copy(sst_file *des, sst_file *src){
 	 */
 }
 
+
+void sst_convert_seq_pf_to_bf(sst_file *src){
+	if(src->type!=PAGE_FILE || !src->sequential_file){
+		EPRINT("not allowed type", true);
+	}
+
+	src->type=BLOCK_FILE;
+	map_range *mr=(map_range*)malloc(sizeof(map_range));
+	mr->start_lba=src->start_lba;
+	mr->end_lba=src->end_lba;
+	mr->ppa=src->file_addr.map_ppa;
+	
+	src->map_num=1;
+	src->block_file_map=mr;
+
+	src->file_addr.piece_ppa=src->start_piece_ppa;
+}
+
 sst_file *sst_MR_to_sst_file(map_range *mr){
 	sst_file *res=(sst_file*)calloc(1, sizeof(sst_file));
 	res->file_addr.map_ppa=mr->ppa;

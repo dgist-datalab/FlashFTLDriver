@@ -876,12 +876,29 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 	return new_run;
 }
 
-sst_file *trivial_move_processing(run *rptr, sst_pf_out_stream *pos, read_issue_arg *read_arg, 
-		uint32_t target_version, uint32_t from_lev_idx, uint32_t to_lev_idx, bool make_rh){
+static inline void make_rh_for_trivial_move(sst_file *sptr, 
+		std::queue<key_ptr_pair>*kp_q, uint32_t to_lev_idx){
+	read_helper_param rhp=lsmtree_get_target_rhp(to_lev_idx);
+	rhp.member_num=kp_q->size();
+	read_helper *rh=read_helper_init(rhp);
+
+	while(!kp_q->empty()){
+		key_ptr_pair target_pair=kp_q->front();
+		read_helper_stream_insert(rh, target_pair.lba, target_pair.piece_ppa);
+		kp_q->pop();
+	}
+
+	read_helper_insert_done(rh);
+	sptr->_read_helper=rh;
+}
+
+sst_file *trivial_move_processing(run *rptr, sst_pf_out_stream *pos, 
+		read_issue_arg *read_arg, 
+		uint32_t target_version, uint32_t from_lev_idx, 
+		uint32_t to_lev_idx, std::queue<key_ptr_pair> *kp_q, bool make_rh){
 	version *v=LSM.last_run_version;
 	sst_file *sptr=NULL;
 	uint32_t min_lba, max_lba;
-	read_helper *rh=NULL;
 	while(!sst_pos_is_empty(pos)){
 		key_ptr_pair target_pair=sst_pos_pick(pos);
 		if(target_pair.lba==UINT32_MAX){
@@ -890,18 +907,10 @@ sst_file *trivial_move_processing(run *rptr, sst_pf_out_stream *pos, read_issue_
 
 		if(sptr==NULL || !(target_pair.lba >=min_lba && target_pair.lba<=max_lba)){
 			if(sptr && make_rh){
-				read_helper_insert_done(sptr->_read_helper);
+				make_rh_for_trivial_move(sptr, kp_q, to_lev_idx);
 			}
 			sptr=run_retrieve_sst(rptr, target_pair.lba);
-			if(make_rh){
-				if(sptr->_read_helper){
-					rh=sptr->_read_helper;
-				}
-				else{
-					rh=read_helper_init(lsmtree_get_target_rhp(to_lev_idx));
-					sptr->_read_helper=rh;
-				}
-			}
+
 			min_lba=sptr->start_lba;
 			max_lba=sptr->end_lba;
 		}
@@ -912,7 +921,7 @@ sst_file *trivial_move_processing(run *rptr, sst_pf_out_stream *pos, read_issue_
 		}
 
 		if(make_rh){
-			read_helper_stream_insert(rh, target_pair.lba, target_pair.piece_ppa);
+			kp_q->push(target_pair);
 		}
 		sst_pos_pop(pos);
 	}
@@ -945,9 +954,6 @@ void compaction_trivial_move(run *rptr, uint32_t target_version, uint32_t from_l
 		uint32_t sidx;
 		sst_file *sptr;
 		for_each_sst(rptr, sptr, sidx){
-			if(sptr->_read_helper){
-				printf("break!\n");
-			}
 			read_helper_free(sptr->_read_helper);
 			sptr->_read_helper=NULL;
 		}
@@ -956,6 +962,11 @@ void compaction_trivial_move(run *rptr, uint32_t target_version, uint32_t from_l
 	read_arg_set.max_num=map_num;
 	sst_pf_out_stream *pos=NULL;
 
+	std::queue<key_ptr_pair> *kp_q=NULL;
+	if(make_rh){
+		kp_q=new std::queue<key_ptr_pair>();
+	}
+
 	sst_file *sptr;
 	while(read_done!=(1<<stream_num)-1){
 		read_done=update_read_arg_tiering(read_done, isfirst, &pos, &mr_set, &read_arg_set, 
@@ -963,14 +974,14 @@ void compaction_trivial_move(run *rptr, uint32_t target_version, uint32_t from_l
 		last_round=(read_done==(1<<stream_num)-1);
 		if(last_round){
 			if(sptr && make_rh){
-				read_helper_insert_done(sptr->_read_helper);
+				make_rh_for_trivial_move(sptr, kp_q, to_lev_idx);
 			}
 			break;
 		}
 
 		thpool_add_work(_cm->issue_worker, read_sst_job, (void*)&thread_arg);
 		sptr=trivial_move_processing(rptr, pos, &read_arg_set, target_version, 
-				from_lev_idx, to_lev_idx, make_rh);
+				from_lev_idx, to_lev_idx, kp_q, make_rh);
 		isfirst=false;
 	}
 
@@ -984,6 +995,9 @@ void compaction_trivial_move(run *rptr, uint32_t target_version, uint32_t from_l
 		}
 	}
 	
+	if(make_rh){
+		delete kp_q;
+	}
 	sst_pos_free(pos);
 	free(thread_arg.arg_set);
 	free(mr_set);

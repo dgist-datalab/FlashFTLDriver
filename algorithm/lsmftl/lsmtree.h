@@ -116,6 +116,7 @@ typedef struct lsmtree{
 
 	rwlock flushed_kp_set_lock;
 	std::map<uint32_t, uint32_t> *flushed_kp_set;
+	std::map<uint32_t, uint32_t> *flushed_kp_temp_set;
 
 	uint32_t* gc_unavailable_seg;
 	uint32_t gc_locked_seg_num;

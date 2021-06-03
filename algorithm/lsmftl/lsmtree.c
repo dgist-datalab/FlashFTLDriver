@@ -430,9 +430,11 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 
 uint32_t lsmtree_read(request *const req){
 	lsmtree_read_param *r_param;
+#ifdef LSM_DEBUG
 	if(req->key==debug_lba){
 		printf("req->key:%u\n", req->key);
 	}
+#endif
 	if(!req->param){
 		r_param=(lsmtree_read_param*)calloc(1, sizeof(lsmtree_read_param));
 		req->param=(void*)r_param;
@@ -476,6 +478,10 @@ uint32_t lsmtree_read(request *const req){
 		if(LSM.flushed_kp_set){
 			rwlock_read_lock(&LSM.flushed_kp_set_lock);
 			std::map<uint32_t, uint32_t>::iterator iter=LSM.flushed_kp_set->find(req->key);
+
+			LSM.flushed_kp_temp_set;
+
+
 			if(iter!=LSM.flushed_kp_set->end()){
 				rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
 				target_piece_ppa=iter->second;

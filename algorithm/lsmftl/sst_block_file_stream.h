@@ -25,7 +25,7 @@ typedef struct sst_bf_out_stream{
 	/*for pop*/
 //	struct key_value_wrapper* now_kv_wrap;
 
-#ifdef DEBUG
+#ifdef LSM_DEBUG
 	bool isstart;
 	uint32_t prev_lba;
 #endif

@@ -18,10 +18,12 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 	for(uint32_t i=0; i<piece_num; i++){
 		char *oob=bm->get_oob(bm, PIECETOPPA(piece_ppa[i]));
 		memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
+#ifdef LSM_DEBUG
 		if(piece_ppa[i]==debug_piece_ppa){
 			printf("%u ", should_abort?++cnt:cnt);
 			EPRINT("validate piece here!\n", false);	
 		}
+#endif
 
 		if(!bm->populate_bit(bm, piece_ppa[i]) && should_abort){
 			EPRINT("bit error", true);
@@ -30,6 +32,7 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 }
 
 static inline void gc_debug_checking(gc_read_node *gn){
+#ifdef LSM_DEBUG
 	if(gn->piece_ppa/L2PGAP==425967 && LSM.global_debug_flag){
 		EPRINT("debug point", false);
 	}
@@ -40,6 +43,7 @@ static inline void gc_debug_checking(gc_read_node *gn){
 	if(LSM.global_debug_flag && gn->piece_ppa==debug_piece_ppa){
 		EPRINT("break!", false);
 	}
+#endif
 }
 
 bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t lba, uint32_t *idx){
@@ -53,11 +57,13 @@ bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t
 }
 
 bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abort){
+#ifdef LSM_DEBUG
 	if(piece_ppa==debug_piece_ppa){
 		static int cnt=0;
 		printf("%u ", should_abort?++cnt:cnt);
 		EPRINT("invalidate piece here!\n",false);
 	}
+#endif
 
 	if(!bm->unpopulate_bit(bm, piece_ppa)){
 		if(should_abort){
@@ -96,11 +102,13 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 	char *oob=bm->get_oob(bm, map_ppa);
 	((uint32_t*)oob)[0]=start_lba;
 	((uint32_t*)oob)[1]=end_lba;
+#ifdef LSM_DEBUG
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
 		static int cnt=0;
 		printf("%u ", should_abort?++cnt:cnt);
 		EPRINT("validate map here!\n", false);
 	}
+#endif
 	if(!bm->populate_bit(bm, map_ppa*L2PGAP) && should_abort){
 		EPRINT("bit error", true);
 	}
@@ -111,11 +119,13 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 }
 
 void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
+#ifdef LSM_DEBUG
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
 		static int cnt=0;
 		printf("%u ", should_abort?++cnt:cnt);
 		EPRINT("invalidate map here!\n", false);
 	}
+#endif
 	if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP)){
 		if(should_abort){
 			EPRINT("bit error", true);
@@ -322,8 +332,8 @@ uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 		return _PPS-pm->current_segment[MAP_S]->used_page_num;
 	}
 	else{
-		if(!pm->current_segment[DATA_S]){
-			return 0;
+		if(pm->temp_data_segment){
+			return _PPS-pm->temp_data_segment->used_page_num;
 		}
 		return _PPS-pm->current_segment[DATA_S]->used_page_num;
 	}
@@ -559,9 +569,11 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_mapping++;
 //	printf("gc_mapping:%u (seg_idx:%u)\n", LSM.monitor.gc_mapping, victim->seg_idx);
 	if(victim->invalidate_number==_PPS*L2PGAP || victim->all_invalid){
+#ifdef LSM_DEBUG
 		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
 			printf("gc_mapping:%u (seg_idx%u) clean\n", LSM.monitor.gc_mapping, victim->seg_idx);
 		}
+#endif
 		bm->trim_segment(bm, victim, bm->li);
 		page_manager_change_reserve(pm, true);
 		return true;
@@ -719,10 +731,6 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t lev_idx,
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_data++;
 	if(victim->invalidate_number==victim->validate_number){
-		/*
-	//	if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx || LSM.global_debug_flag){
-	//		printf("gc_data:%u (seg_idx:%u) - clean\n", LSM.monitor.gc_data, victim->seg_idx);
-		}*/
 		bm->trim_segment(bm, victim, bm->li);
 		page_manager_change_reserve(pm, false);
 		return true;

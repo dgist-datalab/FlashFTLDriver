@@ -62,7 +62,8 @@ static sst_file *pf_queue_to_sstfile(sst_queue *pf_q){
 	return res;
 }
 
-static uint32_t stream_make_rh(sst_pf_out_stream *os, sst_file *file){
+static uint32_t stream_make_rh(sst_pf_out_stream *os, sst_file *file, 
+		uint32_t target_version, uint32_t src_idx){
 	uint32_t res=0;
 	uint32_t end_ppa=file->end_ppa==UINT32_MAX?0:file->end_ppa;
 	uint32_t start_piece_ppa=file->file_addr.piece_ppa;
@@ -70,6 +71,12 @@ static uint32_t stream_make_rh(sst_pf_out_stream *os, sst_file *file){
 		key_ptr_pair kp=sst_pos_pick(os);
 		if(kp.lba==UINT32_MAX) break;
 		read_helper_stream_insert(file->_read_helper, kp.lba, kp.piece_ppa);
+
+		uint32_t recent_version=version_map_lba(LSM.last_run_version, kp.lba);
+		if(version_belong_level(LSM.last_run_version, recent_version, src_idx)){
+			version_coupling_lba_version(LSM.last_run_version, kp.lba, target_version);
+		}
+
 		sst_pos_pop(os);
 
 		if(end_ppa<kp.piece_ppa/L2PGAP){
@@ -89,7 +96,7 @@ static uint32_t stream_make_rh(sst_pf_out_stream *os, sst_file *file){
 	return res;
 }
 
-sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q, uint32_t des_idx){
+sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q, uint32_t des_idx, uint32_t target_version){
 	sst_file *res=NULL;
 	read_issue_arg read_arg;
 	read_arg_container thread_arg;
@@ -108,7 +115,6 @@ sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q, uint32_t des_idx){
 
 	res=pf_queue_to_sstfile(pf_q);
 	map_range *target_mr_set=res->block_file_map;
-
 	read_helper_param temp_rhp=lsmtree_get_target_rhp(des_idx);
 	temp_rhp.member_num=(res->map_num*KP_IN_PAGE);
 	res->_read_helper=read_helper_init(temp_rhp);
@@ -125,8 +131,7 @@ sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q, uint32_t des_idx){
 
 		if(i==0){
 			pos=sst_pos_init_mr(&target_mr_set[read_arg.from], read_arg.param,
-					UINT32_MAX,
-					TARGETREADNUM(read_arg), read_map_done_check, early_map_done);
+					TARGETREADNUM(read_arg), UINT32_MAX,read_map_done_check, early_map_done);
 		}
 		else{
 			sst_pos_add_mr(pos, &target_mr_set[read_arg.from], read_arg.param, 
@@ -134,7 +139,7 @@ sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q, uint32_t des_idx){
 		}
 
 		thpool_add_work(_cm->issue_worker, read_sst_job, (void*)&thread_arg);
-		stream_make_rh(pos, res);
+		stream_make_rh(pos, res, target_version, des_idx-1);
 	}
 	
 

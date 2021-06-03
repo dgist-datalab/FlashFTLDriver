@@ -113,11 +113,12 @@ void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version){
 	if(version!=UINT8_MAX && version>v->total_version_number){
 		EPRINT("over version num", true);
 	}
-
+#ifdef LSM_DEBUG
 	if(lba==debug_lba){
 		printf("[version_map] lba:%u->%u lev:%u\n",lba, version, 
 				version_to_level_idx(v, version, v->leveln));
 	}
+#endif
 	fdriver_lock(&v->version_lock);
 	if(v->key_version[lba]!=UINT8_MAX){
 		v->version_invalidation_cnt[v->key_version[lba]]++;
@@ -202,18 +203,9 @@ uint32_t version_update_for_trivial_move(version *v, uint32_t start_lba, uint32_
 			version_coupling_lba_version(v, i, target_version);
 		}
 		else if(version_to_level_idx(v, version_map_lba(v, i), v->leveln)==src_level_idx){
-			/*
-			if(i==debug_lba){
-				EPRINT("target lba's version is updated",false);
-			}*/
 			version_coupling_lba_version(v, i, target_version);
 		}
 		else{
-			if(i==debug_lba){
-				/*
-				printf("\nversion info:%u, ", version_map_lba(v, i));
-				EPRINT("target lba's version is [not] updated",false);*/
-			}
 		}
 	}
 	return 1;

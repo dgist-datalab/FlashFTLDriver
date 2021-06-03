@@ -286,19 +286,7 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 
 		debug_kp[i].lba=map_pair->lba;
 		debug_kp[i].piece_ppa=map_pair->piece_ppa;
-/*
-		if(map_pair->lba==debug_lba){
-			printf("tiering lba:%u map to %u\n", debug_lba, map_pair->piece_ppa);
-		}*/
 		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, true);
-		/*
-		if(map_pair->lba==debug_lba){
-			printf("move data!!\n");
-			for(uint32_t j=0; j<10; j++){
-				printf("%u ", *(uint32_t*)&bis->buffer[i]->kv_ptr.data[j*sizeof(uint32_t)]);
-			}
-			printf("\n");
-		}*/
 		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i]->kv_ptr.data, LPAGESIZE);
 
 		if(bis->make_read_helper){

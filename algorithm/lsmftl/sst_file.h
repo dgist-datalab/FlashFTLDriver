@@ -29,6 +29,7 @@ typedef struct sst_file{
 	bool sequential_file;
 
 	p_addr file_addr;
+	uint32_t start_piece_ppa;
 	uint32_t end_ppa;
 	uint32_t map_num;
 
@@ -49,6 +50,7 @@ void sst_reinit(sst_file *);
 void sst_free(sst_file*, struct page_manager *);
 void sst_print(sst_file *);
 void sst_deep_copy(sst_file *des, sst_file *src);
+void sst_convert_seq_pf_to_bf(sst_file *src);
 static inline void sst_shallow_copy_move_originality(sst_file *des, sst_file *src){
 	*des=*src;
 	//des->_read_helper=src->_read_helper;
