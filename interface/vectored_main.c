@@ -42,13 +42,13 @@ int main(int argc,char* argv[]){
 		inf_init(0,0,argc,argv, false);
 		bench_init();
 		bench_vectored_configure();
-		//bench_add(VECTOREDSSET,0,RANGE,RANGE);
-		//bench_add(VECTOREDSGET,0,RANGE,RANGE);
+	//	bench_add(VECTOREDSSET,0,RANGE,RANGE);
+	//	bench_add(VECTOREDSGET,0,RANGE,RANGE);
 		//bench_add(VECTOREDRSET,0,RANGE,RANGE*3);
 		//bench_add(VECTOREDRSET,0,RANGE/2,RANGE/2);
-		//bench_add(VECTOREDRW,0,RANGE/2/100*99,RANGE/100*99);
-		//bench_add(VECTOREDRW,0,RANGE,RANGE*4);
-		inf_algorithm_testing();
+		//bench_add(VECTOREDRW,0,RANGE,RANGE/2);
+		bench_add(VECTOREDRW,0,RANGE,RANGE*8);
+		//inf_algorithm_testing();
 	}
 	printf("range: %lu!\n",RANGE);
 
