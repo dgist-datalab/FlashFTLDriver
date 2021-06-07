@@ -37,6 +37,7 @@ void invalidate_ppa(uint32_t t_ppa){
 		printf("%u unpopulated!\n",test_ppa);
 	}
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
+		printf("target:%u ",t_ppa);
 		EPRINT("double invalidation!", true);
 	}
 }
@@ -45,9 +46,10 @@ void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx){
 	/*when the ppa is validated this function must be called*/
 	for(uint32_t i=0; i<max_idx; i++){
 		if(ppa*L2PGAP+i==test_ppa){
-			printf("%u populated!\n", test_ppa);
+			printf("%u populated, it is ppa for %u!\n", test_ppa,lbas[i]);
 		}
 		if(!demand_ftl.bm->populate_bit(demand_ftl.bm,ppa * L2PGAP+i)){
+			printf("target:%u ", ppa*L2PGAP+i);
 			EPRINT("double validation!", true);
 		}
 	}
@@ -90,7 +92,7 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 	return res;
 }
 
-
+uint32_t debug_gc_lba;
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
@@ -178,7 +180,12 @@ void do_gc(){
 					}
 				}
 
+				if(gv->ppa*L2PGAP+i==test_ppa){
+					debug_gc_lba=lbas[i];
+					printf("the gc for %u\n", test_ppa);
+				}
 
+				invalidate_ppa(gv->ppa*L2PGAP+i);
 				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 

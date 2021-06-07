@@ -2,12 +2,30 @@
 #include "../../interface/interface.h"
 #include <stdlib.h>
 
+extern demand_map_manager dmm;
+
 void *demend_end_req(algo_req * my_req){
 	request *parents=my_req->parents;
+	demand_param *dp;
+	std::map<uint32_t, bool>::iterator iter;
 	switch(my_req->type){
 		case MAPPINGR:
+			fdriver_lock(&dmm.flying_map_read_lock);
+			dp=(demand_param *)my_req->param;
+			iter=dmm.flying_map_read_flag_set->find(GETGTDIDX(dp->flying_map_read_key));
+			if(iter==dmm.flying_map_read_flag_set->end()){
+				printf("issued key is not inserted into flying set\n");
+				abort();
+			}
+			else{
+	//			printf("iter->first:%u\n", iter->first);
+				iter->second=true;
+			}
+			fdriver_unlock(&dmm.flying_map_read_lock);
 		case MAPPINGW:
-			inf_assign_try(parents);
+			if(!inf_assign_try(parents)){
+				abort();
+			}
 			break;
 		default:
 			printf("unknown type :%d (%s:%d)\n",my_req->type, __FILE__, __LINE__);
@@ -33,7 +51,7 @@ void *demend_inter_end_req(algo_req *my_req){
 	return NULL;
 }
 
-void demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *param){
+algo_req* demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *param){
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	my_req->type=MAPPINGR;
 	my_req->parents=req;
@@ -42,6 +60,7 @@ void demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *param
 	my_req->param=param;
 	my_req->ppa=ppa;
 	li->read(ppa, PAGESIZE, req->value, ASYNC, my_req);
+	return my_req;
 }
 
 void demand_mapping_write(uint32_t ppa, lower_info *li, request *req, void *param){

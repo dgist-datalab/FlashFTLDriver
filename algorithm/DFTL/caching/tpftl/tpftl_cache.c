@@ -7,7 +7,9 @@ my_cache tp_cache_func{
 	.free=tp_free,
 	.is_needed_eviction=tp_is_needed_eviction,
 	.need_more_eviction=tp_is_needed_eviction,
+	.update_eviction_hint=tp_update_eviction_hint,
 	.is_hit_eviction=tp_is_hit_eviction,
+	.is_eviction_hint_full=tp_is_eviction_hint_full,
 	.update_entry=tp_update_entry,
 	.update_entry_gc=tp_update_entry_gc,
 	.force_put_mru=tp_force_put_mru,
@@ -76,6 +78,7 @@ uint32_t tp_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	tcm.tp_node_change_cnt=0;
 	tcm.prefetching_mode=false;
 	tcm.GTD_internal_state=(char*)calloc(RANGE/(PAGESIZE/sizeof(DMF))+(RANGE%(PAGESIZE/sizeof(DMF))?1:0),sizeof(uint8_t));
+	tcm.eviction_hint_map=new std::multimap<uint32_t, uint32_t>();
 	return tcm.max_caching_byte/(TP_ENTRY_SZ);
 }
 
@@ -92,6 +95,7 @@ uint32_t tp_free(struct my_cache *mc){
 		free(tn);
 	}
 	lru_free(tcm.lru);
+	delete tcm.eviction_hint_map;
 	printf("now_caching_byte: %u max_caching_byte: %u\n", tcm.now_caching_byte, tcm.max_caching_byte);
 	return 1;
 }
@@ -117,7 +121,7 @@ static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
 	return cnt;
 }
 
-bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num){
+bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num, uint32_t *eviction_hint){
 	GTD_entry *etr=GETETR(dmm, lba);
 
 	uint32_t prefetching_hint=((*prefetching_num)!=UINT32_MAX?(*prefetching_num):0);
@@ -137,16 +141,28 @@ bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetchi
 			target_byte+=TP_ENTRY_SZ;
 		}
 	}
-	
-	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte){
+
+	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte + (*eviction_hint)){
 		return false;
 	}
-	else return true;
+	else{
+		tcm.eviction_hint_map->insert(std::pair<uint32_t, uint32_t>(lba, target_byte));
+		return true;
+	}
 }
 
-
-bool tp_is_needed_more_eviction(struct my_cache *a, uint32_t lba){
-	return tp_is_needed_eviction(a, lba, NULL);
+uint32_t tp_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t eviction_hint, bool increase){
+	std::multimap<uint32_t, uint32_t>::iterator iter=tcm.eviction_hint_map->find(lba);
+	if(iter!=tcm.eviction_hint_map->end()){
+		while((std::next(iter,1))->first==lba){
+			iter++;
+		}
+	}
+	else{
+		printf("%s:%d it cannot be\n",__FILE__, __LINE__);
+		abort();
+	}
+	return increase?eviction_hint+iter->second:eviction_hint-iter->second;
 }
 
 static inline tp_node* __find_tp_node(GTD_entry *etr){
@@ -235,7 +251,7 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	return old_ppa;
 }
 
-uint32_t tp_update_entry(struct my_cache *, GTD_entry *e, uint32_t lba, uint32_t ppa){
+uint32_t tp_update_entry(struct my_cache *, GTD_entry *e, uint32_t lba, uint32_t ppa, uint32_t *){
 	return __update_entry(e, lba, ppa, false);
 }
 
@@ -243,7 +259,7 @@ uint32_t tp_update_entry_gc(struct my_cache *, GTD_entry *e, uint32_t lba, uint3
 	return __update_entry(e, lba, ppa, true);
 }
 
-uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *prefetching_num){
+uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *prefetching_num, uint32_t *eviction_hint){
 	if(etr->status==EMPTY){
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
@@ -313,8 +329,12 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		bitmap_set(tcm.populated_cache_entry, lba+i);
 		tcm.now_caching_byte+=TP_ENTRY_SZ;
 	}
-
-
+	std::multimap<uint32_t, uint32_t>::iterator iter=tcm.eviction_hint_map->find(lba);
+	if(iter==tcm.eviction_hint_map->end()){
+		printf("%s:%d it cannot be\n",__FILE__, __LINE__);
+		abort();
+	}
+	(*eviction_hint)-=iter->second;
 	return 1;
 }
 
@@ -517,4 +537,8 @@ bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_
 
 void tp_update_dynamic_size(struct my_cache*, uint32_t lba, char*data){
 	return;
+}
+
+bool tp_is_eviction_hint_full(struct my_cache*, uint32_t eviction_hint){
+	return tcm.max_caching_byte<=eviction_hint;
 }

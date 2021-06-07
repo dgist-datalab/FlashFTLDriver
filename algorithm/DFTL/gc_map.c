@@ -5,11 +5,6 @@ extern struct algorithm demand_ftl;
 extern uint32_t test_ppa;
 extern uint32_t test_key;
 void invalidate_map_ppa(uint32_t piece_ppa){
-
-	if(piece_ppa==98016){
-		printf("map %u invalidate\n", piece_ppa);
-	}
-
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa)){
 		EPRINT("double invalidation!", true);
 	}
@@ -84,8 +79,8 @@ void do_map_gc(){
 		temp_queue.pop();
 	}
 
-	static int cnt=0;
-	printf("map_gc:%u seg_idx:%u (piece_ppa:%u~%u)\n", cnt++, target->seg_idx, target->seg_idx*L2PGAP*_PPS, (target->seg_idx+1)*L2PGAP*_PPS-1);
+	//static int cnt=0;
+	//printf("map_gc:%u seg_idx:%u (piece_ppa:%u~%u)\n", cnt++, target->seg_idx, target->seg_idx*L2PGAP*_PPS, (target->seg_idx+1)*L2PGAP*_PPS-1);
 
 	list *temp_list=NULL;	
 	gc_value *gv;
@@ -124,6 +119,10 @@ void do_map_gc(){
 			gv=(gc_value*)now->data;
 			if(!gv->isdone) continue;
 			gtd_idx=(KEYT*)bm->get_oob(bm, gv->ppa);
+
+			uint32_t old_ppa=dmm.GTD[gtd_idx[0]].physical_address;
+			invalidate_map_ppa(old_ppa);
+			
 			new_ppa=get_map_rppa(gtd_idx[0]);
 			dmm.GTD[gtd_idx[0]].physical_address=new_ppa*L2PGAP;
 			send_req(new_ppa, GCMW, NULL, gv);

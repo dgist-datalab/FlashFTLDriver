@@ -5,6 +5,7 @@
 #include "../../include/data_struct/list.h"
 #include "../../include/sem_lock.h"
 #include "../../include/container.h"
+#include <map>
 
 
 #define GETGTDIDX(lba) ((lba)/(PAGESIZE/sizeof(DMF)))
@@ -52,11 +53,16 @@ typedef union evict_target{
 
 typedef struct demand_param{
 	MAP_ASSIGN_STATUS status;
+	MAP_ASSIGN_STATUS prev_status[10];
+	uint32_t now_eviction_hint;
+	uint32_t log;
 	GTD_entry *etr;
 	evict_target et;
 	mapping_entry target;
 	void *param_ex;
 	bool is_hit_eviction;
+
+	uint32_t flying_map_read_key;
 }demand_param;
 
 typedef struct assign_param_ex{
@@ -77,6 +83,12 @@ typedef struct demand_map_manager{
 	GTD_entry *GTD;	
 	my_cache *cache;
 	lower_info *li;
+	uint32_t eviction_hint;
+	//uint32_t flying_lba_idx;
+	//uint32_t flying_lba_array[QDEPTH*2];
+	fdriver_lock_t flying_map_read_lock;
+	std::map<uint32_t, request*> *flying_map_read_req_set;
+	std::map<uint32_t, bool> *flying_map_read_flag_set;
 	blockmanager *bm;
 }demand_map_manager;
 
@@ -93,6 +105,7 @@ typedef struct demand_map_monitoer{
 	uint32_t hit_num;
 	uint32_t write_hit_num;
 	uint32_t read_hit_num;
+	uint32_t shadow_hit_num;
 
 	uint32_t miss_num;
 	uint32_t cold_miss_num;	

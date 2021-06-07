@@ -2,7 +2,9 @@
 #include "amf_info.h"
 #include "../../include/settings.h"
 #include "../../bench/bench.h"
+#include <pthread.h>
 #include <unistd.h>
+#include <queue>
 AmfManager *am;
 /*testtest*/
 #ifdef LOWER_MEM_DEV
@@ -21,6 +23,14 @@ typedef struct dummy_req{
 	uint32_t test_ppa;
 	uint8_t type;
 }dummy_req;
+
+typedef struct amf_wrapper{
+	uint32_t cnt;
+	algo_req *req;
+}amf_wrapper;
+
+amf_wrapper *wrapper_array;
+std::queue<amf_wrapper*>* wrap_q;
 
 lower_info amf_info={
 	.create=amf_info_create,
@@ -45,8 +55,30 @@ static uint8_t test_type(uint8_t type){
 	return type&t_type;
 }
 
+pthread_cond_t wrapper_cond=PTHREAD_COND_INITIALIZER;
+pthread_mutex_t wrapper_lock=PTHREAD_MUTEX_INITIALIZER;
+
+static inline amf_wrapper* get_amf_wrapper(){
+	amf_wrapper *res;
+	pthread_mutex_lock(&wrapper_lock);
+	while(wrap_q->empty()){
+		pthread_cond_wait(&wrapper_cond, &wrapper_lock);
+	}
+	res=wrap_q->front();
+	res->cnt=0;
+	wrap_q->pop();
+	pthread_mutex_unlock(&wrapper_lock);
+	return res;
+}
+
+static inline void release_amf_wrapper(amf_wrapper *amw){
+	pthread_mutex_lock(&wrapper_lock);
+	wrap_q->push(amw);
+	pthread_cond_broadcast(&wrapper_cond);
+	pthread_mutex_unlock(&wrapper_lock);
+}
+
 uint32_t amf_info_create(lower_info *li, blockmanager *bm){
-	
 	if (access("aftl.bin", F_OK)!=-1){
 		am=AmfOpen(1);
 	}
@@ -68,6 +100,12 @@ uint32_t amf_info_create(lower_info *li, blockmanager *bm){
 
 	temp_mem_buf=(char*)malloc(PAGESIZE);
 #endif
+
+	wrapper_array=(amf_wrapper*)malloc(sizeof(amf_wrapper)*QDEPTH);
+	wrap_q=new std::queue<amf_wrapper*>();
+	for(uint32_t i=0; i<QDEPTH; i++){
+		wrap_q->push(&wrapper_array[i]);
+	}
 
 	return 1;
 }
@@ -93,11 +131,13 @@ void* amf_info_destroy(lower_info *li){
 	free(mem_pool);
 	free(temp_mem_buf);
 #endif
+
+	free(wrapper_array);
+	delete wrap_q;
 	return NULL;
 }
 
 void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req){
-	
 	uint8_t t_type=test_type(req->type);
 	if(t_type < LREQ_TYPE_NUM){
 		amf_info.req_type_cnt[t_type]++;
@@ -106,8 +146,12 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,bool async,al
 	req->test_ppa=ppa;
 	req->type_lower=0;
 #ifdef LOWER_MEM_DEV
+	amf_wrapper *temp_req=get_amf_wrapper();
+	temp_req->req=req;
 	memcpy(mem_pool[ppa], value->value, PAGESIZE);
-	AmfWrite(am, ppa, temp_mem_buf, (void *)req);
+	for(uint32_t i=0; i<R2PGAP; i++){
+		AmfWrite(am, ppa*R2PGAP+i, temp_mem_buf, (void *)temp_req);
+	}
 #else
 	AmfWrite(am, ppa, value->value, (void *)req);
 #endif
@@ -125,8 +169,12 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,bool async,alg
 
 	req->type_lower=0;
 #ifdef LOWER_MEM_DEV
-	memcpy(value->value, mem_pool[ppa], PAGESIZE);
-	AmfRead(am, ppa, temp_mem_buf, (void *)req);
+	amf_wrapper *temp_req=get_amf_wrapper();
+	temp_req->req=req;
+	memcpy(mem_pool[ppa], value->value, PAGESIZE);
+	for(uint32_t i=0; i<R2PGAP; i++){
+		AmfRead(am, ppa*R2PGAP+i, temp_mem_buf, (void *)temp_req);
+	}
 #else
 	AmfRead(am, ppa, value->value, (void *)req);
 #endif
@@ -137,13 +185,13 @@ void* amf_info_trim_block(uint32_t ppa,bool async){
 	dummy_req *temp=(dummy_req*)malloc(sizeof(dummy_req));
 	amf_info.req_type_cnt[TRIM]++;
 	temp->type=TRIM;
-	if(ppa%PAGES_PER_SEGMENT){
+	if((ppa*R2PGAP)%PAGES_PER_SEGMENT){
 		printf("not aligned!\n");
 		abort();
 	}
 	temp->test_ppa=ppa;
 	for(uint32_t i=0; i< 128; i++){
-		AmfErase(am,ppa+i,(void*)temp);
+		AmfErase(am,ppa*R2PGAP+i,(void*)temp);
 	}
 	return NULL;
 }
@@ -168,15 +216,30 @@ void amf_flying_req_wait(){
 }
 
 void amf_call_back_r(void *_req){
-	algo_req *req=(algo_req*)_req;
-	req->end_req(req);
+	amf_wrapper *wrapper=(amf_wrapper*)_req;
+
+	wrapper->cnt++;
+	if(wrapper->cnt==R2PGAP){
+		algo_req *req=(algo_req*)wrapper->req;
+		req->end_req(req);
+		release_amf_wrapper(wrapper);
+	}
 }
+
 void amf_call_back_w(void *_req){
-	algo_req *req=(algo_req*)_req;
-	req->end_req(req);
+	amf_wrapper *wrapper=(amf_wrapper*)_req;
+	wrapper->cnt++;
+	if(wrapper->cnt==R2PGAP){
+		algo_req *req=(algo_req*)wrapper->req;
+		req->end_req(req);
+		release_amf_wrapper(wrapper);
+	}
 }
+
 void amf_call_back_e(void *_req){
+
 }
+
 void amf_error_call_back_r(void *_req){
 	algo_req *req=(algo_req*)_req;
 

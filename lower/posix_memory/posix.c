@@ -99,6 +99,10 @@ void *posix_make_push(uint32_t PPA, uint32_t size, value_set* value, bool async,
 	bool flag=false;
 	posix_request *p_req=(posix_request*)malloc(sizeof(posix_request));
 	p_req->type=FS_LOWER_W;
+	if(PPA > _NOP){
+		printf("over range!\n");
+		abort();
+	}
 	p_req->key=PPA;
 	p_req->value=value;
 	p_req->upper_req=req;
@@ -118,6 +122,10 @@ void *posix_make_push(uint32_t PPA, uint32_t size, value_set* value, bool async,
 void *posix_make_pull(uint32_t PPA, uint32_t size, value_set* value, bool async, algo_req *const req){
 	bool flag=false;
 	posix_request *p_req=(posix_request*)malloc(sizeof(posix_request));
+	if(PPA > _NOP){
+		printf("over range!\n");
+		abort();
+	}
 	p_req->type=FS_LOWER_R;
 	p_req->key=PPA;
 	p_req->value=value;

@@ -15,8 +15,8 @@ typedef struct align_buffer{
 }align_buffer;
 
 typedef struct page_read_buffer{
-	std::map<uint32_t, algo_req *> * pending_req;
-	std::map<uint32_t, algo_req *>* issue_req;
+	std::multimap<uint32_t, algo_req *> * pending_req;
+	std::multimap<uint32_t, algo_req *>* issue_req;
 	fdriver_lock_t pending_lock;
 	fdriver_lock_t read_buffer_lock;
 	uint32_t buffer_ppa;

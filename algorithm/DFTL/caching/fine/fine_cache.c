@@ -16,7 +16,9 @@ my_cache fine_cache_func{
 	.free=fine_free,
 	.is_needed_eviction=fine_is_needed_eviction,
 	.need_more_eviction=NULL,
+	.update_eviction_hint=fine_update_eviction_hint,
 	.is_hit_eviction=NULL,
+	.is_eviction_hint_full=fine_is_eviction_hint_full,
 	.update_entry=fine_update_entry,
 	.update_entry_gc=fine_update_entry_gc,
 	.force_put_mru=fine_force_put_mru,
@@ -68,8 +70,8 @@ uint32_t fine_free(struct my_cache *mc){
 	return 1;
 }
 
-bool fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *){
-	if(fcm.max_caching_map==fcm.now_caching_map) return true;
+bool fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t *eviction_hint){
+	if(fcm.max_caching_map ==fcm.now_caching_map+ (*eviction_hint) ) return true;
 	if(fcm.max_caching_map < fcm.now_caching_map){
 		printf("now caching map bigger!!!! %s:%d\n", __FILE__, __LINE__);
 		abort();
@@ -77,6 +79,9 @@ bool fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *){
 	return false;
 }
 
+uint32_t fine_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t eviction_hint, bool increase){
+	return increase?eviction_hint+1:eviction_hint-1;
+}
 static inline void checking_lba_exist(uint32_t lba){
 	/*
 	lru_node *target;
@@ -94,12 +99,14 @@ static inline fine_cache * __find_lru_map(uint32_t lba){
 #ifdef SEARCHSPEEDUP
 	return (fine_cache*)fcm.cl_mapping->fc_array[lba];
 #else
+	return (fine_cache*)lru_find(fcm.lru, lba);
+	/*
 	lru_node *ln;
 	fine_cache *fc;
 	for_each_lru_list(fcm.lru, ln){
 		fc=(fine_cache*)ln->data;
 		if(fc->lba==lba) return fc;
-	}
+	}*/
 #endif
 	return NULL;
 }
@@ -141,7 +148,7 @@ last:
 	return old_ppa;
 }
 
-uint32_t fine_update_entry(struct my_cache *mc, GTD_entry *e, uint32_t lba, uint32_t ppa){
+uint32_t fine_update_entry(struct my_cache *mc, GTD_entry *e, uint32_t lba, uint32_t ppa, uint32_t *eviction_hint){
 	return __update_entry(e, lba, ppa, false);
 }
 
@@ -149,12 +156,17 @@ uint32_t fine_update_entry_gc(struct my_cache *mc, GTD_entry *e, uint32_t lba, u
 	return __update_entry(e, lba, ppa, true);
 }
 
-uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *){
+uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *, uint32_t *eviction_hint){
 	if(etr->status==EMPTY){
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
 	}
-	
+
+	if(bitmap_is_set(fcm.populated_cache_entry,lba)){
+		(*eviction_hint)--;
+		return 1;
+	}
+
 	fine_cache *fc=(fine_cache*)malloc(sizeof(fine_cache));
 	uint32_t *map=(uint32_t*)data;
 	fc->lba=lba;
@@ -165,9 +177,11 @@ uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 	fcm.cl_mapping->fc_array[lba]=(void*)fc;
 #endif
 	bitmap_set(fcm.populated_cache_entry, lba);
+
+	//printf("inserted lba:%u\n", lba);
 	get_ln(fc)=lru_push(fcm.lru, (void*)fc);
 	set_flag(fc,0);
-
+	(*eviction_hint)--;
 	fcm.now_caching_map++;
 	return 1;
 }
@@ -280,14 +294,20 @@ bool fine_evict_target(struct my_cache *, GTD_entry *, mapping_entry *fc){
 bool fine_exist(struct my_cache *, uint32_t lba){
 	bool res=bitmap_is_set(fcm.populated_cache_entry, lba);
 	if(res){
+#ifdef SEARCHSPEEDUP
 		if(!fcm.cl_mapping->fc_array[lba]){
 			printf("bitmap is wiered! %u\n",lba);
 			abort();
 		}
+#endif
 	}
 	return res;
 }
 
 void fine_force_put_mru(struct my_cache *, GTD_entry *,mapping_entry *map,  uint32_t lba){
 	lru_update(fcm.lru, get_ln(map));
+}
+
+bool fine_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint){
+	return fcm.max_caching_map==eviction_hint;
 }

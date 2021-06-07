@@ -10,7 +10,7 @@
 #include "../../bench/bench.h"
 extern uint32_t test_key;
 align_buffer a_buffer;
-typedef std::map<uint32_t, algo_req*>::iterator rb_r_iter;
+typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 
 extern MeasureTime mt;
 struct algorithm page_ftl={
@@ -30,8 +30,8 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	algo->bm=bm; //blockmanager is managing invalidation 
 	page_map_create();
 
-	rb.pending_req=new std::map<uint32_t, algo_req *>();
-	rb.issue_req=new std::map<uint32_t, algo_req*>();
+	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
+	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
@@ -96,7 +96,18 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 	}
 }
 
+bool testing;
+uint32_t testing_lba;
+
 uint32_t page_read(request *const req){
+
+	if(!testing){
+		testing_lba=req->key;
+		testing=true;
+	}
+
+//	printf("issue %u %u\n", req->seq, req->key);
+
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		if(req->key==a_buffer.key[i]){
 			//		printf("buffered read!\n");
@@ -196,6 +207,7 @@ static void processing_pending_req(algo_req *req, value_set *v){
 void *page_end_req(algo_req* input){
 	//this function is called when the device layer(lower_info) finish the request.
 	rb_r_iter target_r_iter;
+	rb_r_iter target_r_iter_temp;
 	algo_req *pending_req;
 	page_param* param=(page_param*)input->param;
 	switch(input->type){

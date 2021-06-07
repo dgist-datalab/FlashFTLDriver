@@ -32,8 +32,8 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	demand_ftl.algo_body=(void*)pm_body_create(bm);
 	a_buffer.value=(char*)malloc(PAGESIZE);
 
-	rb.pending_req=new std::map<uint32_t, algo_req *>();
-	rb.issue_req=new std::map<uint32_t, algo_req*>();
+	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
+	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
@@ -126,7 +126,7 @@ uint32_t page_flush(request *const req){
 }
 
 extern struct algorithm demand_ftl;
-typedef std::map<uint32_t, algo_req*>::iterator rb_r_iter;
+typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
 	if(type==DATAR){
