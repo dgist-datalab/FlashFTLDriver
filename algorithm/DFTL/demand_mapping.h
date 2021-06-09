@@ -61,7 +61,6 @@ typedef struct demand_param{
 	MAP_ASSIGN_STATUS prev_status[10];
 	uint32_t now_eviction_hint;
 	uint32_t log;
-	GTD_entry *etr;
 	evict_target et;
 	mapping_entry target;
 	void *param_ex;
@@ -76,11 +75,6 @@ typedef struct assign_param_ex{
 	uint32_t *prefetching_info;
 	uint8_t idx;
 }assign_param_ex;
-
-
-typedef struct pick_param_ex{
-	KEYT lba;
-}pick_param_ex;
 
 typedef struct demand_map_manager{
 	uint32_t max_caching_pages;
