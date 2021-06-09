@@ -20,6 +20,7 @@ struct blockmanager seq_bm={
 	.free_segment=seq_free_segment,
 	.populate_bit=seq_populate_bit,
 	.unpopulate_bit=seq_unpopulate_bit,
+	.query_bit=seq_query_bit,
 	.erase_bit=seq_erase_bit,
 	.is_valid_page=seq_is_valid_page,
 	.is_invalid_page=seq_is_invalid_page,
@@ -372,6 +373,18 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 }
 
 
+bool seq_query_bit(struct blockmanager *bm, uint32_t ppa){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	uint32_t bn=ppa/(_PPB * L2PGAP);
+	uint32_t pn=ppa%(_PPB * L2PGAP);
+	uint32_t bt=pn/8;
+	uint32_t of=pn%8;
+	__block *b=&p->seq_block[bn];
+
+	return p->seq_block[bn].bitset[bt]&(1<<of);
+}
+
+
 void seq_invalidate_number_decrease(struct blockmanager *bm, uint32_t ppa){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	uint32_t bn=ppa/(_PPB * L2PGAP);
@@ -518,3 +531,4 @@ uint32_t seq_get_invalidate_number(struct blockmanager *bm, uint32_t seg_idx){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	return p->logical_segment[seg_idx].total_invalid_number;
 }
+

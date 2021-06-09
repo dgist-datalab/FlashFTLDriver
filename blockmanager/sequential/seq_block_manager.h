@@ -40,6 +40,7 @@ __gsegment* seq_get_gc_target (struct blockmanager*);
 void seq_trim_segment (struct blockmanager*, __gsegment*, struct lower_info*);
 int seq_populate_bit (struct blockmanager*, uint32_t ppa);
 int seq_unpopulate_bit (struct blockmanager*, uint32_t ppa);
+bool seq_query_bit(struct blockmanager *, uint32_t ppa);
 int seq_erase_bit (struct blockmanager*, uint32_t ppa);
 bool seq_is_valid_page (struct blockmanager*, uint32_t ppa);
 bool seq_is_invalid_page (struct blockmanager*, uint32_t ppa);
