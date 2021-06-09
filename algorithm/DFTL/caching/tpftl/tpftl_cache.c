@@ -121,7 +121,7 @@ static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
 	return cnt;
 }
 
-bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num, uint32_t *eviction_hint){
+bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num, uint32_t eviction_hint){
 	GTD_entry *etr=GETETR(dmm, lba);
 
 	uint32_t prefetching_hint=((*prefetching_num)!=UINT32_MAX?(*prefetching_num):0);
@@ -142,7 +142,7 @@ bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetchi
 		}
 	}
 
-	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte + (*eviction_hint)){
+	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte + (eviction_hint)){
 		return false;
 	}
 	else{
@@ -259,7 +259,7 @@ uint32_t tp_update_entry_gc(struct my_cache *, GTD_entry *e, uint32_t lba, uint3
 	return __update_entry(e, lba, ppa, true);
 }
 
-uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *prefetching_num, uint32_t *eviction_hint){
+uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *prefetching_num, uint32_t *eviction_hint, uint32_t org_eviction_hint){
 	if(etr->status==EMPTY){
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
@@ -335,6 +335,10 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		abort();
 	}
 	(*eviction_hint)-=iter->second;
+	if(iter->second!=org_eviction_hint){
+		printf("size changed!\n");
+		abort();
+	}
 	return 1;
 }
 

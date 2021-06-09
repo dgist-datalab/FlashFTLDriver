@@ -63,9 +63,9 @@ uint32_t sftl_free(struct my_cache *mc){
 	return 1;
 }
 
-bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba, uint32_t *, uint32_t *eviction_hint){
+bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba, uint32_t *, uint32_t eviction_hint){
 	uint32_t target_size=scm.gtd_size[GETGTDIDX(lba)];
-	if(scm.max_caching_byte <= scm.now_caching_byte+target_size+sizeof(uint32_t)*2+(*eviction_hint)){
+	if(scm.max_caching_byte <= scm.now_caching_byte+target_size+sizeof(uint32_t)*2+(eviction_hint)){
 		return true;
 	}
 	if(scm.max_caching_byte <= scm.now_caching_byte){
@@ -113,6 +113,13 @@ inline static bool is_sequential(sftl_cache *sc, uint32_t lba, uint32_t ppa){
 		return true;
 	}
 	else return false;
+}
+
+static inline void sftl_size_checker(uint32_t eviction_hint){
+	if(scm.now_caching_byte+eviction_hint> scm.max_caching_byte){
+		printf("caching overflow! %s:%d\n", __FILE__, __LINE__);
+		abort();
+	}
 }
 
 enum NEXT_STEP{
@@ -276,10 +283,6 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		sc=get_initial_state_cache(gtd_idx, etr);
 		ln=lru_push(scm.lru, sc);
 		etr->private_data=(void*)ln;
-		if(eviction_hint){
-			uint32_t target_size=scm.gtd_size[GETGTDIDX(lba)];
-			(*eviction_hint)-=(target_size+sizeof(uint32_t)*2);
-		}
 	}else{
 		if(scm.now_caching_byte <= scm.gtd_size[gtd_idx]){
 			scm.now_caching_byte=0;
@@ -323,13 +326,15 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		printf("oversize!\n");
 		abort();
 	}
-
 	scm.now_caching_byte+=scm.gtd_size[gtd_idx];
-
-	if(scm.now_caching_byte > scm.max_caching_byte){
-		printf("caching overflow! %s:%d\n", __FILE__, __LINE__);
-		abort();
+	
+	if(eviction_hint){
+		sftl_size_checker(*eviction_hint);
 	}
+	else{
+		sftl_size_checker(0);
+	}
+
 	if(!isgc){
 		lru_update(scm.lru, ln);
 	}
@@ -345,7 +350,7 @@ uint32_t sftl_update_entry_gc(struct my_cache *, GTD_entry *etr, uint32_t lba, u
 	return __update_entry(etr, lba, ppa, true, NULL);
 }
 
-static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, uint32_t lba, char *data){
+static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, char *data){
 	sftl_cache *sc=(sftl_cache*)malloc(sizeof(sftl_cache));
 	sc->map=bitmap_init(BITMAPMEMBER);
 	sc->etr=etr;
@@ -388,7 +393,7 @@ static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, uint32_t lba,
 	return sc;
 }
 
-uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *, uint32_t *eviction_hint){
+uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t /*lba*/, char *data, uint32_t *, uint32_t *eviction_hint, uint32_t org_eviction_hint){
 	if(etr->private_data){
 		printf("already lru node exists! %s:%d\n", __FILE__, __LINE__);
 		abort();
@@ -403,7 +408,7 @@ uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 	
 		test=true;
 	}*/
-	sftl_cache *sc=make_sc_from_translation(etr, lba, data);
+	sftl_cache *sc=make_sc_from_translation(etr, data);
 	/*
 	if(test){
 		sftl_print_mapping(sc);
@@ -413,8 +418,15 @@ uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 	etr->status=CLEAN;
 	scm.now_caching_byte+=scm.gtd_size[etr->idx];
 
-	uint32_t target_size=scm.gtd_size[GETGTDIDX(lba)];
+	uint32_t target_size=scm.gtd_size[etr->idx];
 	(*eviction_hint)-=target_size+sizeof(uint32_t)*2;
+
+	if(target_size+sizeof(uint32_t)*2!=org_eviction_hint){
+		printf("changed_size\n");
+		abort();
+	}
+
+	sftl_size_checker(*eviction_hint);
 	return 1;
 }
 

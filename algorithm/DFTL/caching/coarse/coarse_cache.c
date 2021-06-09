@@ -52,12 +52,12 @@ uint32_t coarse_free(struct my_cache *mc){
 	return 1;
 }
 
-bool coarse_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t *eviction_hint){
-	if(ccm.max_caching_page == ccm.now_caching_page+ (*eviction_hint)){
+bool coarse_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t eviction_hint){
+	if(ccm.max_caching_page == ccm.now_caching_page+ (eviction_hint)){
 		return true;
 	}
 
-	if(ccm.max_caching_page<ccm.now_caching_page+(*eviction_hint)){
+	if(ccm.max_caching_page<ccm.now_caching_page+(eviction_hint)){
 		printf("now caching page bigger!!!! %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
@@ -137,7 +137,7 @@ uint32_t coarse_update_entry_gc(struct my_cache *, GTD_entry *etr, uint32_t lba,
 	return __update_entry(etr, lba, ppa, true, NULL);
 }
 
-uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *, uint32_t *eviction_hint){
+uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *, uint32_t *eviction_hint, uint32_t){
 	if(etr->private_data){
 		printf("already lru node exists! %s:%d\n", __FILE__, __LINE__);
 		abort();

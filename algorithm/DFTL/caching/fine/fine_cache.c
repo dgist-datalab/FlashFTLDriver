@@ -94,9 +94,9 @@ static inline void map_size_check(uint32_t *eviction_hint){
 	}
 }
 
-bool fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t *eviction_hint){
-	if(fcm.max_caching_map ==fcm.now_caching_map+ (*eviction_hint) ) return true;
-	map_size_check(eviction_hint);
+bool fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t eviction_hint){
+	if(fcm.max_caching_map ==fcm.now_caching_map+ (eviction_hint) ) return true;
+	map_size_check(&eviction_hint);
 	return false;
 }
 
@@ -183,7 +183,7 @@ uint32_t fine_update_entry_gc(struct my_cache *mc, GTD_entry *e, uint32_t lba, u
 	return __update_entry(e, lba, ppa, true, NULL);
 }
 
-uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *, uint32_t *eviction_hint){
+uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *, uint32_t *eviction_hint, uint32_t /*org_eviction_hint*/){
 	if(etr->status==EMPTY){
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
