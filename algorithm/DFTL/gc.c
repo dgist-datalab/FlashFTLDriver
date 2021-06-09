@@ -9,6 +9,7 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
+uint32_t debug_lba=UINT32_MAX;
 uint32_t test_ppa=UINT32_MAX;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
@@ -34,7 +35,7 @@ void pm_body_destroy(pm_body *pm){
 void invalidate_ppa(uint32_t t_ppa){
 	/*when the ppa is invalidated this function must be called*/
 	if(t_ppa==test_ppa){
-		printf("%u unpopulated!\n",test_ppa);
+		printf("%u unpopulated!\n",t_ppa);
 	}
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
 		printf("target:%u ",t_ppa);

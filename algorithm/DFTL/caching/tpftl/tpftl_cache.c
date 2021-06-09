@@ -440,7 +440,8 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
 	return NULL;
 }
 
-bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_entry *etr, mapping_entry *map, char *data){
+bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, 
+		GTD_entry *etr, mapping_entry *map, char *data){
 	uint32_t gtd_idx=GETGTDIDX(map->lba);
 	if(tcm.GTD_internal_state[gtd_idx]==0){
 		tcm.GTD_internal_state[gtd_idx]=1;

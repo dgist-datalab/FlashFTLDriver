@@ -89,8 +89,6 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		ln=lru_push(ccm.lru, cc);
 		etr->private_data=(void*)ln;
 		ccm.now_caching_page++;
-		if(eviction_hint)
-			(*eviction_hint)--;
 	}else{
 		if(etr->private_data==NULL){
 			printf("insert translation page before cache update! %s:%d\n",__FILE__, __LINE__);
