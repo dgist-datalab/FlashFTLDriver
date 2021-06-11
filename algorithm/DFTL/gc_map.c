@@ -17,11 +17,14 @@ void validate_map_ppa(uint32_t piece_ppa, KEYT gtd_idx){
 	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)&gtd_idx, sizeof(KEYT), piece_ppa/L2PGAP);
 }
 
-ppa_t get_map_ppa(KEYT gtd_idx){
+ppa_t get_map_ppa(KEYT gtd_idx, bool *gc_triggered){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	if(demand_ftl.bm->check_full(demand_ftl.bm, p->map_active,MASTER_PAGE) && demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 		do_map_gc();//call gc
+		if(gc_triggered){
+			*gc_triggered=true;
+		}
 	}
 
 retry:
@@ -96,9 +99,6 @@ void do_map_gc(){
 		//this function check the page is valid or not
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(page*L2PGAP==98016){
-				printf("%u gc invalidation check!\n", 98016);
-			}
 			if(bm->is_invalid_page(bm,page*L2PGAP)) continue;
 			else{
 				should_read=true;

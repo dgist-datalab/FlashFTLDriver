@@ -134,7 +134,6 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 		if(ppa==rb.buffer_ppa){
 			read_buffer_hit_cnt++;
 			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-			req->type_ftl=req->type_lower=0;
 			req->end_req(req);
 			fdriver_unlock(&rb.read_buffer_lock);
 			return;
@@ -180,7 +179,7 @@ static void processing_pending_req(algo_req *req, value_set *v){
 	request *parents=req->parents;
 	page_params *params=(page_params*)req->param;
 	memcpy(params->value->value, &v->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-	parents->type_ftl=parents->type_lower=0;
+	//parents->type_ftl=parents->type_lower=0;
 	parents->end_req(parents);
 	free(params);
 	free(req);
@@ -220,7 +219,7 @@ void *page_end_req(algo_req* input){
 	}
 	request *res=input->parents;
 	if(res){
-		res->type_ftl=res->type_lower=0;
+		//res->type_ftl=res->type_lower=0;
 		res->end_req(res);//you should call the parents end_req like this
 	}
 	free(params);

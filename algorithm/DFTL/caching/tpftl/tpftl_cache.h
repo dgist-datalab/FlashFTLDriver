@@ -8,7 +8,7 @@
 #define GETTPLRU(etr) ((LRU*)((etr)->private_data))
 #define GETLBA(tn, tc) ((tn->idx*(PAGESIZE/sizeof(uint32_t)))+tc->offset)
 #define MAXOFFSET ((PAGESIZE/sizeof(uint32_t))-1)
-#define PREFETCHINGTH 3
+#define PREFETCHINGTH -3
 
 typedef struct tp_entry{
 	uint16_t offset;
@@ -29,7 +29,7 @@ typedef struct tp_cache_monitor{
 	bitmap *populated_cache_entry;
 	char *GTD_internal_state;
 	int8_t tp_node_change_cnt;
-	bool prefetching_mode;
+	//bool prefetching_mode;
 	LRU *lru;
 }tp_cache_monitor;
 

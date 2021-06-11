@@ -222,7 +222,12 @@ static inline void write_updated_map(request *req, GTD_entry *target_etr,
 	if(target_etr->physical_address!=UINT32_MAX){
 		invalidate_map_ppa(target_etr->physical_address);
 	}
-	target_etr->physical_address=get_map_ppa(target_etr->idx)*L2PGAP;
+	bool is_map_gc_triggered=false;
+	req->type_ftl|=MAP_WRITE;
+	target_etr->physical_address=get_map_ppa(target_etr->idx, &is_map_gc_triggered)*L2PGAP;
+	if(is_map_gc_triggered){
+		req->type_ftl|=MAP_WRITE_GC;
+	}
 #ifdef DFTL_DEBUG
 	mapping_sanity_checker(req->value->value);
 	printf("entry write:%u:%u\n\n",target_etr->idx, target_etr->physical_address);
@@ -461,6 +466,8 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 		dp=(demand_param*)treq->param;
 		ap=NULL;
 
+		treq->type_ftl|=MAP_EVICT_READ;
+
 		dmm.cache->update_eviction_target_translation(dmm.cache, req->key, etr, dp->et.mapping, temp_value, dp->cache_private);
 		if(req==treq){
 			list_delete_node(etr->pending_req, now);
@@ -547,12 +554,6 @@ uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_para
 	GTD_entry *eviction_etr=NULL;
 	uint32_t eviction_hint_temp;
 
-	/*if(now_pair->lba==debug_lba){
-		printf("target req->seq: %u\n", req->seq);
-	}*/
-	if(req->seq==3344003 && now_pair->lba==debug_lba){
-		printf("break!\n");
-	}
 retry:
 	switch(dp->status){
 		case EVICTIONW:
@@ -565,8 +566,7 @@ retry:
 				dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
 				dp_status_update(dp, HIT); goto retry;
 			}
-
-			dp_status_update(dp, MISSR);
+			dp_status_update(dp, MISSR); 
 			if(map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba)==FLYING_HIT_END){
 				if(dmm.cache->type==COARSE){
 					dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
@@ -581,6 +581,7 @@ retry:
 				dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, true);
 				if(flying_request_hit_check(req, now_pair->lba, dp, true)) return FLYING_HIT_END;
 
+				req->type_ftl |=(MAP_MISS);
 				DMI.miss_num++;
 				iswrite_path ? DMI.write_miss_num++ : DMI.read_miss_num++;
 				
@@ -885,7 +886,6 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	list_node *now, *nxt;
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list, now, nxt){
-
 			gmv=(gc_map_value*)now->data;
 			if(!gmv->isdone) continue;
 
@@ -899,7 +899,7 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 			}
 			
 			invalidate_map_ppa(dmm.GTD[gtd_idx].physical_address);
-			uint32_t new_ppa=get_map_ppa(gtd_idx);
+			uint32_t new_ppa=get_map_ppa(gtd_idx, NULL);
 			dmm.GTD[gtd_idx].physical_address=new_ppa*L2PGAP;
 			demand_mapping_inter_write(new_ppa, dmm.li, gmv);
 			list_delete_node(temp_list, now);
@@ -989,8 +989,7 @@ uint32_t demand_argument(int argc, char **argv){
 		}
 	}
 	
-	cache_type_set=true;
-	c_type=TPFTL;
+	//cache_type_set=true;
 	
 	if(cache_type_set){
 		switch(c_type){
