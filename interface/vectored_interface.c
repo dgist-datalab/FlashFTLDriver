@@ -14,7 +14,8 @@
 extern master_processor mp;
 extern tag_manager *tm;
 static int32_t flying_cnt = QDEPTH;
-static pthread_mutex_t flying_cnt_lock=PTHREAD_MUTEX_INITIALIZER; 
+static pthread_mutex_t flying_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t req_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 bool vectored_end_req (request * const req);
 
 /*request-length request-size tid*/
@@ -208,6 +209,8 @@ bool vectored_end_req (request * const req){
 	vectored_request *preq=req->parents;
 	switch(req->type){
 		case FS_GET_T:
+	//		printf("ack req->seq:%u\n", req->seq);
+	//		fprintf(stderr,"read:%u\n",req->seq);
 			if(mp._data_check_flag){
 				__checking_data_check(req->key, req->value->value);
 			}
@@ -225,12 +228,17 @@ bool vectored_end_req (request * const req){
 		default:
 			abort();
 	}
+
+	pthread_mutex_lock(&req_cnt_lock);
 	preq->done_cnt++;
 	uint32_t tag_num=req->tag_num;
 	if(preq->size==preq->done_cnt){
-		if(preq->end_req)
+		if(preq->end_req){
 			preq->end_req((void*)preq);	
+		}
 	}
+	pthread_mutex_unlock(&req_cnt_lock);
+
 	pthread_mutex_lock(&flying_cnt_lock);
 	flying_cnt++;
 	if(flying_cnt > QDEPTH){

@@ -75,9 +75,16 @@ bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba, uint32_t *, uint
 	return false;
 }
 
-uint32_t sftl_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t eviction_hint, bool increase){
+uint32_t sftl_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t * /*prefetching_info*/,uint32_t eviction_hint, 
+		uint32_t *now_eviction_hint, bool increase){
 	uint32_t target_size=scm.gtd_size[GETGTDIDX(lba)];
-	return increase?eviction_hint+target_size+sizeof(uint32_t)*2:eviction_hint-(target_size+sizeof(uint32_t)*2);
+	if(increase){
+		*now_eviction_hint=target_size+sizeof(uint32_t)*2;
+		return eviction_hint+*now_eviction_hint;
+	}
+	else{
+		return eviction_hint-*now_eviction_hint;
+	}
 }
 
 inline static sftl_cache* get_initial_state_cache(uint32_t gtd_idx, GTD_entry *etr){
@@ -393,7 +400,7 @@ static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, char *data){
 	return sc;
 }
 
-uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t /*lba*/, char *data, uint32_t *, uint32_t *eviction_hint, uint32_t org_eviction_hint){
+uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t /*lba*/, char *data, uint32_t *eviction_hint, uint32_t org_eviction_hint){
 	if(etr->private_data){
 		printf("already lru node exists! %s:%d\n", __FILE__, __LINE__);
 		abort();
@@ -419,13 +426,13 @@ uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 	scm.now_caching_byte+=scm.gtd_size[etr->idx];
 
 	uint32_t target_size=scm.gtd_size[etr->idx];
-	(*eviction_hint)-=target_size+sizeof(uint32_t)*2;
-
+	(*eviction_hint)-=org_eviction_hint;
+/*
 	if(target_size+sizeof(uint32_t)*2!=org_eviction_hint){
 		printf("changed_size\n");
 		abort();
 	}
-
+*/
 	sftl_size_checker(*eviction_hint);
 	return 1;
 }
@@ -509,7 +516,7 @@ struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *, uint32_t lba){
 }
 
 
-bool sftl_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr,mapping_entry *map, char *data){
+bool sftl_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr,mapping_entry *map, char *data, void *){
 	sftl_cache *sc=(sftl_cache*)((lru_node*)etr->private_data)->data;
 
 	bool target;

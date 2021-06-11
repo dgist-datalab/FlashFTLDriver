@@ -64,6 +64,7 @@ typedef struct demand_param{
 	evict_target et;
 	mapping_entry target;
 	void *param_ex;
+	void *cache_private;
 	bool is_hit_eviction;
 
 	uint32_t flying_map_read_key;
@@ -83,6 +84,7 @@ typedef struct demand_map_manager{
 	my_cache *cache;
 	lower_info *li;
 	uint32_t eviction_hint;
+	bool global_debug_flag;
 	//uint32_t flying_lba_idx;
 	//uint32_t flying_lba_array[QDEPTH*2];
 	fdriver_lock_t flying_map_read_lock;

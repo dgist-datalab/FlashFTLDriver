@@ -8,7 +8,6 @@
 
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
-extern uint32_t test_key;
 uint32_t debug_lba=UINT32_MAX;
 uint32_t test_ppa=UINT32_MAX;
 pm_body *pm_body_create(blockmanager *bm){
@@ -181,11 +180,6 @@ void do_gc(){
 					}
 				}
 
-				if(gv->ppa*L2PGAP+i==test_ppa){
-					debug_gc_lba=lbas[i];
-					printf("the gc for %u\n", test_ppa);
-				}
-
 				invalidate_ppa(gv->ppa*L2PGAP+i);
 				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
@@ -273,9 +267,6 @@ ppa_t get_rppa(KEYT *lbas, uint8_t idx, mapping_entry *target, uint32_t *_target
 		target[target_idx].lba=t_lba;
 		target[target_idx].ppa=res*L2PGAP+i;
 		target_idx++;
-		if(res*L2PGAP+i==test_ppa){
-			printf("%u is map for %u in rppa\n",test_ppa, lbas[i]);	
-		}
 		demand_ftl.bm->populate_bit(demand_ftl.bm, res*L2PGAP+i);
 	}
 	(*_target_idx)=target_idx;

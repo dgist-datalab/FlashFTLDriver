@@ -65,8 +65,14 @@ bool coarse_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint3
 }
 
 
-uint32_t coarse_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t eviction_hint, bool increase){
-	return increase?eviction_hint+1:eviction_hint-1;
+uint32_t coarse_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t * /*prefetching_info*/, uint32_t eviction_hint, 
+		uint32_t *now_eviction_hint, bool increase){
+	if(increase){
+		*now_eviction_hint=1;
+		return eviction_hint+(*now_eviction_hint);
+	}else{
+		return eviction_hint-(*now_eviction_hint);
+	}
 }
 
 inline static void check_caching_size(uint32_t eviction_hint){
@@ -137,7 +143,7 @@ uint32_t coarse_update_entry_gc(struct my_cache *, GTD_entry *etr, uint32_t lba,
 	return __update_entry(etr, lba, ppa, true, NULL);
 }
 
-uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *, uint32_t *eviction_hint, uint32_t){
+uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *eviction_hint, uint32_t now_eviction_hint){
 	if(etr->private_data){
 		printf("already lru node exists! %s:%d\n", __FILE__, __LINE__);
 		abort();
@@ -150,7 +156,7 @@ uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *etr,
 	etr->private_data=(void *)lru_push(ccm.lru, (void*)cc);
 	etr->status=CLEAN;
 	ccm.now_caching_page++;
-	(*eviction_hint)--;
+	(*eviction_hint)-=now_eviction_hint;
 	check_caching_size(*eviction_hint);
 	return 1;
 }
@@ -202,7 +208,7 @@ struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *, uint32_t lba)
 	return NULL;
 }
 
-bool coarse_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr,mapping_entry *map, char *data){
+bool coarse_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr,mapping_entry *map, char *data, void *){
 	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
 	memcpy(data, c_data, PAGESIZE);
 	free(c_data);

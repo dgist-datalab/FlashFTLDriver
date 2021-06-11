@@ -100,8 +100,14 @@ bool fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_
 	return false;
 }
 
-uint32_t fine_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t eviction_hint, bool increase){
-	return increase?eviction_hint+1:eviction_hint-1;
+uint32_t fine_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t *prefetching_info, uint32_t eviction_hint, 
+		uint32_t *now_eviction_hint, bool increase){
+	if(increase){
+		*now_eviction_hint=1;
+		return eviction_hint+*now_eviction_hint;
+	}else{
+		return eviction_hint-*now_eviction_hint;
+	}
 }
 static inline void checking_lba_exist(uint32_t lba){
 	/*
@@ -183,7 +189,8 @@ uint32_t fine_update_entry_gc(struct my_cache *mc, GTD_entry *e, uint32_t lba, u
 	return __update_entry(e, lba, ppa, true, NULL);
 }
 
-uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *, uint32_t *eviction_hint, uint32_t /*org_eviction_hint*/){
+uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, 
+		uint32_t *eviction_hint, uint32_t org_eviction_hint){
 	if(etr->status==EMPTY){
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
@@ -198,7 +205,7 @@ uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 
 
 	if(bitmap_is_set(fcm.populated_cache_entry,lba)){
-		(*eviction_hint)--;
+		(*eviction_hint)-=org_eviction_hint;
 		printf("already in cache lba:%u\n", lba);
 		map_size_check(eviction_hint);
 		return 1;
@@ -221,7 +228,7 @@ uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 	//printf("inserted lba:%u\n", lba);
 	get_ln(fc)=lru_push(fcm.lru, (void*)fc);
 	set_flag(fc,0);
-	(*eviction_hint)--;
+	(*eviction_hint)-=org_eviction_hint;
 	fcm.now_caching_map++;
 	map_size_check(eviction_hint);
 	return 0;
@@ -240,7 +247,7 @@ uint32_t fine_get_mapping(struct my_cache *, uint32_t lba){
 	return fc->ppa;
 }
 
-mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba){
+mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t, void **){
 	lru_node *target;
 	//checking_lba_exist(1778630);
 	for_each_lru_backword(fcm.lru, target){
@@ -278,7 +285,7 @@ mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba){
 	return NULL;
 }
 
-bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr, mapping_entry *map, char *data){
+bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr, mapping_entry *map, char *data, void *){
 	uint32_t gtd_idx=GETGTDIDX(map->lba);
 	if(fcm.GTD_internal_state[gtd_idx]==0){
 		fcm.GTD_internal_state[gtd_idx]=1;
