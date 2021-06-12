@@ -13,7 +13,7 @@ lsmtree LSM;
 char all_set_page[PAGESIZE];
 void *lsmtree_read_end_req(algo_req *req);
 static void processing_data_read_req(algo_req *req, char *v, bool);
-typedef std::map<uint32_t, algo_req*>::iterator rb_r_iter;
+typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 page_read_buffer rb;
 extern uint32_t debug_lba;
 int tiered_level_fd;
@@ -132,8 +132,8 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	memset(LSM.now_merging_run, -1, sizeof(uint32_t)*(1+1));
 	LSM.li=li;
 
-	rb.pending_req=new std::map<uint32_t, algo_req *>();
-	rb.issue_req=new std::map<uint32_t, algo_req*>();
+	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
+	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
@@ -560,6 +560,9 @@ read_helper_check_again:
 		r_param->use_read_helper=true;
 		if(read_helper_check(sptr->_read_helper, req->key, &read_target_ppa, sptr, &r_param->read_helper_idx)){
 			al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
+			if(req->key==debug_lba){
+				printf("read %u->%u\n",req->key, read_target_ppa);
+			}
 			read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false);
 			goto normal_end;
 		}else{

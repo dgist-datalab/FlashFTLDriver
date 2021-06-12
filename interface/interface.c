@@ -181,7 +181,6 @@ bool inf_assign_try(request *req){
 		processor *t=&mp.processors[i];
 		tag_manager_free_tag(tm, req->tag_num);
 		while(q_enqueue((void*)req,t->retry_q)){
-
 			flag=true;
 			break;
 		}
@@ -359,7 +358,7 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv, bool data_che
 
 
 		q_init(&t->req_q,QSIZE);
-		q_init(&t->retry_q,1);
+		q_init(&t->retry_q,QSIZE);
 
 #ifdef interface_vector
 		pthread_create(&t->t_id,NULL,&vectored_main, NULL);

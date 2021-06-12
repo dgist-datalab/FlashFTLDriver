@@ -7,7 +7,9 @@ my_cache tp_cache_func{
 	.free=tp_free,
 	.is_needed_eviction=tp_is_needed_eviction,
 	.need_more_eviction=tp_is_needed_eviction,
+	.update_eviction_hint=tp_update_eviction_hint,
 	.is_hit_eviction=tp_is_hit_eviction,
+	.is_eviction_hint_full=tp_is_eviction_hint_full,
 	.update_entry=tp_update_entry,
 	.update_entry_gc=tp_update_entry_gc,
 	.force_put_mru=tp_force_put_mru,
@@ -22,13 +24,13 @@ my_cache tp_cache_func{
 	.exist=tp_exist,
 };
 
-extern uint32_t test_key;
-extern uint32_t test_ppa;
 extern demand_map_manager dmm;
+extern uint32_t debug_lba;
+extern algorithm demand_ftl;
 tp_cache_monitor tcm;
 
 static uint32_t TP_ENTRY_SZ;
-#define TP_NODE_SZ (sizeof(tp_node)-sizeof(uint32_t))
+#define TP_NODE_SZ (sizeof(tp_node)-TP_ENTRY_SZ)
 
 inline static uint32_t get_bits_from_int(uint32_t t){
 	uint32_t cnt=1;
@@ -55,8 +57,7 @@ inline static void tc_lru_traverse(LRU *lru, tp_node *tn){
 	uint32_t idx=0;
 	for_each_lru_backword_safe(lru, ln, lp){
 		tc=(tp_cache_node*)ln->data;
-		printf("[%u] lba:%u-(offset:%u) ppa:%u addr:%p dirty_bit:%d\n", 
-				idx++, GETLBA(tn, tc),tc->offset, tc->ppa, tc, tc->dirty_bit);
+		printf("[%u] lba:%lu-(offset:%u) ppa:%u addr:%p dirty_bit:%d\n", idx++, GETLBA(tn, tc),tc->offset, tc->ppa, tc, tc->dirty_bit);
 	}
 }
 
@@ -74,7 +75,6 @@ uint32_t tp_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	printf("|\tcaching <min> percentage: %.2lf%%\n", (double)(tcm.max_caching_byte/(TP_NODE_SZ+TP_ENTRY_SZ))/RANGE *100);
 	tcm.populated_cache_entry=bitmap_init(RANGE);
 	tcm.tp_node_change_cnt=0;
-	tcm.prefetching_mode=false;
 	tcm.GTD_internal_state=(char*)calloc(RANGE/(PAGESIZE/sizeof(DMF))+(RANGE%(PAGESIZE/sizeof(DMF))?1:0),sizeof(uint8_t));
 	return tcm.max_caching_byte/(TP_ENTRY_SZ);
 }
@@ -97,6 +97,7 @@ uint32_t tp_free(struct my_cache *mc){
 }
 
 static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
+	/*this function returns the number of cached entries which share same GTD of "lba"*/
 	if(!tn) return 0;
 
 	uint32_t cnt=0;
@@ -114,39 +115,71 @@ static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
 	if(GETOFFSET(lba)+cnt > MAXOFFSET){
 		cnt=MAXOFFSET-GETOFFSET(lba);
 	}
+
 	return cnt;
 }
 
-bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num){
-	GTD_entry *etr=GETETR(dmm, lba);
-
-	uint32_t prefetching_hint=((*prefetching_num)!=UINT32_MAX?(*prefetching_num):0);
-	etr_sanity_check(etr);
-	uint32_t target_byte;
-	if(etr->private_data){
-		uint32_t cnt=__get_prefetching_length((tp_node*)etr->private_data, lba);
-		target_byte=TP_ENTRY_SZ*(cnt+1);
-	}
-	else{
-		target_byte=TP_ENTRY_SZ+TP_NODE_SZ;
-	}
-
+static inline uint32_t get_target_byte(GTD_entry *etr, uint32_t lba, uint32_t prefetching_hint, bool isquery){
+	uint32_t target_byte=0;
 	if(prefetching_hint){
 		for(uint32_t i=lba+1; i<=lba+prefetching_hint; i++){
 			if(GETGTDIDX(i)!=GETGTDIDX(lba)) break;
 			target_byte+=TP_ENTRY_SZ;
 		}
+	}else{
+		if(etr->private_data && tcm.tp_node_change_cnt < PREFETCHINGTH){
+			uint32_t cnt=0;
+			cnt=__get_prefetching_length((tp_node*)etr->private_data, lba);
+			target_byte=TP_ENTRY_SZ*(cnt+1);
+			if(!isquery){
+				tcm.tp_node_change_cnt=0;
+			}
+		}
+		else{
+			if(!etr->private_data){
+				target_byte=TP_ENTRY_SZ+TP_NODE_SZ;
+			}
+			else{
+				target_byte=TP_ENTRY_SZ;
+			}
+		}
 	}
-	
-	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte){
-		return false;
-	}
-	else return true;
+
+	return target_byte;
 }
 
+static inline void tp_check_cache_size(){
+	if(tcm.max_caching_byte < tcm.now_caching_byte){
+		abort();
+	}
+}
 
-bool tp_is_needed_more_eviction(struct my_cache *a, uint32_t lba){
-	return tp_is_needed_eviction(a, lba, NULL);
+bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num, uint32_t eviction_hint){
+	GTD_entry *etr=GETETR(dmm, lba);
+	etr_sanity_check(etr);
+
+	uint32_t prefetching_hint=((*prefetching_num)!=UINT32_MAX?(*prefetching_num):0);
+	uint32_t target_byte=get_target_byte(etr, lba, prefetching_hint, true);
+	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte + (eviction_hint)){
+		return false;
+	}
+	else{
+		return true;
+	}
+}
+
+uint32_t tp_update_eviction_hint(struct my_cache *c, uint32_t lba, uint32_t *prefetching_num, 
+		uint32_t eviction_hint, uint32_t *now_eviction_hint, bool increase){
+	if(increase){
+		GTD_entry *etr=GETETR(dmm, lba);
+		uint32_t prefetching_hint=((*prefetching_num)!=UINT32_MAX?(*prefetching_num):0);
+		uint32_t target_byte=get_target_byte(etr, lba, prefetching_hint, false);
+		(*now_eviction_hint)=target_byte;
+		return eviction_hint+target_byte;
+	}
+	else{
+		return eviction_hint-(*now_eviction_hint);
+	}
 }
 
 static inline tp_node* __find_tp_node(GTD_entry *etr){
@@ -156,7 +189,6 @@ static inline tp_node* __find_tp_node(GTD_entry *etr){
 }
 
 static inline tp_cache_node * __find_tp_cache_node(tp_node *tn, uint32_t lba){
-	lru_node *ln;
 	/*
 	for_each_lru_list(tn->tp_lru,ln){
 		tp_cache_node *tcn=(tp_cache_node*)ln->data;
@@ -178,11 +210,8 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	uint32_t old_ppa;
 	uint32_t target_byte=0;
 	
-	if(lba==test_key){
-		printf("[%s]mapping update %u->%u\n", isgc?"gc":"normal",lba, ppa);
-	}
-
 	etr_sanity_check(etr);
+	//tp_check_cache_size();
 
 	if(tn){
 		if(!(tc=__find_tp_cache_node(tn, lba))){
@@ -209,9 +238,8 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		tn->lru_node=lru_push(tcm.lru, (void*)tn);
 
 		etr->private_data=(void*)tn;
-		tcm.tp_node_change_cnt++;
-		if(tcm.tp_node_change_cnt > PREFETCHINGTH){
-			tcm.prefetching_mode=true;
+		if(tcm.tp_node_change_cnt< 126){
+			tcm.tp_node_change_cnt++;
 		}
 		target_byte+=TP_ENTRY_SZ+TP_NODE_SZ;
 	}
@@ -223,19 +251,23 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	}
 
 	tcm.now_caching_byte+=target_byte;
-
 	tc->ppa=ppa;
 	tc->dirty_bit=true;
+
+	if(lba==debug_lba){
+		printf("address update %u: %u -> %u\n", lba, old_ppa, ppa);
+	}
 	bitmap_set(tcm.populated_cache_entry, lba);
 
 	if(!isgc){
 		lru_update(tn->tp_lru, tc->lru_node);
 		lru_update(tcm.lru, tn->lru_node);
 	}
+
 	return old_ppa;
 }
 
-uint32_t tp_update_entry(struct my_cache *, GTD_entry *e, uint32_t lba, uint32_t ppa){
+uint32_t tp_update_entry(struct my_cache *, GTD_entry *e, uint32_t lba, uint32_t ppa, uint32_t *){
 	return __update_entry(e, lba, ppa, false);
 }
 
@@ -243,13 +275,15 @@ uint32_t tp_update_entry_gc(struct my_cache *, GTD_entry *e, uint32_t lba, uint3
 	return __update_entry(e, lba, ppa, true);
 }
 
-uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, uint32_t *prefetching_num){
+uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, 
+		uint32_t *eviction_hint, uint32_t now_eviction_hint){
 	if(etr->status==EMPTY){
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
 	}
 	etr_sanity_check(etr);
 	tp_node *tn;
+	uint32_t org_now_eviction_hint=now_eviction_hint;
 	if(etr->private_data){
 		tn=(tp_node*)etr->private_data;
 	}
@@ -259,12 +293,11 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		tn->lru_node=lru_push(tcm.lru, (void*)tn);
 		etr->private_data=(void*)tn;
 		tn->idx=etr->idx;
-
-		tcm.tp_node_change_cnt++;
-		if(tcm.tp_node_change_cnt > PREFETCHINGTH){
-			tcm.prefetching_mode=true;
+		if(tcm.tp_node_change_cnt<126){
+			tcm.tp_node_change_cnt++;
 		}
 		tcm.now_caching_byte+=TP_NODE_SZ;
+		now_eviction_hint=now_eviction_hint>TP_NODE_SZ?now_eviction_hint-TP_NODE_SZ:now_eviction_hint;
 	}
 
 	etr_sanity_check(etr);
@@ -273,17 +306,11 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		abort();
 	}
 
-	uint32_t prefetching_len=0;
-	if(tcm.prefetching_mode){
-		prefetching_len=__get_prefetching_length(tn,lba);
-		tcm.tp_node_change_cnt=0;
-		tcm.prefetching_mode=false;
-	}
-	prefetching_len+=*prefetching_num;
 
+	uint32_t prefetching_len=now_eviction_hint/TP_ENTRY_SZ+(now_eviction_hint%TP_ENTRY_SZ?1:0);
 	tp_cache_node *tc;
 	uint32_t *ppa_list=(uint32_t*)data;
-	for(uint32_t i=0; i<1+prefetching_len; i++){
+	for(uint32_t i=0; i<prefetching_len; i++){
 		if(GETGTDIDX(lba)!=(GETGTDIDX((lba+i)))){
 			break;
 		}
@@ -297,11 +324,14 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 
 		tc->ppa=ppa_list[tc->offset];
 		tc->dirty_bit=false;
-
 		if(tc->ppa==UINT32_MAX){
 			free(tc); //not populated entry;
 			continue;
 		}
+
+#ifdef DFTL_DEBUG
+		printf("insert debug_lba %u:%u %u-th\n", lba+i, ppa_list[tc->offset], i);
+#endif
 
 		if(i==0){
 			tc->lru_node=lru_push(tn->tp_lru,(void*)tc);
@@ -312,8 +342,10 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		
 		bitmap_set(tcm.populated_cache_entry, lba+i);
 		tcm.now_caching_byte+=TP_ENTRY_SZ;
+		//tp_check_cache_size();
 	}
 
+	(*eviction_hint)-=org_now_eviction_hint;
 
 	return 1;
 }
@@ -326,10 +358,6 @@ uint32_t tp_update_from_translation_gc(struct my_cache *, char *data, uint32_t l
 	GTD_entry *etr=GETETR(dmm,lba);
 
 	etr_sanity_check(etr);
-	if(etr->idx==test_key/2048 && ppa==test_ppa){
-		printf("%s-", tp_exist(NULL,lba)?"true":"false");
-		printf("%u gc dirty evict!\n",etr->idx);
-	}
 	return old_ppa;
 }
 
@@ -341,7 +369,22 @@ uint32_t tp_get_mapping(struct my_cache *, uint32_t lba){
 	return tc->ppa;
 }
 
-mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
+static inline void remove_tn_lru(tp_node *target_tn){
+	lru_delete(tcm.lru, target_tn->lru_node);
+	lru_free(target_tn->tp_lru);
+	GTD_entry *evict_etr=&dmm.GTD[target_tn->idx];
+	etr_sanity_check(evict_etr);
+	free(target_tn);
+	evict_etr->private_data=NULL;
+
+	tcm.now_caching_byte-=TP_NODE_SZ;
+	if(tcm.tp_node_change_cnt > -126){
+		tcm.tp_node_change_cnt--;
+	}
+}
+
+mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t now_eviction_hint, 
+		void **additional_data){
 	GTD_entry *etr=GETETR(dmm,lba);
 	etr_sanity_check(etr);
 
@@ -351,15 +394,18 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
 		printf("over flow idx!!\n");
 		abort();
 	}
-	uint32_t target_cnt=__get_prefetching_length(tn, lba)+1;
-	uint32_t remain_byte=tcm.max_caching_byte-tcm.now_caching_byte;
-	uint32_t eviction_cnt=0;
-	if(target_cnt==1){
-		eviction_cnt=2;
+	
+
+	int32_t eviction_cnt=now_eviction_hint/TP_ENTRY_SZ+(now_eviction_hint%TP_ENTRY_SZ?1:0);
+
+	if(eviction_cnt==0) eviction_cnt++;
+
+	if(eviction_cnt<0){
+		printf("may be the ");
+		abort();
 	}
-	else{
-		eviction_cnt=target_cnt-remain_byte/TP_ENTRY_SZ;
-	}
+
+	(*additional_data)=NULL;
 
 	tp_node *target_tn=(tp_node*)tcm.lru->tail->data;
 	tp_cache_node *tc;
@@ -373,54 +419,81 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba){
 	for_each_lru_backword_safe(target_tn->tp_lru, ln, lp){
 		tc=(tp_cache_node*)ln->data;
 		if(!tc->dirty_bit){
+			if(GETLBA(target_tn, tc)==debug_lba){
+				printf("target of clean eviction %u:%u\n", debug_lba, tc->ppa);
+			}
 			lru_delete(target_tn->tp_lru, ln);
 			bitmap_unset(tcm.populated_cache_entry, GETLBA(target_tn, tc));
 			free(tc);
 			tcm.now_caching_byte-=TP_ENTRY_SZ;
-			if(!--eviction_cnt) break;
+			if(--eviction_cnt<=0) break;
 		}
 	}
-
-
 
 	if(!target_tn->tp_lru->size){
-		lru_delete(tcm.lru, target_tn->lru_node);
-		lru_free(target_tn->tp_lru);
-		GTD_entry *evict_etr=&dmm.GTD[target_tn->idx];
-		etr_sanity_check(evict_etr);
-		free(target_tn);
-		evict_etr->private_data=NULL;
-	
-		tcm.now_caching_byte-=TP_NODE_SZ;
-		tcm.tp_node_change_cnt--;
-		if(tcm.tp_node_change_cnt < -1*PREFETCHINGTH){
-			tcm.prefetching_mode=true;
-		}
+		remove_tn_lru(target_tn);
 		return NULL;
 	}
-	if(!eviction_cnt) return NULL;
+
+	if(eviction_cnt<=0) return NULL;
+
+	tp_evicting_entry_set *dirty_evicting_set=(tp_evicting_entry_set*)malloc(sizeof(tp_evicting_entry_set));
+	dirty_evicting_set->evicting_num=eviction_cnt;
+	dirty_evicting_set->map=(mapping_entry*)malloc(eviction_cnt * sizeof(mapping_entry));
+
+	uint32_t dirty_set_idx=0;
+	mapping_entry *res=NULL;
 	for_each_lru_backword_safe(target_tn->tp_lru, ln, lp){
 		tc=(tp_cache_node*)ln->data;
 		if(!tc->dirty_bit){
-			printf("it can't has clean entry %s:%d\n", __FILE__, __LINE__);
+			printf("it can't has clean entry %s:%d\n", __FILE__, __LINE__); 
 			abort();
 		}
 		else{
-			mapping_entry *target=(mapping_entry*)malloc(sizeof(mapping_entry));
+			if(dirty_set_idx==0){
+				res=(mapping_entry*)malloc(sizeof(mapping_entry));
+				res->lba=GETLBA(target_tn, tc);
+				res->ppa=tc->ppa;
+			}
+
+			mapping_entry *target=&dirty_evicting_set->map[dirty_set_idx++];
 			target->lba=GETLBA(target_tn, tc);
 			target->ppa=tc->ppa;
-			/*
-			if(target->lba > UINT32_MAX/2){
-				printf("wtf??\n");
-				abort();
-			}*/
-			return target;
+
+			if(target->lba==debug_lba){
+				dmm.global_debug_flag=true;
+				printf("target of dirty eviction%u:%u\n", target->lba, target->ppa);
+			}
+			lru_delete(target_tn->tp_lru, ln);
+			bitmap_unset(tcm.populated_cache_entry, target->lba);
+			tcm.now_caching_byte-=TP_ENTRY_SZ;
+			free(tc);
+			if(!--eviction_cnt){
+				break;
+			}
 		}
 	}
-	return NULL;
+
+	if(!target_tn->tp_lru->size){
+		remove_tn_lru(target_tn);
+//		return NULL;
+	}
+
+	if(dirty_set_idx==0){
+		(*additional_data)=NULL;
+		free(dirty_evicting_set->map);
+		free(dirty_evicting_set);
+	}
+	else{
+		dirty_evicting_set->evicting_num=dirty_set_idx;
+		(*additional_data)=(void*)dirty_evicting_set;
+	}
+
+	return res;
 }
 
-bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_entry *etr, mapping_entry *map, char *data){
+bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, 
+		GTD_entry *etr, mapping_entry *map, char *data, void *additional_data){
 	uint32_t gtd_idx=GETGTDIDX(map->lba);
 	if(tcm.GTD_internal_state[gtd_idx]==0){
 		tcm.GTD_internal_state[gtd_idx]=1;
@@ -435,58 +508,45 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_
 	lru_node *ln;
 	uint32_t old_ppa;
 
-	for_each_lru_list(tn->tp_lru, ln){
-		tc=(tp_cache_node*)ln->data;
-		if(tc->dirty_bit){
-			old_ppa=ppa_list[tc->offset];
-			ppa_list[tc->offset]=tc->ppa;
-			/*
-			if(old_ppa!=UINT32_MAX && !dmm.bm->is_invalid_page(dmm.bm, old_ppa) && old_ppa!=tc->ppa){
-				invalidate_ppa(old_ppa);
-			}*/
-			tc->dirty_bit=0;
+	if(tn){
+		for_each_lru_list(tn->tp_lru, ln){
+			tc=(tp_cache_node*)ln->data;
+			if(tc->dirty_bit){
+				old_ppa=ppa_list[tc->offset];
+				ppa_list[tc->offset]=tc->ppa;
+				tc->dirty_bit=0;
+#ifdef DFTL_DEBUG
+				if(!demand_ftl.bm->query_bit(demand_ftl.bm, tc->ppa)){
+					printf("wtf1! %u:%u\n", GETLBA(tn, tc), tc->ppa);
+				}
+				printf("cache drity_update %u -> %u:\n", GETLBA(tn, tc), tc->ppa);
+#endif
+			}
 		}
-	}
-
-	uint32_t target_cnt=__get_prefetching_length(tn, lba)+1;
-	uint32_t remain_byte=tcm.max_caching_byte-tcm.now_caching_byte;
-	int32_t eviction_cnt=0;
-	if(target_cnt==1){
-		eviction_cnt=2;
 	}
 	else{
-		eviction_cnt=target_cnt-remain_byte/TP_ENTRY_SZ;
+		/*entry is deleted while it read mapping*/
 	}
-	
+
+	if(additional_data){
+		tp_evicting_entry_set *dirty_eviction_set=(tp_evicting_entry_set*)additional_data;
+		for(uint32_t i=0; i<dirty_eviction_set->evicting_num; i++){
+			mapping_entry temp=dirty_eviction_set->map[i];
+
+			ppa_list[GETOFFSET(temp.lba)]=temp.ppa;
+#ifdef DFTL_DEBUG
+			if(!demand_ftl.bm->query_bit(demand_ftl.bm, temp.lba)){
+				printf("wtf2! %u:%u\n", temp.lba, temp.ppa);
+			}
+			printf("evicted drity_update %u -> %u:\n",temp.lba, temp.ppa);
+#endif
+		}
+		free(dirty_eviction_set->map);
+		free(dirty_eviction_set);
+	}
+
 	free(map);
-	if(eviction_cnt<0) return true;
 
-	lru_node *lp;
-	for_each_lru_backword_safe(tn->tp_lru, ln, lp){
-		tc=(tp_cache_node*)ln->data;
-		if(!tc->dirty_bit){
-			lru_delete(tn->tp_lru, ln);	
-			bitmap_unset(tcm.populated_cache_entry, GETLBA(tn, tc));
-			free(tc);
-			tcm.now_caching_byte-=TP_ENTRY_SZ;
-			if(--eviction_cnt) break;
-		}
-	}
-
-	if(!tn->tp_lru->size){
-		lru_delete(tcm.lru, tn->lru_node);
-		lru_free(tn->tp_lru);
-		free(tn);
-
-		etr->private_data=NULL;
-
-		tcm.tp_node_change_cnt--;
-		if(tcm.tp_node_change_cnt < -1*PREFETCHINGTH){
-			tcm.prefetching_mode=true;
-		}
-		tcm.now_caching_byte-=TP_NODE_SZ;
-		return NULL;
-	}
 	return true;
 }	
 
@@ -509,7 +569,7 @@ void tp_force_put_mru(struct my_cache *, GTD_entry *etr, mapping_entry *, uint32
 bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa){
 	if(!etr->private_data) return false;
 	etr_sanity_check(etr);
-	if(tcm.now_caching_byte + TP_ENTRY_SZ > tcm.max_caching_byte){
+	if(tcm.now_caching_byte > tcm.max_caching_byte){
 		return true;
 	}
 	return false;
@@ -517,4 +577,8 @@ bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_
 
 void tp_update_dynamic_size(struct my_cache*, uint32_t lba, char*data){
 	return;
+}
+
+bool tp_is_eviction_hint_full(struct my_cache*, uint32_t eviction_hint){
+	return tcm.max_caching_byte<=eviction_hint;
 }

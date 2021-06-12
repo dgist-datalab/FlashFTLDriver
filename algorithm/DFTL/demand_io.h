@@ -3,7 +3,7 @@
 #include "demand_mapping.h"
 #include "../../include/container.h"
 
-void demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *params);
+algo_req* demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *params);
 void demand_mapping_write(uint32_t ppa, lower_info *li, request *req, void *params);
 
 void demand_mapping_fine_type_evict_write(uint32_t ppa, lower_info *li, request *req);

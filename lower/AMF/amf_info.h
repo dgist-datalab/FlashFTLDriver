@@ -1,7 +1,8 @@
 #include "../../include/settings.h"
 #include "../../include/container.h"
-
+#define LOWER_MEM_DEV
 #define REAL_PAGE_SIZE 8192
+#define R2PGAP (PAGESIZE/REAL_PAGE_SIZE)
 
 uint32_t amf_info_create(lower_info *li, blockmanager *bm);
 void* amf_info_destroy(lower_info *li);

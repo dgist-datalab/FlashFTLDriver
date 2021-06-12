@@ -566,6 +566,7 @@ void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *t
 	if(cm->read_param_queue->size()>COMPACTION_TAGS){
 		EPRINT("debug point", false);
 	}
+	fdriver_destroy(&target->done_lock);
 	cm->read_param_queue->push(target);
 	return;
 }

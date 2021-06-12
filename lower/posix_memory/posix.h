@@ -2,6 +2,7 @@
 #define POSIX_HEADER
 #include "../../include/container.h"
 
+//#define LASYNC
 #define FS_LOWER_W 1
 #define FS_LOWER_R 2
 #define FS_LOWER_T 3

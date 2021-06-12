@@ -226,6 +226,7 @@ struct blockmanager{
 	void (*free_segment)(struct blockmanager *,__segment*);
 	int (*populate_bit) (struct blockmanager*, uint32_t ppa);
 	int (*unpopulate_bit) (struct blockmanager*, uint32_t ppa);
+	bool (*query_bit) (struct blockmanager *, uint32_t ppa);
 	int (*erase_bit)(struct blockmanager*, uint32_t ppa);
 	bool (*is_valid_page) (struct blockmanager*, uint32_t ppa);
 	bool (*is_invalid_page) (struct blockmanager*, uint32_t ppa);

@@ -5,11 +5,6 @@ extern struct algorithm demand_ftl;
 extern uint32_t test_ppa;
 extern uint32_t test_key;
 void invalidate_map_ppa(uint32_t piece_ppa){
-
-	if(piece_ppa==98016){
-		printf("map %u invalidate\n", piece_ppa);
-	}
-
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa)){
 		EPRINT("double invalidation!", true);
 	}
@@ -22,11 +17,14 @@ void validate_map_ppa(uint32_t piece_ppa, KEYT gtd_idx){
 	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)&gtd_idx, sizeof(KEYT), piece_ppa/L2PGAP);
 }
 
-ppa_t get_map_ppa(KEYT gtd_idx){
+ppa_t get_map_ppa(KEYT gtd_idx, bool *gc_triggered){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	if(demand_ftl.bm->check_full(demand_ftl.bm, p->map_active,MASTER_PAGE) && demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 		do_map_gc();//call gc
+		if(gc_triggered){
+			*gc_triggered=true;
+		}
 	}
 
 retry:
@@ -37,10 +35,10 @@ retry:
 		p->seg_type_checker[p->map_active->seg_idx]=MAPSEG;
 		goto retry;
 	}
-	
+	/*
 	if(GETGTDIDX(test_key)==gtd_idx){
-	//	printf("%u mapping change to %u\n", test_key, res*L2PGAP);
-	}
+		printf("%u mapping change to %u\n", test_key, res*L2PGAP);
+	}*/
 
 	validate_map_ppa(res*L2PGAP, gtd_idx);
 	return res;
@@ -84,8 +82,8 @@ void do_map_gc(){
 		temp_queue.pop();
 	}
 
-	static int cnt=0;
-	printf("map_gc:%u seg_idx:%u (piece_ppa:%u~%u)\n", cnt++, target->seg_idx, target->seg_idx*L2PGAP*_PPS, (target->seg_idx+1)*L2PGAP*_PPS-1);
+	//static int cnt=0;
+	//printf("map_gc:%u seg_idx:%u (piece_ppa:%u~%u)\n", cnt++, target->seg_idx, target->seg_idx*L2PGAP*_PPS, (target->seg_idx+1)*L2PGAP*_PPS-1);
 
 	list *temp_list=NULL;	
 	gc_value *gv;
@@ -101,9 +99,6 @@ void do_map_gc(){
 		//this function check the page is valid or not
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(page*L2PGAP==98016){
-				printf("%u gc invalidation check!\n", 98016);
-			}
 			if(bm->is_invalid_page(bm,page*L2PGAP)) continue;
 			else{
 				should_read=true;
@@ -124,6 +119,10 @@ void do_map_gc(){
 			gv=(gc_value*)now->data;
 			if(!gv->isdone) continue;
 			gtd_idx=(KEYT*)bm->get_oob(bm, gv->ppa);
+
+			uint32_t old_ppa=dmm.GTD[gtd_idx[0]].physical_address;
+			invalidate_map_ppa(old_ppa);
+			
 			new_ppa=get_map_rppa(gtd_idx[0]);
 			dmm.GTD[gtd_idx[0]].physical_address=new_ppa*L2PGAP;
 			send_req(new_ppa, GCMW, NULL, gv);

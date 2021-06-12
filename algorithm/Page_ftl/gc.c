@@ -157,9 +157,6 @@ void do_gc(){
 			if(!gv->isdone) continue;
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
-				if(gv->ppa*L2PGAP+i==343414){
-					printf("temp_break\n");
-				}
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
 				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
