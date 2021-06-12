@@ -75,6 +75,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		a_buffer.key[a_buffer.idx]=key;
 		a_buffer.prefetching_info[a_buffer.idx]=req->consecutive_length;
 	}
+	if(req->key==test_key){
+		printf("%u is buffered\n", test_key);
+	}
 	a_buffer.idx++;
 
 	if(a_buffer.idx==L2PGAP){
@@ -85,7 +88,10 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		KEYT physical[L2PGAP];
 
 		for(uint32_t i=0; i<L2PGAP; i++){
-			physical[i]=ppa*L2PGAP+i;
+			physical[i]=ppa*L2PGAP+i;	
+			if(a_buffer.key[i]==test_key){
+				printf("%u -> %u %u\n", test_key, physical[i],*(uint32_t*)&a_buffer.value[LPAGESIZE*i]);
+			}
 		}
 
 		demand_map_assign(req, a_buffer.key, physical, a_buffer.prefetching_info);
@@ -111,7 +117,7 @@ uint32_t page_write(request *const req){
 		}
 	}
 	else{*/
-	if(!align_buffering(req, 0, NULL)){
+	if(!align_buffering(req, req->key, req->value)){
 		req->end_req(req);
 	}
 	/*}*/

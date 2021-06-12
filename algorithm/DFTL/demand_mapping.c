@@ -247,6 +247,10 @@ inline void __demand_map_pending_read(request *req, demand_param *dp, bool need_
 		return;
 	}
 
+	if(req->key==test_key){
+		printf("%u read ppa %u\n", req->key, dp->target.ppa);
+	}
+
 	req->value->ppa=dp->target.ppa;
 	send_user_req(req, DATAR, dp->target.ppa/L2PGAP, req->value);
 	if(dp->param_ex){
@@ -856,6 +860,9 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	uint32_t debug_gtd_idx;
 	uint32_t debug_idx=UINT32_MAX;
 	for(uint32_t i=0; i<idx; i++){
+		if(target[i].lba==test_key){
+			printf("gc test_key is updated from %u\n", target[i].ppa);
+		}
 		temp_gtd_idx=GETGTDIDX(target[i].lba);
 		update_flying_req_data(target[i].lba, target[i].ppa);
 

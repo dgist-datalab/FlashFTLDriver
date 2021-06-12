@@ -10,6 +10,7 @@ extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 uint32_t debug_lba=UINT32_MAX;
 uint32_t test_ppa=UINT32_MAX;
+extern uint32_t test_key;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -93,6 +94,7 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 }
 
 uint32_t debug_gc_lba;
+
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
@@ -186,8 +188,15 @@ void do_gc(){
 
 				g_buffer.idx++;
 
+				if(test_key==lbas[i]){
+					printf("gc org:%u -> %u\n", lbas[i], gv->ppa*L2PGAP+i);
+				}
+
 				if(g_buffer.idx==L2PGAP){
 					uint32_t res=get_rppa(g_buffer.key, L2PGAP, update_target, &update_target_idx);
+
+		//			gc_data_check(g_buffer);
+
 					send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE), NULL);
 					g_buffer.idx=0;
 				}
@@ -202,6 +211,7 @@ void do_gc(){
 
 	if(g_buffer.idx!=0){
 		uint32_t res=get_rppa(g_buffer.key, g_buffer.idx, update_target, &update_target_idx);
+//		gc_data_check(g_buffer);
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE), NULL);
 		g_buffer.idx=0;	
 	}

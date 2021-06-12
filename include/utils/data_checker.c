@@ -9,7 +9,7 @@
 uint32_t *keymap;
 static uint32_t my_seed;
 static fdriver_lock_t data_check_lock;
-uint32_t test_key=UINT32_MAX;
+uint32_t test_key=350576;
 
 int str2int(const char* str, int len)
 {
@@ -28,6 +28,11 @@ void __checking_data_init(){
 }
 
 void __checking_data_make(uint32_t key, char *data){
+	static bool isstart=false;
+	if(!isstart){
+		isstart=true;
+		printf("data checking start!!!\n");
+	}
 	keymap[key]=my_seed;
 	fdriver_lock(&data_check_lock);
 	if(key==test_key){
