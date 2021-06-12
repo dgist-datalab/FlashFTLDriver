@@ -39,7 +39,7 @@ retry:
 	}
 	
 	if(GETGTDIDX(test_key)==gtd_idx){
-		printf("%u mapping change to %u\n", test_key, res*L2PGAP);
+	//	printf("%u mapping change to %u\n", test_key, res*L2PGAP);
 	}
 
 	validate_map_ppa(res*L2PGAP, gtd_idx);

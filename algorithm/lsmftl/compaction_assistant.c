@@ -440,6 +440,7 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
 	}
 
+	//lsmtree_gc_unavailable_sanity_check(&LSM);
 	version_sanity_checker(LSM.last_run_version);
 }
 
