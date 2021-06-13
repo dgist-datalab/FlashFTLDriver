@@ -171,7 +171,7 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,bool async,alg
 #ifdef LOWER_MEM_DEV
 	amf_wrapper *temp_req=get_amf_wrapper();
 	temp_req->req=req;
-	memcpy(mem_pool[ppa], value->value, PAGESIZE);
+	memcpy(value->value, mem_pool[ppa], PAGESIZE);
 	for(uint32_t i=0; i<R2PGAP; i++){
 		AmfRead(am, ppa*R2PGAP+i, temp_mem_buf, (void *)temp_req);
 	}

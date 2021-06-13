@@ -212,6 +212,9 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 			printf("%u overlap key should not be inserted!\n", iter->first);
 			abort();
 		}
+		else{
+			//printf("%u is flying inserted\n", GETGTDIDX(target_data_lba));
+		}
 
 		dmm.flying_map_read_req_set->insert(std::pair<uint32_t, request*>(GETGTDIDX(target_data_lba), req));
 		dmm.flying_map_read_flag_set->insert(std::pair<uint32_t, bool>(GETGTDIDX(target_data_lba), false));
@@ -1110,8 +1113,8 @@ uint32_t demand_argument(int argc, char **argv){
 		}
 	}
 	else{
-		dmm.c_type=DEMAND_COARSE;
-		dmm.cache=&coarse_cache_func;
+		dmm.c_type=DEMAND_FINE;
+		dmm.cache=&fine_cache_func;
 	}
 
 	if(!cache_size){

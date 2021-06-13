@@ -42,7 +42,7 @@ int main(int argc,char* argv[]){
 		}
 	}
 	else{
-		inf_init(0,0,argc,argv, true);
+		inf_init(0,0,argc,argv, false);
 		bench_init();
 		bench_vectored_configure();
 		//bench_add(VECTOREDSSET,0,RANGE,RANGE);

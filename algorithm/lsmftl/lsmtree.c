@@ -908,6 +908,7 @@ read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
 }
 
 uint32_t lsmtree_seg_debug(lsmtree *lsm){
+#ifdef LSM_DEBUG
 	page_manager *pm=lsm->pm;
 	blockmanager *bm=pm->bm;
 	for(uint32_t i=0; i<_NOS; i++){
@@ -944,5 +945,6 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 			}
 		}
 	}
+#endif
 	return 1;
 }

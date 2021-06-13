@@ -7,7 +7,7 @@ export CC=g++
 export CXX=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=posix_memory
+export TARGET_LOWER=AMF
 export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -29,7 +29,7 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-		-O3 -march=native -mtune=native -flto=20 \
+	-O3 -march=native -mtune=native -flto=20 \
 #-DDFTL_DEBUG\
 #-DLSM_DEBUG\
 
