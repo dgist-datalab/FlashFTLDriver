@@ -14,7 +14,7 @@ void *demand_end_req(algo_req * my_req){
 			dp=(demand_param *)my_req->param;
 			iter=dmm.flying_map_read_flag_set->find(GETGTDIDX(dp->flying_map_read_key));
 			if(iter==dmm.flying_map_read_flag_set->end()){
-				printf("issued key is not inserted into flying set\n");
+				printf("%u issued key is not inserted into flying set\n", iter->first);
 				abort();
 			}
 			else{
