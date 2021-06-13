@@ -26,8 +26,13 @@ uint32_t issue_read_kv_for_bos_sorted_set(sst_bf_out_stream *bos,
 
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
-
+	
+		if(kv_wrapper->kv_ptr.lba==debug_lba && kv_wrapper->piece_ppa==debug_piece_ppa){
+			printf("break!\n");
+		}
+#ifdef NOTSURE
 		invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
+#endif
 	
 		/*version alread check in stream sorting logci*/
 		if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){
@@ -70,7 +75,10 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 
 	key_value_wrapper *read_target;
 	uint32_t res=0;
-
+/*
+	static uint32_t bos_stream_cnt=0;
+	printf("bos_stream_cnt :%u\n", bos_stream_cnt++);
+*/
 	for(uint32_t i=0; i<target_num  && !sst_pos_is_empty(pos); i++){
 		key_ptr_pair target_pair=sst_pos_pick(pos);
 		if(target_pair.lba==UINT32_MAX) continue;
@@ -79,9 +87,11 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
+#ifdef NOTSURE
 		if(slm_invalidate_enable(now_level, kv_wrapper->piece_ppa)){
 			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
 		}
+#endif
 
 		if(demote && now_level!=0){
 			uint32_t target_version=version_level_to_start_version(LSM.last_run_version, now_level-1);
@@ -101,6 +111,7 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 			read_req->type=COMPACTIONDATAR;
 			read_req->param=(void*)read_target;
 			read_req->end_req=comp_alreq_end_req;
+			read_req->ppa=read_target->piece_ppa;
 			io_manager_issue_read(PIECETOPPA(read_target->piece_ppa),
 					read_target->param->data, read_req, false);
 		}

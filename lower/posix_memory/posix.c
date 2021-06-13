@@ -283,6 +283,8 @@ void *posix_pull_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 		abort();
 	}
 
+//	printf("%u _PPA: %u\n", req->ppa, _PPA);
+
 	if(req->type_lower!=1 && req->type_lower!=0){
 		req->type_lower=0;
 	}

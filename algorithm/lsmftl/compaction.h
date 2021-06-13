@@ -48,7 +48,7 @@ typedef struct key_value_wrapper{ //for data read!
 	uint32_t piece_ppa;
 	key_value_pair kv_ptr;
 	bool free_target_req;
-	bool check_req;
+	bool wait_target_req;
 	bool no_inter_param_alloc;
 	inter_read_alreq_param *param;
 }key_value_wrapper;

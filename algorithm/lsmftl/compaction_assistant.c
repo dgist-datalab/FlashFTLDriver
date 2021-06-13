@@ -440,6 +440,7 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
 	}
 
+	//lsmtree_gc_unavailable_sanity_check(&LSM);
 	version_sanity_checker(LSM.last_run_version);
 }
 
@@ -565,6 +566,7 @@ void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *t
 	if(cm->read_param_queue->size()>COMPACTION_TAGS){
 		EPRINT("debug point", false);
 	}
+	fdriver_destroy(&target->done_lock);
 	cm->read_param_queue->push(target);
 	return;
 }

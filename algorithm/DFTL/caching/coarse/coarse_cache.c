@@ -79,14 +79,11 @@ inline static void check_caching_size(uint32_t eviction_hint){
 	static int cnt=0;
 
 	if((int)eviction_hint<0){
-		printf("?????\n");
+		printf("minus ?????\n");
 		abort();
 	}
 
 	//printf("cc - now:%u\n", ccm.now_caching_page);
-	if(ccm.now_caching_page> 256){
-		printf("???\n");
-	}
 	if(ccm.now_caching_page + eviction_hint> ccm.max_caching_page){
 		printf("caching overflow! %s:%d\n", __FILE__, __LINE__);
 		abort();
@@ -172,7 +169,7 @@ uint32_t coarse_get_mapping(struct my_cache *, uint32_t lba){
 	uint32_t gtd_idx=GETGTDIDX(lba);
 	GTD_entry *etr=&dmm.GTD[gtd_idx];
 	if(!etr->private_data){
-		printf("insert data before pick mapping! %s:%d\n", __FILE__, __LINE__);
+		printf("%u insert data before pick mapping! %s:%d\n",lba, __FILE__, __LINE__);
 		abort();
 	}
 

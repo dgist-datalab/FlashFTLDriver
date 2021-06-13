@@ -81,6 +81,7 @@ typedef struct assign_param_ex{
 	KEYT *lba;
 	KEYT *physical;
 	uint32_t *prefetching_info;
+	uint32_t max_idx;
 	uint8_t idx;
 }assign_param_ex;
 
@@ -97,6 +98,7 @@ typedef struct demand_map_manager{
 	fdriver_lock_t flying_map_read_lock;
 	std::map<uint32_t, request*> *flying_map_read_req_set;
 	std::map<uint32_t, bool> *flying_map_read_flag_set;
+	std::map<uint32_t, request*> *flying_req;//pair<req->seq, request*>
 	blockmanager *bm;
 }demand_map_manager;
 

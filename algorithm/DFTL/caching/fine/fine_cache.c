@@ -206,7 +206,9 @@ uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 
 	if(bitmap_is_set(fcm.populated_cache_entry,lba)){
 		(*eviction_hint)-=org_eviction_hint;
+#ifdef DFTL_DEBUG
 		printf("already in cache lba:%u\n", lba);
+#endif
 		map_size_check(eviction_hint);
 		return 1;
 	}

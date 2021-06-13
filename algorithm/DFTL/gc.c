@@ -8,9 +8,9 @@
 
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
-uint32_t debug_lba=UINT32_MAX;
-uint32_t test_ppa=UINT32_MAX;
 extern uint32_t test_key;
+uint32_t debug_lba=test_key;
+uint32_t test_ppa=UINT32_MAX;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -186,11 +186,12 @@ void do_gc(){
 				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
-				g_buffer.idx++;
 
 				if(test_key==lbas[i]){
-					printf("gc org:%u -> %u\n", lbas[i], gv->ppa*L2PGAP+i);
+					printf("gc org:%u -> %u data:%u\n", lbas[i], gv->ppa*L2PGAP+i, *(uint32_t*)&g_buffer.value[g_buffer.idx*LPAGESIZE]);
 				}
+				
+				g_buffer.idx++;
 
 				if(g_buffer.idx==L2PGAP){
 					uint32_t res=get_rppa(g_buffer.key, L2PGAP, update_target, &update_target_idx);

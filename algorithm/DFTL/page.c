@@ -90,7 +90,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		for(uint32_t i=0; i<L2PGAP; i++){
 			physical[i]=ppa*L2PGAP+i;	
 			if(a_buffer.key[i]==test_key){
-				printf("%u -> %u %u\n", test_key, physical[i],*(uint32_t*)&a_buffer.value[LPAGESIZE*i]);
+				printf("%u -> %u[%u] %u \n", test_key, physical[i], i ,*(uint32_t*)&a_buffer.value[LPAGESIZE*i]);
 			}
 		}
 

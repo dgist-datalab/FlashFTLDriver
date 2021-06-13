@@ -560,6 +560,9 @@ read_helper_check_again:
 		r_param->use_read_helper=true;
 		if(read_helper_check(sptr->_read_helper, req->key, &read_target_ppa, sptr, &r_param->read_helper_idx)){
 			al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
+			if(req->key==debug_lba){
+				printf("read %u->%u\n",req->key, read_target_ppa);
+			}
 			read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false);
 			goto normal_end;
 		}else{

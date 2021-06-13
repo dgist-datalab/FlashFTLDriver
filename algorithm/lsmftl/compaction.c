@@ -11,7 +11,7 @@ extern lsmtree LSM;
 compaction_master *_cm;
 extern uint32_t test_key;
 //uint32_t debug_lba=3967;
-uint32_t debug_lba=UINT32_MAX;
+uint32_t debug_lba=test_key;
 
 extern uint32_t debug_piece_ppa;
 
@@ -1343,6 +1343,7 @@ void *comp_alreq_end_req(algo_req *req){
 			break;
 		case COMPACTIONDATAR:
 		case DATAR:
+//			printf("read_done: %u\n", req->ppa);
 			kv_wrapper=(key_value_wrapper*)req->param;
 			fdriver_unlock(&kv_wrapper->param->done_lock);
 			break;

@@ -8,7 +8,7 @@
 
 extern lsmtree LSM;
 //uint32_t debug_piece_ppa=16705;
-uint32_t debug_piece_ppa=UINT32_MAX;
+uint32_t debug_piece_ppa=754695;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
 
@@ -804,6 +804,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				piece_ppa=ppa*L2PGAP+i;
 				gn->piece_ppa=piece_ppa;
 				gn->lba=oob_lba[i];
+				if(gn->lba==debug_lba){
+					printf("target is moved!\n");
+				}
 				
 	//			gc_debug_checking(gn);
 

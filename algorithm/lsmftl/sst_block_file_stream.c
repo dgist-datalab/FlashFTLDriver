@@ -9,7 +9,9 @@ sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(inter_read_alreq_param *, b
 	res->kv_read_check_done=r_check_done;
 	res->kv_wrapper_q=new std::queue<key_value_wrapper*>();
 	res->prev_ppa=UINT32_MAX;
+#ifdef LSM_DEBUG
 	res->prev_lba=UINT32_MAX;
+#endif
 	res->no_inter_param_alloc=no_inter_param_alloc;
 	return res;
 }
@@ -33,8 +35,22 @@ static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_w
 			res->param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 			fdriver_lock_init(&res->param->done_lock, 0);
 			value=res->param->data->value;
+			kv_wrap_buf[i]->wait_target_req=true;
+		}
+		else{
+			kv_wrap_buf[i]->wait_target_req=false;
+		}
+
+#ifndef NOTSURE
+		invalidate_piece_ppa(LSM.pm->bm, kv_wrap_buf[i]->piece_ppa, true);
+#endif
+
+		if(kv_wrap_buf[i]->kv_ptr.lba==debug_lba){
+			printf("wrapping! %u -> offset:%u\n", debug_lba, kv_wrap_buf[i]->piece_ppa%L2PGAP);	
 		}
 		kv_wrap_buf[i]->kv_ptr.data=&value[LPAGESIZE*(kv_wrap_buf[i]->piece_ppa%L2PGAP)];
+		kv_wrap_buf[i]->free_target_req=false;
+
 		bos->last_issue_lba=kv_wrap_buf[i]->kv_ptr.lba;
 		if(i==num-1){
 			kv_wrap_buf[i]->free_target_req=true;
@@ -47,7 +63,7 @@ static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_w
 
 key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos, 
 		key_value_wrapper *kv_wrapper, compaction_master *cm){
-
+#ifdef LSM_DEBUG
 	if(bos->prev_lba==UINT32_MAX){
 		bos->prev_lba=kv_wrapper->kv_ptr.lba;
 	}
@@ -57,6 +73,7 @@ key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos,
 		}
 		bos->prev_lba=kv_wrapper->kv_ptr.lba;
 	}
+#endif
 
 	key_value_wrapper *res=NULL;
 
@@ -97,8 +114,7 @@ key_value_wrapper *sst_bos_get_pending(sst_bf_out_stream *bos,
 
 key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool should_buffer_check){
 	key_value_wrapper *target=bos->kv_wrapper_q->front();
-
-	if(target->param  && target->check_req){
+	if(target->wait_target_req){
 		bos->kv_read_check_done(target->param, false);
 	}
 	else{
@@ -113,6 +129,12 @@ key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool should_buffer_chec
 
 	if(target->kv_ptr.data==NULL){
 		EPRINT("over entry pick!", true);
+	}
+
+	if(target->kv_ptr.lba==debug_lba){
+		printf("pick target->piece_ppa:%u p:%p f:%u s:%u data:%u\n", target->piece_ppa, target->param, 
+				target->free_target_req, should_buffer_check,
+				*(uint32_t*)target->kv_ptr.data);
 	}
 	return target;
 }
@@ -280,6 +302,8 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 			bis->now_map_data_idx=0;
 		}
 
+		//printf("read : write target %u:%u - %u\n", bis->buffer[i]->kv_ptr.lba, bis->buffer[i]->piece_ppa, PIECETOPPA(bis->buffer[i]->piece_ppa));
+
 		key_ptr_pair *map_pair=&((key_ptr_pair*)(bis->now_map_data->value))[bis->now_map_data_idx++];
 		map_pair->lba=bis->buffer[i]->kv_ptr.lba;
 		map_pair->piece_ppa=ppa*L2PGAP+(i%L2PGAP);
@@ -287,11 +311,19 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 		debug_kp[i].lba=map_pair->lba;
 		debug_kp[i].piece_ppa=map_pair->piece_ppa;
 		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, true);
+
 		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i]->kv_ptr.data, LPAGESIZE);
+		if(bis->buffer[i]->kv_ptr.lba==debug_lba){
+			printf("readed data before_write: %u (%u->%u), copied_data:%u (%u)\n", 
+					*(uint32_t*)bis->buffer[i]->kv_ptr.data,
+					bis->buffer[i]->piece_ppa, map_pair->piece_ppa,
+					*(uint32_t*)&res->value[(i%L2PGAP)*LPAGESIZE], i);
+		}
 
 		if(bis->make_read_helper){
 			read_helper_stream_insert(bis->rh, map_pair->lba, map_pair->piece_ppa);
 		}
+
 
 		bis->write_issued_kv_num++;
 		if(bis->buffer[i]->free_target_req){
