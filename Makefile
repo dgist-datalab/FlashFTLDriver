@@ -30,8 +30,8 @@ export COMMONFLAGS=\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
 	-DLSM_DEBUG\
-#	-O3 -march=native -mtune=native -flto=20 \
-	-DDFTL_DEBUG\
+	-O3 -march=native -mtune=native -flto=20 \
+#	-DDFTL_DEBUG\
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
 
