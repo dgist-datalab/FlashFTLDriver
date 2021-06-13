@@ -315,7 +315,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 				}
 			}
 
-			thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);//read work
+			issue_map_read_sst_job(cm, &thread_arg);
 			
 			if(newer_mr && older_mr){
 				border_lba=MIN(newer_mr[read_arg1.to].end_lba, 
@@ -436,6 +436,7 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, bool isfirst,sst_pf_ou
 	for(uint32_t i=0 ; i<stream_num; i++){
 		if(read_done_flag & (1<<i)) continue;
 		if(!isfirst && read_arg_set[i].to==read_arg_set[i].max_num-1){
+			read_arg_set[i].from=read_arg_set[i].to+1;
 			read_done_flag|=(1<<i);
 			continue;
 		}
@@ -597,7 +598,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 
 		bool last_round=(read_done==(1<<stream_num)-1);
 		if(!last_round){
-			thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
+			issue_map_read_sst_job(cm, &thread_arg);
 		}
 
 		border_lba=get_border_from_read_arg_set(read_arg_set, mr_set, stream_num, read_done);
@@ -750,7 +751,7 @@ level *compaction_TW_convert_LW(compaction_master *cm, level *src){
 		bool last_round=(read_done==(1<<stream_num)-1);
 
 		if(!last_round){
-			thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
+			issue_map_read_sst_job(cm, &thread_arg);
 		}
 	
 		border_lba=get_border_from_read_arg_set(read_arg_set, mr_set, stream_num, read_done);
@@ -810,6 +811,31 @@ static uint32_t filter_invalidation(sst_pf_out_stream *pos, std::queue<key_ptr_p
 	return valid_num;
 }
 
+static inline void gc_lock_run(run *r){
+	sst_file *sptr;
+	uint32_t idx;
+	for_each_sst(r, sptr, idx){
+	//	printf("lock lba:%u ->sidx:%u segidx:%u\n", sptr->end_lba, idx, sptr->end_ppa/_PPS);
+		lsmtree_gc_unavailable_set(&LSM, sptr, UINT32_MAX);
+	}
+}
+
+static inline void gc_unlock_run(run *r, uint32_t *sst_file_num, uint32_t border_lba){
+	if(r->now_sst_num <= *sst_file_num) return;
+	sst_file *sptr;
+	uint32_t idx=*sst_file_num;
+	for_each_sst_at(r, sptr, idx){
+		if(sptr->end_lba<=border_lba){
+	//		printf("unlock lba:%u ->sidx:%u border:%u\n", sptr->end_lba, idx, border_lba);
+			lsmtree_gc_unavailable_unset(&LSM, sptr, UINT32_MAX);
+		}
+		else{
+			break;
+		}
+	}
+	*sst_file_num=idx;
+}
+
 run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t version){
 	_cm=cm;
 	read_issue_arg read_arg_set;
@@ -835,14 +861,18 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 
 	read_arg_set.max_num=map_num;
 
+	gc_lock_run(target_rptr);
+
 	run *new_run=run_init(target_rptr->now_sst_num, UINT32_MAX, 0);
 
+	uint32_t unlocked_sst_idx=0;
 	while(read_done!=(1<<stream_num)-1){
 		read_done=update_read_arg_tiering(read_done, isfirst, &pos, &mr_set, 
 				&read_arg_set, true, stream_num, NULL, version);
 		last_round=(read_done==(1<<stream_num)-1);
+
 		if(!last_round){
-			thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
+			issue_map_read_sst_job(cm, &thread_arg);
 		}
 
 		filter_invalidation(pos, kpq, version);
@@ -858,9 +888,14 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 				false, UINT32_MAX, UINT32_MAX, last_round);
 		border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
 				read_num, version, last_round);
+		
+		gc_unlock_run(target_rptr, &unlocked_sst_idx, border_lba);
+
 		isfirst=false;
 	}
 	thpool_wait(cm->issue_worker);
+	/*finishing*/
+	gc_unlock_run(target_rptr, &unlocked_sst_idx, UINT32_MAX);
 
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
@@ -876,6 +911,7 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 	sst_pos_free(pos);
 	free(mr_set);
 	free(thread_arg.arg_set);
+	lsmtree_gc_unavailable_sanity_check(&LSM);
 	return new_run;
 }
 
@@ -982,7 +1018,7 @@ void compaction_trivial_move(run *rptr, uint32_t target_version, uint32_t from_l
 			break;
 		}
 
-		thpool_add_work(_cm->issue_worker, read_sst_job, (void*)&thread_arg);
+		issue_map_read_sst_job(_cm, &thread_arg);
 		sptr=trivial_move_processing(rptr, pos, &read_arg_set, target_version, 
 				from_lev_idx, to_lev_idx, kp_q, make_rh);
 		isfirst=false;

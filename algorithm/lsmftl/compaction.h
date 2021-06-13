@@ -140,6 +140,7 @@ void compaction_trivial_move(run *rptr, uint32_t target_version,
 		uint32_t from_lev_idx, uint32_t to_lev_idx);
 
 void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des);
+void issue_map_read_sst_job(compaction_master *cm, read_arg_container* thread_arg);
 
 
 void *comp_alreq_end_req(algo_req *req);
