@@ -796,6 +796,7 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		i=mp->idx=0;
 		dp->param_ex=(void*)mp;
 		dp->is_hit_eviction=false;
+		dp->flying_map_read_key=UINT32_MAX;
 		req->param=(void*)dp;
 		mp->max_idx=check_flying_req(req, mp);
 		if(mp->max_idx==0){
@@ -879,6 +880,7 @@ uint32_t demand_page_read(request *const req){
 		dp->param_ex=mp;
 		dp->target.lba=req->key;
 		dp->target.ppa=UINT32_MAX;
+		dp->flying_map_read_key=UINT32_MAX;
 		req->param=(void*)dp;
 	}else{
 		dp=(demand_param*)req->param;
