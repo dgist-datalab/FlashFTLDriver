@@ -546,7 +546,6 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		new_run=run_init(src->max_sst_num, UINT32_MAX, 0);
 	}
 	
-	EPRINT("seq error!", true);
 
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
 
@@ -718,8 +717,6 @@ level *compaction_TW_convert_LW(compaction_master *cm, level *src){
 		}
 		return res;
 	}
-
-	EPRINT("seq error!", true);
 
 	read_issue_arg *read_arg_set=(read_issue_arg*)calloc(stream_num, sizeof(read_issue_arg));
 	read_arg_container thread_arg;

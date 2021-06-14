@@ -35,6 +35,7 @@ void invalidate_ppa(uint32_t t_ppa);
 void validate_ppa(uint32_t t_ppa, KEYT *lbas, uint32_t max_idx);
 void invalidate_map_ppa(uint32_t ppa);
 void validate_map_ppa(uint32_t ppa, KEYT gtd_idx);
+void segment_print(bool);
 ppa_t get_ppa(KEYT* lba, uint32_t max_idx);
 ppa_t get_rppa(KEYT *, uint8_t num, mapping_entry *, uint32_t *idx);
 ppa_t get_map_ppa(KEYT gtd_idx, bool *gc_triggered);

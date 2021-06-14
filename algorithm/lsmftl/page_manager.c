@@ -109,12 +109,11 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 		EPRINT("validate map here!\n", false);
 	}
 #endif
-	if(!bm->populate_bit(bm, map_ppa*L2PGAP) && should_abort){
-		EPRINT("bit error", true);
-	}
 
-	if(!bm->populate_bit(bm, map_ppa*L2PGAP+1) && should_abort){
-		EPRINT("bit error", true);
+	for(uint32_t i=0; i<L2PGAP; i++){
+		if(!bm->populate_bit(bm, map_ppa*L2PGAP+i) && should_abort){
+			EPRINT("bit error", true);
+		}
 	}
 }
 
@@ -126,21 +125,15 @@ void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 		EPRINT("invalidate map here!\n", false);
 	}
 #endif
-	if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP)){
-		if(should_abort){
-			EPRINT("bit error", true);
-		} 
-		else{
-			bm->invalidate_number_decrease(bm, map_ppa*L2PGAP);
-		}
-	}
 
-	if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP+1)){
-		if(should_abort){
-			EPRINT("bit error", true);
-		} 
-		else{
-			bm->invalidate_number_decrease(bm, map_ppa*L2PGAP+1);
+	for(uint32_t i=0; i<L2PGAP; i++){
+		if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP+i)){
+			if(should_abort){
+				EPRINT("bit error", true);
+			} 
+			else{
+				bm->invalidate_number_decrease(bm, map_ppa*L2PGAP+i);
+			}
 		}
 	}
 }

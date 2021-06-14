@@ -163,7 +163,7 @@ static inline bool KEYVALCHECK(KEYT a){
 #define ASYNC 1
 #define QSIZE (512)
 #define LOWQDEPTH (128)
-#define QDEPTH (128)
+#define QDEPTH (512)
 
 #define THPOOL
 #define NUM_THREAD 4

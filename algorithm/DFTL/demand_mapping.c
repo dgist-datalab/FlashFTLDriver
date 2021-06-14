@@ -1113,8 +1113,8 @@ uint32_t demand_argument(int argc, char **argv){
 		}
 	}
 	else{
-		dmm.c_type=DEMAND_FINE;
-		dmm.cache=&fine_cache_func;
+		dmm.c_type=DEMAND_COARSE;
+		dmm.cache=&coarse_cache_func;
 	}
 
 	if(!cache_size){

@@ -32,6 +32,7 @@ void pm_body_destroy(pm_body *pm){
 	free(pm->map_reserve);
 	free(pm->reserve);
 }
+
 void invalidate_ppa(uint32_t t_ppa){
 	/*when the ppa is invalidated this function must be called*/
 	if(t_ppa==test_ppa){
@@ -95,6 +96,27 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 
 uint32_t debug_gc_lba;
 
+void segment_print(bool is_data_gc){
+	if(is_data_gc){
+		printf("is data gc!\n");
+	}
+	else{
+		printf("is map gc!\n");
+	}
+
+	pm_body *p=(pm_body*)demand_ftl.algo_body;
+	blockmanager *bm=demand_ftl.bm;
+	for(uint32_t i=0; i<_NOS; i++){
+		uint32_t invalidate_number=bm->get_invalidate_number(bm, i);
+		printf("%u %s inv:%u - %s\n", i,
+				p->seg_type_checker[i]==DATASEG?"DATASEG":"MAPSEG",
+				invalidate_number,
+				invalidate_number==_PPS*L2PGAP?"all":"no");
+	}
+
+	printf("\n");
+}
+
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
@@ -106,7 +128,7 @@ void do_gc(){
 	while(!target || 
 			p->seg_type_checker[target->seg_idx]!=DATASEG){
 		if(target){
-			if(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS){
+			if(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS *L2PGAP){
 				break;	
 			}
 			temp_queue.push(target->seg_idx);
@@ -115,6 +137,10 @@ void do_gc(){
 		target=bm->get_gc_target(bm);
 	} 
 
+/*
+	segment_print(true);
+	printf("target seg_idx:%u\n", target->seg_idx);
+*/
 	uint32_t seg_idx;
 	while(temp_queue.size()){
 		seg_idx=temp_queue.front();
@@ -130,7 +156,7 @@ void do_gc(){
 	list *temp_list=NULL;
 	mapping_entry *update_target=NULL;
 	if((p->seg_type_checker[target->seg_idx]==DATASEG && target->invalidate_number==_PPS*L2PGAP) ||
-			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS)){
+			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS * L2PGAP)){
 		goto finish;
 	}
 	temp_list=list_init();

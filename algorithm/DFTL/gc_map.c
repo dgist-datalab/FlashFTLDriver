@@ -5,14 +5,18 @@ extern struct algorithm demand_ftl;
 extern uint32_t test_ppa;
 extern uint32_t test_key;
 void invalidate_map_ppa(uint32_t piece_ppa){
-	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa)){
-		EPRINT("double invalidation!", true);
+	for(uint32_t i=0; i<L2PGAP; i++){
+		if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa+i)){
+			EPRINT("double invalidation!", true);
+		}
 	}
 }
 
 void validate_map_ppa(uint32_t piece_ppa, KEYT gtd_idx){
-	if(!demand_ftl.bm->populate_bit(demand_ftl.bm, piece_ppa)){
-		EPRINT("double validation!", true);
+	for(uint32_t i=0; i<L2PGAP; i++){
+		if(!demand_ftl.bm->populate_bit(demand_ftl.bm, piece_ppa+i)){
+			EPRINT("double validation!", true);
+		}
 	}
 	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)&gtd_idx, sizeof(KEYT), piece_ppa/L2PGAP);
 }
@@ -74,7 +78,10 @@ void do_map_gc(){
 		}
 		target=bm->get_gc_target(bm);
 	} 
-
+/*
+	segment_print(false);
+	printf("target seg_idx:%u\n", target->seg_idx);
+*/
 	uint32_t seg_idx;
 	while(temp_queue.size()){
 		seg_idx=temp_queue.front();
@@ -90,7 +97,7 @@ void do_map_gc(){
 	uint32_t page;
 	uint32_t bidx, pidx;
 	if((p->seg_type_checker[target->seg_idx]==DATASEG && target->invalidate_number==_PPS*L2PGAP) ||
-			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS)){
+			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS *L2PGAP)){
 		goto finish;
 	}
 
