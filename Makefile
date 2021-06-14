@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=Page_ftl
+export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
@@ -145,10 +145,10 @@ duma_sim: duma_driver
 debug_driver: ./interface/main.c libdriver_d.a libart.o
 	$(CC) $(CFLAGS) -DDEBUG -o $@ $^ $(LIBS)
 
-cheeze_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_block_main.c libdriver.a
+cheeze_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_block_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
-cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_trace_block_main.c libdriver.a
+cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_trace_block_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 driver: ./interface/vectored_main.c libdriver.a libart.o
