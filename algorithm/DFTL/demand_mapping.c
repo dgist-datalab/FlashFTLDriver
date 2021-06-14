@@ -77,7 +77,7 @@ static char* get_demand_status_name(MAP_ASSIGN_STATUS a){
 
 static inline void update_cache_entry_wrapper(GTD_entry *target_etr, uint32_t lba, uint32_t ppa, bool ispending){
 	uint32_t old_ppa=dmm.cache->update_entry(dmm.cache, target_etr, lba, ppa, &dmm.eviction_hint);
-	if(lba==test_key){
+	if(lba==debug_lba){
 		printf("%u is updated %u->%u\n", lba, old_ppa, ppa);
 		if(old_ppa!=UINT32_MAX && ppa < old_ppa){
 			abort();
@@ -90,7 +90,7 @@ static inline void update_cache_entry_wrapper(GTD_entry *target_etr, uint32_t lb
 			printf("updating same ppa %u %u\n", lba, ppa);
 			abort();
 		}
-		if(!dmm.GTD[GETGTDIDX(lba)].private_data){
+		if(dmm.cache->type==COARSE && !dmm.GTD[GETGTDIDX(lba)].private_data){
 			printf("????\n");
 			abort();
 		}
@@ -186,9 +186,24 @@ void demand_map_free(){
 
 uint32_t pending_debug_seq;
 
+static inline void notfound_processing(request *req){
+	demand_param *dp=(demand_param*)req->param;
+	assign_param_ex *mp=(assign_param_ex*)dp->param_ex;
+	free(mp->prefetching_info);
+	free(mp);
+	free(dp);
+	req->type=FS_NOTFOUND_T;
+	req->end_req(req);
+}
+
 uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_param *param, 
 		uint32_t target_data_lba){
 	param->flying_map_read_key=target_data_lba;
+	if(req->type==FS_GET_T){
+		if(etr->physical_address==UINT32_MAX){
+			return NOTFOUND_END;
+		}
+	}
 
 	if(etr->idx!=GETGTDIDX(target_data_lba)){
 		abort();
@@ -262,13 +277,12 @@ inline void __demand_map_pending_read(request *req, demand_param *dp, bool need_
 	}
 
 	if(dp->target.ppa==UINT32_MAX){
-		printf("try to read invalidate ppa %s:%d\n", __FILE__,__LINE__);
-		req->type=FS_NOTFOUND_T;
-		req->end_req(req);
+		//printf("try to read invalidate ppa %s:%d\n", __FILE__,__LINE__);
+		notfound_processing(req);
 		return;
 	}
 
-	if(req->key==test_key){
+	if(req->key==debug_lba){
 		printf("%u read ppa %u\n", req->key, dp->target.ppa);
 	}
 
@@ -586,9 +600,13 @@ uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_para
 	GTD_entry *now_etr=&dmm.GTD[GETGTDIDX(now_pair->lba)];
 	GTD_entry *eviction_etr=NULL;
 	uint32_t eviction_hint_temp;
-
-	if(now_pair->lba==test_key){
+	uint32_t res;
+	if(now_pair->lba==debug_lba){
 		printf("traverse :%u,%u\n", now_pair->lba, now_pair->ppa);
+	}
+
+	if(req->type==FS_GET_T && now_pair->lba==debug_lba){
+		printf("break!\n");
 	}
 
 retry:
@@ -604,18 +622,19 @@ retry:
 				dp_status_update(dp, HIT); goto retry;
 			}
 			dp_status_update(dp, MISSR); 
-
-			if(map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba)==FLYING_HIT_END){
+			res=map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba);
+			if(res==FLYING_HIT_END){
 				if(dmm.cache->type==COARSE){
 					dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
 				}
-				return FLYING_HIT_END;
 			}
-			else{
-				return MAP_READ_ISSUE_END;
-			}
+			return res;
 		case NONE:
 			if(dmm.cache->exist(dmm.cache, now_pair->lba)==false){ //MISS
+				/*notfound check!*/
+				if(req->type==FS_GET_T && now_etr->physical_address==UINT32_MAX){
+					return NOTFOUND_END;
+				}
 				dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, true);
 				if(flying_request_hit_check(req, now_pair->lba, dp, true)) return FLYING_HIT_END;
 
@@ -749,8 +768,8 @@ static inline uint32_t check_flying_req(request *req, assign_param_ex *mp){
 
 			for(uint32_t tnow=tmp->idx; tnow<tmp->max_idx; tnow++){
 				if(tmp->lba[tnow]==now_entry.lba){
-					if(tmp->lba[tnow]==test_key){
-						printf("%u overlap flyin req, update %u->%u\n", test_key, tmp->physical[tnow], now_entry.ppa);				
+					if(tmp->lba[tnow]==debug_lba){
+						printf("%u overlap flyin req, update %u->%u\n", debug_lba, tmp->physical[tnow], now_entry.ppa);				
 					}
 #ifdef DFTL_DEBUG
 					printf("%u %u->%u  is update in flying\n", tmp->lba[tnow], tmp->lba[tnow], now_entry.ppa);
@@ -839,6 +858,8 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 				dp->is_hit_eviction=false;
 				//nxt round
 				break;
+			case NOTFOUND_END:
+				printf("not found end in write!\n");
 			default:
 				abort();
 		}
@@ -890,10 +911,6 @@ uint32_t demand_page_read(request *const req){
 		mp=(assign_param_ex*)dp->param_ex;
 	}
 
-	if(req->key==test_key){
-		EPRINT("read function", false);
-	}
-
 	uint32_t res;
 	switch((res=cache_traverse_state(req, &dp->target, dp, &mp->prefetching_info[0], false))){
 		case RETRY_END:
@@ -906,6 +923,9 @@ uint32_t demand_page_read(request *const req){
 			return res;
 		case DONE_END:
 			goto read_data;
+		case NOTFOUND_END:	
+			notfound_processing(req);
+			return 1;
 		default:
 			abort();
 	}
@@ -954,8 +974,8 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	uint32_t debug_gtd_idx;
 	uint32_t debug_idx=UINT32_MAX;
 	for(uint32_t i=0; i<idx; i++){
-		if(target[i].lba==test_key){
-			printf("gc test_key is updated from %u\n", target[i].ppa);
+		if(target[i].lba==debug_lba){
+			printf("gc debug_lba is updated from %u\n", target[i].ppa);
 		}
 		temp_gtd_idx=GETGTDIDX(target[i].lba);
 		update_flying_req_data(target[i].lba, target[i].ppa);

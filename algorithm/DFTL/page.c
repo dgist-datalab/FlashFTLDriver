@@ -8,6 +8,7 @@
 #include "page.h"
 #include "gc.h"
 extern uint32_t test_key;
+extern uint32_t debug_lba;
 align_buffer a_buffer;
 extern MeasureTime mt;
 struct algorithm demand_ftl={
@@ -17,7 +18,7 @@ struct algorithm demand_ftl={
 	.read=page_read,
 	.write=page_write,
 	.flush=page_flush,
-	.remove=NULL,
+	.remove=page_remove,
 };
 
 page_read_buffer rb;
@@ -75,8 +76,8 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		a_buffer.key[a_buffer.idx]=key;
 		a_buffer.prefetching_info[a_buffer.idx]=req->consecutive_length;
 	}
-	if(req->key==test_key){
-		printf("%u is buffered\n", test_key);
+	if(req->key==debug_lba){
+		printf("%u is buffered\n", debug_lba);
 	}
 	a_buffer.idx++;
 
@@ -89,8 +90,8 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
 		for(uint32_t i=0; i<L2PGAP; i++){
 			physical[i]=ppa*L2PGAP+i;	
-			if(a_buffer.key[i]==test_key){
-				printf("%u -> %u[%u] %u \n", test_key, physical[i], i ,*(uint32_t*)&a_buffer.value[LPAGESIZE*i]);
+			if(a_buffer.key[i]==debug_lba){
+				printf("%u -> %u[%u] %u \n", debug_lba, physical[i], i ,*(uint32_t*)&a_buffer.value[LPAGESIZE*i]);
 			}
 		}
 
@@ -122,6 +123,12 @@ uint32_t page_write(request *const req){
 	}
 	/*}*/
 
+	return 0;
+}
+
+
+uint32_t page_remove(request *const req){
+	req->end_req(req);
 	return 0;
 }
 

@@ -318,6 +318,7 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		level *temp_level, uint32_t start_idx, uint32_t end_idx){
 	level *lev=NULL;
 	if(temp_level){
+		printf("0 lock!\n");
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 	}else{
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);

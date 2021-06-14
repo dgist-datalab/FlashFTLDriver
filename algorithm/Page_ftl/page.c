@@ -126,6 +126,11 @@ uint32_t page_read(request *const req){
 
 	//DPRINTF("\t\tmap info : %u->%u\n", req->key, req->value->ppa);
 	if(req->value->ppa==UINT32_MAX){
+		if(req->key==0){
+			printf("0 is not found\n");
+		}
+
+
 		req->type=FS_NOTFOUND_T;
 		req->end_req(req);
 	}
@@ -161,6 +166,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
 uint32_t page_write(request *const req){
 	//printf("write key :%u\n",req->key);
+	if(req->key==0){
+		printf("0 is written\n");
+	}
 	align_buffering(req, 0, NULL);
 	req->value=NULL;
 	req->end_req(req);
@@ -169,7 +177,6 @@ uint32_t page_write(request *const req){
 }
 
 uint32_t page_remove(request *const req){
-
 	for(uint8_t i=0; i<a_buffer.idx; i++){
 		if(a_buffer.key[i]==req->key){
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
