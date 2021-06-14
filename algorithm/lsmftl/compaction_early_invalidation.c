@@ -112,6 +112,7 @@ uint32_t compaction_early_invalidation(uint32_t target_version){
 					TARGETREADNUM(read_arg));
 		}
 
+		printf("%s:%u - read_sst_job\n", __FILE__, __LINE__);
 		thpool_add_work(_cm->issue_worker, read_sst_job, (void*)&thread_arg);
 		total_invalidation_cnt+=stream_invalidation(pos, target_version);
 	}

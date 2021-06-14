@@ -171,6 +171,25 @@ void read_sst_job(void *arg, int th_num){
 	free(param_set);
 }
 
+void issue_map_read_sst_job(compaction_master *cm, read_arg_container *thread_arg){
+#ifdef LSM_DEBUG
+	/*sanity check*/
+	for(uint32_t i=0; i<thread_arg->set_num; i++){
+		read_issue_arg *now_issue=thread_arg->arg_set[i];
+		for(uint32_t j=now_issue->from, k=0; j<=now_issue->to; j++, k++){
+			if(now_issue->param[k]->target){
+				continue;
+			}
+			if(now_issue->param[k]->map_target){
+				continue;
+			}
+			abort();
+		}
+	}
+#endif
+	thpool_add_work(cm->issue_worker, read_sst_job, (void*)thread_arg);
+}
+
 static void read_param_init(read_issue_arg *read_arg){
 	inter_read_alreq_param *param;
 	for(int i=0; i<read_arg->to-read_arg->from+1; i++){
@@ -586,7 +605,7 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t 
 			*/
 
 		/*send read I/O*/
-		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
+		issue_map_read_sst_job(cm, &thread_arg);
 
 		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, is, NULL, sidx==src->now_sst_num-1, 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba),
@@ -884,7 +903,6 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 			level_update_run_at_move_originality(res, target_run_idx, new_run, true);
 			tiering_compaction_error_check(src, NULL, NULL, new_run, LSM.monitor.compaction_cnt[des->idx]);
 			run_free(new_run);
-			level_print(res);
 			return res;
 		}
 		else{
@@ -1054,7 +1072,8 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 					read_arg2.to-read_arg2.from+1);
 		}
 		/*send read I/O*/
-		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
+		printf("%s:%u - read_sst_job\n", __FILE__, __LINE__);
+		issue_map_read_sst_job(cm, &thread_arg);
 
 		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, NULL, kpq, final_flag, 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(temp_des_level,read_arg2.to).end_lba),
@@ -1213,7 +1232,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 		}
 
 		/*send read I/O*/
-		thpool_add_work(cm->issue_worker, read_sst_job, (void*)&thread_arg);
+		issue_map_read_sst_job(cm, &thread_arg);
 
 		stream_sorting(res, COMPACTION_LEVEL_NUM, os_set, NULL, kpq, final_flag, 
 				MIN(LEVELING_SST_AT(temp_src_level,read_arg1.to).end_lba, 

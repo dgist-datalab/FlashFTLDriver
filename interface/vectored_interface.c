@@ -229,6 +229,8 @@ bool vectored_end_req (request * const req){
 			abort();
 	}
 
+	release_each_req(req);  
+
 	pthread_mutex_lock(&req_cnt_lock);
 	preq->done_cnt++;
 	uint32_t tag_num=req->tag_num;
@@ -239,6 +241,16 @@ bool vectored_end_req (request * const req){
 	}
 	pthread_mutex_unlock(&req_cnt_lock);
 
+	tag_manager_free_tag(tm, tag_num);
+	return true;
+}
+
+void inf_algorithm_testing(){
+	mp.algo->test();
+}
+
+void release_each_req(request *req){
+	uint32_t tag_num=req->tag_num;
 	pthread_mutex_lock(&flying_cnt_lock);
 	flying_cnt++;
 	if(flying_cnt > QDEPTH){
@@ -248,9 +260,28 @@ bool vectored_end_req (request * const req){
 	pthread_mutex_unlock(&flying_cnt_lock);
 
 	tag_manager_free_tag(tm, tag_num);
-	return true;
 }
 
-void inf_algorithm_testing(){
-	mp.algo->test();
+void assign_vectored_req(vec_request *txn){
+	while(1){
+		pthread_mutex_lock(&flying_cnt_lock);
+		if(flying_cnt - (int32_t)txn->size < 0){
+			pthread_mutex_unlock(&flying_cnt_lock);
+			continue;
+		}
+		else{
+			flying_cnt-=txn->size;
+			if(flying_cnt<0){
+				printf("abort!!!\n");
+				abort();
+			}
+			pthread_mutex_unlock(&flying_cnt_lock);
+		}
+	//	printf("flying tagnum %u, txn->size %u, req_q->size:%u\n", QDEPTH-flying_cnt, txn->size, mp.processors[0].req_q->size);
+		
+		if(q_enqueue((void*)txn, mp.processors[0].req_q)){
+			break;
+		}
+	}
 }
+

@@ -220,14 +220,14 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	bool is_sequential=check_sequential(LSM.flushed_kp_set, wb);
 	uint32_t now_remain_page_num=UINT32_MAX;
 	uint32_t flushing_entry_num=KP_IN_PAGE;
-	bool making_level;
+	bool making_level=false;
 	if(is_sequential){
 		now_remain_page_num=page_manager_get_remain_page(LSM.pm, false);
 		uint32_t mapping_num=CEILING_TARGET(LSM.flushed_kp_set->size(), KP_IN_PAGE);
 		uint32_t now_flushing_num=CEILING_TARGET(wb->buffered_entry_num, L2PGAP);
 		uint32_t update_mapping_num=CEILING_TARGET(wb->buffered_entry_num+LSM.flushed_kp_set->size(), KP_IN_PAGE);
 
-		if(now_remain_page_num < now_flushing_num+update_mapping_num){
+		if(now_remain_page_num < (now_flushing_num+update_mapping_num)){
 			if(now_remain_page_num < mapping_num){
 				EPRINT("sequential_error", true);
 			}
@@ -327,6 +327,7 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 	uint32_t end_type=LSM.disk[end_idx]->level_type;
 	level *src_lev=temp_level?temp_level:LSM.disk[start_idx];
 	level *des_lev=LSM.disk[end_idx];
+
 	uint32_t target_version;
 	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
 		target_version=version_level_to_start_version(LSM.last_run_version, des_lev->idx);
@@ -440,7 +441,7 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 		rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
 	}
 
-	//lsmtree_gc_unavailable_sanity_check(&LSM);
+	lsmtree_gc_unavailable_sanity_check(&LSM);
 	version_sanity_checker(LSM.last_run_version);
 }
 

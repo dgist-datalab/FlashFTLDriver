@@ -866,3 +866,10 @@ bool inf_wait_background(){
 	}*/
 	return false;
 }
+
+void inf_lower_log_print(){
+    for(int i=0; i<LREQ_TYPE_NUM;i++){
+        fprintf(stderr,"%s %lu\n",bench_lower_type(i),mp.li->req_type_cnt[i]);
+    }
+}
+

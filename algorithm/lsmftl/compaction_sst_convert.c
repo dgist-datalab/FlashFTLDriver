@@ -138,6 +138,7 @@ sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *pf_q, uint32_t des_idx, 
 					TARGETREADNUM(read_arg));
 		}
 
+		printf("%s:%u - read_sst_job\n", __FILE__, __LINE__);
 		thpool_add_work(_cm->issue_worker, read_sst_job, (void*)&thread_arg);
 		stream_make_rh(pos, res, target_version, des_idx-1);
 	}

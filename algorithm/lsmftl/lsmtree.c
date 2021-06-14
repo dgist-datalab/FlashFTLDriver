@@ -803,12 +803,14 @@ void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx
 }
 
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
-	EPRINT("remove this code for exp", false);
+#ifdef LSM_DEBUG
+	//EPRINT("remove this code for exp", false);
 	for(uint32_t i=0; i<_NOS; i++){
 		if(lsm->gc_unavailable_seg[i]){
 			EPRINT("should be zero", true);
 		}
 	}
+#endif
 }
 
 uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t *leveling, uint64_t *tiering, uint32_t lba_unit, uint64_t *level_memory){

@@ -277,8 +277,9 @@ void level_print(level *lev){
 		}
 	}
 	else{
-		printf("level idx:%d sst:%u/%u\n", 
+		printf("level idx:%d run:%u/%u sst:%u/%u\n", 
 			lev->idx,
+			lev->run_num, lev->max_run_num,
 			lev->now_sst_num, lev->max_sst_num);
 	}
 #endif

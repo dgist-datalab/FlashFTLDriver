@@ -7,8 +7,8 @@ export CC=g++
 export CXX=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=AMF
-export TARGET_ALGO=DFTL
+export TARGET_LOWER=posix_memory
+export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
@@ -30,8 +30,9 @@ export COMMONFLAGS=\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
 	-O3 -march=native -mtune=native -flto=20 \
-#-DDFTL_DEBUG\
 #-DLSM_DEBUG\
+#-DDFTL_DEBUG\
+
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
 
@@ -93,6 +94,7 @@ SRCS +=\
 	./include/utils/rwlock.c\
 	./include/utils/cond_lock.c\
 	./include/utils/data_checker.c\
+	./include/utils/crc32.c\
 	./include/data_struct/hash_kv.c\
 	./include/data_struct/list.c\
 	./include/data_struct/redblack.c\
@@ -134,7 +136,7 @@ LIBS +=\
 		-ljemalloc\
 #	-laio\
 
-all: driver
+all: cheeze_block_driver
 
 DEBUG: debug_driver
 
@@ -142,6 +144,12 @@ duma_sim: duma_driver
 
 debug_driver: ./interface/main.c libdriver_d.a libart.o
 	$(CC) $(CFLAGS) -DDEBUG -o $@ $^ $(LIBS)
+
+cheeze_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_block_main.c libdriver.a
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
+cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_trace_block_main.c libdriver.a
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 driver: ./interface/vectored_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
