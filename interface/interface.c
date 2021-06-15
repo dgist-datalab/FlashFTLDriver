@@ -214,7 +214,6 @@ send_req:
 uint32_t inf_algorithm_caller(request *const inf_req){
 	switch(inf_req->type){
 		case FS_GET_T:
-
 			mp.algo->read(inf_req);
 			break;
 		case FS_SET_T:

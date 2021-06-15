@@ -77,12 +77,6 @@ static char* get_demand_status_name(MAP_ASSIGN_STATUS a){
 
 static inline void update_cache_entry_wrapper(GTD_entry *target_etr, uint32_t lba, uint32_t ppa, bool ispending){
 	uint32_t old_ppa=dmm.cache->update_entry(dmm.cache, target_etr, lba, ppa, &dmm.eviction_hint);
-	if(lba==debug_lba){
-		printf("%u is updated %u->%u\n", lba, old_ppa, ppa);
-		if(old_ppa!=UINT32_MAX && ppa < old_ppa){
-			abort();
-		}
-	}
 
 	if(old_ppa!=UINT32_MAX){
 #ifdef DFTL_DEBUG
@@ -216,6 +210,8 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 		//printf("overlap %u gtd idx:%u, input_lba:%u target_lba:%u\n",req->seq, etr->idx, target_data_lba, ap->lba[ap->idx]);
 		pending_debug_seq=req->seq;
 		fdriver_lock(&etr->lock);
+		
+		req->type_ftl &=~(MAP_MISS);
 		list_insert(etr->pending_req, (void*)req);
 		fdriver_unlock(&etr->lock);
 		return FLYING_HIT_END;
@@ -337,6 +333,7 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 	for_each_list_node_safe(etr->pending_req, now, next){
 		treq=(request*)now->data;
 		dp=(demand_param*)treq->param;
+		dp->flying_map_read_key=UINT32_MAX;
 		ap=NULL;
 
 		if(treq->type==FS_SET_T && dp->status==MISSR){
@@ -394,10 +391,16 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 		list_delete_node(etr->pending_req, now);
 	}
 
-	fdriver_lock(&dmm.flying_map_read_lock);
-	dmm.flying_map_read_req_set->erase(GETGTDIDX(flying_map_read_lba));
-	dmm.flying_map_read_flag_set->erase(GETGTDIDX(flying_map_read_lba));
-	fdriver_unlock(&dmm.flying_map_read_lock);
+	if(flying_map_read_lba!=UINT32_MAX){
+		fdriver_lock(&dmm.flying_map_read_lock);
+		std::map<uint32_t, bool>::iterator iter=dmm.flying_map_read_flag_set->find(GETGTDIDX(flying_map_read_lba));
+		if(!iter->second){
+			printf("????\n");
+		}
+		dmm.flying_map_read_req_set->erase(GETGTDIDX(flying_map_read_lba));
+		dmm.flying_map_read_flag_set->erase(GETGTDIDX(flying_map_read_lba));
+		fdriver_unlock(&dmm.flying_map_read_lock);
+	}
 
 	fdriver_unlock(&etr->lock);
 	return res;
@@ -440,6 +443,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	for_each_list_node_safe(etr->pending_req, now, next){
 		treq=(request*)now->data;
 		dp=(demand_param*)treq->param;
+		dp->flying_map_read_key=UINT32_MAX;
 		ap=(assign_param_ex*)dp->param_ex;
 
 		mapping=&dp->target;
@@ -511,11 +515,12 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	for_each_list_node_safe(etr->pending_req, now, next){ //for eviction
 		treq=(request*)now->data;
 		dp=(demand_param*)treq->param;
+		dp->flying_map_read_key=UINT32_MAX;
 		ap=NULL;
 
 		treq->type_ftl|=MAP_EVICT_READ;
 
-		dmm.cache->update_eviction_target_translation(dmm.cache, req->key, etr, dp->et.mapping, temp_value, dp->cache_private);
+		dmm.cache->update_eviction_target_translation(dmm.cache, treq->key, etr, dp->et.mapping, temp_value, dp->cache_private);
 		if(req==treq){
 			list_delete_node(etr->pending_req, now);
 			continue;
@@ -552,10 +557,16 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	}
 
 end:
-	fdriver_lock(&dmm.flying_map_read_lock);
-	dmm.flying_map_read_req_set->erase(GETGTDIDX(flying_map_read_lba));
-	dmm.flying_map_read_flag_set->erase(GETGTDIDX(flying_map_read_lba));
-	fdriver_unlock(&dmm.flying_map_read_lock);
+	if(flying_map_read_lba!=UINT32_MAX){
+		fdriver_lock(&dmm.flying_map_read_lock);
+		std::map<uint32_t, bool>::iterator iter=dmm.flying_map_read_flag_set->find(GETGTDIDX(flying_map_read_lba));
+		if(!iter->second){
+			printf("????\n");
+		}
+		dmm.flying_map_read_req_set->erase(GETGTDIDX(flying_map_read_lba));
+		dmm.flying_map_read_flag_set->erase(GETGTDIDX(flying_map_read_lba));
+		fdriver_unlock(&dmm.flying_map_read_lock);
+	}
 
 	fdriver_unlock(&etr->lock);
 
@@ -603,10 +614,6 @@ uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_para
 	uint32_t res;
 	if(now_pair->lba==debug_lba){
 		printf("traverse :%u,%u\n", now_pair->lba, now_pair->ppa);
-	}
-
-	if(req->type==FS_GET_T && now_pair->lba==debug_lba){
-		printf("break!\n");
 	}
 
 retry:
@@ -900,6 +907,9 @@ uint32_t demand_page_read(request *const req){
 		mp=(assign_param_ex*)malloc(sizeof(assign_param_ex));
 		mp->prefetching_info=(uint32_t*)malloc(sizeof(uint32_t));
 		mp->idx=0;
+		if(req->consecutive_length){
+			req->consecutive_length++;
+		}
 		mp->prefetching_info[0]=req->consecutive_length;
 		dp->param_ex=mp;
 		dp->target.lba=req->key;
@@ -909,6 +919,11 @@ uint32_t demand_page_read(request *const req){
 	}else{
 		dp=(demand_param*)req->param;
 		mp=(assign_param_ex*)dp->param_ex;
+	}
+
+	//static uint32_t prev_lba=1437024
+	if(req->key==3181089){
+		printf("lba:%u\n", req->key);
 	}
 
 	uint32_t res;

@@ -15,7 +15,7 @@ extern master_processor mp;
 extern tag_manager *tm;
 static int32_t flying_cnt = QDEPTH;
 static pthread_mutex_t flying_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t req_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t req_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 bool vectored_end_req (request * const req);
 
 /*request-length request-size tid*/
@@ -100,6 +100,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 			prev_lba=temp->key;
 			temp->consecutive_length=0;
 		}
+
 		if(mp._data_check_flag && temp->type==FS_SET_T){
 			__checking_data_make( temp->key,temp->value->value);
 		}

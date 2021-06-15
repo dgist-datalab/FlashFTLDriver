@@ -305,7 +305,10 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		printf("over flow idx!!\n");
 		abort();
 	}
-
+	
+	if(lba==3146882){
+		printf("break!\n");
+	}
 
 	uint32_t prefetching_len=now_eviction_hint/TP_ENTRY_SZ+(now_eviction_hint%TP_ENTRY_SZ?1:0);
 	tp_cache_node *tc;
@@ -324,10 +327,11 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 
 		tc->ppa=ppa_list[tc->offset];
 		tc->dirty_bit=false;
+		/*
 		if(tc->ppa==UINT32_MAX){
 			free(tc); //not populated entry;
 			continue;
-		}
+		}*/
 
 #ifdef DFTL_DEBUG
 		printf("insert debug_lba %u:%u %u-th\n", lba+i, ppa_list[tc->offset], i);
@@ -344,6 +348,11 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		tcm.now_caching_byte+=TP_ENTRY_SZ;
 		//tp_check_cache_size();
 	}
+/*
+	if(!tn->tp_lru->size){
+		printf("%u ??????\n", lba);
+		abort();
+	}*/
 
 	(*eviction_hint)-=org_now_eviction_hint;
 
@@ -364,6 +373,9 @@ uint32_t tp_update_from_translation_gc(struct my_cache *, char *data, uint32_t l
 uint32_t tp_get_mapping(struct my_cache *, uint32_t lba){
 	tp_node *tn=__find_tp_node(GETETR(dmm, lba));
 	tp_cache_node *tc=__find_tp_cache_node(tn,lba);
+	if(!tc){
+		return UINT32_MAX;
+	}
 	lru_update(tn->tp_lru, tc->lru_node);
 	lru_update(tcm.lru, tn->lru_node);
 	return tc->ppa;
@@ -415,6 +427,11 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t n
 		printf("over flow idx!!\n");
 		abort();
 	}
+
+	if(target_tn->tp_lru->size==0){
+		abort();
+	}
+
 	//GTD_entry *target_etr=GETETR(dmm, target_tn->idx *(PAGESIZE/sizeof(uint32_t)));
 	for_each_lru_backword_safe(target_tn->tp_lru, ln, lp){
 		tc=(tp_cache_node*)ln->data;

@@ -9,7 +9,7 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
-uint32_t debug_lba=0;
+uint32_t debug_lba=2623152;
 uint32_t test_ppa=UINT32_MAX;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));

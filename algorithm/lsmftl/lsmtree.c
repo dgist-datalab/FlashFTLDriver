@@ -144,7 +144,6 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 }
 
 static void lsmtree_monitor_print(){
-
 	printf("----LSMtree monitor log----\n");
 	printf("TRIVIAL MOVE cnt:%u\n", LSM.monitor.trivial_move_cnt);
 	for(uint32_t i=0; i<=LSM.param.LEVELN; i++){
@@ -370,7 +369,6 @@ void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param){
 		//	rwlock_read_lock(LSM.level_rwlock[i-1]);
 			res=&LSM.level_rwlock[i];
 		}
-		printf("%d read lock\n", i);
 		rwlock_read_lock(res);
 		version=version_map_lba(LSM.last_run_version, lba);
 		queried_level=version_to_level_idx(LSM.last_run_version, version, LSM.param.LEVELN);
@@ -382,7 +380,6 @@ void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param){
 		}
 		else{
 			rwlock_read_unlock(res);
-			printf("%d read unlock in miss\n", i);
 		}
 	}
 }
@@ -392,7 +389,6 @@ static void notfound_processing(request *const req){
 	if(r_param->target_level_rw_lock){
 		for(uint32_t i=0; i<LSM.param.LEVELN; i++){
 			if(r_param->target_level_rw_lock==&LSM.level_rwlock[i]){
-				printf("%d read_unlock in not found\n",i);
 				break;
 			}
 		}
@@ -401,8 +397,6 @@ static void notfound_processing(request *const req){
 	else{
 		abort();
 	}
-	printf("req->key: %u-", req->key);
-	EPRINT("not found key", false);
 	free(r_param);
 	/*
 	printf("prev_level:%u prev_run:%u read_helper_idx:%u version:%u\n", 

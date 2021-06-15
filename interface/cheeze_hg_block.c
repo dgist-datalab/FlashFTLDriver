@@ -22,8 +22,10 @@ struct cheeze_req_user *ureq_addr; // sizeof(req) * 1024
 static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
 static uint64_t seq = 0;
 static int trace_fd = 0;
-static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
-static uint32_t trace_crc_buf[CRC_BUFSIZE];
+//static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
+//static uint32_t trace_crc_buf[CRC_BUFSIZE];
+
+extern pthread_mutex_t req_cnt_lock;
 
 static inline char *get_buf_addr(char **pdata_addr, int id) {
     int idx = id / ITEMS_PER_HP;
@@ -50,6 +52,7 @@ char *null_value;
 #ifdef CHECKINGDATA
 uint32_t* CRCMAP;
 #endif
+
 #define TRACE_TARGET "/trace"
 void init_trace_cheeze(){
 	trace_fd = open(TRACE_TARGET, O_RDONLY);
@@ -97,6 +100,15 @@ void init_cheeze(uint64_t phy_addr){
 	CRCMAP=(uint32_t*)malloc(sizeof(uint32_t) * RANGE);
 	memset(CRCMAP, 0, sizeof(uint32_t) *RANGE);
 #endif
+
+#ifdef TRACE_COLLECT
+	trace_fd=open(TRACE_TARGET, 0x666, O_CREAT | O_WRONLY | O_TRUNC);
+	if (trace_fd < 0) {
+		perror("Failed to open " TRACE_TARGET);
+		abort();
+		return;
+	}
+#endif
 }
 
 inline void error_check(cheeze_ureq *creq){
@@ -129,8 +141,6 @@ const char *type_to_str(uint32_t type){
 	return NULL;
 }
 
-
-
 static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
 	res->tag_id=id;
@@ -148,12 +158,11 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		res->buf=NULL;
 	}
 	else{
-		if(trace_fd){
-			res->buf=NULL;	
-		}
-		else{
-			res->buf=get_buf_addr(data_addr, id);
-		}
+#ifdef TRACE_REPLAY
+		res->buf=NULL;	
+#else
+		res->buf=get_buf_addr(data_addr, id);
+#endif
 	}
 
 
@@ -162,6 +171,8 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		abort();
 		return NULL;
 	}
+	uint32_t prev_lba=UINT32_MAX;
+	uint32_t consecutive_cnt=0;
 
 	for(uint32_t i=0; i<res->size; i++){
 		request *temp=&res->req_array[i];
@@ -170,29 +181,23 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		temp->end_req=cheeze_end_req;
 		temp->isAsync=ASYNC;
 		temp->seq=i;
+		temp->type_ftl=0;
+		temp->type_lower=0;
+		temp->is_sequential_start=false;
 		switch(type){
 			case FS_GET_T:
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
-				if(trace_fd)
-					memcpy(&temp->crc_value, trace_crc_buf + i, sizeof(uint32_t));
 				break;
 			case FS_SET_T:
-				if(trace_fd){
-					/*crc map*/
-					//memcpy(trace_crc + (creq->pos + i), trace_crc_buf + i, sizeof(uint32_t));
-					temp->value=inf_get_valueset(NULL, FS_MALLOC_W, LPAGESIZE);
-					memcpy(&temp->crc_value, trace_crc_buf + i, sizeof(uint32_t));
-					memcpy(temp->value->value, trace_crc_buf + i, sizeof(uint32_t));
-				}else{
-					temp->value=inf_get_valueset(&res->buf[LPAGESIZE*i],FS_MALLOC_W,LPAGESIZE);
-				}
+#ifdef TRACE_REPLAY
+				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+#else
+				temp->value=inf_get_valueset(&res->buf[LPAGESIZE*i],FS_MALLOC_W,PAGESIZE);
+#endif
 				break;	
 			case FS_FLUSH_T:
 				break;
 			case FS_DELETE_T:
-				/*clear crc map*/
-				if (trace_fd)
-					memset(trace_crc + (creq->pos + i), 0, sizeof(uint32_t));
 				break;
 			default:
 				printf("error type!\n");
@@ -200,20 +205,41 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 				break;
 		}
 		temp->key=creq->pos+i;
-		if(temp->key==28895274){	
-			printf("start REQ-TYPE:%s INFO(%d:%d) LBA: %u crc:%u\n", type_to_str(temp->type),creq->id, i, temp->key, temp->crc_value);
+
+		if(prev_lba==UINT32_MAX){
+			prev_lba=temp->key;
 		}
+		else{
+			if(prev_lba+1==temp->key){
+				consecutive_cnt++;
+			}
+			else{
+				res->req_array[i-consecutive_cnt-1].is_sequential_start=(consecutive_cnt!=0);
+				res->req_array[i-consecutive_cnt-1].consecutive_length=consecutive_cnt;
+				consecutive_cnt=0;
+			}
+			prev_lba=temp->key;
+			temp->consecutive_length=0;
+		}
+
+	//	printf("start REQ-TYPE:%s INFO(%d:%d) LBA: %u crc:%u\n", type_to_str(temp->type),creq->id, i, temp->key, temp->crc_value);
 
 #ifdef CHECKINGDATA
 		if(temp->type==FS_SET_T){
-			CRCMAP[temp->key]=crc32(&res->buf[LPAGESIZE*i],LPAGESIZE);	
+			CRCMAP[temp->key]=crc32(&res->buf[LPAGESIZE*i],LPAGESIZE);
+			if(temp->key==0){
+				printf("target crc is set:%u\n", CRCMAP[0]);
+			}
 		}
 		else if(temp->type==FS_DELETE_T){
-			CRCMAP[temp->key]=crc32(null_value, LPAGESIZE);
+	//		CRCMAP[temp->key]=crc32(null_value, LPAGESIZE);
 		}
 #endif
-		DPRINTF("REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type_to_str(temp->type),creq->id, i, temp->key);
+		DPRINTF("[START] REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type_to_str(temp->type),creq->id, i, temp->key);
 	}
+
+	res->req_array[(res->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
+	res->req_array[(res->size-1)-consecutive_cnt].consecutive_length=consecutive_cnt;
 	return res;
 }
 
@@ -275,6 +301,9 @@ vec_request **get_vectored_request_arr()
 		id = i;
 		ureq = ureq_addr + id;
 		res[req_idx++] = ch_ureq2vec_req(ureq, id);
+#ifdef TRACE_COLLECT
+		write(trace_fd, ureq, sizeof(cheeze_req_user));
+#endif
 		barrier();
 		*send = 0;
 		if (ureq->op!=REQ_OP_READ) {
@@ -307,12 +336,7 @@ vec_request *get_trace_vectored_request(){
 		len=read(trace_fd, &ureq, sizeof(ureq));
 		if(len!=sizeof(ureq)){
 			printf("read error!!: len:%u\n", len);
-			abort();
-		}
-		crc_len = ureq.len/LPAGESIZE * sizeof(uint32_t);
-		len=read(trace_fd, trace_crc_buf, crc_len);
-		if(len!=crc_len){
-			printf("read error!!: len:%u, crc_len:%u\n", len, crc_len);
+			break;
 			abort();
 		}
 		res=ch_ureq2vec_req(&ureq, id);
@@ -328,23 +352,15 @@ vec_request *get_trace_vectored_request(){
 
 bool cheeze_end_req(request *const req){
 	vectored_request *preq=req->parents;
-	if(req->key==28895274){	
-		printf("end REQ-TYPE:%s INFO(%d:%d) LBA: %u req->crc:%u\n", type_to_str(req->type), 0,0, req->key, req->crc_value);
-	}
+	uint32_t temp_crc;
 	switch(req->type){
 		case FS_NOTFOUND_T:
-
-			/*crc map check for not found check!! by crc*/
-			if (trace_fd && (trace_crc[req->key] != 0) ) {
-				printf("[ERROR] NOTFOUND - key:%u, origin crc: %u\n", req->key, trace_crc[req->key]);	
-				abort();
-			}
 			bench_reap_data(req, mp.li);
 			DPRINTF("%u not found!\n",req->key);
 #ifdef CHECKINGDATA
 			if(CRCMAP[req->key]){
 				printf("\n");
-				printf("\t\tcrc checking error in key:%u\n", req->key);	
+				printf("\t\tnotfound - crc checking error in key:%u - %u\n", req->key, CRCMAP[req->key]);	
 				printf("\n");		
 			}
 #endif
@@ -354,17 +370,6 @@ bool cheeze_end_req(request *const req){
 			inf_free_valueset(req->value,FS_MALLOC_R);
 			break;
 		case FS_GET_T:
-			/*crc map check!! by crc*/
-			if(trace_fd && req->key==28895274){
-				printf("%u crc value:%u\n", req->key, *(uint32_t*)req->value->value);
-			}
-			if (trace_fd && trace_crc[req->key] != 0) {
-				uint32_t crc_result = *((uint32_t *)req->value->value);
-				if (crc_result != trace_crc[req->key]) {
-					printf("[ERROR] FOUND - key:%u, origin crc: %u, result crc: %u\n", req->key, trace_crc[req->key], crc_result);
-					abort();
-				}
-			}
 			bench_reap_data(req, mp.li);
 			if(req->value){
 
@@ -372,19 +377,20 @@ bool cheeze_end_req(request *const req){
 					memcpy(&preq->buf[req->seq*LPAGESIZE], req->value->value,LPAGESIZE);
 				}
 #ifdef CHECKINGDATA
-				if(CRCMAP[req->key]!=crc32(&preq->buf[req->seq*LPAGESIZE], LPAGESIZE)){
+				temp_crc=crc32(&preq->buf[req->seq*LPAGESIZE], LPAGESIZE);
+				if(CRCMAP[req->key]!=temp_crc){
 					printf("\n");
-					printf("\t\tcrc checking error in key:%u\n", req->key);	
+					printf("\t\tfound - crc checking error in key:%u %u -> org:%u\n", req->key, temp_crc, CRCMAP[req->key]);	
 					printf("\n");
-				}	
+				}
+				if(req->key==0){
+					printf("target 0 crc:%u\n", CRCMAP[req->key]);
+				}
 #endif
 				inf_free_valueset(req->value,FS_MALLOC_R);
 			}
 			break;
 		case FS_SET_T:
-			//memcpy(trace_crc + req->key, req->crc, sizeof(uint32_t));
-			if (trace_fd)
-				trace_crc[req->key] = req->crc_value;
 			bench_reap_data(req, mp.li);
 			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);
 			break;
@@ -394,18 +400,28 @@ bool cheeze_end_req(request *const req){
 		default:
 			abort();
 	}
-	preq->done_cnt++;
-	release_each_req(req);
 
+	pthread_mutex_lock(&req_cnt_lock);
+	preq->done_cnt++;
+
+#ifdef DEBUG
+	cheeze_ureq *creq=(cheeze_ureq*)preq->origin_req;
+	DPRINTF("[END]REQ-TYPE:%s INFO(%d:%d) LBA: %u -> preq-done:%u/%u\n", type_to_str(req->type),creq->id, req->seq, req->key, preq->done_cnt, preq->size);
+#endif
+
+	release_each_req(req);
 	if(preq->size==preq->done_cnt){
-		if(!trace_fd){
-			if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
-				recv_event_addr[preq->tag_id]=1;		
-			}
+#ifdef TRACE_REPLAY
+
+#else
+		if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
+			recv_event_addr[preq->tag_id]=1;		
 		}
+#endif
 		free(preq->req_array);
 		free(preq);
 	}
+	pthread_mutex_unlock(&req_cnt_lock);
 
 	return true;
 }

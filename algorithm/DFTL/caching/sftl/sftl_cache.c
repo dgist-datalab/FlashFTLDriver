@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern uint32_t test_key;
+extern uint32_t debug_lba;
+extern uint32_t test_ppa;
 //bool global_debug_flag=false;
 
 my_cache sftl_cache_func{
@@ -137,10 +138,11 @@ inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 
 	bool is_next_do=false;
 	uint32_t next_original_ppa;
+
 	if(!ISLASTOFFSET(lba+1)){
 		if(!bitmap_is_set(sc->map, GETOFFSET(lba+1))){
 			is_next_do=true;
-			next_original_ppa=get_ppa_from_sc(sc, lba+2);
+			next_original_ppa=get_ppa_from_sc(sc, lba+1);
 		}
 	}
 
@@ -185,6 +187,7 @@ inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 		else
 			*should_more=DONE;
 	}
+
 	return old_ppa;
 }
 
@@ -304,7 +307,13 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		ln=(lru_node*)etr->private_data;
 		sc=(sftl_cache*)(ln->data);
 	}
-
+/*
+	if(lba==2129921){//GETGTDIDX(lba)==520){
+		printf("prev %u-%u : ", lba, ppa);
+		sftl_print_mapping(sc);
+		sftl_mapping_verify(sc);
+	}
+*/
 	uint32_t more_lba=lba;
 	uint32_t more_ppa;
 	char should_more=false;
@@ -328,7 +337,13 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 				break;
 		}
 	}
-
+/*
+	if(lba==2129921){//GETGTDIDX(lba)==520){
+		printf("after %u-%u:", lba, ppa);
+		sftl_print_mapping(sc);
+		sftl_mapping_verify(sc);
+	}
+*/
 	if((scm.gtd_size[gtd_idx]-BITMAPSIZE)/sizeof(uint32_t) > PAGESIZE/sizeof(uint32_t)){
 		printf("oversize!\n");
 		abort();
