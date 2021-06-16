@@ -3,11 +3,20 @@
 #include <stdio.h>
 #include <limits.h>
 #include <getopt.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "../../include/data_struct/lrucache.hpp"
 #include "page.h"
 #include "map.h"
-
 #include "../../bench/bench.h"
+
+//#define LBA_LOGGING "/lba_log"
+
+#ifdef LBA_LOGGING
+uint32_t log_fd;
+#endif
+
+
 extern uint32_t test_key;
 align_buffer a_buffer;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
@@ -35,10 +44,22 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
+
+#ifdef LBA_LOGGING
+	log_fd=open(LBA_LOGGING, 0x666, O_CREAT | O_WRONLY | O_TRUNC);
+	if (log_fd < 0) {
+		perror("Failed to open " LBA_LOGGING);
+		abort();
+		return 1;
+	}
+#endif
 	return 1;
 }
 
 void page_destroy (lower_info* li, algorithm *algo){
+#ifdef LBA_LOGGING
+	close(log_fd);
+#endif
 	//page_map_free();
 	delete rb.pending_req;
 	delete rb.issue_req;
@@ -100,6 +121,9 @@ bool testing;
 uint32_t testing_lba;
 
 uint32_t page_read(request *const req){
+#ifdef LBA_LOGGING
+	dprintf(log_fd, "R %u\n",req->key);
+#endif
 
 	if(!testing){
 		testing_lba=req->key;
@@ -120,17 +144,9 @@ uint32_t page_read(request *const req){
 	//printf("read key :%u\n",req->key);
 
 	req->value->ppa=page_map_pick(req->key);
-	if(req->key==test_key){
-		printf("read: map info - %u->%u\n", req->key, req->value->ppa);
-	}
 
 	//DPRINTF("\t\tmap info : %u->%u\n", req->key, req->value->ppa);
 	if(req->value->ppa==UINT32_MAX){
-		if(req->key==0){
-			printf("0 is not found\n");
-		}
-
-
 		req->type=FS_NOTFOUND_T;
 		req->end_req(req);
 	}
@@ -165,10 +181,10 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 }
 
 uint32_t page_write(request *const req){
+#ifdef LBA_LOGGING
+	dprintf(log_fd, "W %u\n",req->key);
+#endif
 	//printf("write key :%u\n",req->key);
-	if(req->key==0){
-		printf("0 is written\n");
-	}
 	align_buffering(req, 0, NULL);
 	req->value=NULL;
 	req->end_req(req);

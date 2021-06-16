@@ -414,7 +414,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	demand_param *dp=(demand_param*)req->param;
 	uint32_t flying_map_read_lba=dp->flying_map_read_key;
 	assign_param_ex *ap;
-	uint8_t i=0;
+	uint32_t i=0;
 
 	GTD_entry *etr=&dmm.GTD[GETGTDIDX(mapping->lba)];
 	uint32_t head_req_is_missread=0;
@@ -427,7 +427,6 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	bool already_in_cache;
 	bool value_free=false;
 	char *temp_value=NULL;
-
 	fdriver_lock(&etr->lock);
 
 	if(etr->pending_req->size > 1){
@@ -534,6 +533,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 		}
 		list_delete_node(etr->pending_req, now);
 	}
+	
 	pending_eviction_req_idx=pending_eviction_req_idx?pending_eviction_req_idx-1:0;
 	for(i=0; i<pending_eviction_req_idx; i++){
 		if(!inf_assign_try(pending_eviction_req[i])){

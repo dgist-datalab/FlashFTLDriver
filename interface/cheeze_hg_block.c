@@ -173,6 +173,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	}
 	uint32_t prev_lba=UINT32_MAX;
 	uint32_t consecutive_cnt=0;
+	static uint32_t global_seq=0;
 
 	for(uint32_t i=0; i<res->size; i++){
 		request *temp=&res->req_array[i];
@@ -184,6 +185,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		temp->type_ftl=0;
 		temp->type_lower=0;
 		temp->is_sequential_start=false;
+		temp->global_seq=global_seq++;
 		switch(type){
 			case FS_GET_T:
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);

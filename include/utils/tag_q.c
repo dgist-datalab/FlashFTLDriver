@@ -11,6 +11,7 @@ tag_manager *tag_manager_init(uint32_t tag_num){
 	for(uint32_t i=0; i<tag_num; i++){
 		tmanager->tagQ->push(i);
 	}
+	tmanager->max_tag_num=tag_num;
 	return tmanager;
 }
 
@@ -31,6 +32,10 @@ void tag_manager_free_tag(tag_manager *tm, uint32_t tag_num){
 	//printf("free tag %u\n", tag_num);
 	pthread_mutex_lock(&tm->tag_lock);
 	tm->tagQ->push(tag_num);
+	if(tm->max_tag_num < tm->tagQ->size()){
+		printf("over free in tagQ\n");
+		abort();
+	}
 	pthread_cond_broadcast(&tm->tag_cond);
 	pthread_mutex_unlock(&tm->tag_lock);
 }

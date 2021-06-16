@@ -18,6 +18,7 @@ page_read_buffer rb;
 extern uint32_t debug_lba;
 int tiered_level_fd;
 
+//#define RWLOCK_PRINT
 struct algorithm lsm_ftl={
 	.argument_set=lsmtree_argument_set,
 	.create=lsmtree_create,
@@ -361,14 +362,16 @@ void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param){
 	rwlock *res;
 	uint32_t version;
 	uint32_t queried_level;
-	for(int i=-1; i<(int)LSM.param.LEVELN; i++){
+	for(int i=0; i<(int)LSM.param.LEVELN; i++){
 		if(i==-1 || i==0){
 			res=&LSM.level_rwlock[0];	
 		}
 		else{
-		//	rwlock_read_lock(LSM.level_rwlock[i-1]);
 			res=&LSM.level_rwlock[i];
 		}
+#ifdef RWLOCK_PRINT
+		printf("%d read_lock\n", i);
+#endif
 		rwlock_read_lock(res);
 		version=version_map_lba(LSM.last_run_version, lba);
 		queried_level=version_to_level_idx(LSM.last_run_version, version, LSM.param.LEVELN);
@@ -379,6 +382,9 @@ void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param){
 			return;
 		}
 		else{
+#ifdef RWLOCK_PRINT
+			printf("%d read_unlock\n", i);
+#endif
 			rwlock_read_unlock(res);
 		}
 	}
@@ -459,6 +465,9 @@ uint32_t lsmtree_read(request *const req){
 		r_param->piece_ppa=UINT32_MAX;
 
 		r_param->target_level_rw_lock=&LSM.level_rwlock[0];
+#ifdef RWLOCK_PRINT
+		printf("%d read_lock\n", 0);
+#endif
 		rwlock_read_lock(r_param->target_level_rw_lock);
 	
 		char *target;
@@ -506,6 +515,9 @@ uint32_t lsmtree_read(request *const req){
 		rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 
 		rwlock_read_unlock(r_param->target_level_rw_lock);
+#ifdef RWLOCK_PRINT
+		printf("%d read_unlock\n", 0);
+#endif
 		/*find data from write_buffer*/
 		lsmtree_find_version_with_lock(req->key, r_param);
 	}
@@ -663,10 +675,23 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	uint32_t offset;
 	uint32_t piece_ppa=req->ppa;
 
+#ifdef RWLOCK_PRINT
+	uint32_t rw_lock_lev=0;
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		if(r_param->target_level_rw_lock==&LSM.level_rwlock[i]){
+			rw_lock_lev=i;
+			break;
+		}
+	}
+#endif
+
 	if(r_param->use_read_helper && 
 			read_helper_data_checking(r_param->rh, LSM.pm, piece_ppa, parents->key, &r_param->read_helper_idx,&offset, r_param->prev_sf)){
 
 		if(r_param->target_level_rw_lock){
+#ifdef RWLOCK_PRINT
+			printf("%u read_unlock - %u\n", rw_lock_lev, r_param->prev_level);
+#endif
 			rwlock_read_unlock(r_param->target_level_rw_lock);
 		}
 		if(offset>=L2PGAP){
@@ -680,6 +705,9 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	else if(page_manager_oob_lba_checker(LSM.pm, piece_ppa, 
 				parents->key, &offset)){
 		if(r_param->target_level_rw_lock){
+#ifdef RWLOCK_PRINT
+			printf("%u read_unlock - %u\n", rw_lock_lev, r_param->prev_level);
+#endif
 			rwlock_read_unlock(r_param->target_level_rw_lock);
 		}
 

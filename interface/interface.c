@@ -174,7 +174,7 @@ void assign_req(request* req){
         MA(&infTime);
 #endif
 }
-
+extern int32_t flying_cnt;
 bool inf_assign_try(request *req){
 	bool flag=false;
 	for(int i=0; i<1; i++){
@@ -184,6 +184,10 @@ bool inf_assign_try(request *req){
 			flag=true;
 			break;
 		}
+	}
+
+	if(flag==false){
+		printf("%u retry queue is full\n", flying_cnt);
 	}
 	return flag;
 }
