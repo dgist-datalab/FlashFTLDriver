@@ -157,15 +157,28 @@ uint32_t page_read(request *const req){
 }
 
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
+	bool overlap=false;
+	uint32_t overlapped_idx=UINT32_MAX;
+	for(uint32_t i=0; i<a_buffer.idx; i++){
+		if(a_buffer.key[i]==req->key){
+			overlapped_idx=i;
+			overlap=true;
+			break;
+		}
+	}
+
+	uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
+
 	if(req){
-		a_buffer.value[a_buffer.idx]=req->value;
-		a_buffer.key[a_buffer.idx]=req->key;
+		a_buffer.value[target_idx]=req->value;
+		a_buffer.key[target_idx]=req->key;
 	}
 	else{
-		a_buffer.value[a_buffer.idx]=value;
-		a_buffer.key[a_buffer.idx]=key;
+		a_buffer.value[target_idx]=value;
+		a_buffer.key[target_idx]=key;
 	}
-	a_buffer.idx++;
+
+	if(!overlap){ a_buffer.idx++;}
 
 	if(a_buffer.idx==L2PGAP){
 		ppa_t ppa=page_map_assign(a_buffer.key, a_buffer.idx);

@@ -210,7 +210,7 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 		//printf("overlap %u gtd idx:%u, input_lba:%u target_lba:%u\n",req->seq, etr->idx, target_data_lba, ap->lba[ap->idx]);
 		pending_debug_seq=req->seq;
 		fdriver_lock(&etr->lock);
-		
+
 		req->type_ftl &=~(MAP_MISS);
 		list_insert(etr->pending_req, (void*)req);
 		fdriver_unlock(&etr->lock);
@@ -320,7 +320,7 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 	demand_param *dp=(demand_param*)req->param;
 	assign_param_ex *ap;
 	uint32_t flying_map_read_lba=dp->flying_map_read_key;
-	uint8_t i;
+	uint32_t i;
 
 	uint32_t res=0;
 	dmm.cache->insert_entry_from_translation(dmm.cache, etr, UINT32_MAX, value, &dmm.eviction_hint, dp->now_eviction_hint);

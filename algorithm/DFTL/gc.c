@@ -9,8 +9,9 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
-uint32_t debug_lba=2623152;
+uint32_t debug_lba=UINT32_MAX;
 uint32_t test_ppa=UINT32_MAX;
+uint32_t test_ppa2=UINT32_MAX;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -38,6 +39,10 @@ void invalidate_ppa(uint32_t t_ppa){
 	if(t_ppa==test_ppa){
 		printf("%u unpopulated!\n",t_ppa);
 	}
+	if(t_ppa==test_ppa2){
+		printf("%u unpopulated!\n",t_ppa);
+	}
+
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
 		printf("target:%u ",t_ppa);
 		EPRINT("double invalidation!", true);
@@ -49,6 +54,9 @@ void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx){
 	for(uint32_t i=0; i<max_idx; i++){
 		if(ppa*L2PGAP+i==test_ppa){
 			printf("%u populated, it is ppa for %u!\n", test_ppa,lbas[i]);
+		}
+		if(ppa*L2PGAP+i==test_ppa2){
+			printf("%u populated, it is ppa for %u!\n", test_ppa2,lbas[i]);
 		}
 		if(!demand_ftl.bm->populate_bit(demand_ftl.bm,ppa * L2PGAP+i)){
 			printf("target:%u ", ppa*L2PGAP+i);
