@@ -213,7 +213,7 @@ typedef struct ghostsegment{ //for gc
 	uint16_t now;
 	uint16_t max;
 	uint32_t invalidate_number;
-	uint16_t validate_number;
+	uint32_t validate_number;
 }__gsegment;
 
 struct blockmanager{
