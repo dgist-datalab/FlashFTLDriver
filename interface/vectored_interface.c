@@ -13,7 +13,7 @@
 
 extern master_processor mp;
 extern tag_manager *tm;
-static int32_t flying_cnt = QDEPTH;
+int32_t flying_cnt = QDEPTH;
 static pthread_mutex_t flying_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t req_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 bool vectored_end_req (request * const req);
@@ -180,7 +180,7 @@ void *vectored_main(void *__input){
 				/*retry queue*/
 				while(1){
 					request *temp_req=get_retry_request(_this);
-					if(temp_req){
+					if(temp_req){	
 						temp_req->tag_num=tag_manager_get_tag(tm);
 						inf_algorithm_caller(temp_req);
 					}
@@ -241,8 +241,6 @@ bool vectored_end_req (request * const req){
 		}
 	}
 	pthread_mutex_unlock(&req_cnt_lock);
-
-	tag_manager_free_tag(tm, tag_num);
 	return true;
 }
 

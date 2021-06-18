@@ -186,7 +186,8 @@ void* amf_info_trim_block(uint32_t ppa,bool async){
 	amf_info.req_type_cnt[TRIM]++;
 	temp->type=TRIM;
 	if((ppa*R2PGAP)%PAGES_PER_SEGMENT){
-		printf("not aligned!\n");
+		printf("not aligned! %u\n");
+		print_stacktrace();
 		abort();
 	}
 	temp->test_ppa=ppa;

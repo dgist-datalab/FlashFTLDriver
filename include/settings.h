@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include<stdio.h>
 #include <string.h>
+#include <execinfo.h>
 
 /*
 #define free(a) \
@@ -187,6 +188,20 @@ static inline bool KEYVALCHECK(KEYT a){
 		printf("[%s:%d]-%s\n", __FILE__,__LINE__, (error));\
 		if((isabort)){abort();}\
 	}while(0)
+
+
+static inline void print_stacktrace()
+{
+	int size = 16;
+	void * array[16];
+	int stack_num = backtrace(array, size);
+	char ** stacktrace = backtrace_symbols(array, stack_num);
+	for (int i = 0; i < stack_num; ++i)
+	{
+		printf("%s\n", stacktrace[i]);
+	}
+	free(stacktrace);
+}
 
 #ifndef __GNUG__
 typedef enum{false,true} bool;

@@ -49,8 +49,12 @@ static void shm_data_init(void *ppage_addr) {
 bool cheeze_end_req(request *const req);
 char *null_value;
 
-#ifdef CHECKINGDATA
+#if defined(CHECKINGDATA) || defined(TRACE_REPLAY)
 uint32_t* CRCMAP;
+#endif
+
+#ifdef TRACE_COLLECT
+uint32_t* crc_buffer;
 #endif
 
 #define TRACE_TARGET "/trace"
@@ -64,6 +68,11 @@ void init_trace_cheeze(){
 
 	null_value = (char*)malloc(PAGESIZE);
 	memset(null_value, 0, PAGESIZE);
+
+#if defined(CHECKINGDATA) || defined(TRACE_REPLAY)
+	CRCMAP=(uint32_t*)malloc(sizeof(uint32_t) * RANGE);
+	memset(CRCMAP, 0, sizeof(uint32_t) *RANGE);
+#endif
 }
 
 void init_cheeze(uint64_t phy_addr){
@@ -96,7 +105,7 @@ void init_cheeze(uint64_t phy_addr){
 	null_value=(char*)malloc(PAGESIZE);
 	memset(null_value,0,PAGESIZE);
 
-#ifdef CHECKINGDATA
+#if defined(CHECKINGDATA) || defined(TRACE_REPLAY)
 	CRCMAP=(uint32_t*)malloc(sizeof(uint32_t) * RANGE);
 	memset(CRCMAP, 0, sizeof(uint32_t) *RANGE);
 #endif
@@ -108,6 +117,7 @@ void init_cheeze(uint64_t phy_addr){
 		abort();
 		return;
 	}
+	crc_buffer=(uint32_t*)malloc(sizeof(uint32_t) * 512);
 #endif
 }
 
@@ -225,16 +235,34 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		}
 
 	//	printf("start REQ-TYPE:%s INFO(%d:%d) LBA: %u crc:%u\n", type_to_str(temp->type),creq->id, i, temp->key, temp->crc_value);
+#ifdef TRACE_REPLAY
+		if(temp->type==FS_SET_T){
+			read(trace_fd, &CRCMAP[temp->key],sizeof(uint32_t));
+			*(uint32_t*)temp->value->value=CRCMAP[temp->key];
+		}
+		else{
+			uint32_t temp_crc;
+			read(trace_fd, &temp_crc, sizeof(uint32_t));
+			temp->crc_value=CRCMAP[temp->key];
+		}
+#endif
 
 #ifdef CHECKINGDATA
 		if(temp->type==FS_SET_T){
-			CRCMAP[temp->key]=crc32(&res->buf[LPAGESIZE*i],LPAGESIZE);
-			if(temp->key==0){
-				printf("target crc is set:%u\n", CRCMAP[0]);
-			}
+			CRCMAP[temp->key]=crc32(&res->buf[LPAGESIZE*i],LPAGESIZE);	
 		}
 		else if(temp->type==FS_DELETE_T){
 	//		CRCMAP[temp->key]=crc32(null_value, LPAGESIZE);
+		}
+		else if(temp->type==FS_GET_T){
+			temp->crc_value=CRCMAP[temp->key];
+		}
+#endif
+
+
+#ifdef TRACE_COLLECT
+		if(temp->type==FS_SET_T){
+			crc_buffer[i]=crc32(temp->value->value, LPAGESIZE);
 		}
 #endif
 		DPRINTF("[START] REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type_to_str(temp->type),creq->id, i, temp->key);
@@ -305,6 +333,7 @@ vec_request **get_vectored_request_arr()
 		res[req_idx++] = ch_ureq2vec_req(ureq, id);
 #ifdef TRACE_COLLECT
 		write(trace_fd, ureq, sizeof(cheeze_req_user));
+		write(trace_fd, crc_buffer, ureq->len/LPAGESIZE * sizeof(uint32_t));
 #endif
 		barrier();
 		*send = 0;
@@ -359,13 +388,6 @@ bool cheeze_end_req(request *const req){
 		case FS_NOTFOUND_T:
 			bench_reap_data(req, mp.li);
 			DPRINTF("%u not found!\n",req->key);
-#ifdef CHECKINGDATA
-			if(CRCMAP[req->key]){
-				printf("\n");
-				printf("\t\tnotfound - crc checking error in key:%u - %u\n", req->key, CRCMAP[req->key]);	
-				printf("\n");		
-			}
-#endif
 			if(preq->buf){
 				memcpy(&preq->buf[req->seq*LPAGESIZE], null_value,LPAGESIZE);
 			}
@@ -378,12 +400,18 @@ bool cheeze_end_req(request *const req){
 				if(preq->buf){
 					memcpy(&preq->buf[req->seq*LPAGESIZE], req->value->value,LPAGESIZE);
 				}
+#ifdef TRACE_REPLAY
+			if(req->crc_value!=*(uint32_t*)req->value->value){
+				printf("lba:%u data faile abort!\n", req->key);
+			}
+#endif
+
 #ifdef CHECKINGDATA
 				temp_crc=crc32(&preq->buf[req->seq*LPAGESIZE], LPAGESIZE);
-				if(CRCMAP[req->key]!=temp_crc){
+				if(req->crc_value!=temp_crc){
 					printf("\n");
 					printf("\t\tfound - crc checking error in key:%u %u -> org:%u\n", req->key, temp_crc, CRCMAP[req->key]);	
-					printf("\n");
+					abort();
 				}
 				if(req->key==0){
 					printf("target 0 crc:%u\n", CRCMAP[req->key]);
