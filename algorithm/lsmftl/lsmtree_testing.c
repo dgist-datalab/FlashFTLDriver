@@ -82,7 +82,7 @@ sst_file *get_dummy_page_sst(std::set<uint32_t> *target, uint32_t version_idx){
 
 level *making_leveling(uint32_t sst_num, uint32_t populate_sst_num, bool issequential, 
 		uint32_t idx, bool wisckey){
-	level *res=level_init(sst_num, 1, wisckey? LEVELING_WISCKEY:LEVELING, idx);
+	level *res=level_init(sst_num, 1, wisckey? LEVELING_WISCKEY:LEVELING, idx, sst_num*KP_IN_PAGE, false);
 	std::set<uint32_t> *sorted_set=NULL;
 	std::set<uint32_t>* lba_set[100];
 	uint32_t version_idx;
@@ -126,7 +126,7 @@ level *making_leveling(uint32_t sst_num, uint32_t populate_sst_num, bool isseque
 
 level *making_tiering(uint32_t run_num, uint32_t sst_num, uint32_t populate_run_num, 
 	bool issequential, uint32_t idx, bool wisckey){
-	level *res=level_init(sst_num, run_num, wisckey?TIERING_WISCKEY:TIERING, idx);
+	level *res=level_init(sst_num, run_num, wisckey?TIERING_WISCKEY:TIERING, idx, sst_num*KP_IN_PAGE, false);
 	std::set<uint32_t> **run_set=new std::set<uint32_t>*[run_num];
 	std::set<uint32_t>** lba_set=new std::set<uint32_t>*[sst_num*2];
 	for(uint32_t i=0; i<populate_run_num; i++){
@@ -195,8 +195,8 @@ static inline void compaction_test(level **disk,
 
 uint32_t lsmtree_testing(){
 	level *temp_disk[2];
-	temp_disk[0]=level_init(10, 10, 1, 0);
-	temp_disk[1]=level_init(10, 10, 1, 1);
+	temp_disk[0]=level_init(10, 10, 1, 0, 10*KP_IN_PAGE, false);
+	temp_disk[1]=level_init(10, 10, 1, 1, 10*KP_IN_PAGE, false);
 	level *disk[2];
 	dummy_data=(char*)malloc(PAGESIZE);
 	LSM.param.normal_size_factor=LSM.param.last_size_factor=10;

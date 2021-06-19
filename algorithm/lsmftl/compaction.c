@@ -237,23 +237,31 @@ static void write_sst_file(sst_pf_in_stream *is, level *des){ //for page file
 }
 
 static bool leveling_invalidation_function(level *des, uint32_t stream_id, uint32_t version, 
-		key_ptr_pair kp, bool overlap){
+		key_ptr_pair kp, bool overlap, bool inplace){
 	if(overlap){
 		if(slm_invalidate_enable(des->idx, kp.piece_ppa)){
-			invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, true);
+			invalidate_kp_entry(kp.lba, kp.piece_ppa, version, true);
 			return false;
 		}
 	}
 	else{
 		uint32_t lba_version=version_map_lba(LSM.last_run_version, kp.lba);
-		if(lba_version!=UINT8_MAX && lba_version > version+1){
-			if(stream_id==0 && des->idx!=0 && slm_invalidate_enable(des->idx-1, kp.piece_ppa)){
-				invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, true);
+		if(inplace){
+			if(lba_version!=UINT8_MAX  && lba_version > version){
+				invalidate_kp_entry(kp.lba, kp.piece_ppa, version, true);
+				return false;
 			}
-			else if(stream_id==1 && slm_invalidate_enable(des->idx, kp.piece_ppa)){
-				invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa , true);
+		}
+		else{
+			if(lba_version!=UINT8_MAX && lba_version > version+1){
+				if(stream_id==0 && des->idx!=0 && slm_invalidate_enable(des->idx-1, kp.piece_ppa)){
+					invalidate_kp_entry(kp.lba, kp.piece_ppa, version, true);
+				}
+				else if(stream_id==1 && slm_invalidate_enable(des->idx, kp.piece_ppa)){
+					invalidate_kp_entry(kp.lba, kp.piece_ppa, version, true);
+				}
+				return false;
 			}
-			return false;
 		}
 	}
 	return true;
@@ -263,7 +271,8 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 		sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
 		bool all_empty_stop, uint32_t limit, uint32_t target_version,
 		bool merge_flag,
-		bool (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_version, key_ptr_pair kp, bool overlap)){
+		bool (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_version, key_ptr_pair kp, bool overlap, bool inplace),
+		bool inplace){
 	bool one_empty=false;
 	if(stream_num >= 32){
 		EPRINT("too many stream!!", true);
@@ -295,7 +304,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 					target_idx=i;
 				}
 				else if(target_pair.lba!=UINT32_MAX && target_pair.lba==now.lba){
-					invalidate_function(des, i, os_set[i]->version_idx, now, true);
+					invalidate_function(des, i, os_set[i]->version_idx, now, true, inplace);
 					sst_pos_pop(os_set[i]);
 					continue;
 				}
@@ -313,8 +322,14 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 			
 			compaction_debug_func(target_pair.lba, target_pair.piece_ppa, target_version, des);
 		
-			uint32_t query_version=merge_flag?os_set[target_idx]->version_idx: target_version;
-			if(invalidate_function(des, target_idx, query_version, target_pair, false)){
+			uint32_t query_version;
+			if(inplace){
+				query_version=os_set[target_idx]->version_idx;
+			}
+			else{
+				query_version=merge_flag?os_set[target_idx]->version_idx: target_version;
+			}
+			if(invalidate_function(des, target_idx, query_version, target_pair, false, inplace)){
 				if(kpq){
 					sorting_idx++;
 					kpq->push(target_pair);
@@ -392,7 +407,7 @@ static void leveling_update_meta_for_trivial_move(level *up, level *down, uint32
 		read_helper_insert_done(sptr->_read_helper);
 	}
 	else{
-		compaction_trivial_move(&up->array[0], target_version, up->idx, down->idx);
+		compaction_trivial_move(&up->array[0], target_version, up->idx, down->idx, false);
 	}
 }
 
@@ -534,7 +549,7 @@ static void read_params_setting(read_issue_arg *read_arg1, read_issue_arg *read_
 level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t target_version){
 	static uint32_t debug_cnt_flag=0;
 	_cm=cm;
-	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
+	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 
 	if(!level_check_overlap(src, des)){
 		leveling_trivial_move(NULL,src, des, res, target_version);
@@ -611,8 +626,7 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba),
 				version_level_to_start_version(LSM.last_run_version, res->idx),
 				false,
-				leveling_invalidation_function
-				);
+				leveling_invalidation_function, false);
 
 		isstart=false;
 		des_start_idx=des_end_idx+1;
@@ -877,7 +891,7 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 			&start_sst_file_idx, des->idx); //version_update
 	
 	if(new_run->now_sst_num){
-		compaction_trivial_move(new_run, target_version, src->idx, des->idx);
+		compaction_trivial_move(new_run, target_version, src->idx, des->idx, false);
 	}
 
 
@@ -893,7 +907,7 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	}
 	else{
 		if(src->now_sst_num==start_sst_file_idx){//all_sequential_file
-			level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
+			level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 			run *rptr; uint32_t ridx;
 			for_each_run_max(des, rptr, ridx){
 				if(rptr->now_sst_num){
@@ -913,7 +927,7 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	uint32_t total_moved_num=0;
 	new_run=compaction_wisckey_to_normal(cm, src, new_run, &total_moved_num, start_sst_file_idx, target_version, true);
 
-	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 	run *rptr; uint32_t ridx;
 	for_each_run_max(des, rptr, ridx){
 		if(rptr->now_sst_num){
@@ -968,7 +982,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	_cm=cm;
 	if(!level_check_overlap(src, des)){ //sequential
 		run *new_run=compaction_wisckey_to_normal(cm, src, NULL, NULL, UINT32_MAX, target_version, true);
-		level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
+		level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 		sst_file *sptr;
 		run *rptr; 
 		uint32_t sidx, ridx;
@@ -996,7 +1010,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 
 	uint32_t closed_upper_from=0, closed_upper_to=0;
 
-	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
+	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 	/*move unoverlapped sst of above level*/
 	bool trivial_move=leveling_get_sst_overlap_range(src, des, &closed_upper_from, &closed_upper_to);
 	run *new_run=NULL;
@@ -1079,7 +1093,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(temp_des_level,read_arg2.to).end_lba),
 				version_level_to_start_version(LSM.last_run_version, res->idx),
 				false,
-				leveling_invalidation_function
+				leveling_invalidation_function, false
 				);
 
 		if(bos==NULL){
@@ -1134,7 +1148,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t target_version){
 	_cm=cm;
 	if(!level_check_overlap(src, des)){
-		level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
+		level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 		sst_file *sptr;
 		run *rptr; 
 		uint32_t sidx, ridx;
@@ -1164,7 +1178,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	uint32_t upper_version=version_pick_oldest_version(LSM.last_run_version, src->idx);
 	uint32_t lower_version=version_pick_oldest_version(LSM.last_run_version, des->idx);
 
-	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx);
+	level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 	/*move unoverlapped sst of above level*/
 	bool trivial_move=leveling_get_sst_overlap_range(src, des, &closed_upper_from, &closed_upper_to);
 	if(trivial_move){
@@ -1239,7 +1253,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 					LEVELING_SST_AT(temp_des_level,read_arg2.to).end_lba),
 				version_level_to_start_version(LSM.last_run_version, res->idx),
 				false,
-				leveling_invalidation_function
+				leveling_invalidation_function, false
 				);
 
 		if(bos==NULL){
@@ -1294,7 +1308,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){
 	leveling_update_meta_for_trivial_move(src, des, target_version);
 	run *new_run=level_LE_to_run(src, true);
-	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 	//level_run_reinit(des, idx_set[1]);
 	run *rptr;
 	uint32_t ridx;
@@ -1315,7 +1329,7 @@ level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t 
 level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version){
 	leveling_update_meta_for_trivial_move(src, des, target_version);
 	run *new_run=level_LE_to_run(src, true);
-	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx);
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 	//level_run_reinit(des, idx_set[1]);
 	run *rptr;
 	uint32_t ridx;

@@ -21,7 +21,7 @@ static uint32_t stream_invalidation(sst_pf_out_stream *os, uint32_t version){
 			a=version_map_lba(LSM.last_run_version, kp.lba);
 			b=version;
 			if(version_compare(LSM.last_run_version, a, b) > 0){
-				if(invalidate_piece_ppa(LSM.pm->bm, kp.piece_ppa, false)){
+				if(invalidate_kp_entry(kp.lba, kp.piece_ppa, b, false)){
 					res++;
 				}
 			}

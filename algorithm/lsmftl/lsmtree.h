@@ -101,7 +101,7 @@ typedef struct lsmtree{
 	uint32_t now_wb;
 	write_buffer **wb_array;
 	struct version *last_run_version;
-	level **disk;
+	struct level **disk;
 	
 	rwlock *level_rwlock;
 
@@ -158,6 +158,7 @@ void lsmtree_gc_lock_level(lsmtree *lsm, uint32_t level_idx);
 void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
 uint32_t lsmtree_testing();
 uint32_t lsmtree_seg_debug(lsmtree *lsm);
+bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting);
 
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);

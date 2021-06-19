@@ -49,7 +49,7 @@ void compaction_issue_req(compaction_master *cm, compaction_req *req){
 
 static inline void disk_change(level **up, level *src, level** des, uint32_t* idx_set){
 	if(up!=NULL){
-		level *new_up=level_init((*up)->max_sst_num, (*up)->max_run_num, (*up)->level_type, (*up)->idx);
+		level *new_up=level_init((*up)->max_sst_num, (*up)->max_run_num, (*up)->level_type, (*up)->idx, (*up)->max_contents_num, false);
 		level_free(*up, LSM.pm);
 		*up=new_up;
 	}
@@ -183,7 +183,7 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set, write_bu
 				printf("target hit in mem level: %u, %u\n", find_iter->first, find_iter->second);
 			}
 #endif
-			invalidate_piece_ppa(LSM.pm->bm, find_iter->second, true);
+			invalidate_kp_entry(find_iter->first, find_iter->second, UINT32_MAX, true);
 			kp_set->erase(find_iter);
 		}
 		kp_set->insert(
@@ -194,7 +194,7 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set, write_bu
 }
 
 static inline level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
-	level *res=level_init(kp_set->size()/KP_IN_PAGE+(kp_set->size()%KP_IN_PAGE?1:0),1, LEVELING_WISCKEY, UINT32_MAX);
+	level *res=level_init(kp_set->size()/KP_IN_PAGE+(kp_set->size()%KP_IN_PAGE?1:0),1, LEVELING_WISCKEY, UINT32_MAX, kp_set->size(), false);
 	sst_file *sptr=NULL;
 	std::map<uint32_t, uint32_t>::iterator iter=kp_set->begin();
 	while((sptr=kp_to_sstfile(kp_set, &iter, false))){
@@ -313,8 +313,7 @@ static inline level *TW_compaction(compaction_master *cm, level *src, level *des
 	return res;
 }
 
-
-static inline void do_compaction(compaction_master *cm, compaction_req *req, 
+static inline void do_compaction_demote(compaction_master *cm, compaction_req *req, 
 		level *temp_level, uint32_t start_idx, uint32_t end_idx){
 	level *lev=NULL;
 	if(temp_level){
@@ -344,9 +343,6 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 				lev=compaction_LE2LE(cm, src_lev, des_lev, target_version);
 			}
 			else{
-				if(LSM.disk[end_idx]->level_type!=TIERING){
-					EPRINT("wtf??", true);
-				}
 				lev=compaction_LE2TI(cm, src_lev, des_lev, target_version);
 			}
 			break;
@@ -369,13 +365,10 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 			}
 			break;
 		case TIERING:
-			if(LSM.disk[end_idx]->level_type!=TIERING){
-				EPRINT("wtf??", true);
-			}
-			lev=compaction_TI2TI(cm, src_lev, LSM.disk[end_idx], target_version);
+			lev=compaction_TI2TI(cm, src_lev, des_lev, target_version);
 			break;
 		case TIERING_WISCKEY:
-			lev=TW_compaction(cm, src_lev, LSM.disk[end_idx], target_version);
+			lev=TW_compaction(cm, src_lev, des_lev, target_version);
 			break;
 	}
 
@@ -397,16 +390,18 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 					src_lev->idx);
 		}
 		else{
-			for(uint32_t i=0; i<src_lev->run_num; i++){
-				version_unpopulate(LSM.last_run_version,
-						version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
-						src_lev->idx);
+			/*matching order*/
+			if(src_lev->run_num < src_lev->max_run_num){
+				version_get_resort_version(LSM.last_run_version, src_lev->idx);
+			}
+			else{
+				for(uint32_t i=0; i<src_lev->run_num; i++){
+					version_unpopulate(LSM.last_run_version,
+							version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
+							src_lev->idx);
+				}
 			}
 		}
-	}
-
-	if(!lev->array[0].sst_set[0]._read_helper){
-		EPRINT("wtf?", true);
 	}
 
 	disk_change(temp_level?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
@@ -445,6 +440,63 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 	version_sanity_checker(LSM.last_run_version);
 }
 
+static inline void do_compaction_inplace(compaction_master *cm, compaction_req *req, 
+		uint32_t start_idx, uint32_t end_idx){
+	rwlock_write_lock(&LSM.level_rwlock[start_idx]);
+	level *src_lev=LSM.disk[start_idx];
+	level *des_lev=LSM.disk[end_idx];
+	uint32_t target_version=version_level_to_start_version(LSM.last_run_version, start_idx);
+	run *target_run=compaction_TI2RUN(cm, src_lev, des_lev, target_version, true);
+
+	for(uint32_t i=0; i<src_lev->run_num; i++){
+		version_unpopulate(LSM.last_run_version,
+				version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
+				src_lev->idx);
+	}	
+
+	target_version=version_get_empty_version(LSM.last_run_version, src_lev->idx);
+	LSM.monitor.compaction_cnt[start_idx]++;
+
+	level *res=level_init(src_lev->max_sst_num, src_lev->max_run_num, src_lev->level_type, 
+			src_lev->idx, src_lev->max_contents_num, true);
+	version_populate(LSM.last_run_version, target_version, src_lev->idx);
+
+	uint32_t target_ridx=version_to_ridx(LSM.last_run_version, target_version, src_lev->idx);
+	level_update_run_at_move_originality(res, target_ridx, target_run, true);
+
+	level_free(src_lev, LSM.pm);
+	LSM.disk[start_idx]=res;
+	rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
+
+	LSM.global_debug_flag=true;
+
+	lsmtree_gc_unavailable_sanity_check(&LSM);
+	version_sanity_checker(LSM.last_run_version);
+}
+
+static inline void do_compaction(compaction_master *cm, compaction_req *req, 
+		level *temp_level, uint32_t start_idx, uint32_t end_idx){
+	if(temp_level){
+		do_compaction_demote(cm, req, temp_level, start_idx, end_idx);
+		return;
+	}
+
+	level *src_lev=LSM.disk[start_idx];
+	if(src_lev->level_type!=TIERING || start_idx==0){
+		do_compaction_demote(cm, req, temp_level, start_idx, end_idx);
+		return;
+	}
+
+	level *prev_lev=LSM.disk[start_idx-1];
+	uint32_t now_invalidate_num=version_get_level_invalidation_cnt(LSM.last_run_version, start_idx);
+	if(now_invalidate_num >= prev_lev->max_contents_num){
+		do_compaction_inplace(cm, req, start_idx, end_idx);
+	}
+	else{
+		do_compaction_demote(cm, req, temp_level, start_idx, end_idx);
+	}
+}
+
 static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 	if(target_lev->level_type!=TIERING){
 		EPRINT("cannot do GC", true);
@@ -458,6 +510,11 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 		return res;
 	}
 
+	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
+		uint32_t t_version=version_ridx_to_version(LSM.last_run_version, merged_idx_set[i], target_lev->idx);
+		LSM.last_run_version->version_invalidation_cnt[t_version]=0;
+	}
+
 	run *rptr;
 	uint32_t ridx, cnt;
 	for_each_old_ridx_in_lastlev(LSM.last_run_version, ridx, cnt){
@@ -467,6 +524,10 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 			LSM.monitor.compaction_reclaim_run_num++;
 			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
 			run_empty_content(rptr, LSM.pm);
+
+			uint32_t t_version=version_ridx_to_version(LSM.last_run_version, ridx, target_lev->idx);
+			LSM.last_run_version->version_invalidation_cnt[t_version]=0;
+
 			level_update_run_at_move_originality(res, ridx, new_run, false);
 			run_free(new_run);
 		}
@@ -474,6 +535,9 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 			break;
 		}
 	}
+
+
+
 	return res;
 }
 
@@ -495,6 +559,10 @@ void* compaction_main(void *_cm){
 	compaction_master *cm=(compaction_master*)_cm;
 	queue *req_q=(queue*)cm->req_q;
 	uint32_t above_sst_num;
+	uint32_t version_inv_cnt;
+#ifdef LSM_DEBUG
+	uint32_t contents_num;
+#endif
 	while(!compaction_stop_flag){
 		compaction_req *req=(compaction_req*)q_dequeue(req_q);
 		if(!req) continue;
@@ -512,16 +580,36 @@ again:
 		if(req->start_level==-1 && !temp_level){
 			goto end;
 		}
-
+#ifdef LSM_DEBUG
+		if(LSM.global_debug_flag && req->end_level==2){
+			printf("break!\n");
+		}
+#endif
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
+#ifdef LSM_DEBUG
+		version_inv_cnt=version_get_level_invalidation_cnt(LSM.last_run_version, req->end_level);
+		contents_num=get_level_content_num(LSM.disk[req->end_level]);
+		printf("L%u %u %.2f inv_cnt:%u(%.2f) \n", req->end_level, contents_num, (float)contents_num*100/RANGE, version_inv_cnt, 
+				(float)version_inv_cnt/LSM.disk[req->end_level]->max_contents_num);
+	//	if(req->end_level >= 2){
+	///		level_tiering_sst_analysis(LSM.disk[req->end_level], LSM.pm->bm, LSM.last_run_version, false);
+	//	}
+#endif
 
 		if(req->end_level==LSM.param.LEVELN-1){
 			goto end;
 		}
 
-		if(level_is_full(LSM.disk[req->end_level])){
-			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1])){
+		if(level_is_full(LSM.disk[req->end_level], LSM.param.last_size_factor)){
+			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)){
 				last_level_reclaim(cm, LSM.param.LEVELN-1);
+#ifdef LSM_DEBUG
+				/*
+				contents_num=get_level_content_num(LSM.disk[LSM.param.LEVELN-1]);
+				printf("L%u %u %.2f\n", LSM.param.LEVELN-1, contents_num, (float)contents_num*100/RANGE);
+				*/
+		//		level_tiering_sst_analysis(LSM.disk[LSM.param.LEVELN-1], LSM.pm->bm, LSM.last_run_version, true);
+#endif
 			}
 			req->start_level=req->end_level;
 			req->end_level++;
@@ -534,8 +622,12 @@ again:
 				temp_level->max_sst_num:
 				LSM.disk[req->end_level-1]->max_sst_num; 
 			if(!level_is_appendable(LSM.disk[req->end_level], above_sst_num)){
-				if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1])){
+				if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)){
 					last_level_reclaim(cm, LSM.param.LEVELN-1);
+#ifdef LSM_DEBUG
+					contents_num=get_level_content_num(LSM.disk[LSM.param.LEVELN-1]);
+					printf("L%u %u %.2f\n", LSM.param.LEVELN-1, contents_num, (float)contents_num*100/RANGE);
+#endif
 				}
 				req->start_level=req->end_level;
 				req->end_level++;

@@ -764,6 +764,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 			for(uint32_t i=0; i<BPS; i++){
 				printf("%u invalid_number:%u validate_number:%u\n", i,victim->blocks[i]->invalidate_number, victim->blocks[i]->validate_number);
 			}
+			printf("_PPS:%u BPS:%u\n", _PPS, BPS);
 			EPRINT("not match validation!",true);
 		}
 	}
@@ -855,11 +856,11 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 					/*should figure out map ppa*/
 					if(version_compare(LSM.last_run_version, recent_version, target_version)<=0){
-						invalidate_piece_ppa(pm->bm, gn->piece_ppa, true);
+						invalidate_kp_entry(gn->lba, gn->piece_ppa, UINT32_MAX, true);
 						insert_target_sptr(gsn, gn->lba, &gn->data->value[LPAGESIZE*i]);
 					}
 					else{
-						invalidate_piece_ppa(pm->bm, gn->piece_ppa, true);
+						invalidate_kp_entry(gn->lba, gn->piece_ppa, UINT32_MAX, true);
 						continue; //already invalidate
 					}
 				}

@@ -6,6 +6,7 @@ run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
 	res->max_sst_num=sst_file_num;
 	res->start_lba=start_lba;
 	res->end_lba=end_lba;
+	res->now_contents_num=0;
 	res->sst_set=(sst_file*)calloc(sst_file_num, sizeof(sst_file));
 	return res;
 }
@@ -22,6 +23,7 @@ void run_reinit(run *res){
 	res->now_sst_num=0;
 	res->start_lba=UINT32_MAX;
 	res->end_lba=0;
+	res->now_contents_num=0;
 	uint32_t sidx;
 	sst_file *sptr;
 	for_each_sst(res, sptr, sidx){	
@@ -97,6 +99,9 @@ static inline void __do_run_append_sstfile(run *_run, sst_file *sstfile, bool mo
 		sst_shallow_copy(&_run->sst_set[_run->now_sst_num], sstfile);
 	}
 	update_range(_run, sstfile->start_lba, sstfile->end_lba);
+	if(sstfile->_read_helper){
+		_run->now_contents_num+=read_helper_get_cnt(sstfile->_read_helper);
+	}
 	_run->now_sst_num++;
 }
 
@@ -117,6 +122,7 @@ void run_deep_append_sstfile(run *_run, sst_file *sstfile){
 	}
 	sst_deep_copy(&_run->sst_set[_run->now_sst_num], sstfile);
 	update_range(_run, sstfile->start_lba, sstfile->end_lba);
+	_run->now_contents_num+=read_helper_get_cnt(sstfile->_read_helper);
 	_run->now_sst_num++;
 }
 

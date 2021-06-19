@@ -69,20 +69,20 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 		switch(LSM.param.tr.lp[i+1].level_type){
 			case LEVELING:
 				LSM.disk[i]=level_init(
-						ENTRY_TO_SST_PF(now_level_size), 1, LEVELING, i);
+						ENTRY_TO_SST_PF(now_level_size), 1, LEVELING, i, now_level_size, false);
 				printf("L[%d] - size:%u data:%.2lf(%%)H:%s\n",i, LSM.disk[i]->max_sst_num, 
 						(double)now_level_size/RANGE*100,
 						read_helper_type(rhp.type));	
 				break;
 			case LEVELING_WISCKEY:
 				LSM.disk[i]=level_init(
-						ENTRY_TO_SST_PF(now_level_size), 1, LEVELING_WISCKEY, i);
+						ENTRY_TO_SST_PF(now_level_size), 1, LEVELING_WISCKEY, i, now_level_size, false);
 				printf("LW[%d] - size:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_sst_num, 
 						(double)now_level_size/RANGE*100,
 						read_helper_type(rhp.type));
 				break;
 			case TIERING:
-				LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, TIERING, i);
+				LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, TIERING, i, now_level_size, false);
 				printf("TI[%d] - run_num:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_run_num, 
 						(double)now_level_size/RANGE*100,
 						read_helper_type(rhp.type));
@@ -90,7 +90,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 				break;
 			case TIERING_WISCKEY:
 				LSM.disk[i]=level_init(
-						ENTRY_TO_SST_PF(now_level_size), LSM.param.normal_size_factor, TIERING_WISCKEY, i);
+						ENTRY_TO_SST_PF(now_level_size), LSM.param.normal_size_factor, TIERING_WISCKEY, i, now_level_size, false);
 				printf("TW[%d] - run_num:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_run_num,
 						(double)now_level_size/RANGE*100,
 						read_helper_type(rhp.type));
@@ -992,4 +992,9 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 	}
 #endif
 	return 1;
+}
+
+bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting){
+	bool res=invalidate_piece_ppa(LSM.pm->bm, piece_ppa, aborting);
+	return res;
 }

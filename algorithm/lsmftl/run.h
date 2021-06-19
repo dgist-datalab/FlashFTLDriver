@@ -15,6 +15,7 @@ typedef struct run{
 	uint32_t start_lba;
 	uint32_t end_lba;
 	uint32_t start_data_physical_address;
+	uint32_t now_contents_num;
 	bool moved_originality;
 	sst_file *sst_set;
 }run;

@@ -51,6 +51,7 @@ version *version_init(uint8_t total_version_number,
 	fdriver_mutex_init(&res->version_lock);
 	res->last_level_version_num=last_level_version_num;
 	res->leveln=leveln;
+
 	return res;
 }
 
@@ -72,6 +73,7 @@ void version_get_merge_target(version *v, uint32_t *version_set, uint32_t level)
 
 void version_unpopulate(version *v, uint32_t version, uint32_t level_idx){
 	v->version_empty_queue[level_idx]->push(version);
+	v->version_invalidation_cnt[version]=0;
 }
 
 void version_populate(version *v, uint32_t version, uint32_t level_idx){
@@ -110,6 +112,7 @@ void version_free(version *v){
 	free(v->key_version);
 	free(v);
 }
+
 extern uint32_t debug_lba;
 void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version){
 	if(version!=UINT8_MAX && version>v->total_version_number){
@@ -125,6 +128,7 @@ void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version){
 	if(v->key_version[lba]!=UINT8_MAX){
 		v->version_invalidation_cnt[v->key_version[lba]]++;
 	}
+
 	v->key_version[lba]=version;
 	fdriver_unlock(&v->version_lock);
 }
@@ -248,4 +252,29 @@ void version_traversal(version *v){
 	}
 
 	free(version_array);
+}
+
+uint32_t version_get_level_invalidation_cnt(version *v, uint32_t level_idx){
+	if(level_idx==0) return 0;
+	uint32_t start_idx=version_level_to_start_version(v, level_idx);
+	uint32_t end_idx=version_level_to_start_version(v, level_idx-1);
+	uint32_t res=0;
+	for(uint32_t i=start_idx; i<end_idx; i++){
+		res+=v->version_invalidation_cnt[i];
+	}
+	return res;
+}
+
+uint32_t version_get_resort_version(version *v, uint32_t level_idx){
+	uint32_t remain_size=v->version_empty_queue[level_idx]->size();
+	for(uint32_t i=0; i<remain_size; i++){
+		uint32_t target_version=version_get_empty_version(v, level_idx);
+		version_populate(v, target_version, level_idx);
+	}
+
+	remain_size=v->version_populate_queue[level_idx]->size();
+	for(uint32_t i=0; i<remain_size; i++){
+		version_unpopulate(v, version_pop_oldest_version(v, level_idx), level_idx);
+	}
+	return 1;
 }

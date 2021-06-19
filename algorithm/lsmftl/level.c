@@ -1,8 +1,10 @@
 #include "level.h"
 #include "run.h"
+#include "io.h"
 #include "../../include/settings.h"
 
-level *level_init(uint32_t max_sst_num, uint32_t max_run_num, uint32_t level_type, uint32_t idx){
+level *level_init(uint32_t max_sst_num, uint32_t max_run_num, uint32_t level_type, uint32_t idx, 
+		uint32_t max_contents_num, bool check_full_by_size){
 	level *res=(level*)calloc(1,sizeof(level));
 	res->idx=idx;
 	res->array=(run*)calloc(max_run_num, sizeof(run));
@@ -14,9 +16,13 @@ level *level_init(uint32_t max_sst_num, uint32_t max_run_num, uint32_t level_typ
 	if(res->level_type!=TIERING && res->level_type!=TIERING_WISCKEY){
 		res->run_num=1;
 	}
+
 	res->now_sst_num=0;
 	res->max_sst_num=max_sst_num;
 	res->max_run_num=max_run_num;
+	res->max_contents_num=max_contents_num;
+	res->now_contents_num=0;
+	res->check_full_by_size=check_full_by_size;
 	return res;
 }
 
@@ -60,7 +66,7 @@ level *level_convert_normal_run_to_LW(run *r, page_manager *pm,
 		target_sst_file_num+=sptr->map_num;
 	}
 	sidx=closed_from;
-	level *res=level_init(target_sst_file_num, 1, false, UINT32_MAX);
+	level *res=level_init(target_sst_file_num, 1, false, UINT32_MAX, r->now_contents_num, false);
 	for_each_sst_at(r, sptr, sidx){
 		for_each_map_range(sptr, map_ptr, midx){
 			new_sptr=sst_MR_to_sst_file(map_ptr);
@@ -74,9 +80,18 @@ level *level_convert_normal_run_to_LW(run *r, page_manager *pm,
 
 level *level_split_lw_run_to_lev(run *rptr, 
 		uint32_t closed_from, uint32_t closed_to){
-	level *res=level_init(closed_to-closed_from+1, 1, LEVELING_WISCKEY, UINT32_MAX);
 	sst_file *sptr;
 	uint32_t sidx=closed_from;
+	uint32_t contents_num=0;
+	for_each_sst_at(rptr, sptr, sidx){
+	//	level_append_sstfile(res, sptr, false);
+		contents_num+=rptr->now_contents_num;
+		if(sidx==closed_to) break;
+	}
+
+	level *res=level_init(closed_to-closed_from+1, 1, LEVELING_WISCKEY, UINT32_MAX, contents_num, false);
+
+	sidx=closed_from;
 	for_each_sst_at(rptr, sptr, sidx){
 		level_append_sstfile(res, sptr, false);
 		if(sidx==closed_to) break;
@@ -118,7 +133,7 @@ void level_trivial_move_sstfile(level *des, run *src, uint32_t from, uint32_t to
 }
 
 void level_trivial_move_run(level *des, level *src, uint32_t from, uint32_t to, uint32_t num){
-	if(level_is_full(des) || level_is_appendable(des, src->now_sst_num)){
+	if(level_is_appendable(des, src->now_sst_num)){
 		EPRINT("no space to insert run", true);
 	}
 	run *run_ptr;
@@ -140,6 +155,7 @@ uint32_t level_append_run_copy_move_originality(level *lev, run *r, uint32_t rid
 	run_shallow_copy_move_originality(&lev->array[ridx], r);
 	lev->run_num++;
 	lev->now_sst_num+=r->now_sst_num;
+	lev->now_contents_num+=r->now_contents_num;
 	//run_copy_src_empty(&lev->array[lev->run_num++], r);
 	return 1;
 }
@@ -153,6 +169,7 @@ uint32_t level_deep_append_run(level *lev, run *r){
 	}
 
 	run_deep_copy(&lev->array[lev->run_num++], r);
+	lev->now_contents_num+=r->now_contents_num;
 	return 1;
 }
 
@@ -241,12 +258,31 @@ uint32_t level_update_run_at_move_originality(level *lev, uint32_t idx, run *r, 
 		EPRINT("over run in level", true);
 	}
 
+	if(!new_run){
+		lev->now_contents_num-=lev->array[idx].now_contents_num;
+	}
+
 	run_shallow_copy_move_originality(&lev->array[idx], r);
 	if(new_run){
 		lev->now_sst_num+=r->now_sst_num;
+		lev->now_contents_num+=r->now_contents_num;
 		lev->run_num++;
 	}
+	else{
+		lev->now_contents_num+=r->now_contents_num;
+	}
 	return 1;
+}
+
+uint32_t get_level_content_num(level *lev){
+	uint32_t sidx=0, ridx=0;
+	sst_file *sptr;
+	run *rptr;
+	uint32_t content_num=0;
+	for_each_sst_level(lev, rptr, ridx, sptr, sidx){
+		content_num+=read_helper_get_cnt(sptr->_read_helper);
+	}
+	return content_num;
 }
 
 void level_print(level *lev){
@@ -446,4 +482,79 @@ run *level_LE_to_run(level *lev, bool move_originality){
 		}
 	}
 	return res;
+}
+void level_tiering_sst_analysis(level *lev, blockmanager *bm, version *v, bool merge){
+	run *rptr; 
+	uint32_t ridx;
+	/*print all sptr range*/
+	printf("A: %u start sst analysis:\n",lev->idx);
+	uint32_t total_invalidate_num=0;
+	uint32_t total_num=0;
+	uint32_t run_total_validate_number=0;
+	for_each_run_max(lev, rptr, ridx){
+		sst_file *sptr;
+		uint32_t sidx;
+		if(!rptr->now_sst_num && !merge){
+			if(ridx >= lev->run_num){
+				break;
+			}
+			else{
+				printf("????\n");
+				abort();
+			}
+		}
+		printf("A: %u ridx:%u\n", lev->idx, ridx);
+
+		uint32_t entry_num=0;
+		uint32_t block_num=0;
+		uint32_t start_lba=0;
+		uint32_t end_lba=0;
+		uint32_t invalidate_cnt=0;
+		uint32_t run_version=version_level_to_start_version(v, lev->idx)+ridx;
+		run_total_validate_number+=rptr->now_contents_num;
+		for_each_sst(rptr, sptr, sidx){
+			uint32_t midx;
+			map_range *mptr;
+	//		printf("\tA: %u , %u sidx:%u %u~%u\n", lev->idx, ridx, sidx, sptr->start_lba, sptr->end_lba);
+			for_each_map_range(sptr, mptr, midx){
+				char mapping_value[PAGESIZE];
+				io_manager_test_read(mptr->ppa, mapping_value, TEST_IO);
+				key_ptr_pair *kp_set=(key_ptr_pair*)mapping_value;
+				for(uint32_t i=0; kp_set[i].lba!=UINT32_MAX && i<KP_IN_PAGE; i++){
+					uint32_t now_version=version_map_lba(v, kp_set[i].lba);
+					total_num++;
+					if(version_compare(v, now_version,run_version) > 0){
+						invalidate_cnt++;
+						total_invalidate_num++;
+					}
+					/*
+					if(bm->is_invalid_page(bm, kp_set[i].piece_ppa)){
+						invalidate_cnt++;
+					}*/
+
+
+					if(entry_num==0) start_lba=kp_set[i].lba;
+					entry_num++;
+					end_lba=kp_set[i].lba;
+					if(entry_num==_PPB*L2PGAP){
+	//					printf("\t\tA: %u bidx:%u %u~%u %u/%u\n", lev->idx, block_num++, start_lba, end_lba,
+	//							invalidate_cnt, _PPB*L2PGAP);
+						entry_num=start_lba=end_lba=invalidate_cnt=0;
+					}
+				}
+			}
+		}
+		if(entry_num){
+			printf("\t\tA: %u bidx:%u %u~%u %u/%u\n",lev->idx, block_num++, start_lba, end_lba,
+					invalidate_cnt, _PPB*L2PGAP);
+		}
+	}
+
+	uint32_t version_inv_cnt=version_get_level_invalidation_cnt(v, lev->idx);
+	if(version_inv_cnt!=total_invalidate_num){
+		EPRINT("differ value", true);
+	}
+	printf("A: %u end sst analysis: total_invalidate_num:%u/%u (%.2f), version_inv_cnt:%u, run_now_contents%u\n", lev->idx, 
+			total_invalidate_num, total_num,  (float)total_invalidate_num/total_num, 
+			version_get_level_invalidation_cnt(v, lev->idx), run_total_validate_number);
 }

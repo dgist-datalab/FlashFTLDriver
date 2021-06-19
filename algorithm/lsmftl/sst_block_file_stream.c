@@ -42,7 +42,7 @@ static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_w
 		}
 
 #ifndef NOTSURE
-		invalidate_piece_ppa(LSM.pm->bm, kv_wrap_buf[i]->piece_ppa, true);
+		invalidate_kp_entry(kv_wrap_buf[i]->kv_ptr.lba, kv_wrap_buf[i]->piece_ppa, UINT32_MAX, true);
 #endif
 
 		if(kv_wrap_buf[i]->kv_ptr.lba==debug_lba){

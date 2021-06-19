@@ -2,6 +2,7 @@
 #define __LEVEL_H__
 #include "run.h"
 #include "page_manager.h"
+#include "version.h"
 
 enum {LEVELING, LEVELING_WISCKEY, TIERING, TIERING_WISCKEY};
 
@@ -14,6 +15,9 @@ typedef struct level{
 	uint32_t max_run_num;
 	//bool istier;
 	uint32_t level_type;
+	uint32_t max_contents_num;
+	uint32_t now_contents_num;
+	bool check_full_by_size;
 	run *array;
 }level;
 
@@ -50,7 +54,7 @@ typedef struct level{
 	for_each_run(level_ptr, rptr, ridx)\
 		for_each_sst(rptr, sptr, sidx)
 
-level *level_init(uint32_t max_sst_num, uint32_t run_num, uint32_t level_type, uint32_t idx);
+level *level_init(uint32_t max_sst_num, uint32_t run_num, uint32_t level_type, uint32_t idx, uint32_t max_contents_num, bool check_full_by_size);
 uint32_t level_append_sstfile(level *, sst_file *sptr, bool move_originality);
 uint32_t level_deep_append_sstfile(level *, run *);
 uint32_t level_append_run_copy_move_originality(level *, run *, uint32_t ridx);
@@ -150,14 +154,20 @@ static inline bool level_check_overlap_keyrange(uint32_t start, uint32_t end, le
 	return true;
 }
 
-static inline bool level_is_full(level *lev){
+static inline bool level_is_full(level *lev, uint32_t size_factor){
 	switch(lev->level_type){
 		case LEVELING_WISCKEY:
 		case LEVELING:
 			return !(lev->now_sst_num<lev->max_sst_num);
 		case TIERING_WISCKEY:
-		case TIERING:
 			return !(lev->run_num<lev->max_run_num);
+		case TIERING:
+			if(lev->check_full_by_size){
+				return lev->now_contents_num + lev->max_contents_num/size_factor >=lev->max_contents_num;
+			}
+			else{
+				return !(lev->run_num<lev->max_run_num);
+			}
 	}
 	return false;
 }
@@ -166,7 +176,8 @@ static inline bool level_is_appendable(level *lev, uint32_t append_target_num){
 	return lev->now_sst_num+append_target_num <= lev->max_sst_num;
 }
 
+void level_tiering_sst_analysis(level *lev, blockmanager *bm, struct version *v, bool);
 void level_print(level *lev);
 void level_content_print(level *lev, bool print_sst);
-
+uint32_t get_level_content_num(level *lev);
 #endif

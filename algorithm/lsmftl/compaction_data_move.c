@@ -31,7 +31,7 @@ uint32_t issue_read_kv_for_bos_sorted_set(sst_bf_out_stream *bos,
 			printf("break!\n");
 		}
 #ifdef NOTSURE
-		invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
+		invalidate_kp_entry(kv_wrapper->kv_ptr.lba, kv_wrapper->piece_ppa, UINT32_MAX, true);
 #endif
 	
 		/*version alread check in stream sorting logci*/
@@ -89,7 +89,7 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 
 #ifdef NOTSURE
 		if(slm_invalidate_enable(now_level, kv_wrapper->piece_ppa)){
-			invalidate_piece_ppa(LSM.pm->bm, kv_wrapper->piece_ppa, true);
+			invalidate_kp_entry(kv_wrapper->kv_ptr.lba, kv_wrapper->piece_ppa, UINT32_MAX, true);
 		}
 #endif
 
