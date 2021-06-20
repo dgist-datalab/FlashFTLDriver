@@ -77,7 +77,6 @@ static char* get_demand_status_name(MAP_ASSIGN_STATUS a){
 
 static inline void update_cache_entry_wrapper(GTD_entry *target_etr, uint32_t lba, uint32_t ppa, bool ispending){
 	uint32_t old_ppa=dmm.cache->update_entry(dmm.cache, target_etr, lba, ppa, &dmm.eviction_hint);
-
 	if(old_ppa!=UINT32_MAX){
 #ifdef DFTL_DEBUG
 		if(old_ppa==ppa){

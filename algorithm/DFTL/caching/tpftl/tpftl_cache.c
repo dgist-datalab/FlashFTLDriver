@@ -122,6 +122,12 @@ static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
 static inline uint32_t get_target_byte(GTD_entry *etr, uint32_t lba, uint32_t prefetching_hint, bool isquery){
 	uint32_t target_byte=0;
 	if(prefetching_hint){
+		if(!etr->private_data){
+			target_byte=TP_ENTRY_SZ+TP_NODE_SZ;
+		}
+		else{
+			target_byte=TP_ENTRY_SZ;
+		}
 		for(uint32_t i=lba+1; i<=lba+prefetching_hint; i++){
 			if(GETGTDIDX(i)!=GETGTDIDX(lba)) break;
 			target_byte+=TP_ENTRY_SZ;
@@ -253,10 +259,6 @@ static inline uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	tcm.now_caching_byte+=target_byte;
 	tc->ppa=ppa;
 	tc->dirty_bit=true;
-
-	if(lba==debug_lba){
-		printf("address update %u: %u -> %u\n", lba, old_ppa, ppa);
-	}
 	bitmap_set(tcm.populated_cache_entry, lba);
 
 	if(!isgc){
@@ -305,14 +307,16 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 		printf("over flow idx!!\n");
 		abort();
 	}
-	
-	if(lba==3146882){
-		printf("break!\n");
-	}
 
 	uint32_t prefetching_len=now_eviction_hint/TP_ENTRY_SZ+(now_eviction_hint%TP_ENTRY_SZ?1:0);
 	tp_cache_node *tc;
 	uint32_t *ppa_list=(uint32_t*)data;
+
+	if(prefetching_len==0){
+		printf("prefetching len 0 cannot be\n");
+		abort();
+	}
+
 	for(uint32_t i=0; i<prefetching_len; i++){
 		if(GETGTDIDX(lba)!=(GETGTDIDX((lba+i)))){
 			break;
@@ -535,9 +539,13 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba,
 #ifdef DFTL_DEBUG
 				if(!demand_ftl.bm->query_bit(demand_ftl.bm, tc->ppa)){
 					printf("wtf1! %u:%u\n", GETLBA(tn, tc), tc->ppa);
+					abort();
 				}
 				printf("cache drity_update %u -> %u:\n", GETLBA(tn, tc), tc->ppa);
 #endif
+				if(GETLBA(tn, tc)==debug_lba){
+					printf("%u is dirty cleaned by another eviction\n", debug_lba);
+				}
 			}
 		}
 	}
@@ -552,8 +560,9 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba,
 
 			ppa_list[GETOFFSET(temp.lba)]=temp.ppa;
 #ifdef DFTL_DEBUG
-			if(!demand_ftl.bm->query_bit(demand_ftl.bm, temp.lba)){
+			if(!demand_ftl.bm->query_bit(demand_ftl.bm, temp.ppa)){
 				printf("wtf2! %u:%u\n", temp.lba, temp.ppa);
+				abort();
 			}
 			printf("evicted drity_update %u -> %u:\n",temp.lba, temp.ppa);
 #endif
