@@ -527,11 +527,6 @@ void level_tiering_sst_analysis(level *lev, blockmanager *bm, version *v, bool m
 						invalidate_cnt++;
 						total_invalidate_num++;
 					}
-					/*
-					if(bm->is_invalid_page(bm, kp_set[i].piece_ppa)){
-						invalidate_cnt++;
-					}*/
-
 
 					if(entry_num==0) start_lba=kp_set[i].lba;
 					entry_num++;
