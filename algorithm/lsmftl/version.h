@@ -24,7 +24,7 @@ typedef struct version{
 	std::queue<uint32_t> **version_empty_queue;
 	std::queue<uint32_t> **version_populate_queue;
 	uint32_t memory_usage_bit;
-	int32_t poped_version_num;
+	int32_t *poped_version_num;
 	uint32_t leveln;
 }version;
 
@@ -90,20 +90,31 @@ static inline bool version_belong_level(version *v, int32_t a, uint32_t lev_idx)
 	return false;
 }
 
+static inline int version_to_belong_level(version *v, uint32_t a){
+	for(uint32_t i=0; i<v->leveln; i++){
+		if(v->start_vidx_of_level[i] < a) return i;
+	}
+}
+
+static inline int version_to_order(version *v, int32_t version, uint32_t level_idx){
+
+}
+
 static inline int version_compare(version *v, int32_t a, int32_t b){
 	//a: recent version
 	//b: noew version
 	if(b > v->max_valid_version_num){
 		EPRINT("not valid comparing", true);
 	}
-	int a_=a;
-	int b_=b;
+	int a_=version_to_order(v, a, version_to_belong_level(v, a));
+	int b_=version_to_order(v, b, version_to_belong_level(v, b));
+	/*
 	if(version_belong_level(v, a, v->leveln-1)){ //check 
 		a_=a-v->poped_version_num<0?a-v->poped_version_num+v->last_level_version_num:a-v->poped_version_num;
 	}
 	if(version_belong_level(v, b, v->leveln-1)){
 		b_=b-v->poped_version_num<0?b-v->poped_version_num+v->last_level_version_num:b-v->poped_version_num;
-	}
+	}*/
 	return a_-b_;
 }
 static inline void version_poped_update(version *v){
