@@ -13,6 +13,7 @@ my_cache coarse_cache_func{
 	.need_more_eviction=NULL,
 	.update_eviction_hint=coarse_update_eviction_hint,
 	.is_hit_eviction=NULL,
+	.update_hit_eviction_hint=NULL,
 	.is_eviction_hint_full=coarse_is_eviction_hint_full,
 	.update_entry=coarse_update_entry,
 	.update_entry_gc=coarse_update_entry_gc,

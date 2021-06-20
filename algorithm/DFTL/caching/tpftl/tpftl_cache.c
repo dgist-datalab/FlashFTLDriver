@@ -9,6 +9,7 @@ my_cache tp_cache_func{
 	.need_more_eviction=tp_is_needed_eviction,
 	.update_eviction_hint=tp_update_eviction_hint,
 	.is_hit_eviction=tp_is_hit_eviction,
+	.update_hit_eviction_hint=tp_update_eviction_hint,
 	.is_eviction_hint_full=tp_is_eviction_hint_full,
 	.update_entry=tp_update_entry,
 	.update_entry_gc=tp_update_entry_gc,
@@ -592,7 +593,7 @@ void tp_force_put_mru(struct my_cache *, GTD_entry *etr, mapping_entry *, uint32
 	lru_update(tcm.lru, tn->lru_node);
 }
 
-bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa){
+bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa, uint32_t/**/){
 	if(!etr->private_data) return false;
 	etr_sanity_check(etr);
 	if(tcm.now_caching_byte > tcm.max_caching_byte){

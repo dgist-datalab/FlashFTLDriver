@@ -20,6 +20,7 @@ my_cache fine_cache_func{
 	.need_more_eviction=NULL,
 	.update_eviction_hint=fine_update_eviction_hint,
 	.is_hit_eviction=NULL,
+	.update_hit_eviction_hint=NULL,
 	.is_eviction_hint_full=fine_is_eviction_hint_full,
 	.update_entry=fine_update_entry,
 	.update_entry_gc=fine_update_entry_gc,

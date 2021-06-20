@@ -16,6 +16,7 @@ my_cache sftl_cache_func{
 	.need_more_eviction=sftl_is_needed_eviction,
 	.update_eviction_hint=sftl_update_eviction_hint,
 	.is_hit_eviction=sftl_is_hit_eviction,
+	.update_hit_eviction_hint=sftl_update_hit_eviction_hint,
 	.is_eviction_hint_full=sftl_is_eviction_hint_full,
 	.update_entry=sftl_update_entry,
 	.update_entry_gc=sftl_update_entry_gc,
@@ -563,12 +564,12 @@ bool sftl_exist(struct my_cache *, uint32_t lba){
 	return dmm.GTD[GETGTDIDX(lba)].private_data!=NULL;
 }
 
-bool sftl_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa){
+bool sftl_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa, uint32_t total_hit_eviction){
 	if(!etr->private_data) return false;
 	sftl_cache *sc=GETSCFROMETR(etr);
 	if(is_sequential(sc, lba, ppa)) return false;
 
-	if(scm.now_caching_byte+sizeof(uint32_t)*2 > scm.max_caching_byte){
+	if(scm.now_caching_byte+total_hit_eviction+sizeof(uint32_t)*2 > scm.max_caching_byte){
 		return true;
 	}
 	return false;
@@ -580,4 +581,14 @@ void sftl_force_put_mru(struct my_cache *, GTD_entry *etr,mapping_entry *map, ui
 
 bool sftl_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint){
 	return scm.max_caching_byte <= eviction_hint;
+}
+
+uint32_t sftl_update_hit_eviction_hint(struct my_cache *, uint32_t lba, uint32_t *prefetching_info, uint32_t eviction_hint, 
+		uint32_t *now_eviction_hint, bool increase){
+	if(increase){
+		*now_eviction_hint=sizeof(uint32_t)*2;
+		return eviction_hint+*now_eviction_hint;
+	}else{
+		return eviction_hint-*now_eviction_hint;
+	}
 }

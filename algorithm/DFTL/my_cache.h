@@ -17,7 +17,9 @@ typedef struct my_cache{
 	bool (*need_more_eviction)(struct my_cache *, uint32_t lba, uint32_t *prefetching_num, uint32_t eviction_hint);//it is valid if type is VARIABLE
 	uint32_t (*update_eviction_hint)(struct my_cache *, uint32_t lba, uint32_t *prefetching_num,
 			uint32_t total_eviction_hint, uint32_t* now_eviction_hint, bool increase);
-	bool (*is_hit_eviction)(struct my_cache *, struct GTD_entry*, uint32_t lba, uint32_t ppa);
+	bool (*is_hit_eviction)(struct my_cache *, struct GTD_entry*, uint32_t lba, uint32_t ppa, uint32_t eviction_hint);
+	uint32_t (*update_hit_eviction_hint)(struct my_cache *, uint32_t lba, uint32_t *prefetching_num,
+			uint32_t total_eviction_hint, uint32_t* now_eviction_hint, bool increase);
 	bool (*is_eviction_hint_full)(struct my_cache *, uint32_t eviction_hint);
 	uint32_t (*update_entry)(struct my_cache *, struct GTD_entry *, uint32_t lba, 
 			uint32_t ppa, uint32_t *eviction_hint);

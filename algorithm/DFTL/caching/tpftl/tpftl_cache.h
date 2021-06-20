@@ -42,6 +42,7 @@ uint32_t tp_init(struct my_cache *, uint32_t total_caching_physical_pages);
 uint32_t tp_free(struct my_cache *);
 bool tp_is_needed_eviction(struct my_cache *, uint32_t , uint32_t *, uint32_t eviction_hint);
 uint32_t tp_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t *prefetching_info, uint32_t eviction_hint, uint32_t *now_eviciton_hint,bool increase);
+uint32_t tp_update_hit_eviction_hint(struct my_cache *, uint32_t lba, uint32_t *prefetching_info, uint32_t eviction_hint, uint32_t *now_eviciton_hint,bool increase);
 uint32_t tp_update_entry(struct my_cache *, GTD_entry *, uint32_t lba, uint32_t ppa, uint32_t *eviction_hint);
 uint32_t tp_update_entry_gc(struct my_cache *, GTD_entry *, uint32_t lba, uint32_t ppa);
 uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *, uint32_t lba, char *data, uint32_t *eviction_hint, uint32_t now_eviction_hint);
@@ -52,6 +53,6 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_
 bool tp_evict_target(struct my_cache *, GTD_entry *, mapping_entry *etr);
 bool tp_exist(struct my_cache *, uint32_t lba);
 void tp_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *,uint32_t);
-bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa);
+bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa, uint32_t total_hit_eviction);
 void tp_update_dynamic_size(struct my_cache*, uint32_t lba, char*data);
 bool tp_is_eviction_hint_full(struct my_cache*, uint32_t eviction_hint);

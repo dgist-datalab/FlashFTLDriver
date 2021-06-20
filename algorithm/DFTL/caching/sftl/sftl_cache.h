@@ -32,6 +32,9 @@ uint32_t sftl_free(struct my_cache *);
 bool sftl_is_needed_eviction(struct my_cache *, uint32_t lba, uint32_t *, uint32_t eviction_hint);
 uint32_t sftl_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t *prefetching_info, uint32_t eviction_hint, 
 		uint32_t *now_eviction_hint, bool increase);
+
+uint32_t sftl_update_hit_eviction_hint(struct my_cache *, uint32_t lba, uint32_t *prefetching_info, uint32_t eviction_hint, 
+		uint32_t *now_eviction_hint, bool increase);
 uint32_t sftl_update_entry(struct my_cache *, GTD_entry *, uint32_t lba, uint32_t ppa, uint32_t *eviction_hint);
 uint32_t sftl_update_entry_gc(struct my_cache *, GTD_entry *, uint32_t lba, uint32_t ppa);
 uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *, uint32_t lba, char *data, uint32_t *eviction_hint, uint32_t org_eviction_hint);
@@ -46,7 +49,7 @@ void sftl_mapping_verify(sftl_cache* sc);
 void sftl_print_mapping(sftl_cache* sc);
 uint32_t sftl_print_mapping_target(sftl_cache *sc, uint32_t lba);
 
-bool sftl_is_hit_eviction(struct my_cache *, GTD_entry *,uint32_t lba, uint32_t ppa);
+bool sftl_is_hit_eviction(struct my_cache *, GTD_entry *,uint32_t lba, uint32_t ppa, uint32_t total_hit_eviction);
 void sftl_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *, uint32_t);
 bool sftl_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint);
 #endif
