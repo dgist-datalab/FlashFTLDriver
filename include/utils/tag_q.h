@@ -9,6 +9,7 @@ typedef struct tag_manager{
 	pthread_mutex_t tag_lock;
 	pthread_cond_t tag_cond;
 	uint32_t max_tag_num;
+	std::set<uint32_t>* check_tag;
 }tag_manager;
 
 tag_manager *tag_manager_init(uint32_t tag_num);

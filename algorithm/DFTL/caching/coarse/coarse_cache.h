@@ -19,7 +19,7 @@ typedef struct coarse_cache_monitor{
 
 uint32_t coarse_init(struct my_cache *, uint32_t total_caching_physical_pages);
 uint32_t coarse_free(struct my_cache *);
-bool coarse_is_needed_eviction(struct my_cache *, uint32_t lba, uint32_t *prefetching_num, uint32_t eviction_hint);
+uint32_t coarse_is_needed_eviction(struct my_cache *, uint32_t lba, uint32_t *prefetching_num, uint32_t eviction_hint);
 uint32_t coarse_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t *prefetching_info, 
 		uint32_t eviction_hint, uint32_t *now_eviction_hint, bool increase);
 uint32_t coarse_update_entry(struct my_cache *, GTD_entry *, uint32_t lba, uint32_t ppa, uint32_t *eviction_hint);
@@ -32,3 +32,4 @@ struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *, uint32_t lba)
 bool coarse_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr, mapping_entry * map, char *data, void *);
 bool coarse_exist(struct my_cache *, uint32_t lba);
 void coarse_force_put_mru(struct my_cache*, struct GTD_entry *, mapping_entry *,uint32_t lba);
+int32_t coarse_get_remain_space(struct my_cache *, uint32_t total_eviction_hint);

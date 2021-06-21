@@ -83,6 +83,7 @@ struct request {
 	int mark;
 	bool is_sequential_start;
 	uint32_t consecutive_length; 
+	uint32_t round_cnt;
 
 /*s:for application req
 	char *target_buf;

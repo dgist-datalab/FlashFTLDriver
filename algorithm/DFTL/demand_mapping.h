@@ -22,6 +22,10 @@ enum{
 };
 
 enum{
+	 HAVE_SPACE, NORMAL_EVICTION, EMPTY_EVICTION,
+};
+
+enum{
 	MAP_MISS=1,
 	MAP_EVICT_READ=2,
 	MAP_WRITE=4,
@@ -73,7 +77,6 @@ typedef struct demand_param{
 	void *param_ex;
 	void *cache_private;
 	bool is_hit_eviction;
-	bool is_padding_for_dynamic_size;
 
 	uint32_t flying_map_read_key;
 }demand_param;
@@ -94,12 +97,14 @@ typedef struct demand_map_manager{
 	lower_info *li;
 	uint32_t eviction_hint;
 	bool global_debug_flag;
+	uint32_t now_mapping_read_cnt;
 	//uint32_t flying_lba_idx;
 	//uint32_t flying_lba_array[QDEPTH*2];
 	fdriver_lock_t flying_map_read_lock;
 	std::map<uint32_t, request*> *flying_map_read_req_set;
 	std::map<uint32_t, bool> *flying_map_read_flag_set;
 	std::map<uint32_t, request*> *flying_req;//pair<req->seq, request*>
+	std::map<uint32_t, request*> *all_now_req;//pair<req->seq, request*>
 	blockmanager *bm;
 }demand_map_manager;
 

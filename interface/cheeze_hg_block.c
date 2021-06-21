@@ -322,6 +322,7 @@ vec_request **get_vectored_request_arr()
 #endif
 
 	int req_idx = 0;
+	static int cnt=0;
 	res = (vec_request **) malloc(sizeof(vec_request *) * (check_idx + 1));
 	for (int i = 0; i < CHEEZE_QUEUE_SIZE; i++) {
 		if (!check[i])
@@ -331,6 +332,9 @@ vec_request **get_vectored_request_arr()
 		id = i;
 		ureq = ureq_addr + id;
 		res[req_idx++] = ch_ureq2vec_req(ureq, id);
+		if(cnt%10000){
+			printf("%u\n", cnt++);
+		}
 #ifdef TRACE_COLLECT
 		write(trace_fd, ureq, sizeof(cheeze_req_user));
 		write(trace_fd, crc_buffer, ureq->len/LPAGESIZE * sizeof(uint32_t));

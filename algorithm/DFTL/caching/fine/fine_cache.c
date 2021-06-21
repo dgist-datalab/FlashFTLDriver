@@ -22,6 +22,7 @@ my_cache fine_cache_func{
 	.is_hit_eviction=NULL,
 	.update_hit_eviction_hint=NULL,
 	.is_eviction_hint_full=fine_is_eviction_hint_full,
+	.get_remain_space=fine_get_remain_space,
 	.update_entry=fine_update_entry,
 	.update_entry_gc=fine_update_entry_gc,
 	.force_put_mru=fine_force_put_mru,
@@ -95,10 +96,10 @@ static inline void map_size_check(uint32_t *eviction_hint){
 	}
 }
 
-bool fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t eviction_hint){
-	if(fcm.max_caching_map ==fcm.now_caching_map+ (eviction_hint) ) return true;
+uint32_t fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t eviction_hint){
+	if(fcm.max_caching_map ==fcm.now_caching_map+ (eviction_hint) ) return fcm.now_caching_map?NORMAL_EVICTION:EMPTY_EVICTION;
 	map_size_check(&eviction_hint);
-	return false;
+	return HAVE_SPACE;
 }
 
 uint32_t fine_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t *prefetching_info, uint32_t eviction_hint, 
@@ -397,4 +398,8 @@ void fine_force_put_mru(struct my_cache *, GTD_entry *,mapping_entry *map,  uint
 
 bool fine_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint){
 	return fcm.max_caching_map==eviction_hint;
+}
+
+int32_t fine_get_remain_space(struct my_cache *, uint32_t total_eviction_hint){
+	return fcm.max_caching_map-fcm.now_caching_map-total_eviction_hint;
 }

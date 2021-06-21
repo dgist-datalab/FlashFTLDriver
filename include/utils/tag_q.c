@@ -7,9 +7,11 @@ tag_manager *tag_manager_init(uint32_t tag_num){
 	pthread_mutex_init(&tmanager->tag_lock, NULL);
 	pthread_cond_init(&tmanager->tag_cond, NULL);
 	tmanager->tagQ=new std::queue<uint32_t>();
+	tmanager->check_tag=new std::set<uint32_t>();
 
 	for(uint32_t i=0; i<tag_num; i++){
 		tmanager->tagQ->push(i);
+		tmanager->check_tag->insert(i);
 	}
 	tmanager->max_tag_num=tag_num;
 	return tmanager;
@@ -22,6 +24,7 @@ uint32_t tag_manager_get_tag(tag_manager *tm){
 		pthread_cond_wait(&tm->tag_cond, &tm->tag_lock);
 	}
 	res=tm->tagQ->front();
+	tm->check_tag->erase(res);
 	tm->tagQ->pop();
 	pthread_mutex_unlock(&tm->tag_lock);
 	//printf("get tag %u\n", res);
@@ -31,6 +34,13 @@ uint32_t tag_manager_get_tag(tag_manager *tm){
 void tag_manager_free_tag(tag_manager *tm, uint32_t tag_num){
 	//printf("free tag %u\n", tag_num);
 	pthread_mutex_lock(&tm->tag_lock);
+	if(tm->check_tag->find(tag_num)!=tm->check_tag->end()){
+		printf("same tag in tag_q\n");
+		abort();
+	}
+	else{
+		tm->check_tag->insert(tag_num);
+	}
 	tm->tagQ->push(tag_num);
 	if(tm->max_tag_num < tm->tagQ->size()){
 		printf("over free in tagQ\n");

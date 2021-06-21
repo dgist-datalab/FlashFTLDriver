@@ -15,6 +15,7 @@ my_cache coarse_cache_func{
 	.is_hit_eviction=NULL,
 	.update_hit_eviction_hint=NULL,
 	.is_eviction_hint_full=coarse_is_eviction_hint_full,
+	.get_remain_space=coarse_get_remain_space,
 	.update_entry=coarse_update_entry,
 	.update_entry_gc=coarse_update_entry_gc,
 	.force_put_mru=coarse_force_put_mru,
@@ -53,16 +54,16 @@ uint32_t coarse_free(struct my_cache *mc){
 	return 1;
 }
 
-bool coarse_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t eviction_hint){
+uint32_t coarse_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t eviction_hint){
 	if(ccm.max_caching_page == ccm.now_caching_page+ (eviction_hint)){
-		return true;
+		return ccm.now_caching_page?NORMAL_EVICTION:EMPTY_EVICTION;
 	}
 
 	if(ccm.max_caching_page<ccm.now_caching_page+(eviction_hint)){
 		printf("now caching page bigger!!!! %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
-	return false;
+	return HAVE_SPACE;
 }
 
 
@@ -227,4 +228,8 @@ void coarse_force_put_mru(struct my_cache*, struct GTD_entry *etr, mapping_entry
 
 bool coarse_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint){
 	return eviction_hint==ccm.max_caching_page;
+}
+
+int32_t coarse_get_remain_space(struct my_cache *, uint32_t total_eviction_hint){
+	return ccm.max_caching_page-ccm.now_caching_page-total_eviction_hint;
 }

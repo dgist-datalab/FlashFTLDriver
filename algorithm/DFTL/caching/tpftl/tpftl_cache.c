@@ -11,6 +11,7 @@ my_cache tp_cache_func{
 	.is_hit_eviction=tp_is_hit_eviction,
 	.update_hit_eviction_hint=tp_update_eviction_hint,
 	.is_eviction_hint_full=tp_is_eviction_hint_full,
+	.get_remain_space=tp_get_remain_space,
 	.update_entry=tp_update_entry,
 	.update_entry_gc=tp_update_entry_gc,
 	.force_put_mru=tp_force_put_mru,
@@ -161,17 +162,17 @@ static inline void tp_check_cache_size(){
 	}
 }
 
-bool tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num, uint32_t eviction_hint){
+uint32_t tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num, uint32_t eviction_hint){
 	GTD_entry *etr=GETETR(dmm, lba);
 	etr_sanity_check(etr);
 
 	uint32_t prefetching_hint=((*prefetching_num)!=UINT32_MAX?(*prefetching_num):0);
 	uint32_t target_byte=get_target_byte(etr, lba, prefetching_hint, true);
 	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte + (eviction_hint)){
-		return false;
+		return HAVE_SPACE;
 	}
 	else{
-		return true;
+		return tcm.now_caching_byte==0?EMPTY_EVICTION:NORMAL_EVICTION;
 	}
 }
 
@@ -608,4 +609,7 @@ void tp_update_dynamic_size(struct my_cache*, uint32_t lba, char*data){
 
 bool tp_is_eviction_hint_full(struct my_cache*, uint32_t eviction_hint){
 	return tcm.max_caching_byte<=eviction_hint;
+}
+int32_t tp_get_remain_space(struct my_cache *,uint32_t total_eviction_hint){
+	return tcm.max_caching_byte-tcm.now_caching_byte-total_eviction_hint;
 }

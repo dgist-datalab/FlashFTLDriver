@@ -8,6 +8,11 @@
 extern uint32_t test_key;
 extern uint32_t test_ppa;
 extern uint32_t debug_lba;
+
+extern my_cache coarse_cache_func;
+extern my_cache fine_cache_func;
+extern my_cache sftl_cache_func;
+extern my_cache tp_cache_func;
 demand_map_manager dmm;
 dmi DMI;
 
@@ -21,6 +26,39 @@ inline static void cpy_keys(uint32_t **des, uint32_t *src){
 	(*des)=(uint32_t*)malloc(sizeof(KEYT)*L2PGAP);
 	memcpy((*des), src, sizeof(KEYT)*L2PGAP);
 }
+
+static inline char *cache_traverse_type(MAP_ASSIGN_STATUS a){
+	switch(a){
+		case NONE: return "NONE";
+		case HIT:return "HIT";
+		case EVICTIONW: return "EVICTIONW";
+		case EVICTIONR: return "EVICTIONR";
+		case MISSR: return "MISSR";
+	}
+	return NULL;
+}
+void print_all_processed_req(){
+	std::map<uint32_t, request *>::iterator iter;
+	for(iter=dmm.all_now_req->begin(); iter!=dmm.all_now_req->end(); iter++){
+		demand_param *dp=(demand_param*)iter->second->param;
+		assign_param_ex* mp=(assign_param_ex*)dp->param_ex;
+		printf("[%s] req->type:%u seq:%u now_eviction_hint%u lba:%u\n", cache_traverse_type(dp->status),
+				iter->second->type, iter->second->global_seq, dp->now_eviction_hint,
+				mp->lba[mp->idx]);
+	}
+	printf("total eviction hint:%u\n", dmm.eviction_hint);
+}
+
+uint32_t all_eviction_hint(){
+	uint32_t res=0;
+	std::map<uint32_t, request *>::iterator iter;
+	for(iter=dmm.all_now_req->begin(); iter!=dmm.all_now_req->end(); iter++){
+		demand_param *dp=(demand_param*)iter->second->param;
+		res+=dp->now_eviction_hint;
+	}
+	return res;
+}
+
 
 static inline char *cache_type(cache_algo_type t){
 	switch(t){
@@ -131,6 +169,8 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 	dmm.flying_map_read_flag_set=new std::map<uint32_t, bool>();
 	dmm.flying_req=new std::map<uint32_t, request*>();
 
+	dmm.all_now_req=new std::map<uint32_t, request*>();
+
 	dmm.li=li;
 	dmm.bm=bm;
 
@@ -199,7 +239,6 @@ static inline void dp_initialize(demand_param *dp){
 	dp_prev_init(dp);
 	dp->now_eviction_hint=0;
 	dp->is_hit_eviction=false;
-	dp->is_padding_for_dynamic_size=false;
 }
 
 uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_param *param, 
@@ -284,6 +323,13 @@ inline void __demand_map_pending_read(request *req, demand_param *dp, bool need_
 		dp->target.ppa=dmm.cache->get_mapping(dmm.cache, dp->target.lba);
 	}
 
+	dmm.all_now_req->erase(req->global_seq);
+	if(dmm.eviction_hint!=all_eviction_hint()){
+		print_all_processed_req();
+		printf("req:%u dp:%u\n", req->global_seq, dp->now_eviction_hint);
+		abort();
+	}
+
 	if(dp->target.ppa==UINT32_MAX){
 		//printf("try to read invalidate ppa %s:%d\n", __FILE__,__LINE__);
 		notfound_processing(req);
@@ -311,12 +357,9 @@ bool flying_request_hit_check(request *req, uint32_t lba, demand_param *dp ,bool
 	if(dmm.cache->type==COARSE && etr->status==FLYING){
 		dp_status_update(dp, MISSR);
 		list_insert(etr->pending_req, (void*)req);
+		dp->now_eviction_hint=0;
 		DMI.hit_num++;
 		if(iswrite){
-			if(dmm.cache->entry_type==DYNAMIC){
-				dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, lba, NULL, dmm.eviction_hint, &dp->now_eviction_hint, true);
-				dp->is_padding_for_dynamic_size=true;
-			}
 			DMI.write_hit_num++;
 		}
 		else{
@@ -341,6 +384,8 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 
 	uint32_t res=0;
 	dmm.cache->insert_entry_from_translation(dmm.cache, etr, UINT32_MAX, value, &dmm.eviction_hint, dp->now_eviction_hint);
+	dp->now_eviction_hint=0;
+
 	if((int)dmm.eviction_hint<0){
 		printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
 		abort();
@@ -362,35 +407,29 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 				printf("%u is differ ppa %u - max_idx:%u, req->seq:%u\n", lba[i], physical[i], ap->max_idx, treq->seq);
 			}
 
-			if(treq->global_seq==12604126 && lba[i]==2170025){
-				printf("break!\n");
-			}
-
 			if(dmm.cache->entry_type==DYNAMIC){
-				uint32_t temp_eviction_hint=dmm.eviction_hint-dp->now_eviction_hint;
-				if(dmm.cache->is_hit_eviction(dmm.cache, etr, lba[i], physical[i], temp_eviction_hint)){
-					list_delete_node(etr->pending_req, now);
-					dp_initialize(dp);
-					dmm.eviction_hint-=dp->now_eviction_hint;
-					if(!inf_assign_try(treq)){
-						abort();
-					}
-					continue;
-				}
-			}
-
-			if(dmm.cache->entry_type==DYNAMIC && dp->is_padding_for_dynamic_size){
-				dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, lba[i], NULL, dmm.eviction_hint, &dp->now_eviction_hint, false);	
-				if((int)dmm.eviction_hint<0){
-					printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
+				uint32_t temp_size=dmm.eviction_hint-dp->now_eviction_hint;
+				if(dmm.cache->get_remain_space(dmm.cache, temp_size) < dp->now_eviction_hint){
+					printf("size error!\n");
 					abort();
 				}
 			}
+			
 			update_cache_entry_wrapper(etr, lba[i], physical[i], true);
 
+			if(dmm.cache->entry_type==DYNAMIC){
+				dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, lba[i], NULL, dmm.eviction_hint, &dp->now_eviction_hint, false);
+				dp->now_eviction_hint=0;
+			}
 
 			i++;
 			if(i==ap->max_idx){
+				dmm.all_now_req->erase(treq->global_seq);
+				if(dmm.eviction_hint!=all_eviction_hint()){
+					print_all_processed_req();
+					printf("req:%u dp:%u\n", req->global_seq, dp->now_eviction_hint);
+					abort();
+				}
 				free(lba);
 				free(physical);
 				if(ap){
@@ -422,6 +461,12 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 		else if(treq->type==FS_GET_T){
 			if(req==treq){
 				res=1;			
+			}
+			if(dmm.cache->entry_type==DYNAMIC){
+				if(dp->now_eviction_hint){
+					printf("why???\n");
+				}
+				dp->now_eviction_hint=0;
 			}
 			__demand_map_pending_read(treq, dp, true);
 		}
@@ -512,6 +557,12 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 
 				i++;
 				if(i==ap->max_idx){
+					dmm.all_now_req->erase(treq->global_seq);
+					if(dmm.eviction_hint!=all_eviction_hint()){
+						print_all_processed_req();
+						printf("req:%u dp:%u\n", req->global_seq, dp->now_eviction_hint);
+						abort();
+					}
 					free(lba);
 					free(physical);
 					if(ap){
@@ -634,9 +685,11 @@ static inline uint32_t updating_mapping_for_eviction(request *req, demand_param 
 				(!dp->is_hit_eviction && dmm.cache->need_more_eviction(dmm.cache, target->lba, prefetching_info, temp_eviction_hint))){
 			if(dp->is_hit_eviction){
 				dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, target->lba,  prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
+				dp->now_eviction_hint=0;
 			}
 			else{
 				dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, target->lba,  prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
+				dp->now_eviction_hint=0;
 				if((int)dmm.eviction_hint<0){
 					printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
 					abort();
@@ -657,23 +710,50 @@ static inline uint32_t updating_mapping_for_eviction(request *req, demand_param 
 	return 1;
 }
 
+
 uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_param *dp, 
 		uint32_t *prefetching_info, bool iswrite_path){
 	GTD_entry *now_etr=&dmm.GTD[GETGTDIDX(now_pair->lba)];
 	GTD_entry *eviction_etr=NULL;
 	uint32_t eviction_hint_temp;
 	uint32_t res;
+	bool double_eviction=false;
+	bool dynamic_flying_hit=false;
+	static bool print_all=false;
+	static bool debug_flag=false;
+	uint32_t temp_res_value;
+/*
+	if(debug_flag){
+		printf("break! df\n");
+	}
+*/
+	if((req->global_seq==16921881) || req->round_cnt++>20){
+		printf("break1 round_cnt: seq%u -> %u\n", req->global_seq, req->round_cnt);
+	//	print_all=true;
+	}
+
+	if(dmm.eviction_hint!=all_eviction_hint()){
+		print_all_processed_req();
+		abort();
+	}
+
+	if(print_all){
+		print_all_processed_req();
+	}
+
 	if(now_pair->lba==debug_lba){
 		printf("traverse :%u,%u\n", now_pair->lba, now_pair->ppa);
 	}
 
-	if(req->global_seq==13135325){
-		printf("break1\n");
-	}
 retry:
+	if(scm.now_caching_byte==0 && dmm.eviction_hint>4000000){
+		printf("break!\n");
+	}
 	switch(dp->status){
 		case EVICTIONW:
 			if(dp->is_hit_eviction){
+				dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, now_pair->lba, prefetching_info,
+						dmm.eviction_hint, &dp->now_eviction_hint, false);
 				dp_status_update(dp, HIT); 	goto retry;
 			}
 
@@ -685,7 +765,6 @@ retry:
 					abort();
 				}
 				if(dmm.cache->entry_type==DYNAMIC){
-
 					goto hit_eviction;
 				}
 				else{
@@ -693,12 +772,18 @@ retry:
 				}
 			}
 
-			if(dmm.cache->entry_type==DYNAMIC && dmm.cache->type==COARSE){
-				if(dmm.cache->is_needed_eviction(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint)){
+			if(dmm.cache->entry_type==DYNAMIC){
+				uint32_t temp_size=dmm.eviction_hint-dp->now_eviction_hint;
+				if(dmm.cache->get_remain_space(dmm.cache, temp_size) < dp->now_eviction_hint){
+					printf("size error! %u %u\n", req->global_seq, now_pair->lba);
+					dmm.cache->get_remain_space(dmm.cache, temp_size);
+					print_all_processed_req();					
+					//abort();
 					dp_status_update(dp, NONE);
 					dp_prev_init(dp);
-					goto eviction_again;
-				}
+					double_eviction=true;
+					goto eviction_path;
+				}		
 			}
 
 			dp_status_update(dp, MISSR); 
@@ -710,10 +795,16 @@ retry:
 						printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
 						abort();
 					}
+
 					if(dmm.cache->entry_type==DYNAMIC){
-						dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, true);
-						dp->is_padding_for_dynamic_size=true;
+						if(iswrite_path){
+							dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, true);
+						}
+						else{
+							dp->now_eviction_hint=0;
+						}
 					}
+
 					if((int)dmm.eviction_hint<0){
 						printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
 						abort();
@@ -732,24 +823,59 @@ retry:
 					printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
 					abort();
 				}
-				if(flying_request_hit_check(req, now_pair->lba, dp, true)) return FLYING_HIT_END;
 
+				if(dmm.cache->entry_type==DYNAMIC && dmm.cache->type==COARSE){
+					/*sftl*/
+					if(now_etr->status==FLYING){
+						if(iswrite_path){
+							dmm.cache->update_hit_eviction_hint(dmm.cache, now_pair->lba, prefetching_info,
+									dmm.eviction_hint, &dp->now_eviction_hint, true);
+							dynamic_flying_hit=true;
+							dmm.eviction_hint+=dp->now_eviction_hint;
+						}
+						else{
+							if(flying_request_hit_check(req,now_pair->lba, dp, true)) return FLYING_HIT_END;	
+						}
+					}
+				}
+				else{
+					if(flying_request_hit_check(req, now_pair->lba, dp, true)) return FLYING_HIT_END;
+				}
+				
 				req->type_ftl |=(MAP_MISS);
 				DMI.miss_num++;
 				iswrite_path ? DMI.write_miss_num++ : DMI.read_miss_num++;
 				
-				if(dmm.cache->is_needed_eviction(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint)){ 
-eviction_path:
+				if((temp_res_value=dmm.cache->is_needed_eviction(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint))){
+					if(temp_res_value==EMPTY_EVICTION){
+						print_all_processed_req();
+						printf("req->global_seq:%u is retry!!\n", req->global_seq);
+
+						dp->now_eviction_hint=0;
+						dp_status_update(dp, NONE);
+						dp_prev_init(dp);
+						if(!inf_assign_try(req)) abort();
+						debug_flag=true;
+						return RETRY_END;
+	//					abort();
+					}
+					if(dynamic_flying_hit){ 
+						//it is flysing hit, but no space for this entry, it may need larger space
+						dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, now_pair->lba, prefetching_info,
+								dmm.eviction_hint, &dp->now_eviction_hint, false);
+						dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, true);
+					}
 
 					if(!dp->is_hit_eviction && dmm.cache->is_eviction_hint_full(dmm.cache, dmm.eviction_hint)){
 						if(!inf_assign_try(req)) abort();
 						return RETRY_END;
 					}
-
-					if(!dp->is_hit_eviction){
+eviction_path:
+					
+					if(!dp->is_hit_eviction && !double_eviction){
 						dmm.eviction_hint+=dp->now_eviction_hint;
 					}
-eviction_again:
+//eviction_again:
 					DMI.eviction_cnt++;
 
 					if(dmm.cache->type==COARSE){
@@ -787,7 +913,27 @@ eviction_again:
 				}//needed eviction end
 				else{
 					DMI.cold_miss_num++;
-					dmm.eviction_hint+=dp->now_eviction_hint;
+
+					if(dynamic_flying_hit){//has enough space for this entry
+						if(iswrite_path){
+							/*already update dmm.eviction_hint*/
+							//dmm.eviction_hint+=dp->now_eviction_hint;
+						}
+						else{
+							dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, now_pair->lba, prefetching_info,
+									dmm.eviction_hint, &dp->now_eviction_hint, false);
+							dp->now_eviction_hint=0;
+						}
+						fdriver_lock(&now_etr->lock);
+						list_insert(now_etr->pending_req, (void*)req);
+						fdriver_unlock(&now_etr->lock);
+						dp_status_update(dp, MISSR);
+						return FLYING_HIT_END;
+					}
+					else{
+						dmm.eviction_hint+=dp->now_eviction_hint;
+					}
+
 					if(iswrite_path){
 						if(now_etr->physical_address!=UINT32_MAX){
 							dp_status_update(dp, MISSR);
@@ -926,7 +1072,6 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		i=mp->idx=0;
 		dp->param_ex=(void*)mp;
 		dp->is_hit_eviction=false;
-		dp->is_padding_for_dynamic_size=false;
 		dp->flying_map_read_key=UINT32_MAX;
 		req->param=(void*)dp;
 		mp->max_idx=check_flying_req(req, mp);
@@ -937,6 +1082,9 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 
 		lba=mp->lba;
 		physical=mp->physical;
+		req->round_cnt=0;
+
+		dmm.all_now_req->insert(std::pair<uint32_t, request*>(req->global_seq, req));
 	}
 	else{
 		dp=(demand_param*)req->param;
@@ -980,6 +1128,12 @@ end:
 		dmm.flying_req->erase(req->seq);
 	}
 	if(i==mp->max_idx){
+		dmm.all_now_req->erase(req->global_seq);
+		if(dmm.eviction_hint!=all_eviction_hint()){
+			print_all_processed_req();
+			printf("req:%u dp:%u\n", req->global_seq, dp->now_eviction_hint);
+			abort();
+		}
 		if(req->param){
 			free(mp->lba);
 			free(mp->physical);
@@ -1030,7 +1184,6 @@ uint32_t demand_page_read(request *const req){
 		dp_status_update(dp, NONE);
 		dp_prev_init(dp);
 		dp->is_hit_eviction=false;
-		dp->is_padding_for_dynamic_size=false;
 
 		mp=(assign_param_ex*)malloc(sizeof(assign_param_ex));
 		mp->prefetching_info=(uint32_t*)malloc(sizeof(uint32_t));
@@ -1038,6 +1191,8 @@ uint32_t demand_page_read(request *const req){
 		if(req->consecutive_length){
 			req->consecutive_length++;
 		}
+
+		req->round_cnt=0;
 		mp->prefetching_info[0]=req->consecutive_length;
 		dp->param_ex=mp;
 		dp->target.lba=req->key;
@@ -1049,6 +1204,8 @@ uint32_t demand_page_read(request *const req){
 			dp->target.ppa=recent_ppa;
 			goto read_data;
 		}
+
+		dmm.all_now_req->insert(std::pair<uint32_t, request*>(req->global_seq, req));
 	}else{
 		dp=(demand_param*)req->param;
 		mp=(assign_param_ex*)dp->param_ex;
@@ -1071,6 +1228,12 @@ uint32_t demand_page_read(request *const req){
 		case DONE_END:
 			goto read_data;
 		case NOTFOUND_END:	
+			dmm.all_now_req->erase(req->global_seq);
+			if(dmm.eviction_hint!=all_eviction_hint()){
+				print_all_processed_req();
+				printf("req:%u dp:%u\n", req->global_seq, dp->now_eviction_hint);
+				abort();
+			}
 			notfound_processing(req);
 			return 1;
 		default:
@@ -1191,10 +1354,6 @@ inline uint32_t xx_to_byte(char *a){
 	}
 	return 1;
 }
-extern my_cache coarse_cache_func;
-extern my_cache fine_cache_func;
-extern my_cache sftl_cache_func;
-extern my_cache tp_cache_func;
 
 static void print_help(){
 	printf("-----help------\n");

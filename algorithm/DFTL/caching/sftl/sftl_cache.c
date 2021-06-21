@@ -18,6 +18,7 @@ my_cache sftl_cache_func{
 	.is_hit_eviction=sftl_is_hit_eviction,
 	.update_hit_eviction_hint=sftl_update_hit_eviction_hint,
 	.is_eviction_hint_full=sftl_is_eviction_hint_full,
+	.get_remain_space=sftl_get_remain_space,
 	.update_entry=sftl_update_entry,
 	.update_entry_gc=sftl_update_entry_gc,
 	.force_put_mru=sftl_force_put_mru,
@@ -65,16 +66,29 @@ uint32_t sftl_free(struct my_cache *mc){
 	return 1;
 }
 
-bool sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba, uint32_t *, uint32_t eviction_hint){
+uint32_t sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba, uint32_t *, uint32_t eviction_hint){
 	uint32_t target_size=scm.gtd_size[GETGTDIDX(lba)];
 	if(scm.max_caching_byte <= scm.now_caching_byte+target_size+sizeof(uint32_t)*2+(eviction_hint)){
-		return true;
+		return scm.now_caching_byte==0? EMPTY_EVICTION : NORMAL_EVICTION;
 	}
+
+	/*sftl get eviction gtd entry*/
+	/*
+	lru_node *target;
+	GTD_entry *etr=NULL;
+	for_each_lru_backword(scm.lru, target){
+		sftl_cache *sc=(sftl_cache*)target->data;
+		etr=sc->etr;
+		if(target_size > scm.gtd_size[etr->idx]){
+			break;
+		}
+	}*/
+
 	if(scm.max_caching_byte <= scm.now_caching_byte){
 		printf("now caching byte bigger!!!! %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
-	return false;
+	return HAVE_SPACE;
 }
 
 uint32_t sftl_update_eviction_hint(struct my_cache *, uint32_t lba, uint32_t * /*prefetching_info*/,uint32_t eviction_hint, 
@@ -288,6 +302,8 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 
 	uint32_t old_ppa;
 	uint32_t gtd_idx=GETGTDIDX(lba);
+	int32_t prev_gtd_size;
+	int32_t changed_gtd_size;
 	lru_node *ln;
 
 	if(etr->status==EMPTY){
@@ -308,6 +324,8 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		ln=(lru_node*)etr->private_data;
 		sc=(sftl_cache*)(ln->data);
 	}
+
+	prev_gtd_size=scm.gtd_size[gtd_idx];
 /*
 	if(lba==2129921){//GETGTDIDX(lba)==520){
 		printf("prev %u-%u : ", lba, ppa);
@@ -338,6 +356,12 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 				break;
 		}
 	}
+
+	changed_gtd_size=scm.gtd_size[gtd_idx];
+	if(changed_gtd_size - prev_gtd_size > (int)sizeof(uint32_t)*2){
+		printf("what happen???\n");
+		abort();
+	}
 /*
 	if(lba==2129921){//GETGTDIDX(lba)==520){
 		printf("after %u-%u:", lba, ppa);
@@ -347,6 +371,7 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 */
 	if((scm.gtd_size[gtd_idx]-BITMAPSIZE)/sizeof(uint32_t) > PAGESIZE/sizeof(uint32_t)){
 		printf("oversize!\n");
+		sftl_print_mapping(sc);
 		abort();
 	}
 	scm.now_caching_byte+=scm.gtd_size[gtd_idx];
@@ -591,4 +616,8 @@ uint32_t sftl_update_hit_eviction_hint(struct my_cache *, uint32_t lba, uint32_t
 	}else{
 		return eviction_hint-*now_eviction_hint;
 	}
+}
+
+int32_t sftl_get_remain_space(struct my_cache *, uint32_t total_eviction_hint){
+	return scm.max_caching_byte-scm.now_caching_byte-total_eviction_hint;
 }
