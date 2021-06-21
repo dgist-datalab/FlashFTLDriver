@@ -11,6 +11,9 @@ extern uint32_t debug_lba;
 demand_map_manager dmm;
 dmi DMI;
 
+#include "./caching/sftl/sftl_cache.h"
+extern sftl_cache_monitor scm;
+
 extern algorithm demand_ftl;
 uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_param *dp, 
 		uint32_t *prefetching_info, bool iswrite_path);
@@ -674,14 +677,6 @@ retry:
 				dp_status_update(dp, HIT); 	goto retry;
 			}
 
-			if(dmm.cache->entry_type==DYNAMIC && dmm.cache->type==COARSE){
-				if(dmm.cache->is_needed_eviction(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint)){
-					dp_status_update(dp, NONE);
-					dp_prev_init(dp);
-					goto eviction_again;
-				}
-			}
-
 			if(now_etr->status==EMPTY || dmm.cache->exist(dmm.cache, now_pair->lba)){
 				/*direct insert and already exist*/
 				dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
@@ -690,12 +685,22 @@ retry:
 					abort();
 				}
 				if(dmm.cache->entry_type==DYNAMIC){
+
 					goto hit_eviction;
 				}
 				else{
 					dp_status_update(dp, HIT); goto retry;
 				}
 			}
+
+			if(dmm.cache->entry_type==DYNAMIC && dmm.cache->type==COARSE){
+				if(dmm.cache->is_needed_eviction(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint)){
+					dp_status_update(dp, NONE);
+					dp_prev_init(dp);
+					goto eviction_again;
+				}
+			}
+
 			dp_status_update(dp, MISSR); 
 			res=map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba);
 			if(res==FLYING_HIT_END){
@@ -799,6 +804,8 @@ eviction_again:
 					}
 					else{
 						//read-req should read mapping data
+						/*printf("???? now:%u max:%u dmm.evict%u\n", 
+								scm.now_caching_byte, scm.max_caching_byte, dmm.eviction_hint);*/
 						dp_status_update(dp, MISSR);
 						return map_read_wrapper(now_etr, req, dmm.li,dp, req->key);
 					}

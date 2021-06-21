@@ -125,8 +125,8 @@ inline static bool is_sequential(sftl_cache *sc, uint32_t lba, uint32_t ppa){
 }
 
 static inline void sftl_size_checker(uint32_t eviction_hint){
-	if(scm.now_caching_byte+eviction_hint> scm.max_caching_byte){
-		printf("caching overflow! %s:%d\n", __FILE__, __LINE__);
+	if(scm.now_caching_byte+eviction_hint> scm.max_caching_byte/100*110){
+		printf("n:%u m:%u e:%ucaching overflow! %s:%d\n", scm.now_caching_byte, scm.max_caching_byte, eviction_hint, __FILE__, __LINE__);
 		abort();
 	}
 }
