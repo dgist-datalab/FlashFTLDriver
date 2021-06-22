@@ -208,7 +208,7 @@ uint32_t lsmtree_testing(){
 		{
 			temp_disk[0]->level_type=TIERING;
 			temp_disk[1]->level_type=TIERING;
-			version *now_version=version_init(20, 10, RANGE, temp_disk, 2);
+			version *now_version=version_init(20, RANGE, temp_disk, 2);
 			version *temp_version=LSM.last_run_version;
 			LSM.last_run_version=now_version;
 			disk[1]=making_tiering(10, 1000, 10, false, 1, false);
@@ -235,7 +235,7 @@ uint32_t lsmtree_testing(){
 		{
 			temp_disk[0]->level_type=TIERING;
 			temp_disk[1]->level_type=TIERING;
-			version *now_version=version_init(20, 10, RANGE, temp_disk, 2);
+			version *now_version=version_init(20, RANGE, temp_disk, 2);
 			version *temp_version=LSM.last_run_version;
 			LSM.last_run_version=now_version;
 			disk[1]=making_tiering(10, 1000, 10, false, 1, false);
@@ -267,7 +267,7 @@ uint32_t lsmtree_testing(){
 
 			level_consistency_check(disk[1], true);
 			level_free(disk[1], LSM.pm);
-			version_traversal(now_version);
+			//version_traversal(now_version);
 
 			LSM.last_run_version=temp_version;
 			version_free(now_version);

@@ -103,7 +103,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	}
 
 	LSM.last_run_version=version_init(LSM.param.tr.run_num, 
-			LSM.param.last_size_factor, RANGE,
+			RANGE,
 			LSM.disk,
 			LSM.param.LEVELN);
 

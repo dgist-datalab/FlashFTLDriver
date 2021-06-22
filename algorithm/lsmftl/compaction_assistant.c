@@ -453,9 +453,10 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 	rwlock_write_lock(&LSM.level_rwlock[start_idx]);
 	level *src_lev=LSM.disk[start_idx];
 	level *des_lev=LSM.disk[end_idx];
+	level *res;
+
 	uint32_t target_version=version_level_to_start_version(LSM.last_run_version, start_idx);
 	run *target_run=compaction_TI2RUN(cm, src_lev, des_lev, target_version, true);
-
 
 	if(src_lev->run_num < src_lev->max_run_num){
 		version_get_resort_version(LSM.last_run_version, src_lev->idx);
@@ -471,7 +472,7 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 	target_version=version_get_empty_version(LSM.last_run_version, src_lev->idx);
 	LSM.monitor.compaction_cnt[start_idx]++;
 
-	level *res=level_init(src_lev->max_sst_num, src_lev->max_run_num, src_lev->level_type, 
+	res=level_init(src_lev->max_sst_num, src_lev->max_run_num, src_lev->level_type, 
 			src_lev->idx, src_lev->max_contents_num, true);
 	version_populate(LSM.last_run_version, target_version, src_lev->idx);
 
@@ -507,10 +508,16 @@ static inline void do_compaction(compaction_master *cm, compaction_req *req,
 
 	level *prev_lev=LSM.disk[start_idx-1];
 	uint32_t now_invalidate_num=version_get_level_invalidation_cnt(LSM.last_run_version, start_idx);
-	if(now_invalidate_num >= prev_lev->max_contents_num){
+	
+	if(now_invalidate_num >= prev_lev->max_contents_num){ //the level is physically full but the capacity of invalidated data exceeds upper level capacity
 		do_compaction_inplace(cm, req, start_idx, end_idx);
 	}
-	else{
+	else if(!(src_lev->run_num<src_lev->max_run_num) && 
+			(src_lev->now_contents_num+src_lev->max_contents_num/LSM.param.normal_size_factor < prev_lev->max_contents_num)){ 
+			//the level is logically full but it has enough space to store upper level's data
+		do_compaction_inplace(cm, req, start_idx, end_idx);
+	}
+	else{//level is physically full
 		do_compaction_demote(cm, req, temp_level, start_idx, end_idx);
 	}
 }

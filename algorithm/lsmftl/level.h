@@ -162,11 +162,16 @@ static inline bool level_is_full(level *lev, uint32_t size_factor){
 		case TIERING_WISCKEY:
 			return !(lev->run_num<lev->max_run_num);
 		case TIERING:
-			if(lev->check_full_by_size){
-				return lev->now_contents_num + lev->max_contents_num/size_factor >=lev->max_contents_num;
+			if(lev->check_full_by_size){ //physical space full
+				if(lev->run_num<lev->max_run_num){
+					return lev->now_contents_num + lev->max_contents_num/size_factor >=lev->max_contents_num;
+				}
+				else{
+					return true;
+				}
 			}
 			else{
-				return !(lev->run_num<lev->max_run_num);
+				return !(lev->run_num<lev->max_run_num); //logical space full
 			}
 	}
 	return false;

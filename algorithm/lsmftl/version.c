@@ -5,8 +5,7 @@
 
 extern lsmtree LSM;
 
-version *version_init(uint8_t total_version_number, 
-		uint32_t last_level_version_num, uint32_t LBA_num, level **disk, uint32_t leveln){
+version *version_init(uint8_t total_version_number, uint32_t LBA_num, level **disk, uint32_t leveln){
 	version *res=(version*)malloc(sizeof(version));
 	res->start_hand=res->end_hand=0;
 	res->key_version=(uint8_t*)calloc(LBA_num, sizeof(uint8_t));
@@ -17,6 +16,8 @@ version *version_init(uint8_t total_version_number,
 
 	res->version_empty_queue=new std::queue<uint32_t>*[leveln];
 	res->start_vidx_of_level=(uint32_t*)malloc(sizeof(uint32_t)*leveln);
+	res->level_run_num=(uint32_t*)malloc(sizeof(uint32_t)*leveln);
+	res->poped_version_num=(uint32_t*)calloc(leveln, sizeof(uint32_t));
 
 	uint32_t version=0;
 	for(int32_t i=leveln-1; i>=0; i--){
@@ -27,9 +28,11 @@ version *version_init(uint8_t total_version_number,
 			case LEVELING:
 			case LEVELING_WISCKEY:
 				res->version_empty_queue[i]->push(version++);
+				res->level_run_num[i]=1;
 				break;
 			case TIERING_WISCKEY:
 			case TIERING:
+				res->level_run_num[i]=limit;
 				for(uint32_t j=0; j<limit; j++){
 					res->version_empty_queue[i]->push(version++);
 				}
@@ -47,9 +50,7 @@ version *version_init(uint8_t total_version_number,
 	res->version_invalidation_cnt=(uint32_t*)calloc(res->total_version_number+1, sizeof(uint32_t));
 	//res->version_early_invalidate=(bool*)calloc(res->total_version_number+1, sizeof(bool));
 	res->memory_usage_bit=ceil(log2(res->max_valid_version_num))*LBA_num;
-	res->poped_version_num=0;
 	fdriver_mutex_init(&res->version_lock);
-	res->last_level_version_num=last_level_version_num;
 	res->leveln=leveln;
 
 	return res;
@@ -106,6 +107,8 @@ void version_free(version *v){
 	delete[] v->version_empty_queue;
 	delete[] v->version_populate_queue;
 
+	free(v->level_run_num);
+	free(v->poped_version_num);
 	free(v->start_vidx_of_level);
 	//free(v->version_early_invalidate);
 	free(v->version_invalidation_cnt);
@@ -227,7 +230,7 @@ void version_make_early_invalidation_enable_old(version *v){
 uint32_t version_level_to_start_version(version *v, uint32_t lev_idx){
 	return v->start_vidx_of_level[lev_idx];
 }
-
+/*
 void version_traversal(version *v){
 	uint32_t* version_array=(uint32_t*)malloc(sizeof(uint32_t)*v->max_valid_version_num);
 	for(uint32_t i=0; i<v->max_valid_version_num; i++){
@@ -253,7 +256,7 @@ void version_traversal(version *v){
 
 	free(version_array);
 }
-
+*/
 uint32_t version_get_level_invalidation_cnt(version *v, uint32_t level_idx){
 	if(level_idx==0) return 0;
 	uint32_t start_idx=version_level_to_start_version(v, level_idx);

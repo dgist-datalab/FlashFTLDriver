@@ -18,18 +18,17 @@ typedef struct version{
 	int8_t total_version_number;
 	int8_t max_valid_version_num;
 	uint32_t *version_invalidation_cnt;
-	uint32_t last_level_version_num;
 	uint32_t *start_vidx_of_level;
 	fdriver_lock_t version_lock;
 	std::queue<uint32_t> **version_empty_queue;
 	std::queue<uint32_t> **version_populate_queue;
 	uint32_t memory_usage_bit;
-	int32_t *poped_version_num;
+	uint32_t *level_run_num;
+	uint32_t *poped_version_num;
 	uint32_t leveln;
 }version;
 
-version *version_init(uint8_t total_version_number, uint32_t last_level_version_num,
-		uint32_t LBA_num, level **disk, uint32_t leveln);
+version *version_init(uint8_t total_version_number, uint32_t LBA_num, level **disk, uint32_t leveln);
 uint32_t version_get_empty_version(version *v, uint32_t level);
 static inline uint32_t version_pop_oldest_version(version *v, uint32_t level){
 	uint32_t res=v->version_populate_queue[level]->front();
@@ -70,6 +69,7 @@ static inline uint32_t version_map_lba(version *v, uint32_t lba){
 	fdriver_unlock(&v->version_lock);
 	return res;
 }
+/*
 static inline int version_to_run(version *v, int32_t a){
 //	return 
 	//return a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a-v->poped_version_num;
@@ -77,7 +77,7 @@ static inline int version_to_run(version *v, int32_t a){
 		v->max_valid_version_num? a+v->poped_version_num-v->max_valid_version_num:
 		a+v->poped_version_num;
 }
-
+*/
 
 static inline bool version_belong_level(version *v, int32_t a, uint32_t lev_idx){
 	uint32_t start_v=v->start_vidx_of_level[lev_idx];
@@ -94,10 +94,13 @@ static inline int version_to_belong_level(version *v, uint32_t a){
 	for(uint32_t i=0; i<v->leveln; i++){
 		if(v->start_vidx_of_level[i] < a) return i;
 	}
+	return 0;
 }
 
 static inline int version_to_order(version *v, int32_t version, uint32_t level_idx){
-
+	return version-v->poped_version_num[level_idx]<0? 
+		version-v->poped_version_num[level_idx]+v->level_run_num[level_idx]:
+		version-v->poped_version_num[level_idx];
 }
 
 static inline int version_compare(version *v, int32_t a, int32_t b){
@@ -117,9 +120,9 @@ static inline int version_compare(version *v, int32_t a, int32_t b){
 	}*/
 	return a_-b_;
 }
-static inline void version_poped_update(version *v){
-	v->poped_version_num+=MERGED_RUN_NUM;
-	v->poped_version_num%=v->max_valid_version_num;
+static inline void version_poped_update(version *v, uint32_t leveln){
+	v->poped_version_num[leveln]+=MERGED_RUN_NUM;
+	v->poped_version_num[leveln]%=v->level_run_num[leveln];
 }
 static inline uint32_t version_to_level_idx(version *v, uint32_t version, uint32_t level_num){
 	for(uint32_t i=0; i<level_num-1; i++){
@@ -141,11 +144,11 @@ static inline uint32_t version_to_level_idx(version *v, uint32_t version, uint32
 	else
 		return level_num-version+v->max_valid_version_num-2;*/
 }
-void version_traversal(version *v);
+//void version_traversal(version *v);
 
 #define for_each_old_ridx_in_lastlev(v, ridx, cnt)\
 	for(cnt=0, ridx=version_to_ridx(v, version_pick_oldest_version(v, (v)->leveln-1), (v)->leveln-1);\
-			cnt<(v)->last_level_version_num;\
-			cnt++, ridx=(ridx+1)%(v)->last_level_version_num)
+			cnt<(v)->level_run_num[(v)->leveln-1];\
+			cnt++, ridx=(ridx+1)%(v)->level_run_num[(v)->leveln-1])
 
 #endif

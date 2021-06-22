@@ -405,7 +405,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 	run_free(new_run);
 
-	version_poped_update(LSM.last_run_version);
+	version_poped_update(LSM.last_run_version, des->idx);
 
 	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], target_ridx);
 	delete new_range_set;
