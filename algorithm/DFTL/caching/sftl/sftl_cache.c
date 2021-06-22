@@ -176,7 +176,7 @@ inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 		}
 		
 		if(total_head!=head_offset+(is_next_do?1:0)){
-				memcpy(&new_head_array[head_offset+(is_next_do?1:0)], &sc->head_array[(head_offset+1)], (total_head-1-head_offset)*sizeof(uint32_t));
+			memcpy(&new_head_array[head_offset+(is_next_do?1:0)], &sc->head_array[(head_offset+1)], (total_head-1-head_offset)*sizeof(uint32_t));
 		}
 		free(sc->head_array);
 		sc->head_array=new_head_array;
@@ -192,15 +192,23 @@ inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 	if(!ISLASTOFFSET(lba)){
 		if(GETOFFSET(lba+1)< PAGESIZE/sizeof(uint32_t) ){
 			if(bitmap_is_set(sc->map, GETOFFSET(lba+1))){
-				*should_more=DONE;
+				uint32_t next_ppa=get_ppa_from_sc(sc, lba+1);
+				if(ppa+1==next_ppa){
+					*should_more=SHRINK;
+					*more_ppa=next_ppa;
+				}
+				else{
+					*should_more=DONE;
+				}
 			}
 			else{
 				*should_more=EXPAND;
 				*more_ppa=get_ppa_from_sc(sc, lba+1);
 			}
 		}
-		else
+		else{
 			*should_more=DONE;
+		}
 	}
 
 	return old_ppa;
@@ -319,6 +327,7 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		}
 		if(etr->private_data==NULL){
 			printf("insert translation page before cache update! %s:%d\n",__FILE__, __LINE__);
+			print_stacktrace();
 			abort();
 		}
 		ln=(lru_node*)etr->private_data;
@@ -330,9 +339,16 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	if(lba==2129921){//GETGTDIDX(lba)==520){
 		printf("prev %u-%u : ", lba, ppa);
 		sftl_print_mapping(sc);
+	}
+
+
+	if(etr->idx==535){
 		sftl_mapping_verify(sc);
+		sftl_print_mapping(sc);
+		printf("pair: %u, %u physical:%u\n", lba, ppa, etr->physical_address);
 	}
 */
+
 	uint32_t more_lba=lba;
 	uint32_t more_ppa;
 	char should_more=false;
@@ -356,6 +372,15 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 				break;
 		}
 	}
+/*
+	if(etr->idx==535){
+		sftl_mapping_verify(sc);
+		sftl_print_mapping(sc);
+		printf("pair: %u, %u physical:%u\n", lba, ppa, etr->physical_address);
+	}
+	
+*/
+	//sftl_mapping_verify(sc);
 
 	changed_gtd_size=scm.gtd_size[gtd_idx];
 	if(changed_gtd_size - prev_gtd_size > (int)sizeof(uint32_t)*2){
@@ -437,6 +462,11 @@ static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, char *data){
 		}
 		
 	}
+	if(new_head_idx<total_head){
+		sftl_print_mapping(sc);
+		printf("etr->idx:%u making error:%u\n",etr->idx, etr->physical_address);
+		abort();
+	}
 	sc->head_array=new_head_array;
 	return sc;
 }
@@ -515,6 +545,7 @@ void sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
 		abort();
 	}
 	scm.gtd_size[GETGTDIDX(lba)]=(total_head*sizeof(uint32_t)+BITMAPSIZE);
+	//sftl_mapping_verify(sc);
 }
 
 uint32_t sftl_get_mapping(struct my_cache *, uint32_t lba){
@@ -534,6 +565,12 @@ struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *, uint32_t lba){
 	for_each_lru_backword(scm.lru, target){
 		sftl_cache *sc=(sftl_cache*)target->data;
 		etr=sc->etr;
+		/*
+		if(sc->etr->idx==535){
+			printf("start %u eviction \n", sc->etr->physical_address);
+			sftl_print_mapping(sc);
+			printf("end: %u eviction \n", sc->etr->physical_address);
+		}*/
 		if(etr->status==FLYING || etr->status==EVICTING){
 			continue;
 		}
@@ -567,6 +604,16 @@ bool sftl_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 	uint32_t *ppa_array=(uint32_t*)data;
 	uint32_t ppa_array_idx=0;
 	uint32_t offset=0;
+	uint32_t total_head=0;
+	/*
+	if(etr->idx==535){
+		total_head=(scm.gtd_size[etr->idx]-BITMAPSIZE)/sizeof(uint32_t);
+		sftl_mapping_verify(sc);
+		printf("eviction start!\n");
+		sftl_print_mapping(sc);
+		printf("print done!\n");
+	}*/
+
 	for_each_bitmap_forward(sc->map, offset, target, max){	
 		if(target){
 			last_ppa=sc->head_array[head_idx++];
@@ -575,8 +622,15 @@ bool sftl_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 		else{
 			ppa_array[ppa_array_idx++]=++last_ppa;
 		}
-
 	}
+/*
+	if(etr->idx==535){
+		sftl_cache *temp=make_sc_from_translation(etr, data);
+		printf("eviction end!\n");
+		free(temp->head_array);
+		free(temp);
+	}
+*/
 	free(sc->head_array);
 	bitmap_free(sc->map);
 	lru_delete(scm.lru, (lru_node*)etr->private_data);

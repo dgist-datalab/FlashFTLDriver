@@ -4,6 +4,8 @@
 extern struct algorithm demand_ftl;
 extern uint32_t test_ppa;
 extern uint32_t test_key;
+extern demand_map_manager dmm;
+
 void invalidate_map_ppa(uint32_t piece_ppa){
 	for(uint32_t i=0; i<L2PGAP; i++){
 		if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa+i)){
@@ -64,7 +66,7 @@ void do_map_gc(){
 
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	blockmanager *bm=demand_ftl.bm;
-//	printf("map gc:%u\n", ++cnt);
+	//printf("map gc:%u\n", ++cnt);
 	__gsegment *target=NULL;
 	std::queue<uint32_t> temp_queue;
 	while(!target || 
@@ -79,9 +81,9 @@ void do_map_gc(){
 		target=bm->get_gc_target(bm);
 	} 
 /*
-	segment_print(false);
-	printf("target seg_idx:%u\n", target->seg_idx);
-*/
+	segment_print(false);*/
+	//printf("map_gc target seg_idx:%u\n", target->seg_idx);
+
 	uint32_t seg_idx;
 	while(temp_queue.size()){
 		seg_idx=temp_queue.front();

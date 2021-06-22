@@ -96,6 +96,7 @@ typedef struct demand_map_manager{
 	my_cache *cache;
 	lower_info *li;
 	uint32_t eviction_hint;
+	//uint32_t eviction_req_cnt;
 	bool global_debug_flag;
 	uint32_t now_mapping_read_cnt;
 	//uint32_t flying_lba_idx;
