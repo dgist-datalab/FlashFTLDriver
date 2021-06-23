@@ -450,6 +450,10 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 
 
 uint32_t lsmtree_read(request *const req){
+	if(!LSM.cm->tm->tagQ->size()){
+	//	printf("now compactioning\n");
+	//	abort();
+	}
 	lsmtree_read_param *r_param;
 #ifdef LSM_DEBUG
 	if(req->key==debug_lba){

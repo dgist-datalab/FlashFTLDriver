@@ -332,6 +332,20 @@ uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 	}
 }
 
+uint32_t page_aligning_data_segment(page_manager *pm){
+	if(pm->temp_data_segment){
+		free(pm->temp_data_segment);
+		pm->temp_data_segment=NULL;
+	}
+
+	if(!pm->current_segment[DATA_S] || _PPS-pm->current_segment[DATA_S]->used_page_num < 2){
+		free(pm->current_segment[DATA_S]);
+		page_manager_move_next_seg(LSM.pm, false, false, DATASEG);
+	}
+
+	return _PPS-pm->current_segment[DATA_S]->used_page_num;
+}
+
 uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap, bool include_inv_block){
 	if(ismap){
 		return pm->bm->remain_free_page(pm->bm, pm->current_segment[MAP_S]);

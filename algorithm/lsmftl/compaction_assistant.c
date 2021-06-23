@@ -223,6 +223,9 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	bool making_level=false;
 	if(is_sequential){
 		now_remain_page_num=page_manager_get_remain_page(LSM.pm, false);
+		if(now_remain_page_num<2){
+			now_remain_page_num=page_aligning_data_segment(LSM.pm);
+		}
 		uint32_t mapping_num=CEILING_TARGET(LSM.flushed_kp_set->size(), KP_IN_PAGE);
 		uint32_t now_flushing_num=CEILING_TARGET(wb->buffered_entry_num, L2PGAP);
 		uint32_t update_mapping_num=CEILING_TARGET(wb->buffered_entry_num+LSM.flushed_kp_set->size(), KP_IN_PAGE);
@@ -428,6 +431,8 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 			LSM.flushed_kp_temp_set=new std::map<uint32_t, uint32_t>();
 		}
 		else{
+			delete LSM.flushed_kp_temp_set;
+			LSM.flushed_kp_temp_set=NULL;
 			LSM.flushed_kp_set=NULL;
 		}
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
@@ -603,6 +608,7 @@ again:
 		if(req->start_level==-1 && !temp_level){
 			goto end;
 		}
+
 
 #ifdef LSM_DEBUG
 		if(req->start_level!=-1){
