@@ -404,7 +404,9 @@ static void leveling_update_meta_for_trivial_move(level *up, level *down, uint32
 			}
 		}
 		//for last sptr;
-		read_helper_insert_done(sptr->_read_helper);
+		if(sptr){
+			read_helper_insert_done(sptr->_read_helper);
+		}
 	}
 	else{
 		compaction_trivial_move(&up->array[0], target_version, up->idx, down->idx, false);
@@ -1327,6 +1329,11 @@ level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t 
 
 
 level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version){
+	static int cnt=0;
+	if(cnt==528){
+		printf("LW2TW cnt:\n");
+	}
+	cnt++;
 	leveling_update_meta_for_trivial_move(src, des, target_version);
 	run *new_run=level_LE_to_run(src, true);
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
