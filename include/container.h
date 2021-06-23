@@ -75,6 +75,7 @@ struct request {
 	void *(*special_func)(void *);
 	bool (*added_end_req)(struct request *const);
 	bool isAsync;
+	bool flush_all;
 	uint8_t magic;
 	void *param;
 	void *__hash_node;

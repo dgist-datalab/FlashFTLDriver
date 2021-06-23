@@ -450,6 +450,10 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 
 
 uint32_t lsmtree_read(request *const req){
+	if(!LSM.cm->tm->tagQ->size()){
+		printf("now compactioning\n");
+		abort();
+	}
 	lsmtree_read_param *r_param;
 #ifdef LSM_DEBUG
 	if(req->key==debug_lba){
@@ -639,9 +643,22 @@ retry:
 		LSM.flush_wait_wb=LSM.wb_array[LSM.now_wb];
 		rwlock_write_unlock(&LSM.flush_wait_wb_lock);
 
+		fdriver_lock_t *done_lock=NULL;
+		if(req->flush_all){
+			done_lock=(fdriver_lock_t*)malloc(sizeof(fdriver_lock_t));
+			fdriver_mutex_init(done_lock);
+			fdriver_lock(done_lock);
+		}
+
 		compaction_req *temp_req=MAKE_L0COMP_REQ(wb, NULL, false);
+		temp_req->done_lock=done_lock;
 		compaction_issue_req(LSM.cm, temp_req);
 
+		if(req->flush_all){
+			fdriver_lock(done_lock);
+			fdriver_destroy(done_lock);
+			free(done_lock);
+		}
 
 		LSM.wb_array[LSM.now_wb]=write_buffer_init(QDEPTH, LSM.pm, NORMAL_WB);
 		if(++LSM.now_wb==WRITEBUFFER_NUM){
@@ -649,13 +666,22 @@ retry:
 		}
 	}
 
+	if(req->flush_all){
+		compaction_wait(LSM.cm);	
+		LSM.li->lower_flying_req_wait();
+	}
 	req->value=NULL;
 	req->end_req(req);
-	return 1;
+	if(wb->buffered_entry_num+1==wb->max_buffer_entry_num){
+		//printf("flush needed flag\n");
+	}
+	return wb->buffered_entry_num+1==wb->max_buffer_entry_num? UINT32_MAX: 1; 
 }
 
-
 void lsmtree_compaction_end_req(compaction_req* req){
+	if(req->done_lock){
+		fdriver_unlock(req->done_lock);
+	}
 	free(req);
 }
 

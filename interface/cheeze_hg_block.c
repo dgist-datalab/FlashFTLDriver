@@ -195,6 +195,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		temp->type_ftl=0;
 		temp->type_lower=0;
 		temp->is_sequential_start=false;
+		temp->flush_all=0;
 		temp->global_seq=global_seq++;
 		switch(type){
 			case FS_GET_T:
@@ -238,6 +239,9 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 #ifdef TRACE_REPLAY
 		if(temp->type==FS_SET_T){
 			read(trace_fd, &CRCMAP[temp->key],sizeof(uint32_t));
+			if(temp->key==0){
+				printf("0 crc value:%u\n", CRCMAP[temp->key]);
+			}
 			*(uint32_t*)temp->value->value=CRCMAP[temp->key];
 		}
 		else{
@@ -376,7 +380,7 @@ vec_request *get_trace_vectored_request(){
 		}
 		res=ch_ureq2vec_req(&ureq, id);
 		cnt++;
-		if(cnt%10000==0){
+		if(cnt%1000==0){
 			printf("%u\n",cnt);
 		}
 		return res;
@@ -384,6 +388,8 @@ vec_request *get_trace_vectored_request(){
 
 	return res;
 }
+
+extern volatile vectored_request *now_processing;
 
 bool cheeze_end_req(request *const req){
 	vectored_request *preq=req->parents;
@@ -407,6 +413,7 @@ bool cheeze_end_req(request *const req){
 #ifdef TRACE_REPLAY
 			if(req->crc_value!=*(uint32_t*)req->value->value){
 				printf("lba:%u data faile abort!\n", req->key);
+				abort();
 			}
 #endif
 
@@ -453,6 +460,7 @@ bool cheeze_end_req(request *const req){
 		}
 #endif
 		free(preq->req_array);
+		now_processing=NULL;
 		free(preq);
 	}
 	pthread_mutex_unlock(&req_cnt_lock);

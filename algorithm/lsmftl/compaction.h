@@ -59,6 +59,7 @@ typedef struct compaction_req{
 	//key_ptr_pair *target;
 	write_buffer *wb;
 	void (*end_req)(struct compaction_req* req);
+	fdriver_lock_t *done_lock;
 	void *param;
 	uint32_t tag;
 	bool gc_data;

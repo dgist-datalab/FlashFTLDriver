@@ -7,10 +7,10 @@
 #include "../include/utils/tag_q.h"
 #include "../include/utils/data_checker.h"
 
-#include <map>
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <map>
 
 extern master_processor mp;
 extern tag_manager *tm;
@@ -19,13 +19,11 @@ static pthread_mutex_t flying_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t req_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 bool vectored_end_req (request * const req);
 
-/*request-length request-size tid*/
-/*type key-len key offset length value*/
-
 std::multimap<uint32_t, request *> *stop_req_list;
 std::map<uint32_t, request *> *stop_req_log_list;
 typedef std::multimap<uint32_t, request *>::iterator stop_req_iter;
-volatile vec_request *now_processing;
+/*request-length request-size tid*/
+/*type key-len key offset length value*/
 
 inline char *buf_parser(char *buf, uint32_t* idx, uint32_t length){
 	char *res=&buf[*idx];
@@ -37,6 +35,8 @@ void* inf_transaction_end_req(void *req);
 extern bool TXN_debug;
 extern char *TXN_debug_ptr;
 static uint32_t seq_val;
+volatile vec_request *now_processing;
+
 uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark){
 	uint32_t idx=0;
 	vec_request *txn=(vec_request*)malloc(sizeof(vec_request));
@@ -67,6 +67,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		temp->seq=seq++;
 		temp->type_ftl=0;
 		temp->type_lower=0;
+		temp->flush_all=0;
 		switch(temp->type){
 #ifdef KVSSD
 			case FS_TRANS_COMMIT:
@@ -139,13 +140,65 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 	return 1;
 }
 
+bool check_request_pending(processor *pr){
+	if( pr->req_q->size==0 && now_processing && flying_cnt < now_processing->size){
+		return true;
+	}
+	else return false;
+}
 
-static uint32_t get_next_request(processor *pr, request** inf_req, vec_request **vec_req){
+
+static inline void remove_req_from_stop_list(request *req){
+	stop_req_log_list->erase(req->global_seq);
+	stop_req_iter iter=stop_req_list->find(req->key);
+	for(; iter->first==req->key && iter!=stop_req_list->end();){
+		stop_req_list->erase(iter++);
+	}
+}
+
+static inline bool processing_read_from_pending_req(request *req){
+	stop_req_iter iter=stop_req_list->find(req->key);
+	uint32_t temp_global_seq=0;
+	request *target_req=NULL;
+	//printf("req->key:%u\n", req->key);
+	if(req->key==512){
+		printf("break!\n");
+	}
+	MeasureTime mt;
+	measure_init(&mt);
+	measure_start(&mt);
+	for(; iter->first==req->key && iter!=stop_req_list->end(); iter++){
+		if(req->global_seq > iter->second->global_seq){
+			if(temp_global_seq < iter->second->global_seq){
+				temp_global_seq=iter->second->global_seq;
+				target_req=iter->second;
+			}
+		}
+	}
+
+	if(target_req){
+		memcpy(req->value->value, target_req->value->value, LPAGESIZE);
+		measure_stamp(&mt);
+		return true;
+	}
+	measure_stamp(&mt);
+	return false;
+}
+
+static uint32_t get_next_request(processor *pr, request** inf_req, vec_request **vec_req,
+		bool *read_only_flag){
 	if(((*inf_req)=(request*)q_dequeue(pr->retry_q))){
 		return 1;
 	}
 	else if(((*vec_req)=(vec_request*)q_dequeue(pr->req_q))){
 		return 2;
+	}
+	else if(check_request_pending(pr) && stop_req_log_list->size()){
+		*read_only_flag=false;
+		request *res=stop_req_log_list->begin()->second;
+		res->flush_all=true;
+		(*inf_req)=res;
+		return 1;
 	}
 	return 0;
 }
@@ -170,16 +223,50 @@ void *vectored_main(void *__input){
 	sprintf(thread_name,"%s","vecotred_main_thread");
 	pthread_setname_np(pthread_self(),thread_name);
 	uint32_t type;
+	uint32_t caller_res=0;
+	bool read_only_flag=false;
 	while(1){
 		if(mp.stopflag)
 			break;
-		type=get_next_request(_this, &inf_req, &vec_req);
+		type=get_next_request(_this, &inf_req, &vec_req, &read_only_flag);
 		if(type==0){
 			continue;
 		}
 		else if(type==1){ //rtry
-			inf_req->tag_num=tag_manager_get_tag(tm);
-			inf_algorithm_caller(inf_req);	
+			if(inf_req->flush_all==0){
+				inf_req->tag_num=tag_manager_get_tag(tm);
+				inf_algorithm_caller(inf_req);
+			}
+			else{
+				while(stop_req_log_list->size()){
+					request *treq=stop_req_log_list->begin()->second;
+					if(treq->key==512){
+						printf("key 512 erased! %p\n", treq);
+					}
+					if(stop_req_log_list->size()==1){
+						treq->flush_all=true;
+					}
+					else{
+						treq->flush_all=false;
+					}
+					measure_init(&treq->latency_checker);
+					measure_start(&treq->latency_checker);
+					treq->tag_num=tag_manager_get_tag(tm);
+					remove_req_from_stop_list(treq);
+					
+					if(treq->type!=FS_SET_T){
+						printf("type error!\n"); 
+						abort();
+					}
+					caller_res=inf_algorithm_caller(treq);
+				}
+
+				if(caller_res==UINT32_MAX){
+					read_only_flag=true;
+				}
+				continue;
+			}
+
 		}else{
 			uint32_t size=vec_req->size;
 			for(uint32_t i=0; i<size; i++){
@@ -196,6 +283,21 @@ void *vectored_main(void *__input){
 				}
 	
 				request *req=&vec_req->req_array[i];
+				if(read_only_flag){
+					if(req->type==FS_SET_T && !req->flush_all){
+						if(req->key==512){
+							printf("key 512 inserted! %p\n", req);
+						}
+						stop_req_list->insert(std::pair<uint32_t, request*>(req->key, req));
+						stop_req_log_list->insert(std::pair<uint32_t, request*>(req->global_seq, req));
+						continue;
+					}
+
+				}
+
+				uint32_t req_type;
+				bool flush_all_req=req->flush_all;
+
 				switch(req->type){
 					case FS_GET_T:
 					case FS_SET_T:
@@ -203,8 +305,29 @@ void *vectored_main(void *__input){
 						measure_start(&req->latency_checker);
 					break;
 				}
+
+				if(req->type==FS_GET_T && req->key==0){
+					printf("break!\n");
+				}
+
 				req->tag_num=tag_manager_get_tag(tm);
-				inf_algorithm_caller(req);
+				if(req->type==FS_GET_T && processing_read_from_pending_req(req)){
+					req->end_req(req);
+					continue;
+				}
+
+				req_type=req->type;
+				caller_res=inf_algorithm_caller(req);
+				if(req_type==FS_SET_T){
+					if(flush_all_req){
+						printf("flush all req should finished before!\n");
+						abort();
+					}
+
+					if(caller_res==UINT32_MAX){
+						read_only_flag=true;
+					}
+				}
 			}
 		}
 
@@ -257,6 +380,7 @@ void inf_algorithm_testing(){
 void release_each_req(request *req){
 	uint32_t tag_num=req->tag_num;
 	pthread_mutex_lock(&flying_cnt_lock);
+
 	flying_cnt++;
 	if(flying_cnt > QDEPTH){
 		printf("???\n");
@@ -268,7 +392,12 @@ void release_each_req(request *req){
 }
 
 void assign_vectored_req(vec_request *txn){
+	if(!stop_req_list){
+		stop_req_list=new std::multimap<uint32_t, request *>();
+		stop_req_log_list=new std::map<uint32_t, request*>();
+	}
 	while(1){
+		now_processing=txn;
 		pthread_mutex_lock(&flying_cnt_lock);
 		if(flying_cnt - (int32_t)txn->size < 0){
 			pthread_mutex_unlock(&flying_cnt_lock);

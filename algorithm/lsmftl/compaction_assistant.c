@@ -685,5 +685,6 @@ void compaction_free_read_param(compaction_master *cm, inter_read_alreq_param *t
 	return;
 }
 void compaction_wait(compaction_master *cm){
-	while(cm->tm->tagQ->size()!=COMPACTION_REQ_MAX_NUM){}
+	uint32_t tag=tag_manager_get_tag(cm->tm);
+	tag_manager_free_tag(cm->tm, tag);
 }

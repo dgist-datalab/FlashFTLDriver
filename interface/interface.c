@@ -22,6 +22,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
+#include <map>
 
 extern Redblack rb_tree;
 extern pthread_mutex_t rb_lock;
@@ -221,8 +222,7 @@ uint32_t inf_algorithm_caller(request *const inf_req){
 			mp.algo->read(inf_req);
 			break;
 		case FS_SET_T:
-			write_stop=mp.algo->write(inf_req);
-			break;
+			return mp.algo->write(inf_req);
 		case FS_DELETE_T:
 			mp.algo->remove(inf_req);
 			break;
@@ -236,7 +236,6 @@ uint32_t inf_algorithm_caller(request *const inf_req){
 			mp.algo->write(inf_req);
 			break;
 #ifdef KVSSD
-`
 		case FS_RANGEGET_T:
 			mp.algo->range_query(inf_req);
 			break;
@@ -352,6 +351,7 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv, bool data_che
 #endif
 
 	tm=tag_manager_init(QDEPTH);
+	//tm=tag_manager_init(1);
 	mp.processors=(processor*)malloc(sizeof(processor)*1);
 	for(int i=0; i<1; i++){
 		processor *t=&mp.processors[i];
@@ -622,7 +622,16 @@ bool inf_end_req( request * const req){
 
 	return true;
 }
+
+extern std::multimap<uint32_t, request *> *stop_req_list;
+extern std::map<uint32_t, request *> *stop_req_log_list;
+
 void inf_free(){
+	if(stop_req_list){
+		delete stop_req_list;
+		delete stop_req_log_list;
+	}
+
 	bench_print();
 	bench_free();
 	mp.li->stop();
