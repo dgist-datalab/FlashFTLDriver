@@ -141,6 +141,10 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 
 	printf("NOS:%lu\n", _NOS);
 	lsmtree_monitor_init();
+
+#ifdef LSM_DEBUG
+	LSM.LBA_cnt=(uint32_t*)calloc(RANGE+1, sizeof(uint32_t));
+#endif
 	return 1;
 }
 
@@ -236,6 +240,57 @@ static void lsmtree_monitor_print(){
 
 void lsmtree_destroy(lower_info *li, algorithm *){
 	lsmtree_monitor_print();
+
+
+#ifdef LSM_DEBUG
+	uint32_t request_sum=0;
+	uint32_t high_resolution=0;
+	uint32_t average=0;
+	uint32_t populate_cnt=0;
+	uint32_t cdf_cnt[151]={0,};
+	for(uint32_t i=0; i<=RANGE; i++){
+		if(LSM.LBA_cnt[i]){
+			request_sum+=LSM.LBA_cnt[i];
+			populate_cnt++;
+		}
+		if(LSM.LBA_cnt[i]>=150){
+			high_resolution+=LSM.LBA_cnt[i];
+			cdf_cnt[150]++;
+		}
+		else{
+			cdf_cnt[LSM.LBA_cnt[i]]++;
+		}
+	}
+	average=request_sum/populate_cnt;
+	printf("cnt cdf\n");
+	for(uint32_t i=0; i<151; i++){
+		printf("%u %u %.2f %.2f \n", i, cdf_cnt[i], 
+				i==150?(float)high_resolution/request_sum:(float)cdf_cnt[i]*i/request_sum,
+				(float)cdf_cnt[i]/RANGE);
+	}
+	/*
+	for(uint32_t i=0; i<=RANGE; i++){
+		if(LSM.LBA_cnt[i]>=average){
+			fprintf(stderr, "%u %u\n", i, LSM.LBA_cnt[i]);
+		}
+	}*/
+	fprintf(stderr, "average:%u populate:%.2lf\n", average, (float)(populate_cnt)/RANGE);
+
+	for(int i=0; i<LSM.param.LEVELN; i++){
+		level *lev=LSM.disk[i];
+		run *rptr;
+		uint32_t ridx;
+		printf("[%u]: ", i);
+		for_each_run(lev, rptr, ridx){
+			uint32_t average_run_cnt=level_run_populate_analysis(rptr);
+			printf("%u ", average_run_cnt);
+		}
+		printf("\n");
+	}
+
+	free(LSM.LBA_cnt);
+#endif
+
 	printf("----- traffic result -----\n");
 	printf("RAF: %lf\n",
 			(double)(li->req_type_cnt[DATAR]+li->req_type_cnt[MISSDATAR])/li->req_type_cnt[DATAR]);
@@ -246,6 +301,7 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 				li->req_type_cnt[GCMW_DGC]+
 				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	compaction_free(LSM.cm);
+
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 		write_buffer_free(LSM.wb_array[i]);
 	}
@@ -274,7 +330,6 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	if(LSM.flushed_kp_temp_set){
 		delete LSM.flushed_kp_temp_set;
 	}
-
 	//lsmtree_tiered_level_all_print();
 }
 
@@ -631,6 +686,10 @@ normal_end:
 uint32_t lsmtree_write(request *const req){
 	write_buffer *wb=LSM.wb_array[LSM.now_wb];
 	write_buffer_insert(wb, req->key, req->value);
+
+#ifdef LSM_DEBUG
+	LSM.LBA_cnt[req->key]++;
+#endif
 
 	if(write_buffer_isfull(wb)){
 retry:

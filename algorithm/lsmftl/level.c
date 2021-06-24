@@ -553,3 +553,37 @@ void level_tiering_sst_analysis(level *lev, blockmanager *bm, version *v, bool m
 			total_invalidate_num, total_num,  (float)total_invalidate_num/total_num, 
 			version_get_level_invalidation_cnt(v, lev->idx), run_total_validate_number);
 }
+
+extern lsmtree LSM;
+uint32_t level_run_populate_analysis(run *r){
+	sst_file *sptr;
+	uint32_t sidx=0;
+	char mapping[PAGESIZE];
+	key_ptr_pair *kp_ptr;
+	uint32_t contents_num=0;
+	uint32_t cnt_sum=0;
+	for_each_sst(r, sptr, sidx){
+		if(sptr->type==PAGE_FILE){
+			io_manager_test_read(sptr->file_addr.map_ppa, mapping, TEST_IO);
+			kp_ptr=(key_ptr_pair*)mapping;
+			for(uint32_t i=0; kp_ptr[i].piece_ppa!=UINT32_MAX && i<KP_IN_PAGE; i++){
+				cnt_sum+=LSM.LBA_cnt[kp_ptr[i].lba];
+				contents_num++;
+			}
+		}
+		else{
+			map_range *mptr;
+			uint32_t midx;
+			for_each_map_range(sptr, mptr, midx){
+				io_manager_test_read(mptr->ppa, mapping, TEST_IO);
+				kp_ptr=(key_ptr_pair*)mapping;
+				for(uint32_t i=0; kp_ptr[i].piece_ppa!=UINT32_MAX && i<KP_IN_PAGE; i++){
+					cnt_sum+=LSM.LBA_cnt[kp_ptr[i].lba];
+					contents_num++;
+				}		
+			}
+		}
+	}
+	if(cnt_sum==0) return 0;
+	return cnt_sum/contents_num;
+}

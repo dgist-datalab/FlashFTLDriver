@@ -185,4 +185,6 @@ void level_tiering_sst_analysis(level *lev, blockmanager *bm, struct version *v,
 void level_print(level *lev);
 void level_content_print(level *lev, bool print_sst);
 uint32_t get_level_content_num(level *lev);
+uint32_t level_run_populate_analysis(run *r);
+
 #endif

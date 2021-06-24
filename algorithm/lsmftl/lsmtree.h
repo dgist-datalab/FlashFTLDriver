@@ -122,6 +122,9 @@ typedef struct lsmtree{
 	uint32_t gc_locked_seg_num;
 
 	lower_info *li;
+#ifdef LSM_DEBUG
+	uint32_t *LBA_cnt;
+#endif
 }lsmtree;
 
 typedef struct page_read_buffer{
