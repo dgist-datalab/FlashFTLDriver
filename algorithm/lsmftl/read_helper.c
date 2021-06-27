@@ -1,6 +1,7 @@
 #include "key_value_pair.h"
 #include "lsmtree.h"
 #include "read_helper.h"
+#include "oob_manager.h"
 extern lsmtree LSM;
 extern uint32_t debug_lba;
 
@@ -390,6 +391,7 @@ bool read_helper_data_checking(read_helper *rh, page_manager* pm, uint32_t piece
 		uint32_t lba, uint32_t *rh_idx, uint32_t *offset, sst_file *sptr){
 	uint32_t *lba_set;
 	bool is_map_ppa_flag;
+	oob_manager *oob=get_oob_manager(PIECETOPPA(piece_ppa));
 	switch(rh->type){
 		case HELPER_BF_ONLY:
 		case HELPER_BF_PTR:
@@ -400,7 +402,9 @@ bool read_helper_data_checking(read_helper *rh, page_manager* pm, uint32_t piece
 			}
 			break;
 		case HELPER_PLR:
-			lba_set=(uint32_t*)pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa));
+	//		lba_set=(uint32_t*)pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa));
+			lba_set=oob->lba;
+
 			is_map_ppa_flag=sptr->sequential_file?is_map_ppa(sptr, PIECETOPPA(piece_ppa)):false;
 			(*offset)=PLR_checking_oob(lba, piece_ppa, lba_set, is_map_ppa_flag);
 			switch((int32_t)(*offset)){

@@ -103,40 +103,42 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, uint32_t target_num, bool syn
 	std::map<uint32_t, buffer_entry*>::iterator it=wb->data->begin();
 	value_set* target_value=NULL;
 	uint32_t ppa=-1;
-	char *oob=NULL;
+	//char *oob=NULL;
 	key_ptr_pair *res=(key_ptr_pair*)malloc((wb->data->size()+1)*sizeof(key_ptr_pair));
 	fdriver_lock(&LSM.flush_lock);
 
 	uint32_t i=0;
 	uint32_t flushed_cnt=MIN(KP_IN_PAGE, target_num);
+	uint32_t prev_version;
 	for(;it!=wb->data->end() && i<flushed_cnt; i++){
 		uint8_t inter_idx=i%L2PGAP;
 		if(inter_idx==0){
 			ppa=page_manager_get_new_ppa(wb->pm, false, SEPDATASEG);
 			target_value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 			target_value->ppa=ppa;
-			oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);
+		//	oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);
 		}	
 
 		//page_manager_insert_lba(wb->pm, it->first);
 		memcpy(&target_value->value[inter_idx*LPAGESIZE], it->second->data.data->value, LPAGESIZE);//copy value
-		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
+		//*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
+		prev_version=version_map_lba(LSM.last_run_version, it->first);
 #ifdef LSM_DEBUG
 		if(res[i].lba==debug_lba){
 			printf("map target:%u -> %u in buffer\n", res[i].lba, res[i].piece_ppa);
 		}
 #endif
 
-		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
+		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, &prev_version, true);
 		inf_free_valueset(it->second->data.data, FS_MALLOC_W);
 		it->second->data.data=NULL;
 
 		if(inter_idx==(L2PGAP-1)){//issue data
 			io_manager_issue_internal_write(ppa, target_value, make_flush_algo_req(wb, ppa, target_value, sync, false), false);
 			ppa=-1;
-			oob=NULL;
+		//	oob=NULL;
 			target_value=NULL;
 		}
 		wb->buffered_entry_num--;
@@ -244,7 +246,7 @@ key_ptr_pair* write_buffer_flush_for_gc(write_buffer *wb, bool sync, uint32_t se
 	std::map<uint32_t, buffer_entry*>::iterator it=wb->data->begin();
 	value_set* target_value=NULL;
 	uint32_t ppa=-1;
-	char *oob=NULL;
+	//char *oob=NULL;
 	key_ptr_pair *res=(key_ptr_pair*)malloc(PAGESIZE);
 	memset(res, -1, PAGESIZE);
 	uint32_t remain_page_num=0;
@@ -267,6 +269,7 @@ retry:
 	}
 
 	uint8_t inter_idx;
+	uint32_t prev_version;
 	for(uint32_t i=0; it!=wb->data->end() && i<KP_IN_PAGE; i++){
 		inter_idx=i%L2PGAP;
 		if(gkv){
@@ -277,21 +280,22 @@ retry:
 			ppa=page_manager_get_reserve_new_ppa(wb->pm, false, seg_idx);
 			target_value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 			target_value->ppa=ppa;
-			oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);
+	//		oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);
 		}	
 	
 		//page_manager_insert_lba(wb->pm, it->first);
 		memcpy(&target_value->value[inter_idx*LPAGESIZE], it->second->data.gc_data, LPAGESIZE);
-		*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
+	//	*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
+		prev_version=version_map_lba(LSM.last_run_version, it->first);
 #ifdef LSM_DEBUG
 		if(debug_lba==res[i].lba){
 			static int cnt=0;
 			printf("[%u] gc %u -> %u\n", cnt++, res[i].lba, res[i].piece_ppa);
 		}
 #endif
-		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba, true);
+		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba,  &prev_version, true);
 		if(wb->rh){
 			read_helper_stream_insert(wb->rh, res[i].lba, res[i].piece_ppa);
 		}
@@ -315,7 +319,7 @@ retry:
 				}
 			}
 			ppa=-1;
-			oob=NULL;
+			//oob=NULL;
 			target_value=NULL;
 		}
 		wb->buffered_entry_num--;

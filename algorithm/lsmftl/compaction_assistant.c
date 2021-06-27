@@ -340,6 +340,9 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	}
 
 	LSM.monitor.compaction_cnt[end_idx]++;
+#ifdef HOT_COLD
+	bool hot_cold_separation_compaction=false;
+#endif
 
 	switch(src_lev->level_type){
 		case LEVELING:
@@ -369,7 +372,12 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 			}
 			break;
 		case TIERING:
+#ifdef HOT_COLD
+			lev=compaction_TI2TI_separation(cm ,src_lev, des_lev, target_version, 
+					&hot_cold_separation_compaction);
+#else
 			lev=compaction_TI2TI(cm, src_lev, des_lev, target_version);
+#endif
 			break;
 		case TIERING_WISCKEY:
 			lev=TW_compaction(cm, src_lev, des_lev, target_version);
@@ -395,6 +403,23 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		}
 		else{
 			/*matching order*/
+#ifdef HOT_COLD
+			if(hot_cold_separation_compaction){
+				/*do nothing*/
+			}
+			else{
+				if(src_lev->run_num < src_lev->max_run_num){
+					version_get_resort_version(LSM.last_run_version, src_lev->idx);
+				}
+				else{
+					for(uint32_t i=0; i<src_lev->run_num; i++){
+						version_unpopulate(LSM.last_run_version,
+								version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
+								src_lev->idx);
+					}
+				}
+			}
+#else
 			if(src_lev->run_num < src_lev->max_run_num){
 				version_get_resort_version(LSM.last_run_version, src_lev->idx);
 			}
@@ -405,10 +430,20 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 							src_lev->idx);
 				}
 			}
+#endif
 		}
 	}
 
+#ifdef HOT_COLD
+	if(hot_cold_separation_compaction){
+		/*do nothing*/
+	}
+	else{
+		disk_change(temp_level?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
+	}
+#else
 	disk_change(temp_level?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
+#endif
 
 	if(end_idx==LSM.param.LEVELN-1){
 		slm_empty_level(start_idx);
@@ -460,8 +495,10 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 	level *des_lev=LSM.disk[end_idx];
 	level *res;
 
+	bool issequential;
 	uint32_t target_version=version_level_to_start_version(LSM.last_run_version, start_idx);
-	run *target_run=compaction_TI2RUN(cm, src_lev, des_lev, target_version, true);
+	run **target_run=compaction_TI2RUN(cm, src_lev, des_lev, 
+			src_lev->run_num, target_version, UINT32_MAX, &issequential, true, false);
 
 	if(src_lev->run_num < src_lev->max_run_num){
 		version_get_resort_version(LSM.last_run_version, src_lev->idx);
@@ -482,7 +519,12 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 	version_populate(LSM.last_run_version, target_version, src_lev->idx);
 
 	uint32_t target_ridx=version_to_ridx(LSM.last_run_version, target_version, src_lev->idx);
-	level_update_run_at_move_originality(res, target_ridx, target_run, true);
+	level_update_run_at_move_originality(res, target_ridx, target_run[0], true);
+
+	run_free(target_run[0]);
+	if(!issequential){
+		free(target_run);
+	}
 
 	level_free(src_lev, LSM.pm);
 	LSM.disk[start_idx]=res;

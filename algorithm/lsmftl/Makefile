@@ -22,6 +22,7 @@ SRCS +=\
 	   gc_helper.c\
 	   lsmtree_testing.c\
 	   lsmtree_setting.c\
+	   oob_manager.c\
 #	   gc.c\
 #	   helper_algorithm/bf_set.c\
 #	   helper_algorithm/compressed_bloomfilter.c

@@ -46,6 +46,7 @@ typedef struct{
 
 typedef struct key_value_wrapper{ //for data read!
 	uint32_t piece_ppa;
+	uint32_t prev_version;
 	key_value_pair kv_ptr;
 	bool free_target_req;
 	bool wait_target_req;
@@ -90,6 +91,8 @@ level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t 
 level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t target_version);
 level* compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version);	
 level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t target_version); //done
+level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des,
+		uint32_t target_version, bool *hot_cold_separation);
 level *compaction_TW_convert_LW(compaction_master *cm, level *src);
 
 level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx); //done and debug
@@ -110,13 +113,15 @@ void read_sst_job(void *arg, int th_num);
 void read_map_param_init(read_issue_arg *read_arg, map_range *mr);
 bool read_map_done_check(inter_read_alreq_param *param, bool check_page_sst);
 
-run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t target_version, bool inplace);
+run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, 
+		uint32_t merging_num, uint32_t target_demote_version, uint32_t target_keep_version, 
+		bool *issequential, bool inplace, bool hot_cold_mode);
 
 uint32_t stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_stream **os_set, 
 		struct sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
 		bool all_empty_stop, uint32_t limit, uint32_t version,
 		bool merge_flag,
-		bool (*invalidate_function)(level *des, uint32_t taget_idx, uint32_t target_version, key_ptr_pair kp, bool merge, bool inplace), bool inplace);
+		uint32_t (*invalidate_function)(level *des, uint32_t taget_idx, uint32_t target_version, key_ptr_pair kp, bool merge, bool inplace), bool inplace);
 
 
 sst_file *bis_to_sst_file(struct sst_bf_in_stream *bis);
@@ -138,6 +143,11 @@ int issue_read_kv_for_bos_stream(struct sst_bf_out_stream *bos,
 uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, struct sst_bf_out_stream *bos, 
 		std::queue<uint32_t> *locked_seg_q, run *new_run,
 		int32_t entry_num, uint32_t target_version, bool final_);
+
+uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_stream *bos, 
+		std::queue<uint32_t> *locked_seg_q, run **new_run,
+		int32_t entry_num, uint32_t target_demote_version, uint32_t target_keep_version, 
+		uint32_t src_idx, bool final_);
 
 void compaction_trivial_move(run *rptr, uint32_t target_version, 
 		uint32_t from_lev_idx, uint32_t to_lev_idx, bool inplace);

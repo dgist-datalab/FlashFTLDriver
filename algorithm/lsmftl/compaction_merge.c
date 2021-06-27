@@ -110,7 +110,7 @@ static void  bulk_invalidation(run *r, uint32_t* border_idx, uint32_t border_lba
 	(*border_idx)=i;
 }
 
-static bool tiering_invalidation_function(level *des, uint32_t stream_id, uint32_t version,
+static uint32_t tiering_invalidation_function(level *des, uint32_t stream_id, uint32_t version,
 		key_ptr_pair kp, bool overlap, bool inplace){
 	if(overlap){
 		invalidate_kp_entry(kp.lba, kp.piece_ppa, version, true);
@@ -405,7 +405,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 	run_free(new_run);
 
-	version_poped_update(LSM.last_run_version, des->idx);
+	version_poped_update(LSM.last_run_version, des->idx, MERGED_RUN_NUM);
 
 	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], target_ridx);
 	delete new_range_set;
@@ -463,10 +463,14 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, bool isfirst,sst_pf_ou
 	return read_done_flag;
 }
 
-run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t target_version, bool inplace){
+run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num, 
+		uint32_t target_version, bool hot_cold_mode, bool inplace){
 	run *src_rptr; uint32_t src_idx;
 	uint32_t max_lba=0, min_lba=UINT32_MAX;
-	for_each_run(src, src_rptr, src_idx){
+
+	for(uint32_t i=0; i<max_run_num; i++){
+		src_idx=version_get_ridx_of_order(LSM.last_run_version, src->idx, i);
+		src_rptr=LEVEL_RUN_AT_PTR(src, src_idx);
 		if(src_rptr->end_lba > max_lba){
 			max_lba=src_rptr->end_lba;
 		}
@@ -487,9 +491,10 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t target_version,
 	}
 
 	LSM.monitor.trivial_move_cnt++;
-
 	std::map<uint32_t, run*> temp_run;
-	for_each_run(src, src_rptr, src_idx){
+	for(uint32_t i=0; i<max_run_num; i++){
+		src_idx=version_get_ridx_of_order(LSM.last_run_version, src->idx, i);
+		src_rptr=LEVEL_RUN_AT_PTR(src, src_idx);
 		temp_run.insert(std::pair<uint32_t, run*>(src_rptr->start_lba, src_rptr));
 	}
 
@@ -525,16 +530,25 @@ static inline uint32_t get_border_from_read_arg_set(read_issue_arg *arg_set, map
 	return res;
 }
 
-run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t target_version, bool inplace){
+run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t merging_num, 
+		uint32_t target_demote_version, uint32_t target_keep_version, bool *issequential, bool inplace, bool hot_cold_mode){
 	_cm=cm;
-	run *new_run=NULL;
-	uint32_t stream_num=src->run_num;
-	if((new_run=tiering_trivial_move(src, des->idx, target_version, inplace))){
+	run **new_run;
+	if(hot_cold_mode){
+		new_run=(run**)calloc(2, sizeof(run*));
+		new_run[0]=run_init(src->max_sst_num, UINT32_MAX, 0);
+		new_run[1]=run_init(src->max_sst_num, UINT32_MAX, 0);
+	}else{
+		new_run=(run**)calloc(1, sizeof(run*));
+		new_run[0]=run_init(src->max_sst_num, UINT32_MAX, 0);
+	}
+	uint32_t stream_num=merging_num;
+	if((new_run[0]=tiering_trivial_move(src, des->idx, merging_num, target_demote_version, 
+					hot_cold_mode, inplace))){
+		*issequential=true;
 		return new_run;
 	}
-	else{
-		new_run=run_init(src->max_sst_num, UINT32_MAX, 0);
-	}
+	*issequential=false;
 	
 	read_issue_arg *read_arg_set=(read_issue_arg*)calloc(stream_num, sizeof(read_issue_arg));
 	read_arg_container thread_arg;
@@ -548,16 +562,18 @@ run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t t
 	map_range **mr_set=(map_range **)calloc(stream_num, sizeof(map_range*));
 	/*make it reverse order for stream sorting*/
 	for(int32_t i=stream_num-1, j=0; i>=0; i--, j++){
-		uint32_t sst_file_num=src->array[i].now_sst_num;
+		uint32_t ridx=version_get_ridx_of_order(LSM.last_run_version, src->idx, i);
+		uint32_t sst_file_num=src->array[ridx].now_sst_num;
 		uint32_t map_num=0;
 		for(uint32_t j=0; j<sst_file_num; j++){
-			map_num+=src->array[i].sst_set[j].map_num;
+			map_num+=src->array[ridx].sst_set[j].map_num;
 		}
 		read_arg_set[j].max_num=map_num;
-		mr_set[j]=make_mr_set(src->array[i].sst_set, 0, src->array[i].now_sst_num-1, map_num);
+		mr_set[j]=make_mr_set(src->array[ridx].sst_set, 0, src->array[ridx].now_sst_num-1, map_num);
 	}
 
 	std::queue<key_ptr_pair> *kpq=new std::queue<key_ptr_pair>();
+	
 	std::queue<uint32_t> *locked_seg_q=new std::queue<uint32_t>();
 
 	std::list<mr_free_set> **MFS_set_ptr=new std::list<mr_free_set> *[stream_num]();
@@ -569,7 +585,13 @@ run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t t
 	uint32_t read_done=0;
 	sst_pf_out_stream **pos_set=(sst_pf_out_stream **)calloc(stream_num, sizeof(sst_pf_out_stream*));
 	sst_bf_out_stream *bos=NULL;
-	sst_bf_in_stream *bis=NULL;
+	sst_bf_in_stream **bis=NULL;
+	if(hot_cold_mode){
+		bis=(sst_bf_in_stream**)calloc(2, sizeof(sst_bf_in_stream*));
+	}
+	else{
+		bis=(sst_bf_in_stream**)calloc(1, sizeof(sst_bf_in_stream*));
+	}
 	bool isfirst=true;
 
 	uint32_t border_lba=UINT32_MAX;
@@ -593,10 +615,10 @@ run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t t
 			last_round=true;
 		}
 
-		uint32_t sorted_entry_num=stream_sorting(des, stream_num, pos_set, NULL, kpq,
+		uint32_t sorted_entry_num=stream_sorting(des, stream_num, pos_set, NULL, kpq, 
 				last_round,
 				border_lba,/*limit*/
-				target_version, 
+				target_demote_version, 
 				true,
 				tiering_invalidation_function,
 				inplace);
@@ -606,7 +628,13 @@ run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t t
 		}
 
 		if(bis==NULL){
-			bis=tiering_new_bis(locked_seg_q, inplace?src->idx: des->idx);	
+			if(hot_cold_mode){
+				bis[0]=tiering_new_bis(locked_seg_q, inplace?src->idx: des->idx);	
+				bis[1]=tiering_new_bis(locked_seg_q, inplace?src->idx: des->idx);			
+			}
+			else{
+				bis[0]=tiering_new_bis(locked_seg_q, inplace?src->idx: des->idx);	
+			}
 		}
 		
 		if(last_round && sorted_entry_num==0){
@@ -617,8 +645,13 @@ run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t t
 				map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round, false);
 			}
 
-			border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
-					read_num, target_version, last_round);
+			if(hot_cold_mode){
+				border_lba=issue_write_kv_for_bis_hot_cold(&bis, bos, locked_seg_q, new_run, 
+						read_num, target_demote_version, target_keep_version, src->idx, last_round);			
+			}else{
+				border_lba=issue_write_kv_for_bis(&bis[DEMOTE_RUN], bos, locked_seg_q, new_run[DEMOTE_RUN], 
+						read_num, target_demote_version, last_round);
+			}
 		}
 		else{
 			for(uint32_t moved_num=0; moved_num<sorted_entry_num; ){
@@ -629,8 +662,13 @@ run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t t
 					map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round, false);
 				}
 
-				border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
-						read_num, target_version, last_round);
+				if(hot_cold_mode){
+					border_lba=issue_write_kv_for_bis_hot_cold(&bis, bos, locked_seg_q, new_run, 
+							read_num, target_demote_version, target_keep_version, src->idx, last_round);			
+				}else{
+					border_lba=issue_write_kv_for_bis(&bis[DEMOTE_RUN], bos, locked_seg_q, new_run[DEMOTE_RUN], 
+							read_num, target_demote_version, last_round);
+				}
 				moved_num+=read_num;
 			}
 		}
@@ -651,18 +689,28 @@ run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t t
 
 
 	sst_file *last_file;
-	if((last_file=bis_to_sst_file(bis))){
-		run_append_sstfile_move_originality(new_run, last_file);
-		sst_free(last_file, LSM.pm);
+	if(hot_cold_mode){
+		if((last_file=bis_to_sst_file(bis[0]))){
+			run_append_sstfile_move_originality(new_run[0], last_file);
+			sst_free(last_file, LSM.pm);
+		}
+
+		if((last_file=bis_to_sst_file(bis[1]))){
+			run_append_sstfile_move_originality(new_run[1], last_file);
+			sst_free(last_file, LSM.pm);
+		}
+	}
+	else{
+		if((last_file=bis_to_sst_file(bis[0]))){
+			run_append_sstfile_move_originality(new_run[0], last_file);
+			sst_free(last_file, LSM.pm);
+		}
 	}
 
 
 	for(uint32_t i=0; i<stream_num; i++){
 		sst_pos_free(pos_set[i]);
 	}
-
-	sst_bis_free(bis);
-	sst_bos_free(bos, _cm);
 
 	release_locked_seg_q(locked_seg_q);
 	for(uint32_t i=0; i<stream_num; i++){
@@ -671,21 +719,31 @@ run *compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t t
 	}
 	delete[] MFS_set_ptr;
 
+	if(hot_cold_mode){
+		sst_bis_free(bis[0]);
+		sst_bis_free(bis[1]);
+	}else{
+		sst_bis_free(bis[0]);
+	}
+
+	sst_bos_free(bos, _cm);
 	delete kpq;
+	free(bis);
+	free(bos);
 	free(pos_set);
 	free(mr_set);
 	free(thread_arg.arg_set);
 	free(read_arg_set);
-
-
 	return new_run;
 }
 
 level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){
 	_cm=cm;
-	run *new_run=compaction_TI2RUN(cm, src, des ,target_version, false);
+	bool issequential;
+	run **new_run=compaction_TI2RUN(cm, src, des, src->run_num, target_version, UINT32_MAX, &issequential, false, false);
 	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, target_version, des->idx);
-	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, 
+			des->max_contents_num, des->check_full_by_size);
 
 	run *rptr;
 	uint32_t ridx;
@@ -695,10 +753,57 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		}
 	}
 
-	level_update_run_at_move_originality(res, target_run_idx, new_run, true);
+	level_update_run_at_move_originality(res, target_run_idx, new_run[0], true);
 
-	run_free(new_run);
+	run_free(new_run[0]);
+	free(new_run);
 
+	level_print(res);
+	return res;
+}
+
+level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des,
+		uint32_t target_version, bool *hot_cold_separation){
+	bool issequential;
+	uint32_t target_keep_version=version_pick_oldest_version(LSM.last_run_version, src->idx);
+	run **new_run=compaction_TI2RUN(cm, src, des, src->run_num-1, 
+			target_version, target_keep_version, &issequential, false, true);
+
+	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, target_version, des->idx);
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, 
+			des->max_contents_num, des->check_full_by_size);
+
+	uint32_t ridx;
+	run * rptr;
+	for_each_run_max(des, rptr, ridx){
+		if(rptr->now_sst_num){
+			level_append_run_copy_move_originality(res, rptr, ridx);
+		}
+	}
+	level_update_run_at_move_originality(res, target_run_idx, new_run[0], true);
+	if(issequential) {
+		*hot_cold_separation=false;
+		return res;
+	}
+
+	*hot_cold_separation=true;
+
+	for(uint32_t i=0; i<src->run_num-1; i++){
+		uint32_t oldest_version=version_pop_oldest_version(LSM.last_run_version, src->idx);
+		version_unpopulate(LSM.last_run_version, oldest_version, src->idx);
+		uint32_t src_ridx=version_get_ridx_of_order(LSM.last_run_version, src->idx, oldest_version);
+		run_reinit(&src->array[src_ridx]);
+	}
+
+	version_poped_update(LSM.last_run_version, des->idx, src->run_num-1);
+	
+	uint32_t target_lower_version=version_get_empty_version(LSM.last_run_version, src->idx);
+	uint32_t target_lower_run_idx=version_to_ridx(LSM.last_run_version, target_lower_version, src->idx);
+	level_update_run_at_move_originality(src, target_lower_run_idx, new_run[1], true);
+	
+	run_free(new_run[1]);
+	run_free(new_run[0]);
+	free(new_run);
 	level_print(res);
 	return res;
 }
@@ -708,7 +813,7 @@ level *compaction_TW_convert_LW(compaction_master *cm, level *src){
 	run *new_run=NULL;
 	uint32_t stream_num=src->run_num;
 	level *res=level_init(src->now_sst_num, 1, LEVELING_WISCKEY, src->idx, src->max_contents_num, src->check_full_by_size);
-	if((new_run=tiering_trivial_move(src, UINT32_MAX, UINT32_MAX, false))){
+	if((new_run=tiering_trivial_move(src, UINT32_MAX, src->run_num, UINT32_MAX, false, false))){
 		sst_file *sptr; uint32_t sidx;
 		for_each_sst(new_run, sptr, sidx){
 			level_append_sstfile(res, sptr, true);
@@ -1058,3 +1163,44 @@ void *merge_end_req(algo_req *req){
 	free(req);
 	return NULL;
 }
+
+/*
+static inline uint32_t TI2_RUN_data_move(sst_bf_out_stream *bos, 
+		sst_bf_in_stream **bis, 
+		std::queue<key_ptr_pair> *kpq,
+		std::list<mr_free_set> ** MFS_set_ptr,
+		run **new_run;
+		std::<uint32_t> *locked_seg_q,
+		uint32_t *org_border_lba,
+		uint32_t stream_num,
+		uint32_t target_version, 
+		bool last_round,
+		bool hot_cold_mode){
+
+	uint32_t read_num;
+	uint32_t border_lba;
+	if(hot_cold_mode){		
+		read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, org_border_lba,
+				false, UINT32_MAX, UINT32_MAX, last_round);
+
+		for(uint32_t k=0; k<stream_num; k++){
+			map_range_postprocessing(MFS_set_ptr[k], MAX(border_lba1, border_lba2), last_round, false);
+		}
+		
+		border_lba=issue_write_kv_for_bis_hot_cold(&bis, bos, locked_seg_q, new_run, 
+					read_num1, target_version, last_round);
+	}
+	else{
+		read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, org_border_lba,
+				false, UINT32_MAX, UINT32_MAX, last_round);
+
+		for(uint32_t k=0; k<stream_num; k++){
+			map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round, false);
+		}
+
+		border_lba=issue_write_kv_for_bis(&bis[0], bos, locked_seg_q, new_run[0], 
+					read_num1, target_version, last_round);
+	}
+	*org_border_lba=border_lba;
+	return read_num;
+}*/

@@ -236,7 +236,7 @@ static void write_sst_file(sst_pf_in_stream *is, level *des){ //for page file
 	sst_free(sptr, LSM.pm);
 }
 
-static bool leveling_invalidation_function(level *des, uint32_t stream_id, uint32_t version, 
+static uint32_t leveling_invalidation_function(level *des, uint32_t stream_id, uint32_t version, 
 		key_ptr_pair kp, bool overlap, bool inplace){
 	if(overlap){
 		if(slm_invalidate_enable(des->idx, kp.piece_ppa)){
@@ -271,7 +271,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 		sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
 		bool all_empty_stop, uint32_t limit, uint32_t target_version,
 		bool merge_flag,
-		bool (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_version, key_ptr_pair kp, bool overlap, bool inplace),
+		uint32_t (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_version, key_ptr_pair kp, bool overlap, bool inplace),
 		bool inplace){
 	bool one_empty=false;
 	if(stream_num >= 32){

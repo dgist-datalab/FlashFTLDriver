@@ -21,6 +21,11 @@
 #define COMPACTION_REQ_MAX_NUM 1
 #define WRITEBUFFER_NUM (1+1)
 #define TIMERESULT
+#define HOT_COLD
+
+enum{
+	DEMOTE_RUN, KEEP_RUN,
+};
 
 typedef struct lsmtree_monitor{
 	/*cnt*/
@@ -55,6 +60,8 @@ typedef struct tree_param{
 	level_param *lp;
 	uint64_t memory_usage_bit;
 	uint64_t run_num;
+	uint64_t total_run_num_bit;
+	uint64_t entry_bit;
 	double WAF;
 }tree_param;
 

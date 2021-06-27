@@ -305,7 +305,6 @@ static inline std::set<uint32_t> *split_lba_set(std::set<uint32_t> *from, uint32
 static char *flush_set(std::set<uint32_t> *target, bool map_write_same_block, uint32_t *map_ppa, uint32_t version_idx){
 	std::set<uint32_t>::iterator iter;
 	char *key_ptr=(char*)malloc(PAGESIZE);
-	char *oob;
 	memset(key_ptr, -1, PAGESIZE);
 	key_ptr_pair *mapping=(key_ptr_pair*)key_ptr;
 	uint32_t inter_idx=0;
@@ -321,7 +320,6 @@ static char *flush_set(std::set<uint32_t> *target, bool map_write_same_block, ui
 		if(inter_idx==0){
 			ppa=page_manager_get_new_ppa(LSM.pm, 
 					false, map_write_same_block?DATASEG:SEPDATASEG);
-			oob=LSM.pm->bm->get_oob(LSM.pm->bm, ppa);
 		}
 		mapping[cnt].lba=*iter;
 		mapping[cnt].piece_ppa=ppa*L2PGAP+inter_idx;
@@ -329,9 +327,8 @@ static char *flush_set(std::set<uint32_t> *target, bool map_write_same_block, ui
 		*(uint32_t*)&dummy_data[LPAGESIZE*(mapping[cnt].piece_ppa%L2PGAP)]=mapping[cnt].lba;
 
 		version_coupling_lba_version(LSM.last_run_version, mapping[cnt].lba, version_idx);
-
-		validate_piece_ppa(LSM.pm->bm, 1, &mapping[cnt].piece_ppa, 
-				&mapping[cnt].lba, true);
+		uint32_t prev_num=0;
+		validate_piece_ppa(LSM.pm->bm, 1, &mapping[cnt].piece_ppa, &mapping[cnt].lba, &prev_num, true);
 		if(inter_idx==(L2PGAP-1)){
 			io_manager_test_write(ppa, dummy_data, DATAW);
 		}

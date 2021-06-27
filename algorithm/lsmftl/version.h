@@ -54,6 +54,10 @@ uint32_t version_level_to_start_version(version *v, uint32_t level_idx);
 uint32_t version_get_level_invalidation_cnt(version *v, uint32_t level_idx);
 uint32_t version_get_resort_version(version *v, uint32_t level_idx);
 
+static inline uint32_t version_get_ridx_of_order(version *v, uint32_t lev_idx, uint32_t order){
+	return (v->poped_version_num[lev_idx]+order)%v->level_run_num[lev_idx];
+}
+
 static inline uint32_t version_to_ridx(version *v, uint32_t target_version, uint32_t lev_idx){
 	return target_version-version_level_to_start_version(v, lev_idx);
 }
@@ -120,8 +124,8 @@ static inline int version_compare(version *v, int32_t a, int32_t b){
 	}*/
 	return a_-b_;
 }
-static inline void version_poped_update(version *v, uint32_t leveln){
-	v->poped_version_num[leveln]+=MERGED_RUN_NUM;
+static inline void version_poped_update(version *v, uint32_t leveln, uint32_t updating_run_num){
+	v->poped_version_num[leveln]+=updating_run_num;
 	v->poped_version_num[leveln]%=v->level_run_num[leveln];
 }
 static inline uint32_t version_to_level_idx(version *v, uint32_t version, uint32_t level_num){

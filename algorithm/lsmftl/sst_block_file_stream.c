@@ -1,5 +1,6 @@
 #include "sst_block_file_stream.h"
 #include "lsmtree.h"
+#include "oob_manager.h"
 #include <stdlib.h>
 
 extern lsmtree LSM;
@@ -49,6 +50,7 @@ static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_w
 			printf("wrapping! %u -> offset:%u\n", debug_lba, kv_wrap_buf[i]->piece_ppa%L2PGAP);	
 		}
 		kv_wrap_buf[i]->kv_ptr.data=&value[LPAGESIZE*(kv_wrap_buf[i]->piece_ppa%L2PGAP)];
+		kv_wrap_buf[i]->prev_version=UINT32_MAX;
 		kv_wrap_buf[i]->free_target_req=false;
 
 		bos->last_issue_lba=kv_wrap_buf[i]->kv_ptr.lba;
@@ -237,6 +239,7 @@ bool sst_bis_insert(sst_bf_in_stream *bis, key_value_wrapper *kv_wrapper){
 	if(bis->buffer_idx==L2PGAP){
 		EPRINT("plz check buffer_idx", true);
 	}
+	kv_wrapper->prev_version=get_version_from_piece_ppa(kv_wrapper->piece_ppa);
 	bis->buffer[bis->buffer_idx++]=kv_wrapper;
 
 	if(bis->start_lba>kv_wrapper->kv_ptr.lba){
@@ -291,7 +294,9 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 		EPRINT("new data should same segment", true);
 	}
 	res->ppa=ppa;
+	key_value_wrapper *kvw=NULL;
 	for(uint32_t i=0; i<bis->buffer_idx;i++){
+		kvw=bis->buffer[i];
 		if(bis->now_map_data_idx==KP_IN_PAGE){
 			bis->now_map_data=NULL;
 		}
@@ -302,21 +307,21 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 			bis->now_map_data_idx=0;
 		}
 
-		//printf("read : write target %u:%u - %u\n", bis->buffer[i]->kv_ptr.lba, bis->buffer[i]->piece_ppa, PIECETOPPA(bis->buffer[i]->piece_ppa));
+		//printf("read : write target %u:%u - %u\n", kvw->kv_ptr.lba, kvw->piece_ppa, PIECETOPPA(kvw->piece_ppa));
 
 		key_ptr_pair *map_pair=&((key_ptr_pair*)(bis->now_map_data->value))[bis->now_map_data_idx++];
-		map_pair->lba=bis->buffer[i]->kv_ptr.lba;
+		map_pair->lba=kvw->kv_ptr.lba;
 		map_pair->piece_ppa=ppa*L2PGAP+(i%L2PGAP);
 
 		debug_kp[i].lba=map_pair->lba;
 		debug_kp[i].piece_ppa=map_pair->piece_ppa;
-		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, true);
+		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, &kvw->prev_version, true);
 
-		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], bis->buffer[i]->kv_ptr.data, LPAGESIZE);
-		if(bis->buffer[i]->kv_ptr.lba==debug_lba){
+		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], kvw->kv_ptr.data, LPAGESIZE);
+		if(kvw->kv_ptr.lba==debug_lba){
 			printf("readed data before_write: %u (%u->%u), copied_data:%u (%u)\n", 
-					*(uint32_t*)bis->buffer[i]->kv_ptr.data,
-					bis->buffer[i]->piece_ppa, map_pair->piece_ppa,
+					*(uint32_t*)kvw->kv_ptr.data,
+					kvw->piece_ppa, map_pair->piece_ppa,
 					*(uint32_t*)&res->value[(i%L2PGAP)*LPAGESIZE], i);
 		}
 
@@ -326,16 +331,16 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 
 
 		bis->write_issued_kv_num++;
-		if(bis->buffer[i]->free_target_req){
-			inf_free_valueset(bis->buffer[i]->param->data, FS_MALLOC_R);
-			if(!bis->buffer[i]->no_inter_param_alloc){
-				compaction_free_read_param(LSM.cm, bis->buffer[i]->param);
+		if(kvw->free_target_req){
+			inf_free_valueset(kvw->param->data, FS_MALLOC_R);
+			if(!kvw->no_inter_param_alloc){
+				compaction_free_read_param(LSM.cm, kvw->param);
 			}
 			else{
-				free(bis->buffer[i]->param);
+				free(kvw->param);
 			}
 		}
-		free(bis->buffer[i]);
+		free(kvw);
 	}
 
 	(*debug_idx)=bis->buffer_idx;

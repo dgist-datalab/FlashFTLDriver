@@ -32,6 +32,7 @@ typedef struct gc_read_node{
 	fdriver_lock_t done_lock;
 	uint32_t piece_ppa;
 	uint32_t lba;
+	uint32_t version;
 }gc_read_node;
 
 enum{
@@ -63,7 +64,8 @@ uint32_t page_manager_get_new_ppa(page_manager *pm, bool ismap, uint32_t type);
 uint32_t page_manager_pick_new_ppa(page_manager *pm, bool ismap, uint32_t type);
 uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap, bool include_invalid_block);
 uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap);
-void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t* piece_ppa, uint32_t *lba, bool);
+void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t* piece_ppa, uint32_t *lba, 
+		uint32_t* version, bool);
 bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool);
 void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, uint32_t end_lba, bool);
 void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool);

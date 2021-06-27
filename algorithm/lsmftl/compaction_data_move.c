@@ -210,6 +210,91 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 	return last_lba;
 }
 
+uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_stream *bos, 
+		std::queue<uint32_t> *locked_seg_q, run **new_run,
+		int32_t entry_num, uint32_t target_demote_version, uint32_t target_keep_version,
+		uint32_t src_idx,
+		bool final){
+	int32_t inserted_entry_num=0;
+	uint32_t last_lba=UINT32_MAX;
+
+	fdriver_lock(&LSM.flush_lock);
+	uint32_t level_idx=version_to_level_idx(LSM.last_run_version, target_demote_version, LSM.param.LEVELN);
+
+	uint32_t kv_pair_num=sst_bos_size(bos, final);
+	uint32_t need_page_num=(kv_pair_num/L2PGAP+(kv_pair_num%L2PGAP?1:0))+
+		(kv_pair_num/KP_IN_PAGE+(kv_pair_num%KP_IN_PAGE?1:0)); //map_num
+	uint32_t need_seg_num=need_page_num/_PPS+(need_page_num%_PPS?1:0);
+	if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
+		__do_gc(LSM.pm, false, need_seg_num*_PPS);
+	}
+	
+	bool inserting_demote_run;
+	while(!sst_bos_is_empty(bos)){
+		inserting_demote_run=false;
+		key_value_wrapper *target=NULL;
+
+		if(!final && !(target=sst_bos_pick(bos, entry_num-inserted_entry_num <=L2PGAP))){
+			break;
+		}
+		else if(final){
+			target=sst_bos_pick(bos, entry_num-inserted_entry_num<=L2PGAP);
+			if(!target){
+				target=sst_bos_get_pending(bos, _cm);
+			}
+		}
+
+		sst_bf_in_stream **target_bis=NULL;
+
+		if(target){
+			last_lba=target->kv_ptr.lba;
+			uint32_t querying_version=target->prev_version;
+			if(version_belong_level(LSM.last_run_version, querying_version, src_idx)){
+				inserting_demote_run=false;		
+				version_coupling_lba_version(LSM.last_run_version, target->kv_ptr.lba, target_keep_version);
+			}
+			else{
+				inserting_demote_run=true;
+				version_coupling_lba_version(LSM.last_run_version, target->kv_ptr.lba, target_demote_version);
+			}
+			target_bis=&((*bis)[inserting_demote_run?DEMOTE_RUN:KEEP_RUN]);
+
+
+			if((target && sst_bis_insert(*target_bis, target)) ||
+					(final && sst_bos_kv_q_size(bos)==1)){
+				if(inserting_demote_run){
+					issue_bis_result(*target_bis, target_demote_version, final);
+				}
+				else{
+					issue_bis_result(*target_bis, target_keep_version, final);
+				}
+			}
+		}
+
+		sst_bos_pop(bos, _cm);
+
+		if(target_bis && sst_bis_ppa_empty(*target_bis)){
+			sst_file *sptr=bis_to_sst_file(*target_bis);
+			run_append_sstfile_move_originality(new_run[inserting_demote_run?DEMOTE_RUN:KEEP_RUN], sptr);
+			sst_free(sptr, LSM.pm);
+			sst_bis_free(*target_bis);
+			*target_bis=tiering_new_bis(locked_seg_q, inserting_demote_run? level_idx:src_idx);
+		}
+		inserted_entry_num++;
+	}
+	
+	if(final && sst_bos_kv_q_size(bos)==0 && (*bis[DEMOTE_RUN])->buffer_idx){
+		issue_bis_result((*bis)[DEMOTE_RUN], target_demote_version, final);
+	}
+
+	if(final && sst_bos_kv_q_size(bos)==0 && (*bis[KEEP_RUN])->buffer_idx){
+		issue_bis_result((*bis)[KEEP_RUN], target_keep_version, final);
+	}
+	fdriver_unlock(&LSM.flush_lock);
+
+	return last_lba;
+}
+
 void *compaction_data_read_end_req(algo_req *req){
 	key_value_wrapper *kv_wrapper;
 	switch(req->type){

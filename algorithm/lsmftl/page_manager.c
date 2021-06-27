@@ -1,4 +1,5 @@
 #include "page_manager.h"
+#include "oob_manager.h"
 #include "io.h"
 #include "lsmtree.h"
 #include "compaction.h"
@@ -13,11 +14,13 @@ bool temp_debug_flag;
 extern uint32_t debug_lba;
 
 void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_ppa,
-		uint32_t *lba, bool should_abort){
+		uint32_t *lba, uint32_t *version, bool should_abort){
 	static int cnt=0;
 	for(uint32_t i=0; i<piece_num; i++){
-		char *oob=bm->get_oob(bm, PIECETOPPA(piece_ppa[i]));
-		memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
+		oob_manager *oob=get_oob_manager(PIECETOPPA(piece_ppa[i]));
+		oob->lba[piece_ppa[i]%L2PGAP]=lba[i];
+		oob->version[piece_ppa[i]%L2PGAP]=version[i];
+	//	memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 #ifdef LSM_DEBUG
 		if(piece_ppa[i]==debug_piece_ppa){
 			printf("%u ", should_abort?++cnt:cnt);
@@ -47,13 +50,22 @@ static inline void gc_debug_checking(gc_read_node *gn){
 }
 
 bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t lba, uint32_t *idx){
-	char *oob=pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa));
-	if(*(uint32_t*)&oob[(piece_ppa%L2PGAP)*sizeof(uint32_t)]==lba){
+	oob_manager *oob=get_oob_manager(PIECETOPPA(piece_ppa));
+	if(get_lba_from_oob_manager(oob, piece_ppa%L2PGAP)==lba){
 		*idx=piece_ppa%L2PGAP;
 		return true;
 	}
+
 	*idx=L2PGAP;
 	return false;
+
+//	char *oob=pm->bm->get_oob(pm->bm, PIECETOPPA(piece_ppa));
+//	if(*(uint32_t*)&oob[(piece_ppa%L2PGAP)*sizeof(uint32_t)]==lba){
+//		*idx=piece_ppa%L2PGAP;
+//		return true;
+//	}
+//	*idx=L2PGAP;
+//	return false;
 }
 
 bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abort){
@@ -99,9 +111,13 @@ void page_manager_free(page_manager* pm){
 }
 
 void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, uint32_t end_lba, bool should_abort){
-	char *oob=bm->get_oob(bm, map_ppa);
-	((uint32_t*)oob)[0]=start_lba;
-	((uint32_t*)oob)[1]=end_lba;
+	oob_manager *oob=get_oob_manager(map_ppa);
+	oob->lba[0]=start_lba;
+	oob->lba[1]=end_lba;
+
+//	char *oob=bm->get_oob(bm, map_ppa);
+//	((uint32_t*)oob)[0]=start_lba;
+//	((uint32_t*)oob)[1]=end_lba;
 #ifdef LSM_DEBUG
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
 		static int cnt=0;
@@ -609,8 +625,12 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	while(!gc_target_queue->empty()){
 		fdriver_lock(&gn->done_lock);
 		gn=gc_target_queue->front();
-		char *oob=bm->get_oob(bm, gn->piece_ppa);
-		gn->lba=*(uint32_t*)oob;
+
+		oob_manager *oob=get_oob_manager(gn->piece_ppa);
+		gn->lba=oob->lba[0];
+
+//		char *oob=bm->get_oob(bm, gn->piece_ppa);
+//		gn->lba=*(uint32_t*)oob;
 		sst_file *target_sst_file=lsmtree_find_target_sst_mapgc(gn->lba, gn->piece_ppa);
 		target_sst_file->sequential_file=false;
 		invalidate_map_ppa(pm->bm, gn->piece_ppa, true);
@@ -786,6 +806,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	value_set **free_target=(value_set**)malloc(sizeof(value_set*)*read_page_num);
 
 	uint32_t* oob_lba;
+	uint32_t* oob_version;
 	uint32_t ppa, piece_ppa;
 	uint32_t q_idx=0;
 	sst_file *sptr=NULL;
@@ -802,7 +823,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		gn=gc_target_queue->front();
 		fdriver_lock(&gn->done_lock);
 		ppa=PIECETOPPA(gn->piece_ppa);
-		oob_lba=(uint32_t*)bm->get_oob(bm, ppa);
+		oob_manager *oob=get_oob_manager(ppa);
+		oob_lba=oob->lba;
+		oob_version=oob->version;
 
 		for(uint32_t i=0; i<L2PGAP; i++){
 			if(bm->is_invalid_page(bm, ppa*L2PGAP+i)) continue;
@@ -812,6 +835,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				piece_ppa=ppa*L2PGAP+i;
 				gn->piece_ppa=piece_ppa;
 				gn->lba=oob_lba[i];
+				gn->version=oob_version[i];
 				if(gn->lba==debug_lba){
 					printf("target is moved!\n");
 				}
