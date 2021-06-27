@@ -180,7 +180,7 @@ struct algorithm{
 };
 
 typedef struct __OOBT{
-	char d[64];
+	char d[128];
 }__OOB;
 
 typedef struct masterblock{
