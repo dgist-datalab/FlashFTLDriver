@@ -228,6 +228,7 @@ struct blockmanager{
 	int (*pick_page_num)(struct blockmanager*, __segment*);
 	bool (*check_full)(struct blockmanager*, __segment*, uint8_t type);
 	bool (*is_gc_needed) (struct blockmanager*);
+	int (*get_free_segment_number) (struct blockmanager*);
 	__gsegment* (*get_gc_target) (struct blockmanager*);
 	void (*trim_segment) (struct blockmanager*, __gsegment*, struct lower_info*);
 	void (*free_segment)(struct blockmanager *,__segment*);
@@ -255,7 +256,7 @@ struct blockmanager{
 	bool (*pt_isgc_needed)(struct blockmanager*, int pt_num);
 	__segment* (*change_pt_reserve)(struct blockmanager *,int pt_num, __segment *reserve);
 	uint32_t (*pt_reserve_to_free)(struct blockmanager*, int pt_num, __segment *reserve);
-
+	
 	lower_info *li;
 	void *private_data;
 	uint32_t assigned_page;

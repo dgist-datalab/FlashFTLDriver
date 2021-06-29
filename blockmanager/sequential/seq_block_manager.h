@@ -36,6 +36,9 @@ __block *seq_pick_block(struct blockmanager *, uint32_t page_num);
 __segment* seq_get_segment (struct blockmanager*, bool isreserve);
 bool seq_check_full(struct blockmanager *,__segment *active, uint8_t type);
 bool seq_is_gc_needed (struct blockmanager*);
+
+int seq_get_free_segment_number(struct blockmanager*);
+
 __gsegment* seq_get_gc_target (struct blockmanager*);
 void seq_trim_segment (struct blockmanager*, __gsegment*, struct lower_info*);
 int seq_populate_bit (struct blockmanager*, uint32_t ppa);

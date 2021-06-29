@@ -10,14 +10,36 @@ void invalidate_ppa(uint32_t t_ppa){
 	page_ftl.bm->unpopulate_bit(page_ftl.bm, t_ppa);
 }
 
-void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx){
+void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx, uint32_t mig_count){
 	/*when the ppa is validated this function must be called*/
 	for(uint32_t i=0; i<max_idx; i++){
 		page_ftl.bm->populate_bit(page_ftl.bm,ppa * L2PGAP+i);
 	}
 
 	/*this function is used for write some data to OOB(spare area) for reverse mapping*/
-	page_ftl.bm->set_oob(page_ftl.bm,(char*)lbas,sizeof(KEYT)*max_idx,ppa);
+	int len=sizeof(KEYT)*max_idx+sizeof(uint32_t)+1;
+	char *oob_data = (char*)calloc(len, 1);
+	memcpy(oob_data, (char*)lbas, sizeof(KEYT)*max_idx);
+	memcpy(&oob_data[sizeof(KEYT)*max_idx], &mig_count, sizeof(uint32_t));
+	//printf("validate_ppa: %u\n", oob_data[sizeof(KEYT)*max_idx]);
+	page_ftl.bm->set_oob(page_ftl.bm, oob_data, len,ppa);
+	//set_migration_count(page_ftl.bm, mig_count, sizeof(KEYT)*max_idx, ppa);
+}
+
+
+char *get_lbas(struct blockmanager* bm, char* oob_data, int len) {
+	//printf("oob_data: 0x%x\n", oob_data);
+	char *res = (char *)malloc(len);
+	memcpy(res, oob_data, len);
+	KEYT* res_k=(KEYT*)res;
+	return res;
+}
+
+uint32_t get_migration_count(struct blockmanager* bm, char* oob_data, int len) {
+	uint32_t res = 0;
+	memcpy(&res, &oob_data[len], sizeof(uint32_t));
+	printf("get_count: %u\n", res);
+	return res;	
 }
 
 gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value){
@@ -70,7 +92,10 @@ void new_do_gc(){
 	}
 
 	g_buffer.idx=0;
+	char *oobs;
 	KEYT *lbas;
+	uint32_t mig_count=0;
+
 	gv_idx=0;
 	uint32_t done_cnt=0;
 	while(done_cnt!=_PPS){
@@ -78,7 +103,10 @@ void new_do_gc(){
 		if(!gv->isdone){
 			goto next;
 		}
-		lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
+		oobs=bm->get_oob(bm, gv->ppa);
+		lbas=(KEYT*)get_lbas(bm, oobs, sizeof(KEYT)*L2PGAP);
+		mig_count=get_migration_count(bm, oobs, sizeof(KEYT)*L2PGAP);
+		
 		for(uint32_t i=0; i<L2PGAP; i++){
 			if(page_map_pick(lbas[i])!=gv->ppa*L2PGAP+i) continue;
 			memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
@@ -87,8 +115,8 @@ void new_do_gc(){
 			g_buffer.idx++;
 
 			if(g_buffer.idx==L2PGAP){
-				uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP);
-				validate_ppa(res, g_buffer.key, g_buffer.idx);
+				uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP, 0);
+				validate_ppa(res, g_buffer.key, g_buffer.idx, 0);
 				send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 				g_buffer.idx=0;
 			}
@@ -103,8 +131,8 @@ next:
 	}	
 
 	if(g_buffer.idx!=0){
-		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx);
-		validate_ppa(res, g_buffer.key, g_buffer.idx);
+		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx, 0);
+		validate_ppa(res, g_buffer.key, g_buffer.idx, 0);
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 		g_buffer.idx=0;	
 	}
@@ -113,8 +141,8 @@ next:
 
 	bm->free_segment(bm, p->active);
 
-	p->active=p->reserve;//make reserved to active block
-	p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
+	//p->active=p->reserve;//make reserved to active block
+	//p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
 }
 
 void do_gc(){
@@ -149,23 +177,31 @@ void do_gc(){
 
 	li_node *now,*nxt;
 	g_buffer.idx=0;
+	char* oobs;
 	KEYT *lbas;
+	uint32_t mig_count;
+
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list,now,nxt){
 
 			gv=(gc_value*)now->data;
 			if(!gv->isdone) continue;
-			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
+			oobs=bm->get_oob(bm, gv->ppa);
+			lbas=(KEYT*)get_lbas(bm, oobs, sizeof(KEYT)*L2PGAP);
+			mig_count = get_migration_count(bm, oobs, sizeof(KEYT)*L2PGAP);
+			
+			if (mig_count < GNUMBER-1) g_buffer.mig_count=mig_count+1;
+			else g_buffer.mig_count=mig_count;
+
 			for(uint32_t i=0; i<L2PGAP; i++){
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
 				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
-
 				g_buffer.idx++;
 
 				if(g_buffer.idx==L2PGAP){
-					uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP);
-					validate_ppa(res, g_buffer.key, g_buffer.idx);
+					uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP, g_buffer.mig_count);
+					validate_ppa(res, g_buffer.key, g_buffer.idx, g_buffer.mig_count);
 					send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 					g_buffer.idx=0;
 				}
@@ -179,8 +215,8 @@ void do_gc(){
 	}
 
 	if(g_buffer.idx!=0){
-		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx);
-		validate_ppa(res, g_buffer.key, g_buffer.idx);
+		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx, g_buffer.mig_count);
+		validate_ppa(res, g_buffer.key, g_buffer.idx, g_buffer.mig_count);
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 		g_buffer.idx=0;	
 	}
@@ -189,8 +225,8 @@ void do_gc(){
 
 	bm->free_segment(bm, p->active);
 
-	p->active=p->reserve;//make reserved to active block
-	p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
+	p->active=bm->get_segment(page_ftl.bm, false);//make reserved to active block
+	//p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
 
 	list_free(temp_list);
 }
@@ -200,7 +236,7 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	uint32_t res;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
-	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && page_ftl.bm->is_gc_needed(page_ftl.bm)){
+	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && (page_ftl.bm->get_free_segment_number(page_ftl.bm)==1)){
 //		new_do_gc();//call gc
 		do_gc();//call gc
 	}
@@ -216,7 +252,7 @@ retry:
 	}
 
 	/*validate a page*/
-	validate_ppa(res, lbas, max_idx);
+	validate_ppa(res, lbas, max_idx, 0);
 	//printf("assigned %u\n",res);
 	return res;
 }

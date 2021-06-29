@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
+
 extern uint32_t test_key;
 extern algorithm page_ftl;
 
@@ -12,8 +13,10 @@ void page_map_create(){
 	for(int i=0;i<_NOP*L2PGAP; i++){
 		p->mapping[i]=UINT_MAX;
 	}
-	
-	p->reserve=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
+	p->reserve=(__segment **)malloc(sizeof(__segment*)*(GNUMBER-1));
+	for (uint32_t i=0;i<(GNUMBER-1);i++) { 
+		p->reserve[i]=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
+	}
 	p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //now active block for inserted request.
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
 }
@@ -63,12 +66,22 @@ uint32_t page_map_trim(uint32_t lba){
 	}
 }
 
-uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
+uint32_t page_map_gc_update(KEYT *lba, uint32_t idx, uint32_t mig_count){
+	printf("mig_count: %d\n", mig_count);
 	uint32_t res=0;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 
 	/*when the gc phase, It should get a page from the reserved block*/
-	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve);
+retry:
+	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve[mig_count-1]);
+	
+	if (res==UINT32_MAX){
+		__segment* tmp=p->reserve[mig_count-1];
+		p->reserve[mig_count-1] = page_ftl.bm->change_reserve(page_ftl.bm, p->reserve[mig_count-1]);
+		page_ftl.bm->free_segment(page_ftl.bm, tmp);
+		goto retry;
+	}
+
 	uint32_t old_ppa, new_ppa;
 	for(uint32_t i=0; i<idx; i++){
 		KEYT t_lba=lba[i];

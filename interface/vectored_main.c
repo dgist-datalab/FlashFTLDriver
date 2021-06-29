@@ -50,7 +50,7 @@ int main(int argc,char* argv[]){
 	//	bench_add(VECTOREDRGET,0,RANGE,RANGE);
 		//bench_add(VECTOREDRSET,0,RANGE/2,RANGE/2);
 		//bench_add(VECTOREDRW,0,RANGE,RANGE/2);
-		bench_add(VECTOREDRW,0,RANGE,RANGE*2);
+		bench_add(VECTOREDRW,0,RANGE,RANGE*4);
 		//inf_algorithm_testing();
 	}
 	printf("range: %lu!\n",RANGE);

@@ -11,7 +11,10 @@ struct blockmanager base_bm={
 	.get_page_num=base_get_page_num,
 	.pick_page_num=base_pick_page_num,
 	.check_full=base_check_full,
-	.is_gc_needed=base_is_gc_needed, 
+	.is_gc_needed=base_is_gc_needed,
+	
+	.get_free_segment_number=NULL,
+
 	.get_gc_target=base_get_gc_target,
 	.trim_segment=base_trim_segment,
 	.free_segment=base_free_segment,

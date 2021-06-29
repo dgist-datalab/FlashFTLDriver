@@ -14,7 +14,10 @@ struct blockmanager seq_bm={
 	.get_page_num=seq_get_page_num,
 	.pick_page_num=seq_pick_page_num,
 	.check_full=seq_check_full,
-	.is_gc_needed=seq_is_gc_needed, 
+	.is_gc_needed=seq_is_gc_needed,
+
+	.get_free_segment_number=seq_get_free_segment_number,
+
 	.get_gc_target=seq_get_gc_target,
 	.trim_segment=seq_trim_segment,
 	.free_segment=seq_free_segment,
@@ -204,6 +207,11 @@ bool seq_is_gc_needed (struct blockmanager* bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	if(p->free_logical_segment_q->size==0) return true;
 	return false;
+}
+
+int seq_get_free_segment_number(struct blockmanager *bm) {
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	return p->free_logical_segment_q->size;
 }
 
 void temp_print(void *a){
