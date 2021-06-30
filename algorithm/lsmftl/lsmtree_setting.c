@@ -104,16 +104,25 @@ void print_tree_param(tree_param *set, uint32_t number){
 }
 
 void print_tree_param_new(tree_param *set, uint32_t number, uint32_t divide){
-	printf("BUFF\tLEVEL\tWAF\tsf\trun_num\tmemory\tbuffer\tsum\tTABLE\tENTRY\t\n", (double)divide/divide/divide*100);
+	printf("BUFF\tLEVEL\tWAF\tsf\trun_num\tmemory\tbuffer\tsum\tTABLE\tENTRY\tR_AVG\n", (double)divide/divide/divide*100);
 	for(uint32_t i=1; i<=number; i++){
-		printf("%.4f\t%u\t%.2lf\t%.2lf\t%lu\t%.2lf\t%.2lf\t%.3lf\t%.3f\t%.2f\n", 
-				(double)divide/divide/divide*100,
+		printf("%.2f\t%u\t%.2lf\t%.2lf\t%lu\t%.2lf\t%.2lf\t%.3lf\t%.3f\t%.4f\t%.3f\n", 
+				(double)divide,
 				i, set[i].WAF, set[i].size_factor, set[i].run_num,
 				(double)set[i].memory_usage_bit/(RANGE*48),
 				(double)((double)RANGE*48/divide)/(RANGE*48),
 				(double)((double)set[i].memory_usage_bit+(double)((double)RANGE*48/divide))/(RANGE*48),
 				(double)set[i].total_run_num_bit/(RANGE*48),
-				(double)set[i].entry_bit/(RANGE*48));
+				(double)set[i].entry_bit/(RANGE*48),
+	//			(double)RANGE/(set[i].size_factor*i)/RANGE
+				set[i].avg_run_size
+				);
+		
+		for(uint32_t j=1;j<=i; j++){
+			printf("\t%.3lf\t%.2lf\t%.3lf\n", set[i].run_range_size[j]*100, set[i].rh_bit[j],
+					set[i].level_size_ratio[j] * 100);
+		}
+		printf("\n");
 	}
 }
 
@@ -129,6 +138,7 @@ void lsmtree_tiering_only_test(){
 		settings=(tree_param*)calloc(max_level+1, sizeof(tree_param));
 
 		for(uint32_t i=1; i<=max_level; i++){
+
 			settings[i].size_factor=get_size_factor(i, chunk_num);
 			settings[i].num_of_level=i;
 			settings[i].memory_usage_bit=ceil(log2(settings[i].size_factor *i)) * RANGE;
@@ -153,9 +163,29 @@ void lsmtree_tiering_only_test(){
 				double run_coverage_ratio=(double)run_size/num_range;
 				uint64_t run_memory_usage_bit=level_size * MIN(bf_memory_per_ent(run_coverage_ratio),
 						plr_memory_per_ent(run_coverage_ratio));
-				
+				bool plr_on=false;
+				if(bf_memory_per_ent(run_coverage_ratio) > plr_memory_per_ent(run_coverage_ratio)){
+					settings[i].plr_cnt++;
+					plr_on++;
+				}
+				settings[i].rh_bit[j]=MIN(bf_memory_per_ent(run_coverage_ratio),
+						plr_memory_per_ent(run_coverage_ratio));
+
+				settings[i].run_range_size[j]=(double)run_size/RANGE;
+				settings[i].level_size_ratio[j]=(double)level_size/RANGE;
 				settings[i].entry_bit+=run_memory_usage_bit;
 				settings[i].memory_usage_bit+=run_memory_usage_bit;
+				if(plr_on){
+					settings[i].avg_run_size+=run_size;
+				}
+				/*
+				if(j==i){
+					settings[i].last_avg_run_size=(double)level_size/settings[i].size_factor/num_range;
+				}*/
+			}
+			if(settings[i].plr_cnt){
+				settings[i].avg_run_size/=settings[i].plr_cnt;
+				settings[i].avg_run_size/=RANGE;
 			}
 		}
 		printf("\n");
@@ -311,6 +341,6 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 
 	free(settings);
 
-	lsmtree_tiering_only_test();
+//	lsmtree_tiering_only_test();
 	return res;
 }

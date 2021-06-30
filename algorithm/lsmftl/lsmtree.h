@@ -62,6 +62,14 @@ typedef struct tree_param{
 	uint64_t run_num;
 	uint64_t total_run_num_bit;
 	uint64_t entry_bit;
+	uint32_t plr_cnt;
+//	double run_num;
+	double bloom_bit;
+	double plr_bit;
+	double avg_run_size;
+	double rh_bit[21];
+	double run_range_size[21];
+	double level_size_ratio[21];
 	double WAF;
 }tree_param;
 
