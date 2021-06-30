@@ -52,7 +52,7 @@
 #elif defined(SLC)
 
 #define GIGAUNIT 16L
-#define OP 30
+#define OP 10
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
 #define REALSIZE (512L*G)
@@ -80,8 +80,8 @@
 #define LPAGESIZE 4096
 #define L2PGAP (PAGESIZE/LPAGESIZE)
 #define BLOCKSIZE (_PPB*PAGESIZE)
-#define _NOP (TOTALSIZE/PAGESIZE)
 #define _NOS (TOTALSIZE/(_PPS*PAGESIZE))
+#define _NOP (_NOS*_PPS)
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
 
