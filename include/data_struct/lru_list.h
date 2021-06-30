@@ -3,7 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "./libart/src/art.h"
+#include <stdint.h>
+//#include "./libart/src/art.h"
 
 typedef struct lru_node{
 	void *data;
@@ -17,7 +18,7 @@ typedef struct __lru{
 	lru_node *tail;
 	void (*free_data)(void *);
 	uint32_t (*retrieve_key)(void*);
-	art_tree map;
+//	art_tree map;
 } LRU;
 
 //lru

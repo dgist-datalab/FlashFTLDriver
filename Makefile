@@ -142,16 +142,16 @@ DEBUG: debug_driver
 
 duma_sim: duma_driver
 
-debug_driver: ./interface/main.c libdriver_d.a libart.o
+debug_driver: ./interface/main.c libdriver_d.a 
 	$(CC) $(CFLAGS) -DDEBUG -o $@ $^ $(LIBS)
 
-cheeze_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_block_main.c libdriver.a libart.o
+cheeze_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_block_main.c libdriver.a
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
-cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_trace_block_main.c libdriver.a libart.o
+cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/cheeze_trace_block_main.c libdriver.a 
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
-driver: ./interface/vectored_main.c libdriver.a libart.o
+driver: ./interface/vectored_main.c libdriver.a 
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a

@@ -7,12 +7,12 @@ void lru_init(LRU** lru, void (*data_free)(void*), uint32_t (*retrieve_key)(void
 	(*lru)->free_data=data_free;
 	(*lru)->retrieve_key=retrieve_key;
 
-	art_tree_init(&(*lru)->map);
+	//art_tree_init(&(*lru)->map);
 }
 
 void lru_free(LRU* lru){
 	while(lru_pop(lru)){}
-	art_tree_destroy(&lru->map);
+	//art_tree_destroy(&lru->map);
 	free(lru);
 }
 
@@ -28,14 +28,14 @@ lru_node* lru_push(LRU* lru, void* table_ptr){
 		now->next = lru->head;
 		lru->head = now;
 	}
-	
+	/*
 	if(lru->retrieve_key){
 		uint32_t key=lru->retrieve_key(table_ptr);
 		if(art_insert(&lru->map, (const unsigned char*)&key, sizeof(key), now->data)){
 			printf("already exist key:%u in lru map", key);
 			abort();
 		}
-	}
+	}*/
 
 	lru->size++;
 	return now;
@@ -53,7 +53,7 @@ lru_node* lru_push_last(LRU* lru, void* table_ptr){
 		now->prev = lru->tail;
 		lru->tail = now;
 	}
-
+/*
 	if(lru->retrieve_key){
 		uint32_t key=lru->retrieve_key(table_ptr);
 		if(art_insert(&lru->map, (const unsigned char*)&key, sizeof(key), now->data)){
@@ -61,7 +61,7 @@ lru_node* lru_push_last(LRU* lru, void* table_ptr){
 			abort();
 		}
 	}
-
+*/
 	lru->size++;
 	return now;
 }
@@ -79,10 +79,12 @@ void* lru_pop(LRU* lru){
 	else{
 		lru->head = NULL;
 	}
+	/*
 	if(lru->retrieve_key){
 		uint32_t key=lru->retrieve_key(now->data);
 		art_delete(&lru->map, (const unsigned char*)&key, sizeof(key));
 	}
+	*/
 
 	lru->size--;
 	if(lru->free_data){
@@ -136,19 +138,20 @@ void lru_delete(LRU* lru, lru_node* now){
 		now->prev->next = now->next;
 		now->next->prev = now->prev;
 	}
-
+/*
 	if(lru->retrieve_key){
 		uint32_t key=lru->retrieve_key(now->data);
 		art_delete(&lru->map, (const unsigned char*)&key, sizeof(key));
 	}
-	
+*/	
 	lru->size--;
 	if(lru->free_data){
 		lru->free_data(now->data);
 	}
 	free(now);
 }
-
+/*
 void* lru_find(LRU *lru, uint32_t key){
 	return art_search(&lru->map, (const unsigned char*)&key, sizeof(key));
 }
+*/
