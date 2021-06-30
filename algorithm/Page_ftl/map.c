@@ -67,7 +67,7 @@ uint32_t page_map_trim(uint32_t lba){
 }
 
 uint32_t page_map_gc_update(KEYT *lba, uint32_t idx, uint32_t mig_count){
-	printf("mig_count: %d\n", mig_count);
+	//printf("mig_count: %d\n", mig_count);
 	uint32_t res=0;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 

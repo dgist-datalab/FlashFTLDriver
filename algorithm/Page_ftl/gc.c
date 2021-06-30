@@ -38,7 +38,7 @@ char *get_lbas(struct blockmanager* bm, char* oob_data, int len) {
 uint32_t get_migration_count(struct blockmanager* bm, char* oob_data, int len) {
 	uint32_t res = 0;
 	memcpy(&res, &oob_data[len], sizeof(uint32_t));
-	printf("get_count: %u\n", res);
+	//printf("get_count: %u\n", res);
 	return res;	
 }
 
@@ -220,14 +220,15 @@ void do_gc(){
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 		g_buffer.idx=0;	
 	}
-
+	if (g_buffer.mig_count >= 2) printf("mig: %d\n", g_buffer.mig_count);
 	bm->trim_segment(bm,target,page_ftl.li); //erase a block
+	printf("TRIM!!!!!!!!!!!! GC occurs!!!!!!!!!!!!!!!!!!!!!!\n");
+	if (bm->check_full(bm, p->active, MASTER_PAGE)) {
+		bm->free_segment(bm, p->active);
 
-	bm->free_segment(bm, p->active);
-
-	p->active=bm->get_segment(page_ftl.bm, false);//make reserved to active block
+		p->active=bm->get_segment(page_ftl.bm, false);//make reserved to active block
 	//p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
-
+	}
 	list_free(temp_list);
 }
 
@@ -236,8 +237,10 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	uint32_t res;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
-	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && (page_ftl.bm->get_free_segment_number(page_ftl.bm)==1)){
+//	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=5)){
 //		new_do_gc();//call gc
+	if (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=3) {
+		printf("# of Free Blocks: %d\n",page_ftl.bm->get_free_segment_number(page_ftl.bm)); 
 		do_gc();//call gc
 	}
 
