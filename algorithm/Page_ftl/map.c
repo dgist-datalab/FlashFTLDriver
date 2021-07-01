@@ -20,11 +20,15 @@ void page_map_create(){
 	}
 
 #if 1 //NAM
+#if 1 //dirty check with bit
 	p->dirty_check=(unsigned char*)malloc(sizeof(unsigned char)*_DCE); 
 	for(int i=0; i<_DCE; i++){ 
 		p->dirty_check[i]=0; 
 	} 
-	
+#endif
+#if 1 //dirty check for flush
+	p->dirty_check_list = NULL; 
+#endif
 	p->tot_dirty_pages = 0; 
 	p->tot_flush_count = 0; 
 	p->mapflush=page_ftl.bm->get_segment(page_ftl.bm,false); //add the other active block for inserted mapping
@@ -39,12 +43,15 @@ int32_t page_dMap_check(KEYT lba){
 	uint32_t fidx = lba >> _PMES; 
 	pm_body *p=(pm_body*)page_ftl.algo_body; 
 
+#if 1 //dirty check with bit
 	if(p->dirty_check[fidx] & dirty_option)
 		return 0; 
 
 	p->dirty_check[fidx] |= dirty_option; 
+	page_map_dirtyCheck_list(fidx);
+#endif
 	p->tot_dirty_pages++; 
-	
+
 	if(p->tot_dirty_pages >= MAX_PROTECTED){ 
 		page_map_flush(); 
 	}
@@ -57,7 +64,7 @@ int32_t page_dMap_check(KEYT lba){
 int32_t page_map_flush(){ 
 	pm_body *p=(pm_body*)page_ftl.algo_body; 
 
-#if 1 //NAM
+#if 0 //dirty check with bit for flush
 	for(uint32_t i=0; i<_DCE; i++){
 		if(p->dirty_check[i] & dirty_option){ 
 			ppa_t ppa=get_ppa_mapflush(); 
@@ -68,6 +75,24 @@ int32_t page_map_flush(){
 		}
 	} 
 #endif	
+#if 1 //dirty check with list for flush
+	while(p->dirty_check_list != NULL){
+		uint32_t fidx = p->dirty_check_list->idx;  
+		if(p->dirty_check[fidx] & dirty_option){ 
+			ppa_t ppa=get_ppa_mapflush(); 
+			value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE); 
+			memcpy(&value->value[0], &p->mapping[fidx*8192], 8192); 
+			send_user_req(NULL, DATAW, ppa, value); 
+			p->dirty_check[fidx] &= ~dirty_option; 
+		} 
+		else{
+			printf("dirty check error!\n"); 
+		}
+		dp_list *tmp = p->dirty_check_list; 
+		p->dirty_check_list = p->dirty_check_list->next;
+		free(tmp);  
+	} 
+#endif
 	p->tot_dirty_pages = 0; 
 	p->tot_flush_count++;
 
@@ -154,4 +179,15 @@ void page_map_free(){
 	free(p->mapping);
 }
 
-
+#if 1 //NAM
+void page_map_dirtyCheck_list(uint32_t idx){ 
+	pm_body *p=(pm_body*)page_ftl.algo_body; 
+	
+	dp_list* newNode = (dp_list*)malloc(sizeof(dp_list)); 
+	newNode->idx = idx; 
+	newNode->next = p->dirty_check_list; 
+	p->dirty_check_list = newNode;	 	
+	
+	return; 
+}
+#endif

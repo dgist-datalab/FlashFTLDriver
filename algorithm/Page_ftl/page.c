@@ -287,7 +287,7 @@ int32_t dequeue_and_flush(){
 			node->req->end_req(node->req); 
 			free(node); 
 		} 
-		p->dirty_check[imax] &= ~node_dirty_option;
+		//p->dirty_check[imax] &= ~node_dirty_option;
 		dHead = dNode->next; 
 		free(dNode); 
 	}
@@ -514,7 +514,7 @@ void pageIsDirty(uint32_t idx){
 	if(p->dirty_check[idx] & node_dirty_option)
 		return; 
 
-	p->dirty_check[idx] |= node_dirty_option; 
+//	p->dirty_check[idx] |= node_dirty_option; 
 	node_dirty* newNode = (node_dirty*)malloc(sizeof(node_dirty)); 
 	newNode->idx = idx; 
 	newNode->next = dHead; 
