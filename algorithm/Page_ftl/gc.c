@@ -221,6 +221,24 @@ retry:
 	return res;
 }
 
+#if 1 //NAM
+ppa_t get_ppa_mapflush(){ 
+	uint32_t res; 
+	pm_body *p=(pm_body*)page_ftl.algo_body;
+
+retry: 
+	res=page_ftl.bm->get_page_num(page_ftl.bm,p->mapflush); 
+	
+	if(res==UINT32_MAX){ 
+		page_ftl.bm->free_segment(page_ftl.bm, p->mapflush); 
+		p->mapflush=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
+		goto retry; 
+	}
+	
+	return res; 
+} 
+#endif
+
 void *page_gc_end_req(algo_req *input){
 	gc_value *gv=(gc_value*)input->param;
 	switch(input->type){

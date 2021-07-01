@@ -5,6 +5,11 @@
 #include <limits.h>
 extern uint32_t test_key;
 extern algorithm page_ftl;
+#if 1 //NAM
+unsigned char dirty_option=0x1; 
+unsigned char node_dirty_option=0x2; 
+unsigned char heap_option=0x4; 
+#endif 
 
 void page_map_create(){
 	pm_body *p=(pm_body*)calloc(sizeof(pm_body),1);
@@ -12,11 +17,51 @@ void page_map_create(){
 	for(int i=0;i<_NOP*L2PGAP; i++){
 		p->mapping[i]=UINT_MAX;
 	}
+
+#if 1 //NAM
+	p->dirty_check=(unsigned char*)malloc(sizeof(unsigned char)*_DCE); 
+	for(int i=0; i<_DCE; i++){ 
+		p->dirty_check[i]=0; 
+	} 
 	
+	p->tot_dirty_pages = 0; 
+	p->tot_flush_count = 0; 
+	p->mapflush=page_ftl.bm->get_segment(page_ftl.bm,false); //add the other active block for inserted mapping
+#endif	
 	p->reserve=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
 	p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //now active block for inserted request.
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
 }
+
+#if 1 //NAM
+int32_t page_dMap_check(KEYT lba){
+	uint32_t fidx = lba >> _PMES; 
+	pm_body *p=(pm_body*)page_ftl.algo_body; 
+
+	if(p->dirty_check[fidx] & dirty_option)
+		return 0; 
+
+	p->dirty_check[fidx] |= dirty_option; 
+	p->tot_dirty_pages++; 
+	
+	if(p->tot_dirty_pages >= MAX_PROTECTED){ 
+		page_map_flush(); 
+	}
+	
+	return 0;  
+} 
+#endif
+
+#if 1 //NAM
+int32_t page_map_flush(){ 
+	pm_body *p=(pm_body*)page_ftl.algo_body; 
+	
+	p->tot_dirty_pages = 0; 
+	p->tot_flush_count++;
+
+	return 0;  	
+} 
+#endif
 
 uint32_t page_map_assign(KEYT* lba, uint32_t max_idx){
 	uint32_t res=0;
@@ -37,7 +82,8 @@ uint32_t page_map_assign(KEYT* lba, uint32_t max_idx){
 		}
 	//	DPRINTF("\tmap set : %u->%u\n", t_lba, p->mapping[t_lba]);
 	}
-
+	page_dMap_check(lba[0]);
+ 
 	return res;
 }
 

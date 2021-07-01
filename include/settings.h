@@ -43,7 +43,12 @@
 #ifdef MLC
 #define TOTALSIZE (300L*G)
 #define REALSIZE (512L*G)
+#if 1
 #define PAGESIZE (16*K)
+#endif
+#if 0 //NAM
+#define PAGESIZE (8*K)
+#endif
 #define _PPB (256)
 #define BPS (64)
 #define _PPS (_PPB*BPS)
@@ -79,12 +84,27 @@
 #define LPAGESIZE 4096
 #define L2PGAP (PAGESIZE/LPAGESIZE)
 #define BLOCKSIZE (_PPB*PAGESIZE)
+
+#if 1 //NAM
+#define _PME (PAGESIZE/4) //per page mapping entries uint32_t
+#define _PMES 11
+#endif
+
 #define _NOP (TOTALSIZE/PAGESIZE)
+
+#if 1 //NAM 
+#define _DCE (_NOP*L2PGAP/_PME) //dirty check entries
+#endif
+
 #define _NOS (TOTALSIZE/(_PPS*PAGESIZE))
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
-
+#if 0 
 #define RANGE (SHOWINGSIZE/LPAGESIZE)
+#endif 
+#if 1 //NAM
+#define RANGE (SHOWINGSIZE/PAGESIZE) 
+#endif
 #define DEVFULL ((uint32_t)TOTALSIZE/LPAGESIZE)
 #define TOTALLPN ((uint32_t)RANGE)
 
@@ -164,6 +184,10 @@ static inline bool KEYVALCHECK(KEYT a){
 #define QSIZE (128)
 #define LOWQDEPTH (128)
 #define QDEPTH (128)
+
+#if 1 //NAM 
+#define WBUFF_SIZE (54)
+#endif
 
 #define THPOOL
 #define NUM_THREAD 4

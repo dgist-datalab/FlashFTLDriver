@@ -6,11 +6,13 @@ extern master *_master;
 #define TXNHEADERSIZE (sizeof(uint32_t)+sizeof(uint32_t))
 #define REQPERCOMMAND QSIZE
 #if REQPERCOMMAND!=0
-	#define MAXBUFSIZE (REQPERCOMMAND*REQSIZE+TXNHEADERSIZE)
+//	#define MAXBUFSIZE (REQPERCOMMAND*REQSIZE+TXNHEADERSIZE)
+	#define MAXBUFSIZE (REQSIZE+TXNHEADERSIZE)
 #else
 	#define MAXBUFSIZE (4*K)
 #endif
 
+uint64_t request_num; 
 extern int KEYLENGTH;
 
 void bench_vectored_configure(){
@@ -69,6 +71,7 @@ void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
 	uint32_t number_of_command=(m->m_num)/request_per_command;
 	m->m_num=number_of_command*request_per_command;
 	m->tbody=(transaction_bench_value*)malloc(number_of_command * sizeof(transaction_bench_value));
+	request_num = m->m_num; 
 
 	uint32_t request_buf_size=_master->trans_configure.request_size * request_per_command;
 
@@ -102,6 +105,12 @@ void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
 		}
 	}
 }
+
+#if 1 //NAM
+void vectored_lr(uint32_t start, uint32_t end, monitor* m, uint8_t trace){ 
+
+} 
+#endif
 
 void vectored_unique_rset(uint32_t start, uint32_t end, monitor* m){
 	uint32_t request_per_command=_master->trans_configure.request_num_per_command;
@@ -198,6 +207,7 @@ void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
 	uint32_t number_of_command=(m->m_num)/request_per_command;
 	m->m_num=number_of_command*request_per_command;
 	m->tbody=(transaction_bench_value*)malloc(number_of_command * sizeof(transaction_bench_value));
+	request_num = m->m_num; 
 
 	uint32_t request_buf_size=_master->trans_configure.request_size * request_per_command;
 	int *key_buf=(int*)malloc(sizeof(int) * request_per_command);
