@@ -1,5 +1,6 @@
 #include "map.h"
 #include "gc.h"
+#include "page.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
@@ -55,7 +56,18 @@ int32_t page_dMap_check(KEYT lba){
 #if 1 //NAM
 int32_t page_map_flush(){ 
 	pm_body *p=(pm_body*)page_ftl.algo_body; 
-	
+
+#if 1 //NAM
+	for(uint32_t i=0; i<_DCE; i++){
+		if(p->dirty_check[i] & dirty_option){ 
+			ppa_t ppa=get_ppa_mapflush(); 
+			value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE); 
+			memcpy(&value->value[0], &p->mapping[i*8192], 8192); 
+			send_user_req(NULL, DATAW, ppa, value); 
+			p->dirty_check[i] &= ~dirty_option;
+		}
+	} 
+#endif	
 	p->tot_dirty_pages = 0; 
 	p->tot_flush_count++;
 

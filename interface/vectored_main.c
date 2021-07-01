@@ -45,7 +45,7 @@ int main(int argc,char* argv[]){
 	//	bench_add(VECTOREDSSET,0,RANGE,RANGE);
 	//	bench_add(VECTOREDSGET,0,RANGE,RANGE);
 		//bench_add(VECTOREDRSET,0,RANGE,RANGE/20);
-		bench_add(VECTOREDRSET,0,RANGE,RANGE*2);
+		bench_add(VECTOREDSSET,0,RANGE,RANGE*2);
 		//bench_add(VECTOREDRW,0,RANGE,RANGE/2);
 		//bench_add(VECTOREDRW,0,RANGE,RANGE*2);
 		//inf_algorithm_testing();
