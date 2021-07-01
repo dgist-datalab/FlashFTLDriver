@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+extern uint32_t *seg_ratio;
+uint32_t gc_norm_count=0;
+
 extern algorithm page_ftl;
 void invalidate_ppa(uint32_t t_ppa){
 	/*when the ppa is invalidated this function must be called*/
@@ -221,8 +224,12 @@ void do_gc(){
 		g_buffer.idx=0;	
 	}
 	if (g_buffer.mig_count >= 2) printf("mig: %d\n", g_buffer.mig_count);
+	if (g_buffer.mig_count >= GNUMBER) printf("mig count err!---------------------\nmig count: %d\n---------------------------\n", g_buffer.mig_count);
 	bm->trim_segment(bm,target,page_ftl.li); //erase a block
 	printf("TRIM!!!!!!!!!!!! GC occurs!!!!!!!!!!!!!!!!!!!!!!\n");
+	for (int i=0;i<(GNUMBER-1);++i) {
+		printf("current %d group segment number: %d\n", i+1, seg_ratio[i]);
+	}
 	if (bm->check_full(bm, p->active, MASTER_PAGE)) {
 		bm->free_segment(bm, p->active);
 
@@ -239,8 +246,8 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	/*you can check if the gc is needed or not, using this condition*/
 //	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=5)){
 //		new_do_gc();//call gc
-	if (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=3) {
-		printf("# of Free Blocks: %d\n",page_ftl.bm->get_free_segment_number(page_ftl.bm)); 
+	if (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=1) {
+		//printf("# of Free Blocks: %d\n",page_ftl.bm->get_free_segment_number(page_ftl.bm)); 
 		do_gc();//call gc
 	}
 
@@ -249,6 +256,10 @@ retry:
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active);
 
 	if(res==UINT32_MAX){
+		if (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=2) {
+			++gc_norm_count;
+			printf("num of gc: %d\n", gc_norm_count);
+		}
 		page_ftl.bm->free_segment(page_ftl.bm, p->active);
 		p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
 		goto retry;

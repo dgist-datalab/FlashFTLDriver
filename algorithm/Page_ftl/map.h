@@ -3,7 +3,7 @@
 
 #ifndef __grouping__
 #define __grouping__
-#define GNUMBER 8
+#define GNUMBER 4
 #endif
 
 typedef struct page_map_body{
