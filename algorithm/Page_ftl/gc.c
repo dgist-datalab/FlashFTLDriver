@@ -183,6 +183,7 @@ void do_gc(){
 	char* oobs;
 	KEYT *lbas;
 	uint32_t mig_count;
+	uint32_t tmp_mig_count;
 
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list,now,nxt){
@@ -192,7 +193,7 @@ void do_gc(){
 			oobs=bm->get_oob(bm, gv->ppa);
 			lbas=(KEYT*)get_lbas(bm, oobs, sizeof(KEYT)*L2PGAP);
 			mig_count = get_migration_count(bm, oobs, sizeof(KEYT)*L2PGAP);
-			
+			tmp_mig_count=mig_count;
 			if (mig_count < GNUMBER-1) g_buffer.mig_count=mig_count+1;
 			else g_buffer.mig_count=mig_count;
 
@@ -216,7 +217,7 @@ void do_gc(){
 			list_delete_node(temp_list,now);
 		}
 	}
-
+	if (tmp_mig_count > 0) seg_ratio[tmp_mig_count-1]--;
 	if(g_buffer.idx!=0){
 		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx, g_buffer.mig_count);
 		validate_ppa(res, g_buffer.key, g_buffer.idx, g_buffer.mig_count);
