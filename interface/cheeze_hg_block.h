@@ -95,6 +95,7 @@ void free_cheeze();
 void free_trace_cheeze();
 vec_request **get_vectored_request_arr();
 //vec_request *get_vectored_request();
+vec_request *jy_ureq2vec_req(char* art);
 vec_request *get_trace_vectored_request();
 
 #endif

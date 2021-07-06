@@ -18,7 +18,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
--fsanitize=address\
+#-fsanitize=address\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\
@@ -136,7 +136,7 @@ LIBS +=\
 		-ljemalloc\
 #	-laio\
 
-all: driver
+all: jriver
 
 DEBUG: debug_driver
 
@@ -152,6 +152,9 @@ cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/c
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 driver: ./interface/vectored_main.c libdriver.a libart.o
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
+jriver: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a

@@ -22,6 +22,8 @@ struct cheeze_req_user *ureq_addr; // sizeof(req) * 1024
 static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
 static uint64_t seq = 0;
 static int trace_fd = 0;
+
+static int id_req=0;
 //static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
 //static uint32_t trace_crc_buf[CRC_BUFSIZE];
 
@@ -47,6 +49,7 @@ static void shm_data_init(void *ppage_addr) {
 
 
 bool cheeze_end_req(request *const req);
+bool jeeyun_end_req(request *const req);
 char *null_value;
 
 #if defined(CHECKINGDATA) || defined(TRACE_REPLAY)
@@ -156,7 +159,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	res->tag_id=id;
 
 	error_check(creq);
-
+++
 	res->origin_req=(void*)creq;
 	res->size=creq->len/LPAGESIZE;
 	res->req_array=(request*)calloc(res->size,sizeof(request));
@@ -277,6 +280,94 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	return res;
 }
 
+
+vec_request *jy_ureq2vec_req(char* request_raw) {
+	uint32_t lba_r=0;
+	uint32_t size_r=0;
+	printf("request: %s\n", request_raw);
+	char *tmp=strtok(request_raw, " \t");
+	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
+	res->tag_id=id_req++;
+	//cheeze_ureq *creq = ureq_addr+id_req;
+	//TODO check if it is okay
+	FSTYPE type;
+	char *write="W";
+	char *read="R";
+	printf("type: %s\n", tmp);
+	if (strchr(tmp, 'W')) type=FS_SET_T;
+	else if (strchr(tmp, 'R')) type=FS_GET_T;
+	else {
+		printf("type err\n");
+		abort();
+	}
+	lba_r = atoi(strtok(NULL, " \t"));
+	size_r = atoi(strtok(NULL, " \t"));
+	printf("size: %d\n", size_r);
+	res->origin_req=NULL;
+	res->size=size_r/LPAGESIZE;
+	res->req_array=(request*)calloc(res->size, sizeof(request));
+	res->end_req=NULL;
+	res->mark=0;
+
+	res->buf=NULL;
+	static uint32_t global_seq=0;
+
+	for (uint32_t i=0; i<res->size; i++) {
+		request *temp=&res->req_array[i];
+		temp->parents=res;
+		temp->type=type;
+		//TODO make end request
+		temp->end_req=jeeyun_end_req;
+		temp->isAsync=ASYNC;
+		temp->seq=i;
+		temp->type_ftl=0;
+		temp->type_lower=0;
+		temp->is_sequential_start=false;
+		temp->flush_all=0;
+		temp->global_seq=global_seq++;
+		switch(type) {
+			case FS_GET_T:
+				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+				break;
+			case FS_SET_T:
+				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+				break;
+			default:
+				printf("error type!\n");
+				abort();
+				break;
+		}
+		temp->key=lba_r/8;
+	}
+	return res;
+
+}
+
+bool jeeyun_end_req(request *const req) {
+	vectored_request *preq=req->parents;
+	switch(req->type) {
+		case FS_NOTFOUND_T:
+			bench_reap_data(req, mp.li);
+			DPRINTF("%u not fount!\n", req->key);
+			inf_free_valueset(req->value, FS_MALLOC_R);
+			break;
+		case FS_GET_T:
+			bench_reap_data(req, mp.li);
+			if(req->value) {
+			}
+			break;
+		case FS_SET_T:
+			bench_reap_data(req, mp.li);
+			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);
+			break;
+		case FS_FLUSH_T:
+		case FS_DELETE_T:
+			break;
+		default:
+			abort();
+	}
+	return true;
+}
 //extern int MS_TIME_SL;
 //#define MS_TIME_SL 7
 //set to time!!
