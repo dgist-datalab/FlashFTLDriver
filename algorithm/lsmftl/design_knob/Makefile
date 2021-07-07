@@ -1,5 +1,6 @@
 SRCS +=\
 	   lsmtree_param_module.c\
+	   lsmtree_param_module_double.c\
 	   bf_memory_calculator.c\
 	   plr_memory_calculator.c\
 	   design_knob.c\

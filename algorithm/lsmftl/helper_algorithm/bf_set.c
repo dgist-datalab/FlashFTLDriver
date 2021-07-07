@@ -19,14 +19,19 @@ static inline double deriv_func(double x, uint32_t member, float target_fpr){
 
 static inline double newton(double init_value, uint32_t member, float target_fpr){
 	double h, res;
+	uint32_t cnt=0;
 	do{
+		cnt++;
 		h=func(res, member, target_fpr) / deriv_func(res, member, target_fpr);
 //		printf("h: %lf res: %lf\n", h, res);
 		if(ABS(h) >= EPSILON){
 			res-=h;
 		}
 		else break;
+
+		if(cnt>100000)break;
 	}while(1);
+	//printf("cnt:%u\n",cnt);
 
 	return 1-res;
 }

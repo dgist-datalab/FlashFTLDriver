@@ -2,9 +2,9 @@
 #include "../../../include/settings.h"
 #include <cmath>
 #define MAXRETRY_CNT (2)
-static inline int checking(uint32_t level, uint32_t size_factor, uint32_t blocknumber){
+static inline int checking(uint32_t level, double size_factor, uint32_t blocknumber){
 	uint32_t head_num=0;
-	uint32_t level_head_num=1;
+	double level_head_num=1;
 	for(uint32_t i=0; i<=level; i++){
 		head_num+=level_head_num;
 		level_head_num*=size_factor;

@@ -5,7 +5,7 @@
 using namespace std;
 uint32_t *random_seq;
 
-void plr_memory_cacl_init(uint32_t DEV_size){
+void plr_memory_calc_init(uint32_t DEV_size){
 	random_seq=(uint32_t*)malloc(sizeof(uint32_t)*DEV_size);
 	for(uint32_t i=0; i<DEV_size; i++){
 		random_seq[i]=i;	
@@ -36,7 +36,7 @@ int compare(const void* _a, const void *_b){
 uint64_t plr_memory_calc(uint32_t entry_num, 
 		uint32_t error, uint32_t DEV_size, bool wiskey){
 
-
+	
 	uint32_t *target=(uint32_t*)malloc(sizeof(uint32_t)*entry_num);
 	memcpy(target, random_seq, sizeof(uint32_t)*entry_num);
 
@@ -54,7 +54,7 @@ uint64_t plr_memory_calc(uint32_t entry_num,
 }
 
 double plr_memory_calc_avg(uint32_t entry_num, 
-		uint32_t error, uint32_t DEV_size, bool wiskey){
+		uint32_t error, uint32_t DEV_size, bool wiskey, double *line_per_chunk){
 
 	uint32_t *target=(uint32_t*)malloc(sizeof(uint32_t)*entry_num);
 	memcpy(target, random_seq, sizeof(uint32_t)*entry_num);
@@ -67,6 +67,7 @@ double plr_memory_calc_avg(uint32_t entry_num,
 	}
 	plr->insert_end();
 	double res=plr->memory_usage(48);
+	*line_per_chunk=plr->get_line_per_chunk();
 	delete plr;
 	free(target);
 	return (res+(wiskey?entry_num*48:0))/entry_num;

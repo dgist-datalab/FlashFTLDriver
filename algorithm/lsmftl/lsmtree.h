@@ -17,7 +17,6 @@
 #include "../../bench/measurement.h"
 #include <deque>
 
-#define TARGETFPR 0.1f
 #define COMPACTION_REQ_MAX_NUM 1
 #define WRITEBUFFER_NUM (1+1)
 #define TIMERESULT
@@ -78,6 +77,7 @@ typedef struct lsmtree_parameter{
 	uint32_t mapping_num;
 	double last_size_factor;
 	double normal_size_factor;
+	uint32_t write_buffer_divide;
 	uint32_t write_buffer_ent;
 	uint32_t reclaim_ppa_target;
 	float read_amplification;
@@ -152,6 +152,7 @@ typedef struct page_read_buffer{
 }page_read_buffer;
 
 lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit);
+uint64_t lsmtree_memory_limit_of_WAF(uint32_t WAF, double *line_per_chunk, double *);
 uint32_t lsmtree_argument_set(int argc, char *argv[]);
 uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *);
 void lsmtree_destroy(lower_info *li, algorithm *);

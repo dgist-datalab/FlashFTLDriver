@@ -567,7 +567,9 @@ uint32_t level_run_populate_analysis(run *r){
 			io_manager_test_read(sptr->file_addr.map_ppa, mapping, TEST_IO);
 			kp_ptr=(key_ptr_pair*)mapping;
 			for(uint32_t i=0; kp_ptr[i].piece_ppa!=UINT32_MAX && i<KP_IN_PAGE; i++){
+#ifdef LSM_DEBUG
 				cnt_sum+=LSM.LBA_cnt[kp_ptr[i].lba];
+#endif
 				contents_num++;
 			}
 		}
@@ -578,7 +580,9 @@ uint32_t level_run_populate_analysis(run *r){
 				io_manager_test_read(mptr->ppa, mapping, TEST_IO);
 				kp_ptr=(key_ptr_pair*)mapping;
 				for(uint32_t i=0; kp_ptr[i].piece_ppa!=UINT32_MAX && i<KP_IN_PAGE; i++){
+#ifdef LSM_DEBUG
 					cnt_sum+=LSM.LBA_cnt[kp_ptr[i].lba];
+#endif
 					contents_num++;
 				}		
 			}
