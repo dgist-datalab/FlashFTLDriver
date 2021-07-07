@@ -284,16 +284,23 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 vec_request *jy_ureq2vec_req(char* request_raw) {
 	uint32_t lba_r=0;
 	uint32_t size_r=0;
-	printf("request: %s\n", request_raw);
+	//uint32_t out1_max = 1583789;
+	//uint32_t out2_max = 7045835;
+	//uint32_t out_384_max = 8982377;
+	uint32_t out_384_2_max = 31642273;
+	uint32_t tmp_max = 100663295;
+	uint32_t tmp2_max = 100663296;
+	//printf("request: %s\n", request_raw);
 	char *tmp=strtok(request_raw, " \t");
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
 	res->tag_id=id_req++;
 	//cheeze_ureq *creq = ureq_addr+id_req;
 	//TODO check if it is okay
 	FSTYPE type;
-	char *write="W";
-	char *read="R";
-	printf("type: %s\n", tmp);
+	//char *write="W";
+	//char *read="R";
+	//printf("type: %s\n", tmp);
+	if (id_req%1000000==0) printf("percent: %f%%\n", (float)id_req*(float)100/(float)tmp2_max);
 	if (strchr(tmp, 'W')) type=FS_SET_T;
 	else if (strchr(tmp, 'R')) type=FS_GET_T;
 	else {
@@ -302,7 +309,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	}
 	lba_r = atoi(strtok(NULL, " \t"));
 	size_r = atoi(strtok(NULL, " \t"));
-	printf("size: %d\n", size_r);
+	//printf("size: %d\n", size_r);
 	res->origin_req=NULL;
 	res->size=size_r/LPAGESIZE;
 	res->req_array=(request*)calloc(res->size, sizeof(request));
@@ -311,7 +318,6 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 
 	res->buf=NULL;
 	static uint32_t global_seq=0;
-
 	for (uint32_t i=0; i<res->size; i++) {
 		request *temp=&res->req_array[i];
 		temp->parents=res;
@@ -337,7 +343,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 				abort();
 				break;
 		}
-		temp->key=lba_r/8;
+		temp->key=lba_r/8+i;
 	}
 	return res;
 
@@ -366,6 +372,7 @@ bool jeeyun_end_req(request *const req) {
 		default:
 			abort();
 	}
+	release_each_req(req);
 	return true;
 }
 //extern int MS_TIME_SL;
