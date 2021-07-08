@@ -15,7 +15,9 @@ extern uint32_t debug_lba;
 
 void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_ppa,
 		uint32_t *lba, uint32_t *version, bool should_abort){
+#ifdef LSM_DEBUG
 	static int cnt=0;
+#endif
 	for(uint32_t i=0; i<piece_num; i++){
 		oob_manager *oob=get_oob_manager(PIECETOPPA(piece_ppa[i]));
 		oob->lba[piece_ppa[i]%L2PGAP]=lba[i];
@@ -99,10 +101,15 @@ page_manager* page_manager_init(struct blockmanager *_bm){
 	pm->current_segment[MAP_S]=_bm->get_segment(_bm, false);
 	pm->seg_type_checker[pm->current_segment[MAP_S]->seg_idx]=MAPSEG;
 	pm->reserve_segment[MAP_S]=_bm->get_segment(_bm, true);
+
+	pm->remain_data_segment_q=new std::list<__segment*>();
+
 	return pm;
 }
 
 void page_manager_free(page_manager* pm){
+	delete pm->remain_data_segment_q;
+
 	free(pm->current_segment[DATA_S]);
 	free(pm->current_segment[MAP_S]);
 	free(pm->reserve_segment[DATA_S]);
@@ -160,9 +167,9 @@ uint32_t page_manager_get_new_ppa(page_manager *pm, bool is_map, uint32_t type){
 	bool temp_used=false;
 	__segment *seg;
 retry:
-	if(!LSM.function_test_flag && pm->temp_data_segment && !is_map){
+	if(!LSM.function_test_flag && pm->remain_data_segment_q->size() && !is_map){
 		temp_used=true;
-		seg=pm->temp_data_segment;
+		seg=pm->remain_data_segment_q->front();
 	}
 	else{
 		seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
@@ -170,8 +177,8 @@ retry:
 	if(!seg || bm->check_full(bm, seg, MASTER_PAGE)){
 		if(temp_used){
 			temp_used=false;
-			free(pm->temp_data_segment);
-			pm->temp_data_segment=NULL;
+			free(seg);
+			pm->remain_data_segment_q->pop_front();
 			goto retry;
 		}
 		if(bm->is_gc_needed(bm)){
@@ -212,18 +219,19 @@ __segment *page_manager_get_seg(page_manager *pm, bool is_map, uint32_t type){
 	bool temp_used=false;
 	__segment *seg;
 retry:
-	if(pm->temp_data_segment && !is_map){
+	if(pm->remain_data_segment_q->size() && !is_map){
 		temp_used=true;
-		seg=pm->temp_data_segment;
+		seg=pm->remain_data_segment_q->front();
 	}
 	else{
 		seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
 	}
+
 	if(!seg || bm->check_full(bm, seg, MASTER_PAGE)){
 		if(temp_used){
-			free(pm->temp_data_segment);
 			temp_used=false;
-			pm->temp_data_segment=NULL;
+			free(seg);
+			pm->remain_data_segment_q->pop_front();
 			goto retry;
 		}
 		if(bm->is_gc_needed(bm)){
@@ -246,10 +254,8 @@ retry:
 		pm->seg_type_checker[pm->current_segment[is_map?MAP_S:DATA_S]->seg_idx]=type;
 		goto retry;
 	}
-	if(temp_used){
-		pm->temp_data_segment=NULL;
-	}
-	else{
+
+	if(!temp_used){
 		pm->current_segment[is_map?MAP_S:DATA_S]=NULL;
 	}
 	return seg;
@@ -279,9 +285,9 @@ uint32_t page_manager_pick_new_ppa(page_manager *pm, bool is_map, uint32_t type)
 	bool temp_used=false;
 	__segment *seg;
 retry:
-	if(pm->temp_data_segment && !is_map){
+	if(!is_map &&  pm->remain_data_segment_q->size()){
 		temp_used=true;
-		seg=pm->temp_data_segment;
+		seg=pm->remain_data_segment_q->front();
 	}
 	else{
 		seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
@@ -290,8 +296,8 @@ retry:
 	if(!seg || bm->check_full(bm, seg, MASTER_PAGE)){
 		if(temp_used){
 			temp_used=false;
-			free(pm->temp_data_segment);
-			pm->temp_data_segment=NULL;
+			free(seg);
+			pm->remain_data_segment_q->pop_front();
 			goto retry;
 		}
 		if(bm->is_gc_needed(bm)){
@@ -341,20 +347,30 @@ uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 		return _PPS-pm->current_segment[MAP_S]->used_page_num;
 	}
 	else{
-		if(pm->temp_data_segment){
-			return _PPS-pm->temp_data_segment->used_page_num;
+		if(pm->remain_data_segment_q->size()){
+			return _PPS-pm->remain_data_segment_q->front()->used_page_num;
 		}
 		return _PPS-pm->current_segment[DATA_S]->used_page_num;
 	}
 }
 
-uint32_t page_aligning_data_segment(page_manager *pm){
-	if(pm->temp_data_segment){
-		free(pm->temp_data_segment);
-		pm->temp_data_segment=NULL;
+uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_num){
+	//bool isfinish=false;
+	__segment *seg;
+	uint32_t q_size=pm->remain_data_segment_q->size();
+	for(uint32_t i=0; i<q_size; i++){
+		seg=pm->remain_data_segment_q->front();
+		if(_PPS-seg->used_page_num < target_page_num){
+			free(seg);
+			pm->remain_data_segment_q->pop_front();
+		}
+		else{
+			return _PPS-seg->used_page_num;
+		}
 	}
 
-	if(!pm->current_segment[DATA_S] || _PPS-pm->current_segment[DATA_S]->used_page_num < 2){
+	if(!pm->current_segment[DATA_S] ||
+			_PPS-pm->current_segment[DATA_S]->used_page_num < target_page_num){
 		free(pm->current_segment[DATA_S]);
 		page_manager_move_next_seg(LSM.pm, false, false, DATASEG);
 	}
@@ -368,12 +384,18 @@ uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap, bool i
 	}
 	else{
 		uint32_t inv_blk_num=include_inv_block?pm->bm->get_invalidate_blk_number(pm->bm):0;
+		uint32_t temp_data_page_num=0;
+		if(pm->remain_data_segment_q->size()){
+			seg_list_iter iter=pm->remain_data_segment_q->begin();
+			for(;iter!=pm->remain_data_segment_q->end(); iter++){
+				temp_data_page_num+=_PPS-(*iter)->used_page_num;
+			}
+		}
 		if(pm->current_segment[DATA_S]){
-			return (pm->bm->remain_free_page(pm->bm, pm->current_segment[DATA_S])+
-					(pm->temp_data_segment?_PPS-pm->temp_data_segment->used_page_num:0))+inv_blk_num*_PPS;
+			return pm->bm->remain_free_page(pm->bm, pm->current_segment[DATA_S])+temp_data_page_num+inv_blk_num*_PPS;
 		}
 		else{
-			return pm->bm->remain_free_page(pm->bm, pm->temp_data_segment)+inv_blk_num*_PPS;
+			return pm->bm->remain_free_page(pm->bm, NULL)+temp_data_page_num+inv_blk_num*_PPS;
 		}
 	}
 }
@@ -433,7 +455,6 @@ uint32_t page_manager_move_next_seg(page_manager *pm, bool ismap, bool isreserve
 	}
 	return 1;
 }
-
 
 bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim);
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim);
@@ -939,4 +960,8 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		write_buffer_free(wisckey_node_wb);
 	}
 	return false;
+}
+
+void page_manager_insert_remain_seg(page_manager *pm, __segment *seg){
+	pm->remain_data_segment_q->push_back(seg);
 }

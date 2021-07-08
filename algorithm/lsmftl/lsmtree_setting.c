@@ -121,7 +121,6 @@ uint64_t lsmtree_memory_limit_of_WAF(uint32_t WAF, double *avg_line_per_chunk, d
 		uint32_t buffered_ent=write_buffer_memory_bit/(48+48);
 		if(buffered_ent==0) break;
 		uint32_t chunk_num=RANGE/buffered_ent+(RANGE%buffered_ent?1:0);
-		uint32_t max_level=get_level(2, chunk_num);
 		for(uint32_t level=1; level<=WAF; level++){ //level
 			uint64_t memory_size=0;
 			double lpc=0;
@@ -183,7 +182,7 @@ void print_tree_param(tree_param *set, uint32_t number){
 }
 
 void print_tree_param_new(tree_param *set, uint32_t number, uint32_t divide){
-	printf("BUFF\tLEVEL\tWAF\tsf\trun_num\tmemory\tbuffer\tsum\tTABLE\tENTRY\tR_AVG\n", (double)divide/divide/divide*100);
+	printf("BUFF\tLEVEL\tWAF\tsf\trun_num\tmemory\tbuffer\tsum\tTABLE\tENTRY\tR_AVG\n");
 	for(uint32_t i=1; i<=number; i++){
 		printf("%.2f\t%u\t%.2lf\t%.2lf\t%lu\t%.2lf\t%.2lf\t%.3lf\t%.3f\t%.4f\t%.3f\n", 
 				(double)divide,
@@ -436,7 +435,6 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 				level_size=level_size>RANGE?RANGE:level_size;
 				run_size=run_size>RANGE?RANGE:run_size;
 
-				double level_coverage_ratio=(double)level_size/num_range;
 				double run_coverage_ratio=(double)run_size/num_range;
 
 
@@ -458,10 +456,10 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			}
 		}
 
-
+/*
 		printf("write_buffer_divide :%u\n", divide);
 		print_tree_param(settings, max_level+1);
-
+*/
 		for(uint32_t i=1; i<=max_level; i++){
 			if(settings[i].isinvalid) continue;
 			if(min_WAF > settings[i].WAF ||
@@ -516,7 +514,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 
 	res.reclaim_ppa_target=target_buffered_ent*ceil(pow(res.tr.size_factor, target_level-1));
 
-	free(settings);
+	//free(settings);
 	//lsmtree_tiering_only_test();
 	//lsmtree_sf_fix_l0();
 	//lsmtree_l0_fix_sf();

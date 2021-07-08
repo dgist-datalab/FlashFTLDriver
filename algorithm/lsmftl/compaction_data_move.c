@@ -93,7 +93,7 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 		}
 #endif
 
-		if(demote && now_level!=0){
+		if(demote && (now_level!=0 && now_level!=UINT32_MAX)){
 			uint32_t target_version=version_level_to_start_version(LSM.last_run_version, now_level-1);
 			if(version_map_lba(LSM.last_run_version, target_pair.lba) >= target_version){ 
 				//already invalid
@@ -164,6 +164,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 	uint32_t need_page_num=(kv_pair_num/L2PGAP+(kv_pair_num%L2PGAP?1:0))+
 		(kv_pair_num/KP_IN_PAGE+(kv_pair_num%KP_IN_PAGE?1:0)); //map_num
 	uint32_t need_seg_num=need_page_num/_PPS+(need_page_num%_PPS?1:0);
+
 	if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
 		__do_gc(LSM.pm, false, need_seg_num*_PPS);
 	}
@@ -283,11 +284,11 @@ uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_str
 		inserted_entry_num++;
 	}
 	
-	if(final && sst_bos_kv_q_size(bos)==0 && (*bis[DEMOTE_RUN])->buffer_idx){
+	if(final && sst_bos_kv_q_size(bos)==0 && ((*bis)[DEMOTE_RUN])->buffer_idx){
 		issue_bis_result((*bis)[DEMOTE_RUN], target_demote_version, final);
 	}
 
-	if(final && sst_bos_kv_q_size(bos)==0 && (*bis[KEEP_RUN])->buffer_idx){
+	if(final && sst_bos_kv_q_size(bos)==0 && ((*bis)[KEEP_RUN])->buffer_idx){
 		issue_bis_result((*bis)[KEEP_RUN], target_keep_version, final);
 	}
 	fdriver_unlock(&LSM.flush_lock);

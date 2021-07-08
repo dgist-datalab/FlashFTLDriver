@@ -543,8 +543,14 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 		new_run[0]=run_init(src->max_sst_num, UINT32_MAX, 0);
 	}
 	uint32_t stream_num=merging_num;
-	if((new_run[0]=tiering_trivial_move(src, des->idx, merging_num, target_demote_version, 
+	run *temp_new_run;
+	if((temp_new_run=tiering_trivial_move(src, des->idx, merging_num, target_demote_version, 
 					hot_cold_mode, inplace))){
+		run_free(new_run[0]);
+		if(hot_cold_mode){
+			run_free(new_run[1]);
+		}
+		new_run[0]=temp_new_run;
 		*issequential=true;
 		return new_run;
 	}
@@ -595,10 +601,14 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	bool isfirst=true;
 
 	uint32_t border_lba=UINT32_MAX;
+	bool bis_populate=false;
+	uint32_t round=0;
 	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
 		read_done=update_read_arg_tiering(read_done, isfirst, pos_set, mr_set,
 				read_arg_set, true, stream_num, src, UINT32_MAX);
 		
+		printf("round:%u\n", round++);
+
 		for(uint32_t k=0; k<stream_num; k++){
 			if(read_done & (1<<k)) continue;
 			mr_free_set temp_MFS=making_MFS(&read_arg_set[k], mr_set[k], LEVEL_RUN_AT_PTR(src, stream_num-1-k));
@@ -627,7 +637,7 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 			bos=sst_bos_init(read_map_done_check, true);
 		}
 
-		if(bis==NULL){
+		if(!bis_populate){
 			if(hot_cold_mode){
 				bis[0]=tiering_new_bis(locked_seg_q, inplace?src->idx: des->idx);	
 				bis[1]=tiering_new_bis(locked_seg_q, inplace?src->idx: des->idx);			
@@ -635,6 +645,7 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 			else{
 				bis[0]=tiering_new_bis(locked_seg_q, inplace?src->idx: des->idx);	
 			}
+			bis_populate=true;
 		}
 		
 		if(last_round && sorted_entry_num==0){
@@ -1058,7 +1069,7 @@ sst_file *trivial_move_processing(run *rptr, sst_pf_out_stream *pos,
 		}
 
 		uint32_t recent_version=version_map_lba(v, target_pair.lba);
-		if(version_belong_level(v, recent_version, from_lev_idx)){
+		if(from_lev_idx==UINT32_MAX || version_belong_level(v, recent_version, from_lev_idx)){
 			version_coupling_lba_version(v, target_pair.lba, target_version);
 		}
 

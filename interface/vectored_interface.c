@@ -240,7 +240,7 @@ bool vectored_end_req (request * const req){
 
 	pthread_mutex_lock(&req_cnt_lock);
 	preq->done_cnt++;
-	uint32_t tag_num=req->tag_num;
+	//uint32_t tag_num=req->tag_num;
 	if(preq->size==preq->done_cnt){
 		if(preq->end_req){
 			preq->end_req((void*)preq);	

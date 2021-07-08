@@ -812,12 +812,14 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 
 	uint32_t total_moved_num=0;
 
-	uint32_t now_version=version_pick_oldest_version(LSM.last_run_version, src->idx);
+	uint32_t now_version=src->idx==UINT32_MAX? UINT32_MAX: version_pick_oldest_version(LSM.last_run_version, src->idx);
 
 	uint32_t j=0;
 	bool temp_final=false;
 
-	lsmtree_gc_lock_level(&LSM, src->idx);
+	if(src->idx!=UINT32_MAX){
+		lsmtree_gc_lock_level(&LSM, src->idx);
+	}
 
 	for(uint32_t i=0; i<round; i++){
 		read_arg.from=start_idx+i*tier_compaction_tags;
@@ -876,7 +878,9 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		*moved_entry_num=total_moved_num;
 	}
 
-	lsmtree_gc_unlock_level(&LSM, src->idx);
+	if(src->idx!=UINT32_MAX){
+		lsmtree_gc_unlock_level(&LSM, src->idx);
+	}
 
 	release_locked_seg_q(locked_seg_q);
 	sst_pos_free(pos);
@@ -889,6 +893,12 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){ /*move to last level*/
 	_cm=cm;
 	uint32_t start_sst_file_idx=UINT32_MAX;
+	/*
+	static int cnt=0;
+	printf("LW2TI %u\n", cnt++);
+	if(cnt==4){
+		printf("break!\n");
+	}*/
 	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_version, 
 			&start_sst_file_idx, des->idx); //version_update
 	

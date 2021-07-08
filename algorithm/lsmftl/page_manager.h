@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <map>
 #include <queue>
+#include <list>
 
 #define MAX_MAP (PAGESIZE/sizeof(uint32_t))
 #define BLOCK_MAP_SIZE (_PPB*sizeof(uint32_t))
@@ -17,10 +18,12 @@ enum{
 	SEPDATASEG, DATASEG, MAPSEG
 };
 
+typedef std::list<__segment *>::iterator seg_list_iter;
+
 typedef struct page_manager{
 	uint8_t seg_type_checker[_NOS];
 	bool is_master_page_manager;
-	__segment *temp_data_segment;
+	std::list<__segment *> *remain_data_segment_q;
 	__segment *current_segment[PARTNUM];
 	__segment *reserve_segment[PARTNUM];
 	struct blockmanager *bm;
@@ -77,9 +80,10 @@ uint32_t page_manager_get_new_ppa_from_seg(page_manager *pm, __segment *seg);
 uint32_t page_manager_pick_new_ppa_from_seg(page_manager *pm, __segment *seg);
 __segment *page_manager_get_seg(page_manager *pm, bool ismap, uint32_t type);
 __segment *page_manager_get_seg_for_bis(page_manager *pm,  uint32_t type);
-uint32_t page_aligning_data_segment(page_manager *pm);
+uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_num);
 void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*>*, 
 		struct write_buffer *wb, uint32_t seg_idx);
+void page_manager_insert_remain_seg(page_manager *pm, __segment *);
 
 static inline  char *get_seg_type_name(page_manager *pm, uint32_t seg_idx){
 	switch(pm->seg_type_checker[seg_idx]){

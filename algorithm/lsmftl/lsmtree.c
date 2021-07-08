@@ -723,6 +723,7 @@ retry:
 		if(++LSM.now_wb==WRITEBUFFER_NUM){
 			LSM.now_wb=0;
 		}
+		wb=LSM.wb_array[LSM.now_wb];
 	}
 
 	if(req->flush_all){

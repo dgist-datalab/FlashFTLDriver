@@ -224,7 +224,7 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	if(is_sequential){
 		now_remain_page_num=page_manager_get_remain_page(LSM.pm, false);
 		if(now_remain_page_num<2){
-			now_remain_page_num=page_aligning_data_segment(LSM.pm);
+			now_remain_page_num=page_aligning_data_segment(LSM.pm, 2);
 		}
 		uint32_t mapping_num=CEILING_TARGET(LSM.flushed_kp_set->size(), KP_IN_PAGE);
 		uint32_t now_flushing_num=CEILING_TARGET(wb->buffered_entry_num, L2PGAP);
@@ -629,8 +629,8 @@ void* compaction_main(void *_cm){
 	compaction_master *cm=(compaction_master*)_cm;
 	queue *req_q=(queue*)cm->req_q;
 	uint32_t above_sst_num;
-	uint32_t version_inv_cnt;
 #ifdef LSM_DEBUG
+	uint32_t version_inv_cnt;
 	uint32_t contents_num;
 #endif
 	while(!compaction_stop_flag){
