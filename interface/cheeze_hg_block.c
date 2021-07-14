@@ -287,9 +287,11 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	//uint32_t out1_max = 1583789;
 	//uint32_t out2_max = 7045835;
 	//uint32_t out_384_max = 8982377;
-	uint32_t out_384_2_max = 31642273;
-	uint32_t tmp_max = 100663295;
-	uint32_t tmp2_max = 100663296;
+//	uint32_t out_384_2_max = 31642273;
+//	uint32_t tmp_max = 100663295;
+//	uint32_t tmp2_max = 100663296;
+//	uint32_t zip_08=201326592;
+	uint32_t zip_32=41943139;
 	//printf("request: %s\n", request_raw);
 	char *tmp=strtok(request_raw, " \t");
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
@@ -300,7 +302,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	//char *write="W";
 	//char *read="R";
 	//printf("type: %s\n", tmp);
-	if (id_req%1000000==0) printf("percent: %f%%\n", (float)id_req*(float)100/(float)tmp2_max);
+	if (id_req%1000==0) printf("\rpercent: %f%%", (float)id_req*(float)100/(float)zip_32);
 	if (strchr(tmp, 'W')) type=FS_SET_T;
 	else if (strchr(tmp, 'R')) type=FS_GET_T;
 	else {

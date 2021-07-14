@@ -6,6 +6,7 @@
 
 extern uint32_t *seg_ratio;
 uint32_t gc_norm_count=0;
+extern FILE *vFile;
 
 extern algorithm page_ftl;
 void invalidate_ppa(uint32_t t_ppa){
@@ -184,7 +185,8 @@ void do_gc(){
 	KEYT *lbas;
 	uint32_t mig_count;
 	uint32_t tmp_mig_count;
-
+	const uint32_t tot_page_num=65536;
+	uint32_t page_num=0;
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list,now,nxt){
 
@@ -199,11 +201,13 @@ void do_gc(){
 
 			for(uint32_t i=0; i<L2PGAP; i++){
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
+				++page_num;
 				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 				g_buffer.idx++;
 
 				if(g_buffer.idx==L2PGAP){
+					//if (g_buffer.mig_count >= GNUMBER) printf("problem 1: %d\n", g_buffer.mig_count);
 					uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP, g_buffer.mig_count);
 					validate_ppa(res, g_buffer.key, g_buffer.idx, g_buffer.mig_count);
 					send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
@@ -219,18 +223,26 @@ void do_gc(){
 	}
 	if (tmp_mig_count > 0) seg_ratio[tmp_mig_count-1]--;
 	if(g_buffer.idx!=0){
+		//if (g_buffer.mig_count >= GNUMBER) printf("problem 2: %d\n", g_buffer.mig_count);
 		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx, g_buffer.mig_count);
 		validate_ppa(res, g_buffer.key, g_buffer.idx, g_buffer.mig_count);
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 		g_buffer.idx=0;	
 	}
-	if (g_buffer.mig_count >= 2) printf("mig: %d\n", g_buffer.mig_count);
-	if (g_buffer.mig_count >= GNUMBER) printf("mig count err!---------------------\nmig count: %d\n---------------------------\n", g_buffer.mig_count);
+	//if (g_buffer.mig_count >= 2) printf("mig: %d\n", g_buffer.mig_count);
+	//if (g_buffer.mig_count >= GNUMBER) printf("mig count err!---------------------\nmig count: %d tmp_mig: %d\n---------------------------\n", g_buffer.mig_count, tmp_mig_count);
 	bm->trim_segment(bm,target,page_ftl.li); //erase a block
-	printf("TRIM!!!!!!!!!!!! GC occurs!!!!!!!!!!!!!!!!!!!!!!\n");
+	//printf("TRIM!!!!!!!!!!!! GC occurs!!!!!!!!!!!!!!!!!!!!!!group num: %d, valid page: %f%%\n",g_buffer.mig_count, (float)page_num/(float)tot_page_num*(float)100);
+	char val_buf[64];
+	sprintf(val_buf, "%d %f\n", tmp_mig_count+1, (float)page_num/(float)tot_page_num*(float)100);
+	//printf("%s\n", val_buf);
+	fputs(val_buf, vFile);
+	
+	 * print # of current segment number
 	for (int i=0;i<(GNUMBER-1);++i) {
 		printf("current %d group segment number: %d\n", i+1, seg_ratio[i]);
 	}
+	
 	if (bm->check_full(bm, p->active, MASTER_PAGE)) {
 		bm->free_segment(bm, p->active);
 
@@ -257,10 +269,14 @@ retry:
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active);
 
 	if(res==UINT32_MAX){
+		/*
+		 * print normal gc
 		if (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=2) {
 			++gc_norm_count;
 			printf("num of gc: %d\n", gc_norm_count);
 		}
+		*/
+		//printf("free segment: %u\n", page_ftl.bm->get_free_segment_number(page_ftl.bm));
 		page_ftl.bm->free_segment(page_ftl.bm, p->active);
 		p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
 		goto retry;

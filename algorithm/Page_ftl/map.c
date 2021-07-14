@@ -8,6 +8,7 @@ extern uint32_t test_key;
 extern algorithm page_ftl;
 
 uint32_t *seg_ratio;
+FILE *vFile;
 
 void page_map_create(){
 	printf("NOS: %d\n", _NOS);
@@ -18,9 +19,15 @@ void page_map_create(){
 		p->mapping[i]=UINT_MAX;
 	}
 	p->reserve=(__segment **)malloc(sizeof(__segment*)*(GNUMBER-1));
-	for (uint32_t i=0;i<(GNUMBER-1);i++) { 
+	/*
+	for (uint32_t i=0;i<2;i++) { 
 		p->reserve[i]=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
 	}
+	*/
+	char name[32];
+	sprintf(name, "./valid_ratio/tmp_%d", GNUMBER);
+	vFile = fopen(name, "w");
+	setbuf(vFile, NULL);
 	p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //now active block for inserted request.
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
 }
@@ -74,15 +81,17 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx, uint32_t mig_count){
 	//printf("mig_count: %d\n", mig_count);
 	uint32_t res=0;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
-
+	if (mig_count > GNUMBER) printf("mig count problem is found in gc_update******\n");
 	/*when the gc phase, It should get a page from the reserved block*/
+	uint32_t group_idx = mig_count-1;
 retry:
-	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve[mig_count-1]);
-	if (res==UINT32_MAX){
+	if (p->reserve[group_idx] == NULL) p->reserve[group_idx] = page_ftl.bm->get_segment(page_ftl.bm, true);
 
-		__segment* tmp=p->reserve[mig_count-1];
-		seg_ratio[mig_count-1]++;
-		p->reserve[mig_count-1] = page_ftl.bm->change_reserve(page_ftl.bm, p->reserve[mig_count-1]);
+	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve[group_idx]);
+	if (res==UINT32_MAX){
+		__segment* tmp=p->reserve[group_idx];
+		seg_ratio[group_idx]++;
+		p->reserve[group_idx] = page_ftl.bm->change_reserve(page_ftl.bm, p->reserve[group_idx]);
 		page_ftl.bm->free_segment(page_ftl.bm, tmp);
 		goto retry;
 	}
@@ -112,6 +121,7 @@ retry:
 void page_map_free(){
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	free(p->mapping);
+	fclose(vFile);
 }
 
 
