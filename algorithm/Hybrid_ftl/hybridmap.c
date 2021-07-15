@@ -1,5 +1,6 @@
 #include "../../include/container.h"
 #include "../../include/settings.h"
+#include "hybrid.h"
 #include "hybridmap.h"
 #include "hmerge.h"
 #include <stdlib.h>
@@ -13,9 +14,19 @@ void hybrid_map_create(){
     hm_body * h=(hm_body*)calloc(sizeof(hm_body),1);
     h->datablock = (db_t*)malloc(sizeof(db_t)*_NOS); //data block table
     h->logblock = (lb_t*)malloc(sizeof(lb_t)* _NOLB); // log block table
-    for(int i=0;i<_NOLB;i++){
-        h->datablock[i].lb_idx = UINT_MAX;
+    for(int i=0;i<_NOS;i++){
+        h->datablock[i].lb_idx = -1;
     }
+    for(int i=0;i<_NOLB;i++){
+	    for(int j=0;j<_PPS;j++){
+		    h->logblock[i].lbmapping[j] = -1;
+	    }
+
+	    
+	h->logblock[i].empty = true;
+	h->logblock[i].cnt = 0;
+    }
+ 
 
     hybrid_ftl.algo_body=(void*)h; //you can assign your data structure in algorithm structure
 }
@@ -25,6 +36,7 @@ uint32_t find_empty_lb(){
     uint32_t lbnum;
     for(int i=0;i<_NOLB;i++){
         if(h->logblock[i].empty){
+	    h->logblock[i].empty = false;
             lbnum = i;
             return lbnum;
         }
@@ -33,21 +45,33 @@ uint32_t find_empty_lb(){
     return lbnum;
 }
 
+
+void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx){
+	/*when the ppa is validated this function must be called*/
+	for(uint32_t i=0; i<max_idx; i++){
+		hybrid_ftl.bm->populate_bit(hybrid_ftl.bm,ppa * L2PGAP+i);
+	}
+
+	/*this function is used for write some data to OOB(spare area) for reverse mapping*/
+	hybrid_ftl.bm->set_oob(hybrid_ftl.bm,(char*)lbas,sizeof(KEYT)*max_idx,ppa);
+}
+
+
 void invalidate_ppa(uint32_t t_ppa){
 	hybrid_ftl.bm -> unpopulate_bit(hybrid_ftl.bm, t_ppa);
 }
+
 uint32_t hybrid_map_assign(KEYT* lba, uint32_t max_idx){
     hm_body *h=(hm_body*)hybrid_ftl.algo_body;
     blockmanager *bm = hybrid_ftl.bm;
-    uint32_t target_lb,new_target_lb, mer_lb;
+    int target_lb,new_target_lb, mer_lb;
     uint32_t res, cnt;
     uint32_t ppn, lbn, offset;
     uint32_t max= 0;
 
-    lbn = lba[0]/_PPS;
+    lbn = lba[0]/(_PPS* L2PGAP);
     target_lb = h->datablock[lbn].lb_idx;
-
-        if(target_lb == UINT_MAX){
+    if(target_lb == -1){
            new_target_lb = find_empty_lb();
            if(new_target_lb == -1){ // when extra log block doesn't exist
                for(int i=0;i<_NOLB;i++){
@@ -56,21 +80,21 @@ uint32_t hybrid_map_assign(KEYT* lba, uint32_t max_idx){
                        mer_lb = i;
                    }
                }
+	       
                hybrid_merge(h->logblock[mer_lb]);
                new_target_lb = mer_lb;
            }
-
+	   
             h->logblock[new_target_lb].plb = bm->get_segment(bm, false);
 
             h->datablock[lbn].lb_idx = new_target_lb;
             h->logblock[new_target_lb].db_idx = lbn;
 
             ppn = bm->get_page_num(bm, h->logblock[new_target_lb].plb);
-
+	    validate_ppa(ppn,lba,max_idx);
             for(uint32_t i=0;i<L2PGAP;i++){
-                offset = lba[i] % (_PPS);
-                cnt = h->logblock[new_target_lb].cnt;
-
+                offset = lba[i] % (_PPS*L2PGAP);
+              
                 h->logblock[new_target_lb].lbmapping[offset] = ppn*L2PGAP + i;
                 h->logblock[new_target_lb].cnt++;
             }
@@ -78,17 +102,18 @@ uint32_t hybrid_map_assign(KEYT* lba, uint32_t max_idx){
         }
         else{
             ppn = bm->get_page_num(bm, h->logblock[target_lb].plb);
-
+    	    validate_ppa(ppn,lba,max_idx);
             for(uint32_t i=0;i<L2PGAP;i++){
-                offset = lba[i] % (_PPS);
+                offset = lba[i] % (_PPS*L2PGAP);
 
                 invalidate_ppa(h->logblock[target_lb].lbmapping[offset]);
 
-                h->logblock[target_lb].lbmapping[offset] = ppn*L2PGAP + i;
+                h->logblock[target_lb].lbmapping[offset] = ppn*L2PGAP + i;		
                 h->logblock[target_lb].cnt++;
             }
 
             if(bm->check_full(bm,h->logblock[target_lb].plb, MASTER_BLOCK)){ //if block full -> merge call!
+		printf("\ncovid19");
                 hybrid_merge(h->logblock[target_lb]);
             }
             res = ppn;
@@ -99,8 +124,8 @@ uint32_t hybrid_map_assign(KEYT* lba, uint32_t max_idx){
 uint32_t hybrid_map_pick(uint32_t lba) {
     hm_body *h=(hm_body*)hybrid_ftl.algo_body;
     blockmanager *bm = hybrid_ftl.bm;
-    uint32_t lbn = lba / _PPS;
-    uint32_t offset = lba % _PPS;
+    uint32_t lbn = lba / (_PPS*L2PGAP);
+    uint32_t offset = lba % (_PPS*LPAGESIZE);
     uint32_t target_lb = h->datablock[lbn].lb_idx;
 
     if(bm->is_valid_page(bm,h->logblock[target_lb].lbmapping[offset] )){

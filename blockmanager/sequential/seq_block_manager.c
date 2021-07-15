@@ -17,6 +17,7 @@ struct blockmanager seq_bm={
 	.is_gc_needed=seq_is_gc_needed, 
 	.get_gc_target=seq_get_gc_target,
 	.trim_segment=seq_trim_segment,
+	.trim_target_segment=seq_trim_target_segment,
 	.free_segment=seq_free_segment,
 	.populate_bit=seq_populate_bit,
 	.unpopulate_bit=seq_unpopulate_bit,
@@ -74,7 +75,7 @@ int seq_get_cnt(void *a){
 
 uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	bm->li=li;
-	//bb_checker_start(bm->li);/*check if the block is badblock*/
+	//bb_checker_start(bm->li);/*check if the block is badblock//
 #ifdef AMF
 	printf("NOC :%d _NOS:%ld\n", NOC,_NOS);
 #endif
@@ -320,6 +321,47 @@ void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_inf
 	free(gs);
 }
 
+
+
+void seq_trim_target_segment (struct blockmanager* bm, __segment* gs, struct lower_info* li){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	uint32_t segment_startblock_number=gs->blocks[0]->block_num;
+
+	for(int i=0; i<BPS; i++){
+		__block *b=gs->blocks[i];
+		b->invalidate_number=0;
+		b->validate_number=0;
+		b->now=0;
+		memset(b->bitset,0,_PPB*L2PGAP/8);
+		memset(b->oob_list,0,sizeof(b->oob_list));
+	}
+
+	uint32_t segment_idx=segment_startblock_number/BPS;
+	block_set *bs=&p->logical_segment[segment_idx];
+	bs->total_invalid_number=0;
+	bs->total_valid_number=0;
+	/*
+	if(bs==&p->logical_segment[1228928/16384]){
+		bs->blocks[(1228928%16384)%256]
+	}*/
+	q_enqueue((void*)bs, p->free_logical_segment_q);
+	
+	p->assigned_block--;
+	p->free_block++;
+
+	if(p->assigned_block+p->free_block!=_NOS){
+		printf("missing segment error\n");
+		abort();
+	}
+
+	li->trim_block(segment_startblock_number*_PPB, ASYNC);
+	free(gs);
+}
+
+
+
+
+
 int seq_populate_bit (struct blockmanager* bm, uint32_t ppa){
 	int res=1;
 	sbm_pri *p=(sbm_pri*)bm->private_data;
@@ -424,6 +466,9 @@ int seq_erase_bit (struct blockmanager* bm, uint32_t ppa){
 
 bool seq_is_valid_page (struct blockmanager* bm, uint32_t ppa){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
+	int a = _NOB;
+	printf("PPB : ******** %d\n", _PPB);
+	printf("PPS : ******** %d\n", _PPS);
 	uint32_t bn=ppa/(_PPB*L2PGAP);
 	uint32_t pn=ppa%(_PPB * L2PGAP);
 	uint32_t bt=pn/8;

@@ -230,6 +230,7 @@ struct blockmanager{
 	bool (*is_gc_needed) (struct blockmanager*);
 	__gsegment* (*get_gc_target) (struct blockmanager*);
 	void (*trim_segment) (struct blockmanager*, __gsegment*, struct lower_info*);
+	void (*trim_target_segment)(struct blockmanager*, __segment*, struct lower_info*);
 	void (*free_segment)(struct blockmanager *,__segment*);
 	int (*populate_bit) (struct blockmanager*, uint32_t ppa);
 	int (*unpopulate_bit) (struct blockmanager*, uint32_t ppa);

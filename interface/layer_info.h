@@ -10,6 +10,7 @@ extern struct algorithm page_ftl;
 extern struct algorithm algo_lsm;
 extern struct algorithm demand_ftl;
 extern struct algorithm lsm_ftl;
+extern struct algorithm hybrid_ftl;
 
 //device layer
 extern struct lower_info memio_info;
@@ -44,6 +45,8 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 	mp->algo=&__normal;
 #elif defined(Page_ftl)
 	mp->algo=&page_ftl;
+#elif defined(Hybrid_ftl)
+	mp->algo=&hybrid_ftl;
 #elif defined(DFTL)
 	mp->algo=&demand_ftl;
 #elif defined(demand)

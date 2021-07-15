@@ -22,7 +22,7 @@ struct algorithm hybrid_ftl={
 
 extern MeasureTime mt;
 extern uint32_t test_key;
-extern uint32_t debug_lba;
+
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 hybrid_read_buffer rb;
 align_buffer a_buffer[_NOS]; //each block has buffer
@@ -45,6 +45,7 @@ uint32_t hybrid_create (lower_info* li,blockmanager *bm,algorithm *algo){
 uint32_t hybrid_flush(request * const req){
 	abort();
 }
+
 inline void send_user_req(request *const req, uint32_t type, ppa_t ppa, value_set *value){
     if(type==DATAR){
         fdriver_lock(&rb.read_buffer_lock);
@@ -95,7 +96,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa, value_se
 }
 
 uint32_t hybrid_read(request *const req){
-    uint32_t lbn = req->key / _PPS;
+    uint32_t lbn = req->key / (_PPS * L2PGAP) ;
     blockmanager * bm = hybrid_ftl.bm;
     for(uint32_t i=0; i<a_buffer[lbn].idx; i++){
         if(req->key==a_buffer[lbn].key[i]){
@@ -121,8 +122,8 @@ uint32_t hybrid_read(request *const req){
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
     bool overlap=false;
     uint32_t overlapped_idx=UINT32_MAX;
-    uint32_t lbn = req->key / _PPS;
-
+    uint32_t lbn = req->key / (_PPS*L2PGAP)  ;
+printf("lbn ----------   %d\n", lbn);
     for(uint32_t i=0; i<a_buffer[lbn].idx; i++){
         if(a_buffer[lbn].key[i]==req->key){
             overlapped_idx=i;
@@ -164,8 +165,7 @@ void hybrid_destroy (lower_info* li, algorithm *algo){
     return;
 }
 
-uint32_t hybrid_remove(request * const*req){
-
+uint32_t hybrid_remove(request * const req){
 
 }
 

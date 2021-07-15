@@ -38,6 +38,7 @@ bool seq_check_full(struct blockmanager *,__segment *active, uint8_t type);
 bool seq_is_gc_needed (struct blockmanager*);
 __gsegment* seq_get_gc_target (struct blockmanager*);
 void seq_trim_segment (struct blockmanager*, __gsegment*, struct lower_info*);
+void seq_trim_target_segment (struct blockmanager*, __segment*, struct lower_info*);
 int seq_populate_bit (struct blockmanager*, uint32_t ppa);
 int seq_unpopulate_bit (struct blockmanager*, uint32_t ppa);
 bool seq_query_bit(struct blockmanager *, uint32_t ppa);
