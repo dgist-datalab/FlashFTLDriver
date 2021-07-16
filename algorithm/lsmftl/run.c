@@ -1,4 +1,6 @@
 #include "run.h"
+#include "lsmtree.h"
+extern lsmtree LSM;
 
 run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
 	run *res=(run*)calloc(1,sizeof(run));
@@ -7,6 +9,9 @@ run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
 	res->start_lba=start_lba;
 	res->end_lba=end_lba;
 	res->now_contents_num=0;
+	if(sst_file_num>100000){
+		printf("???\n");
+	}
 	res->sst_set=(sst_file*)calloc(sst_file_num, sizeof(sst_file));
 	return res;
 }
@@ -20,15 +25,19 @@ void run_space_init(run *res, uint32_t map_num, uint32_t start_lba, uint32_t end
 }
 
 void run_reinit(run *res){
-	res->now_sst_num=0;
-	res->start_lba=UINT32_MAX;
-	res->end_lba=0;
-	res->now_contents_num=0;
 	uint32_t sidx;
 	sst_file *sptr;
+	if(LSM.global_debug_flag){
+		printf("break!\n");
+		LSM.global_debug_flag=false;
+	}
 	for_each_sst(res, sptr, sidx){	
 		sst_reinit(sptr);
 	}
+	res->start_lba=UINT32_MAX;
+	res->end_lba=0;
+	res->now_contents_num=0;
+	res->now_sst_num=0;
 }
 
 static inline void update_range(run *_run, uint32_t start, uint32_t end){

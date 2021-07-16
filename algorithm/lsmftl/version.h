@@ -54,16 +54,29 @@ uint32_t version_level_to_start_version(version *v, uint32_t level_idx);
 uint32_t version_get_level_invalidation_cnt(version *v, uint32_t level_idx);
 uint32_t version_get_resort_version(version *v, uint32_t level_idx);
 
-static inline uint32_t version_get_ridx_of_order(version *v, uint32_t lev_idx, uint32_t order){
+static inline uint32_t version_order_to_ridx(version *v, uint32_t lev_idx, uint32_t order){
 	return (v->poped_version_num[lev_idx]+order)%v->level_run_num[lev_idx];
 }
 
-static inline uint32_t version_to_ridx(version *v, uint32_t target_version, uint32_t lev_idx){
-	return target_version-version_level_to_start_version(v, lev_idx);
+static inline uint32_t version_ridx_to_order(version *v, uint32_t lev_idx, uint32_t _ridx){
+	int32_t ridx=_ridx;
+	if(ridx-(int32_t)v->poped_version_num[lev_idx]<0){
+		return ridx-(int32_t)v->poped_version_num[lev_idx]+v->level_run_num[lev_idx];
+	}
+	else{
+		return ridx-v->poped_version_num[lev_idx]; //order start to 0
+	}
 }
 
-static inline uint32_t version_ridx_to_version(version *v, uint32_t ridx, uint32_t lev_idx){
-	return version_level_to_start_version(v, lev_idx)+ridx;
+static inline uint32_t version_order_to_version(version *v, uint32_t lev_idx, uint32_t order){
+	uint32_t start_version=version_level_to_start_version(v, lev_idx);
+	return (order+v->poped_version_num[lev_idx]+start_version) % 
+		(start_version+v->level_run_num[lev_idx]);
+}
+
+static inline uint32_t version_ridx_to_version(version *v, uint32_t lev_idx, uint32_t ridx){
+	return version_order_to_version(v, lev_idx, 
+			version_ridx_to_order(v, lev_idx, ridx));
 }
 
 static inline uint32_t version_map_lba(version *v, uint32_t lba){
@@ -73,15 +86,8 @@ static inline uint32_t version_map_lba(version *v, uint32_t lba){
 	fdriver_unlock(&v->version_lock);
 	return res;
 }
-/*
-static inline int version_to_run(version *v, int32_t a){
-//	return 
-	//return a-v->poped_version_num<0?a-v->poped_version_num+v->max_valid_version_num:a-v->poped_version_num;
-	return a+v->poped_version_num >= 
-		v->max_valid_version_num? a+v->poped_version_num-v->max_valid_version_num:
-		a+v->poped_version_num;
-}
-*/
+
+void version_print_order(version *v, uint32_t lev_idx);
 
 static inline bool version_belong_level(version *v, int32_t a, uint32_t lev_idx){
 	uint32_t start_v=v->start_vidx_of_level[lev_idx];
@@ -101,10 +107,17 @@ static inline int version_to_belong_level(version *v, uint32_t a){
 	return 0;
 }
 
-static inline int version_to_order(version *v, int32_t version, uint32_t level_idx){
-	return version-v->poped_version_num[level_idx]<0? 
+static inline int version_to_order(version *v, uint32_t level_idx, int32_t version){
+	version-=v->start_vidx_of_level[level_idx];
+	int32_t res=version-(int32_t)v->poped_version_num[level_idx]<0? 
 		version-v->poped_version_num[level_idx]+v->level_run_num[level_idx]:
 		version-v->poped_version_num[level_idx];
+	return res;
+}
+
+static inline uint32_t version_to_ridx(version *v, uint32_t lev_idx, uint32_t target_version){
+	return version_order_to_ridx(v, lev_idx, 
+			version_to_order(v, lev_idx, target_version));
 }
 
 static inline int version_compare(version *v, int32_t a, int32_t b){
@@ -113,8 +126,10 @@ static inline int version_compare(version *v, int32_t a, int32_t b){
 	if(b > v->max_valid_version_num){
 		EPRINT("not valid comparing", true);
 	}
-	int a_=version_to_order(v, a, version_to_belong_level(v, a));
-	int b_=version_to_order(v, b, version_to_belong_level(v, b));
+	uint32_t a_level=version_to_belong_level(v,a);
+	uint32_t b_level=version_to_belong_level(v,b);
+	int a_=version_to_order(v, a_level, a)+version_level_to_start_version(v, a_level);
+	int b_=version_to_order(v, b_level, b)+version_level_to_start_version(v, b_level);
 	/*
 	if(version_belong_level(v, a, v->leveln-1)){ //check 
 		a_=a-v->poped_version_num<0?a-v->poped_version_num+v->last_level_version_num:a-v->poped_version_num;
@@ -150,9 +165,9 @@ static inline uint32_t version_to_level_idx(version *v, uint32_t version, uint32
 }
 //void version_traversal(version *v);
 
-#define for_each_old_ridx_in_lastlev(v, ridx, cnt)\
-	for(cnt=0, ridx=version_to_ridx(v, version_pick_oldest_version(v, (v)->leveln-1), (v)->leveln-1);\
-			cnt<(v)->level_run_num[(v)->leveln-1];\
-			cnt++, ridx=(ridx+1)%(v)->level_run_num[(v)->leveln-1])
+#define for_each_old_ridx_in_lev(v, ridx, cnt, lev_idx)\
+	for(cnt=0, ridx=version_to_ridx(v, lev_idx, version_pick_oldest_version(v, lev_idx));\
+			cnt<(v)->level_run_num[lev_idx];\
+			cnt++, ridx=(ridx+1)%(v)->level_run_num[lev_idx])
 
 #endif

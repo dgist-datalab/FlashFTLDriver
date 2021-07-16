@@ -213,7 +213,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	uint32_t border_lba;
 
 	uint32_t target_version=version_get_empty_version(LSM.last_run_version, des->idx);
-	uint32_t target_ridx=version_to_ridx(LSM.last_run_version, target_version, des->idx);
+	uint32_t target_ridx=version_to_ridx(LSM.last_run_version,  des->idx, target_version);
 	sst_pf_out_stream *os_set[MERGED_RUN_NUM]={0,};
 
 	sst_bf_out_stream *bos=NULL;
@@ -424,15 +424,7 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, bool isfirst,sst_pf_ou
 		if(read_done_flag & (1<<i)) continue;
 		else remain_num++;
 	}
-	uint32_t start_version;
-	if(isfirst){
-		if(src){
-			start_version=version_level_to_start_version(LSM.last_run_version, src->idx);
-		}
-		else{
-			start_version=version;
-		}
-	}
+
 	for(uint32_t i=0 ; i<stream_num; i++){
 		if(read_done_flag & (1<<i)) continue;
 		if(!isfirst && read_arg_set[i].to==read_arg_set[i].max_num-1){
@@ -442,13 +434,15 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, bool isfirst,sst_pf_ou
 		}
 
 		if(isfirst){
+			uint32_t target_version=src?version_order_to_version(LSM.last_run_version, src->idx, stream_num-1-i): 0;
+			printf("debugging needed target_version: %u\n", target_version);
 			read_arg_set[i].from=0;
 			read_arg_set[i].to=MIN(read_arg_set[i].from+COMPACTION_TAGS/remain_num-1, 
 					read_arg_set[i].max_num-1);
 			read_map_param_init(&read_arg_set[i], mr_set[i]);
 			pos_set[i]=sst_pos_init_mr(&mr_set[i][read_arg_set[i].from], 
 					read_arg_set[i].param, TARGETREADNUM(read_arg_set[i]),
-					start_version+stream_num-1-i, //to set ridx_version
+					target_version,
 					read_map_done_check, invalid_map? invalid_map_done:not_invalid_map_done);
 		}
 		else{
@@ -469,7 +463,7 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 	uint32_t max_lba=0, min_lba=UINT32_MAX;
 
 	for(uint32_t i=0; i<max_run_num; i++){
-		src_idx=version_get_ridx_of_order(LSM.last_run_version, src->idx, i);
+		src_idx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
 		src_rptr=LEVEL_RUN_AT_PTR(src, src_idx);
 		if(src_rptr->end_lba > max_lba){
 			max_lba=src_rptr->end_lba;
@@ -493,7 +487,7 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 	LSM.monitor.trivial_move_cnt++;
 	std::map<uint32_t, run*> temp_run;
 	for(uint32_t i=0; i<max_run_num; i++){
-		src_idx=version_get_ridx_of_order(LSM.last_run_version, src->idx, i);
+		src_idx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
 		src_rptr=LEVEL_RUN_AT_PTR(src, src_idx);
 		temp_run.insert(std::pair<uint32_t, run*>(src_rptr->start_lba, src_rptr));
 	}
@@ -536,21 +530,18 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	run **new_run;
 	if(hot_cold_mode){
 		new_run=(run**)calloc(2, sizeof(run*));
-		new_run[0]=run_init(src->max_sst_num, UINT32_MAX, 0);
-		new_run[1]=run_init(src->max_sst_num, UINT32_MAX, 0);
+		new_run[DEMOTE_RUN]=run_init(src->max_sst_num, UINT32_MAX, 0);
+		new_run[KEEP_RUN]=run_init(src->max_sst_num, UINT32_MAX, 0);
 	}else{
 		new_run=(run**)calloc(1, sizeof(run*));
-		new_run[0]=run_init(src->max_sst_num, UINT32_MAX, 0);
+		new_run[DEMOTE_RUN]=run_init(src->max_sst_num, UINT32_MAX, 0);
 	}
 	uint32_t stream_num=merging_num;
 	run *temp_new_run;
 	if((temp_new_run=tiering_trivial_move(src, des->idx, merging_num, target_demote_version, 
 					hot_cold_mode, inplace))){
-		run_free(new_run[0]);
-		if(hot_cold_mode){
-			run_free(new_run[1]);
-		}
-		new_run[0]=temp_new_run;
+		run_free(new_run[DEMOTE_RUN]);
+		new_run[DEMOTE_RUN]=temp_new_run;
 		*issequential=true;
 		return new_run;
 	}
@@ -565,14 +556,25 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	}
 	thread_arg.set_num=stream_num;
 
+	printf("before break!\n");
+#ifdef LSM_DEBUG
+	version_print_order(LSM.last_run_version, src->idx);
+#endif
+
 	map_range **mr_set=(map_range **)calloc(stream_num, sizeof(map_range*));
 	/*make it reverse order for stream sorting*/
+	printf("target ridx print\n"); 
 	for(int32_t i=stream_num-1, j=0; i>=0; i--, j++){
-		uint32_t ridx=version_get_ridx_of_order(LSM.last_run_version, src->idx, i);
+		uint32_t ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
 		uint32_t sst_file_num=src->array[ridx].now_sst_num;
 		uint32_t map_num=0;
+
+		printf("\tridx:%u\n", ridx);
 		for(uint32_t j=0; j<sst_file_num; j++){
 			map_num+=src->array[ridx].sst_set[j].map_num;
+		}
+		if(!map_num){
+			abort();
 		}
 		read_arg_set[j].max_num=map_num;
 		mr_set[j]=make_mr_set(src->array[ridx].sst_set, 0, src->array[ridx].now_sst_num-1, map_num);
@@ -602,12 +604,12 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 
 	uint32_t border_lba=UINT32_MAX;
 	bool bis_populate=false;
-	uint32_t round=0;
+//	uint32_t round=0;
 	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
 		read_done=update_read_arg_tiering(read_done, isfirst, pos_set, mr_set,
 				read_arg_set, true, stream_num, src, UINT32_MAX);
 		
-		printf("round:%u\n", round++);
+//	printf("round:%u\n", round++);
 
 		for(uint32_t k=0; k<stream_num; k++){
 			if(read_done & (1<<k)) continue;
@@ -701,19 +703,19 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 
 	sst_file *last_file;
 	if(hot_cold_mode){
-		if((last_file=bis_to_sst_file(bis[0]))){
-			run_append_sstfile_move_originality(new_run[0], last_file);
+		if((last_file=bis_to_sst_file(bis[DEMOTE_RUN]))){
+			run_append_sstfile_move_originality(new_run[DEMOTE_RUN], last_file);
 			sst_free(last_file, LSM.pm);
 		}
 
-		if((last_file=bis_to_sst_file(bis[1]))){
-			run_append_sstfile_move_originality(new_run[1], last_file);
+		if((last_file=bis_to_sst_file(bis[KEEP_RUN]))){
+			run_append_sstfile_move_originality(new_run[KEEP_RUN], last_file);
 			sst_free(last_file, LSM.pm);
 		}
 	}
 	else{
-		if((last_file=bis_to_sst_file(bis[0]))){
-			run_append_sstfile_move_originality(new_run[0], last_file);
+		if((last_file=bis_to_sst_file(bis[DEMOTE_RUN]))){
+			run_append_sstfile_move_originality(new_run[DEMOTE_RUN], last_file);
 			sst_free(last_file, LSM.pm);
 		}
 	}
@@ -731,16 +733,18 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	delete[] MFS_set_ptr;
 
 	if(hot_cold_mode){
-		sst_bis_free(bis[0]);
-		sst_bis_free(bis[1]);
+		sst_bis_free(bis[DEMOTE_RUN]);
+		if(new_run[KEEP_RUN]->now_sst_num==0){
+			read_helper_free(bis[KEEP_RUN]->rh);
+		}
+		sst_bis_free(bis[KEEP_RUN]);
 	}else{
-		sst_bis_free(bis[0]);
+		sst_bis_free(bis[DEMOTE_RUN]);
 	}
 
 	sst_bos_free(bos, _cm);
 	delete kpq;
 	free(bis);
-	free(bos);
 	free(pos_set);
 	free(mr_set);
 	free(thread_arg.arg_set);
@@ -752,7 +756,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	_cm=cm;
 	bool issequential;
 	run **new_run=compaction_TI2RUN(cm, src, des, src->run_num, target_version, UINT32_MAX, &issequential, false, false);
-	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, target_version, des->idx);
+	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, des->idx, target_version);
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, 
 			des->max_contents_num, des->check_full_by_size);
 
@@ -766,7 +770,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 
 	level_update_run_at_move_originality(res, target_run_idx, new_run[0], true);
 
-	run_free(new_run[0]);
+	run_free(new_run[DEMOTE_RUN]);
 	free(new_run);
 
 	level_print(res);
@@ -776,11 +780,12 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des,
 		uint32_t target_version, bool *hot_cold_separation){
 	bool issequential;
+	uint32_t target_run_num=src->run_num-1;
 	uint32_t target_keep_version=version_pick_oldest_version(LSM.last_run_version, src->idx);
-	run **new_run=compaction_TI2RUN(cm, src, des, src->run_num-1, 
+	run **new_run=compaction_TI2RUN(cm, src, des, target_run_num,  
 			target_version, target_keep_version, &issequential, false, true);
 
-	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, target_version, des->idx);
+	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, des->idx, target_version);
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, 
 			des->max_contents_num, des->check_full_by_size);
 
@@ -791,31 +796,47 @@ level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des
 			level_append_run_copy_move_originality(res, rptr, ridx);
 		}
 	}
-	level_update_run_at_move_originality(res, target_run_idx, new_run[0], true);
+	level_update_run_at_move_originality(res, target_run_idx, new_run[DEMOTE_RUN], true);
+	/*
 	if(issequential) {
 		*hot_cold_separation=false;
 		return res;
 	}
+	 */
 
+
+//	run_content_print(new_run[0], true);
 	*hot_cold_separation=true;
 
-	for(uint32_t i=0; i<src->run_num-1; i++){
+//	level_content_print(src, true);
+
+	for(uint32_t i=0; i<target_run_num; i++){
 		uint32_t oldest_version=version_pop_oldest_version(LSM.last_run_version, src->idx);
 		version_unpopulate(LSM.last_run_version, oldest_version, src->idx);
-		uint32_t src_ridx=version_get_ridx_of_order(LSM.last_run_version, src->idx, oldest_version);
-		run_reinit(&src->array[src_ridx]);
+		uint32_t src_ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
+		level_run_reinit(src, src_ridx);
 	}
 
-	version_poped_update(LSM.last_run_version, des->idx, src->run_num-1);
-	
-	uint32_t target_lower_version=version_get_empty_version(LSM.last_run_version, src->idx);
-	uint32_t target_lower_run_idx=version_to_ridx(LSM.last_run_version, target_lower_version, src->idx);
-	level_update_run_at_move_originality(src, target_lower_run_idx, new_run[1], true);
-	
-	run_free(new_run[1]);
-	run_free(new_run[0]);
+	version_poped_update(LSM.last_run_version, src->idx, target_run_num);
+#ifdef LSM_DEBUG
+	version_print_order(LSM.last_run_version, src->idx);
+#endif
+
+	if(new_run[KEEP_RUN]->now_sst_num){
+		uint32_t target_real_keep_version=version_get_empty_version(LSM.last_run_version, src->idx);
+		if(target_real_keep_version!=target_keep_version){
+			EPRINT("version is differ from target_keep_version", true);
+		}
+		uint32_t src_ridx=version_order_to_ridx(LSM.last_run_version, src->idx, target_real_keep_version);
+		level_update_run_at_move_originality(src, src_ridx, new_run[KEEP_RUN], true);
+		version_populate(LSM.last_run_version, target_real_keep_version, src->idx);
+	}
+
+	run_free(new_run[KEEP_RUN]);
+	run_free(new_run[DEMOTE_RUN]);
 	free(new_run);
-	level_print(res);
+	level_print(src);
+//	level_print(res);
 	return res;
 }
 
@@ -855,8 +876,7 @@ level *compaction_TW_convert_LW(compaction_master *cm, level *src){
 	uint32_t sorting_done=0;
 	bool isfirst=true;
 	sst_pf_in_stream *pis=sst_pis_init(true, lsmtree_get_target_rhp(src->idx));
-	uint32_t target_version=version_level_to_start_version(LSM.last_run_version, src->idx) 
-		+ src->run_num-1;
+	uint32_t target_version=version_order_to_version(LSM.last_run_version, src->idx, src->run_num-1);
 
 	uint32_t border_lba=UINT32_MAX;
 	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
@@ -1145,6 +1165,7 @@ void compaction_trivial_move(run *rptr, uint32_t target_version, uint32_t from_l
 		sst_file *sptr;
 		for_each_sst(rptr, sptr, sidx){
 			read_helper_insert_done(sptr->_read_helper);
+			rptr->now_contents_num+=read_helper_get_cnt(sptr->_read_helper);
 		}
 	}
 	

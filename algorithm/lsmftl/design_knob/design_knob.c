@@ -93,7 +93,7 @@ void init_memory_info(uint32_t error){
 	}
 /*
 	for(uint32_t i=1; i<=1000; i++){
-		printf("%u : %lf\n", i, plr_dp[i]);
+		printf("%u\t%lf\n", i, plr_dp[i]);
 	}*/
 	gbf_set_prepare((float)error/100, 1000000, BLOOM_ONLY);
 	close(fd);

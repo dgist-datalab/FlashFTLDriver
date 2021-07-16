@@ -250,6 +250,9 @@ void level_free(level *lev, page_manager *pm){
 }
 
 uint32_t level_update_run_at_move_originality(level *lev, uint32_t idx, run *r, bool new_run){
+	if(lev->idx==0 && idx==14 && r->now_sst_num==0){
+		printf("break!\n");
+	}
 	if(lev->level_type!=TIERING && lev->level_type !=TIERING_WISCKEY){
 		EPRINT("it must be tiering level", true);
 	}
@@ -279,21 +282,20 @@ uint32_t get_level_content_num(level *lev){
 	sst_file *sptr;
 	run *rptr;
 	uint32_t content_num=0;
-	for_each_sst_level(lev, rptr, ridx, sptr, sidx){
-		content_num+=read_helper_get_cnt(sptr->_read_helper);
+
+	for_each_run_max(lev, rptr, ridx){
+		if(!rptr->now_sst_num) continue;
+		for_each_sst(rptr, sptr, sidx){
+			content_num+=read_helper_get_cnt(sptr->_read_helper);
+		}
 	}
+
 	return content_num;
 }
 
 void level_print(level *lev){
 #ifdef LSM_DEBUG
-	uint32_t sidx=0, ridx=0;
-	sst_file *sptr;
-	run *rptr;
-	uint32_t content_num=0;
-	for_each_sst_level(lev, rptr, ridx, sptr, sidx){
-		content_num+=read_helper_get_cnt(sptr->_read_helper);
-	}
+	uint32_t content_num=get_level_content_num(lev);
 	if(lev->now_sst_num){
 		if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
 			printf("level idx:%d run %u/%u content_num: %u (%.2lf %%)\n",
@@ -510,7 +512,7 @@ void level_tiering_sst_analysis(level *lev, blockmanager *bm, version *v, bool m
 		uint32_t start_lba=0;
 		uint32_t end_lba=0;
 		uint32_t invalidate_cnt=0;
-		uint32_t run_version=version_level_to_start_version(v, lev->idx)+ridx;
+		uint32_t run_version=version_ridx_to_version(v, lev->idx, ridx);
 		run_total_validate_number+=rptr->now_contents_num;
 		for_each_sst(rptr, sptr, sidx){
 			uint32_t midx;
@@ -562,11 +564,12 @@ uint32_t level_run_populate_analysis(run *r){
 	key_ptr_pair *kp_ptr;
 	uint32_t contents_num=0;
 	uint32_t cnt_sum=0;
+//	printf("r:%u\n", r->start_lba);
 	for_each_sst(r, sptr, sidx){
 		if(sptr->type==PAGE_FILE){
 			io_manager_test_read(sptr->file_addr.map_ppa, mapping, TEST_IO);
 			kp_ptr=(key_ptr_pair*)mapping;
-			for(uint32_t i=0; kp_ptr[i].piece_ppa!=UINT32_MAX && i<KP_IN_PAGE; i++){
+			for(uint32_t i=0;i<KP_IN_PAGE && kp_ptr[i].piece_ppa!=UINT32_MAX; i++){
 #ifdef LSM_DEBUG
 				cnt_sum+=LSM.LBA_cnt[kp_ptr[i].lba];
 #endif
@@ -579,7 +582,7 @@ uint32_t level_run_populate_analysis(run *r){
 			for_each_map_range(sptr, mptr, midx){
 				io_manager_test_read(mptr->ppa, mapping, TEST_IO);
 				kp_ptr=(key_ptr_pair*)mapping;
-				for(uint32_t i=0; kp_ptr[i].piece_ppa!=UINT32_MAX && i<KP_IN_PAGE; i++){
+				for(uint32_t i=0;i<KP_IN_PAGE && kp_ptr[i].piece_ppa!=UINT32_MAX; i++){
 #ifdef LSM_DEBUG
 					cnt_sum+=LSM.LBA_cnt[kp_ptr[i].lba];
 #endif

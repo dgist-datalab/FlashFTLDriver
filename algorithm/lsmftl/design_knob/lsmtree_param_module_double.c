@@ -39,6 +39,7 @@ double get_double_level(double sizefactor, double blocknumber){
 	double target=(std::log(blocknumber)/std::log((double)sizefactor));
 	int result;
 	int retry_cnt=0;
+	return target;
 retry:
 	switch((result=checking(target, sizefactor, blocknumber))){
 		case 1:

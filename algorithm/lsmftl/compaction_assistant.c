@@ -333,7 +333,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 
 	uint32_t target_version;
 	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
-		target_version=version_level_to_start_version(LSM.last_run_version, des_lev->idx);
+		target_version=version_order_to_version(LSM.last_run_version, des_lev->idx, 0);
 	}
 	else{	
 		target_version=version_get_empty_version(LSM.last_run_version, des_lev->idx);
@@ -436,7 +436,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 
 #ifdef HOT_COLD
 	if(hot_cold_separation_compaction){
-		/*do nothing*/
+		disk_change(NULL, lev, &LSM.disk[end_idx], NULL);
 	}
 	else{
 		disk_change(temp_level?NULL:&LSM.disk[start_idx], lev, &LSM.disk[end_idx], NULL);
@@ -486,9 +486,6 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 #ifdef LSM_DEBUG
 	static int inplace_cnt=0;
 	printf("inplace[%d] %u %u\n", inplace_cnt++, start_idx, end_idx);
-	if(inplace_cnt==3){
-		LSM.global_debug_flag=true;
-	}
 #endif
 	rwlock_write_lock(&LSM.level_rwlock[start_idx]);
 	level *src_lev=LSM.disk[start_idx];
@@ -496,7 +493,7 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 	level *res;
 
 	bool issequential;
-	uint32_t target_version=version_level_to_start_version(LSM.last_run_version, start_idx);
+	uint32_t target_version=version_order_to_version(LSM.last_run_version, start_idx, 0);
 	run **target_run=compaction_TI2RUN(cm, src_lev, des_lev, 
 			src_lev->run_num, target_version, UINT32_MAX, &issequential, true, false);
 
@@ -518,7 +515,7 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 			src_lev->idx, src_lev->max_contents_num, true);
 	version_populate(LSM.last_run_version, target_version, src_lev->idx);
 
-	uint32_t target_ridx=version_to_ridx(LSM.last_run_version, target_version, src_lev->idx);
+	uint32_t target_ridx=version_to_ridx(LSM.last_run_version,  src_lev->idx, target_version);
 	level_update_run_at_move_originality(res, target_ridx, target_run[0], true);
 
 	run_free(target_run[0]);
@@ -583,13 +580,14 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 	}
 
 	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
-		uint32_t t_version=version_ridx_to_version(LSM.last_run_version, merged_idx_set[i], target_lev->idx);
+		uint32_t t_version=version_ridx_to_version(LSM.last_run_version, target_lev->idx,  merged_idx_set[i]);
 		LSM.last_run_version->version_invalidation_cnt[t_version]=0;
 	}
 
 	run *rptr;
 	uint32_t ridx, cnt;
-	for_each_old_ridx_in_lastlev(LSM.last_run_version, ridx, cnt){
+	uint32_t round=0;
+	for_each_old_ridx_in_lev(LSM.last_run_version, ridx, cnt, target_lev->idx){
 		if(ridx==merged_idx_set[0]) continue;
 		rptr=LEVEL_RUN_AT_PTR(res, ridx);
 		if(rptr->now_sst_num){
@@ -597,7 +595,7 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
 			run_empty_content(rptr, LSM.pm);
 
-			uint32_t t_version=version_ridx_to_version(LSM.last_run_version, ridx, target_lev->idx);
+			uint32_t t_version=version_ridx_to_version(LSM.last_run_version, target_lev->idx, ridx);
 			LSM.last_run_version->version_invalidation_cnt[t_version]=0;
 
 			level_update_run_at_move_originality(res, ridx, new_run, false);
@@ -605,6 +603,9 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 		}
 		if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
 			break;
+		}
+		else{
+			printf("%u target:%u now_remain:%u\n", round, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
 		}
 	}
 
@@ -665,7 +666,7 @@ again:
 		}*/
 #endif
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
-
+		lsmtree_level_summary(&LSM);
 
 		if(req->end_level==LSM.param.LEVELN-1){
 			goto end;

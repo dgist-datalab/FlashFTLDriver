@@ -251,7 +251,7 @@ uint32_t lsmtree_testing(){
 
 			run *rptr;
 			uint32_t ridx, cnt;
-			for_each_old_ridx_in_lastlev(LSM.last_run_version, ridx, cnt){
+			for_each_old_ridx_in_lev(LSM.last_run_version, ridx, cnt, 1){
 				printf("ridx:%u\n", ridx);
 				rptr=LEVEL_RUN_AT_PTR(disk[1], ridx);
 				if(rptr->now_sst_num){

@@ -40,7 +40,8 @@ static void print_level_param(){
 	printf("[param] read amplification: %f\n", LSM.param.read_amplification+1);
 	printf("[param] version number :%lu\n", tr.run_num);
 	printf("[param] write_buffer ent: %u\n", LSM.param.write_buffer_ent);
-	printf("[param] write_buffer divide: %u\n", LSM.param.write_buffer_divide);
+	printf("[param] write_buffer byte: %u\n", LSM.param.write_buffer_bit/8);
+	printf("[param] reclaim ppa target: %u (%u)\n", LSM.param.reclaim_ppa_target, LSM.param.reclaim_ppa_target*L2PGAP);
 
 	printf("[PERF] WAF:%.2lf+GC\n", tr.WAF);
 	printf("[PERF] RAF:%.3lf\n", LSM.param.read_amplification+1);
@@ -66,7 +67,7 @@ static void print_help(){
 uint32_t lsmtree_argument_set(int argc, char *argv[]){
 	int c;
 	uint64_t target_memory_usage_bit=0;
-	uint32_t percentage=25;
+	uint32_t percentage=21;
 	TARGETFPR=0.1;
 	while((c=getopt(argc,argv,"mMhHfF"))!=-1){
 		switch(c){
@@ -182,36 +183,35 @@ void print_tree_param(tree_param *set, uint32_t number){
 }
 
 void print_tree_param_new(tree_param *set, uint32_t number, uint32_t divide){
-	printf("BUFF\tLEVEL\tWAF\tsf\trun_num\tmemory\tbuffer\tsum\tTABLE\tENTRY\tR_AVG\n");
+	printf("BUFF\tLEVEL\tWAF\tsf\t#R\tbuffer\tsum\tTABLE\tENTRY\tR_AVG\n");
 	for(uint32_t i=1; i<=number; i++){
-		printf("%.2f\t%u\t%.2lf\t%.2lf\t%lu\t%.2lf\t%.2lf\t%.3lf\t%.3f\t%.4f\t%.3f\n", 
+		printf("%.2f\t%u\t%.2lf\t%.2lf\t%lu\t%.2lf\t%.3lf\t%.3f\t%.4f\t%.3f\n", 
 				(double)divide,
 				i, set[i].WAF, set[i].size_factor, set[i].run_num,
-				(double)set[i].memory_usage_bit/(RANGE*48),
 				(double)((double)RANGE*48/divide)/(RANGE*48),
-				(double)((double)set[i].memory_usage_bit+(double)((double)RANGE*48/divide))/(RANGE*48),
+				(double)((double)set[i].memory_usage_bit)/(RANGE*48),
 				(double)set[i].total_run_num_bit/(RANGE*48),
 				(double)set[i].entry_bit/(RANGE*48),
 	//			(double)RANGE/(set[i].size_factor*i)/RANGE
 				set[i].avg_run_size
 				);
-		
+		/*
 		for(uint32_t j=1;j<=i; j++){
 			printf("\t%.3lf\t%.2lf\t%.3lf\n", set[i].run_range_size[j]*100, set[i].rh_bit[j],
 					set[i].level_size_ratio[j] * 100);
-		}
-		printf("\n");
+		}*/
+//		printf("\n");
 	}
 }
 
 void lsmtree_l0_fix_sf(){
-	double size_factor=4;
-	printf("BUF\tLEVEL\tTABLE\tPLR\tSUM\tOP_MEM\tLAST_MEM\tBPE(%%)\n");
-	for(uint32_t divide=size_factor; divide<=RANGE*48/3; divide*=2){
-		double write_buffer_memory_bit=RANGE*48/divide;
+	double size_factor=2;
+	printf("BUF\tLEVEL\tTABLE\tBPE\tSUM\t\n");
+	for(uint32_t WB=(LOWQDEPTH*(48+48)); WB<=RANGE*48; WB*=2){
+		double write_buffer_memory_bit=WB;
 		double buffered_ent=write_buffer_memory_bit/(48+48);
 		double chunk_num=(double)RANGE/buffered_ent;
-		uint32_t max_level=get_level(size_factor, chunk_num);
+		double max_level=get_double_level(size_factor, chunk_num);
 		double max_level_double=get_double_level(size_factor, chunk_num);
 		double table_bit=ceil(log2(max_level*size_factor)) * RANGE;
 		double memory_size=0;
@@ -219,135 +219,246 @@ void lsmtree_l0_fix_sf(){
 		memory_size+=table_bit;
 		double plr_bit=0;
 
-		double op_memory=0;
-		double real_memory=0;
-
-		double total_level_size=0;
 
 		if(max_level!=max_level_double) continue;
 
-
-		for(double i=1; i<=max_level; i++){
-			double run_size=buffered_ent * pow(size_factor, i-1);
-			double level_size=buffered_ent * ceil(pow(size_factor, i))-pow(size_factor, i-1);
-			if(i==max_level){
-				run_size=buffered_ent * pow(size_factor, i-1);
-				level_size=RANGE-total_level_size;
+		uint64_t total_level_size=0;
+		/*calculating */
+		for(uint32_t i=1; i<=ceil(max_level); i++){
+			uint64_t run_size;
+			uint64_t level_size;
+			if(i==ceil(max_level)){
+				run_size=buffered_ent * pow(size_factor, max_level-1);
+				level_size=buffered_ent * pow(size_factor, max_level);
 			}
 			else{
 				run_size=buffered_ent * pow(size_factor, i-1);
-				level_size=buffered_ent * ceil(pow(size_factor, i))-pow(size_factor, i-1);
+				level_size=buffered_ent * ceil(pow(size_factor, i));
 			}
-			level_size=level_size>RANGE?RANGE:level_size;
-			run_size=run_size>RANGE?RANGE:run_size;
-			double run_coverage_ratio=(double)run_size/RANGE;
 			total_level_size+=level_size;
-
-			plr_bit+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
-	//		printf("%.2lf\n", run_coverage_ratio * 100);
-			if(i==max_level){
-				real_memory+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
-			}
-			else{
-				op_memory+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
-			}
-			memory_size+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
 		}
 
-		printf("%lf\t%u\t%.3lf\t%.3lf\t%.3lf\t%.3lf\t%.3lf\t%.3lf\n", (double)1/divide*100, max_level, 
-				table_bit/RANGE/48*100, plr_bit/RANGE, memory_size/RANGE/48*100,
-				op_memory/memory_size*100, real_memory/memory_size*100, plr_bit/total_level_size/48*100);
+		for(uint32_t i=1; i<=ceil(max_level); i++){
+			uint64_t run_size;
+			uint64_t level_size;
+
+			if(i==ceil(max_level)){
+				run_size=buffered_ent * pow(size_factor, max_level-1);
+				level_size=buffered_ent * pow(size_factor, max_level);
+			}
+			else{
+				run_size=buffered_ent * pow(size_factor, i-1);
+				level_size=buffered_ent * ceil(pow(size_factor, i));
+			}
+
+			double run_coverage_ratio=(double)run_size/total_level_size;
+			plr_bit+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
+		}
+
+		double bit_per_entry=plr_bit/total_level_size;
+		memory_size+=bit_per_entry*RANGE;
+
+		printf("%u\t%.3lf\t%.3lf\t%.3lf\t%.3lf\n", WB/LOWQDEPTH, max_level, table_bit/(RANGE*48), 
+			bit_per_entry/48, memory_size/(RANGE*48));
 	}
 }
 
 void lsmtree_sf_fix_l0(){
-	printf("SF\tLEVEL\tTABLE\tPLR\tSUM\tOP_MEM\tLAST_MEM\tBPE(%%)\n");
-	uint32_t divide=512;
-	uint32_t write_buffer_memory_bit=RANGE*48/divide;
+	printf("SF\tLEVEL\tTABLE\tBPE\tSUM\t\n");
+	uint32_t write_buffer_memory_bit=LOWQDEPTH*(48+48);
 	uint32_t buffered_ent=write_buffer_memory_bit/(48+48);
 	uint32_t chunk_num=RANGE/buffered_ent+(RANGE%buffered_ent?1:0);
-	uint32_t max_level=get_level(2, chunk_num);
-	for(uint32_t level=1; level <= max_level; level++){
-		double size_factor=get_double_size_factor((double)level, (double)chunk_num);
-		double table_bit=ceil(log2(level*size_factor)) * RANGE;
+
+	for(uint32_t size_factor=2; size_factor<=1024; size_factor*=2){
+		double max_level=get_double_level(size_factor, chunk_num);
+		double table_bit=ceil(log2(ceil(max_level)*size_factor)) * RANGE;
 		double memory_size=0;
 		memory_size+=table_bit;
 		memory_size+=write_buffer_memory_bit;
 		double plr_bit=0;
 
-		double op_memory=0;
-		double real_memory=0;
-
-		double total_level_size=0;
-
-		for(uint32_t i=1; i<=level; i++){
-
-			uint32_t run_size;
-			uint32_t level_size=buffered_ent * ceil(pow(size_factor, i))-pow(size_factor, i-1);
-			if(i==level){
-				run_size=buffered_ent * pow(size_factor, i-1);
-				level_size=RANGE-total_level_size;
+		uint64_t total_level_size=0;
+		/*calculating */
+		for(uint32_t i=1; i<=ceil(max_level); i++){
+			uint64_t run_size;
+			uint64_t level_size;
+			if(i==ceil(max_level)){
+				run_size=buffered_ent * pow(size_factor, max_level-1);
+				level_size=buffered_ent * pow(size_factor, max_level);
 			}
 			else{
 				run_size=buffered_ent * pow(size_factor, i-1);
-				level_size=buffered_ent * ceil(pow(size_factor, i))-pow(size_factor, i-1);
+				level_size=buffered_ent * ceil(pow(size_factor, i));
 			}
-
-			level_size=level_size>RANGE?RANGE:level_size;
-			run_size=run_size>RANGE?RANGE:run_size;
-
 			total_level_size+=level_size;
-
-			double run_coverage_ratio=(double)run_size/RANGE;
-			plr_bit+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
-			if(i==level){
-				real_memory+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
-			}
-			else{
-				op_memory+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
-			}
-			memory_size+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
 		}
 
-		printf("%.2lf\t%u\t%.3lf\t%.3lf\t%.3lf\t%.3lf\t%.3lf\t%.3lf\n", size_factor, level, table_bit/RANGE, plr_bit/RANGE, memory_size/RANGE/48*100,
-				op_memory/RANGE/48*100, real_memory/RANGE/48*100, plr_bit/total_level_size/48*100);
+		for(uint32_t i=1; i<=ceil(max_level); i++){
+			uint64_t run_size;
+			uint64_t level_size;
+
+			if(i==ceil(max_level)){
+				run_size=buffered_ent * pow(size_factor, max_level-1);
+				level_size=buffered_ent * pow(size_factor, max_level);
+			}
+			else{
+				run_size=buffered_ent * pow(size_factor, i-1);
+				level_size=buffered_ent * ceil(pow(size_factor, i));
+			}
+			
+			double run_coverage_ratio=(double)run_size/total_level_size;
+			plr_bit+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
+		}
+
+		double bit_per_entry=plr_bit/total_level_size;
+		memory_size+=RANGE*bit_per_entry;
+		printf("%u\t%.3lf\t%.3lf\t%.3lf\t%.3lf\n", size_factor, max_level, table_bit/(RANGE*48), 
+				bit_per_entry/(48), memory_size/(RANGE*48));
+
+	}
+	
+//	uint32_t max_level=get_level(2, chunk_num);
+//	for(uint32_t level=2; level <= max_level; level++){
+//		double size_factor=get_double_size_factor((double)level, (double)chunk_num);
+//		double table_bit=ceil(log2(level*size_factor)) * RANGE;
+//		double memory_size=0;
+//		memory_size+=table_bit;
+//		memory_size+=write_buffer_memory_bit;
+//		double plr_bit=0;
+//
+//		uint64_t total_level_size=0;
+//		/*calculating */
+//		for(uint32_t i=1; i<=level; i++){
+//			uint32_t run_size;
+//			uint64_t level_size;
+//
+//			run_size=buffered_ent * pow(size_factor, i-1);
+//			level_size=buffered_ent * ceil(pow(size_factor, i))-pow(size_factor, i-1);
+//			/*
+//			level_size=level_size>RANGE?RANGE:level_size;
+//			run_size=run_size>RANGE?RANGE:run_size;
+//			*/
+//
+//			total_level_size+=level_size;
+//			double run_coverage_ratio=(double)run_size/RANGE;
+//			plr_bit+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
+//		}
+//		double bit_per_entry=plr_bit/total_level_size;
+//		memory_size+=RANGE*bit_per_entry;
+//		printf("%.2lf\t%u\t%.3lf\t%.3lf\t%.3lf\n", size_factor, level, table_bit/(RANGE*48), 
+//				bit_per_entry/(48), memory_size/(RANGE*48));
+//	}
+}
+
+void lsmtree_tiering_only_test2(){
+	//printf("BUF\tSF\tLEVEL\tTABLE\tBPE\tSUM\t\n");
+	printf("\t");
+	for(uint32_t size_factor=2; size_factor<=1024; size_factor*=4){
+		printf("%u\t", size_factor);
+	}
+	printf("\n");
+	for(uint32_t WB=(LOWQDEPTH*(48+48)); WB<=RANGE*48; WB*=4){	
+		double write_buffer_memory_bit=WB;
+		double buffered_ent=write_buffer_memory_bit/(48+48);
+		double chunk_num=(double)RANGE/buffered_ent;
+		printf("%u\t",WB/LOWQDEPTH);
+		for(uint32_t size_factor=2; size_factor<=1024; size_factor*=4){
+			double max_level=get_double_level(size_factor, chunk_num);
+			double table_bit=ceil(log2(ceil(max_level)*size_factor)) * RANGE;
+			double memory_size=0;
+			memory_size+=table_bit;
+			memory_size+=write_buffer_memory_bit;
+			double plr_bit=0;
+
+			uint64_t total_level_size=0;
+			/*calculating */
+			for(uint32_t i=1; i<=ceil(max_level); i++){
+				uint64_t run_size;
+				uint64_t level_size;
+				if(i==ceil(max_level)){
+					run_size=buffered_ent * pow(size_factor, max_level-1);
+					level_size=buffered_ent * pow(size_factor, max_level);
+				}
+				else{
+					run_size=buffered_ent * pow(size_factor, i-1);
+					level_size=buffered_ent * ceil(pow(size_factor, i));
+				}
+				total_level_size+=level_size;
+			}
+
+			for(uint32_t i=1; i<=ceil(max_level); i++){
+				uint64_t run_size;
+				uint64_t level_size;
+
+				if(i==ceil(max_level)){
+					run_size=buffered_ent * pow(size_factor, max_level-1);
+					level_size=buffered_ent * pow(size_factor, max_level);
+				}
+				else{
+					run_size=buffered_ent * pow(size_factor, i-1);
+					level_size=buffered_ent * ceil(pow(size_factor, i));
+				}
+
+				double run_coverage_ratio=(double)run_size/total_level_size;
+				plr_bit+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
+			}
+
+			double bit_per_entry=plr_bit/total_level_size;
+			memory_size+=RANGE*bit_per_entry;
+
+			printf("%.3lf\t", memory_size/(RANGE*48));
+	//		printf("%.3lf\t", max_level);
+	//		printf("%u\t%u\t%.3lf\t%.3lf\t%.3lf\t%.3lf\n",WB/LOWQDEPTH, size_factor, max_level, table_bit/(RANGE*48), 
+	//				bit_per_entry/(48), memory_size/(RANGE*48));
+			if(max_level==1) break;
+		}
+		printf("\n");
 	}
 }
 
 void lsmtree_tiering_only_test(){
-	for(uint32_t divide=1; divide<RANGE*48/3; divide*=4){
+	for(uint32_t divide=2; true ; divide*=2){
 		uint32_t write_buffer_memory_bit=RANGE*48/divide;
 		uint32_t buffered_ent=write_buffer_memory_bit/(48+48);
 		tree_param *settings=NULL;
-		if(buffered_ent==0) break;
+
+		if(buffered_ent < QSIZE*L2PGAP){
+			break;
+		}
 		uint32_t chunk_num=RANGE/buffered_ent+(RANGE%buffered_ent?1:0);
 		uint32_t max_level=get_level(2, chunk_num);
 		max_level=max_level>20?20:max_level;
 		settings=(tree_param*)calloc(max_level+1, sizeof(tree_param));
 
 		for(uint32_t i=1; i<=max_level; i++){
-			settings[i].size_factor=get_size_factor(i, chunk_num);
+			settings[i].size_factor=get_double_size_factor(i, chunk_num);
 			settings[i].num_of_level=i;
 			settings[i].memory_usage_bit=ceil(log2(settings[i].size_factor *i)) * RANGE;
 			settings[i].total_run_num_bit=ceil(log2(settings[i].size_factor *i)) * RANGE;
 			settings[i].WAF=i;
 			settings[i].run_num=i*settings[i].size_factor;
-			if(settings[i].size_factor<=2) break;
+			double total_level_size=0;
+			settings[i].memory_usage_bit+=write_buffer_memory_bit;
+			//if(settings[i].size_factor<=2) break;
 	//		settings[i].lp=(level_param*)calloc(i+1, sizeof(level_param));	
 			for(uint32_t j=1; j<=i; j++){
 				uint64_t num_range=RANGE;
-				uint32_t run_size=buffered_ent * pow(settings[i].size_factor, j-1);
+				uint32_t run_size;
 				uint64_t level_size=0;
-				/*
 				if(j==i){
-					level_size=buffered_ent * ceil(pow(settings[i].size_factor, j));
+					run_size=buffered_ent * pow(settings[i].size_factor, j-1);
+					level_size=RANGE-total_level_size;
 				}
-				else{*/
-					level_size=buffered_ent * ceil(pow(settings[i].size_factor, j))-pow(settings[i].size_factor, j-1);
-				//}
+				else{
+					run_size=buffered_ent * pow(settings[i].size_factor, j-1);
+					level_size=buffered_ent * ceil(pow(settings[i].size_factor, j)) -pow(settings[i].size_factor, j-1);
+					//level_size=buffered_ent * ceil(pow(settings[i].size_factor, j));
+				}
+
+				total_level_size+=level_size;
 				level_size=level_size>RANGE?RANGE:level_size;
 				run_size=run_size>RANGE?RANGE:run_size;
-				double run_coverage_ratio=(double)run_size/num_range;
+				double run_coverage_ratio=(double)run_size/RANGE;
 				uint64_t run_memory_usage_bit=level_size * MIN(bf_memory_per_ent(run_coverage_ratio),
 						plr_memory_per_ent(run_coverage_ratio));
 				bool plr_on=false;
@@ -361,7 +472,8 @@ void lsmtree_tiering_only_test(){
 				settings[i].run_range_size[j]=(double)run_size/RANGE;
 				settings[i].level_size_ratio[j]=(double)level_size/RANGE;
 				settings[i].entry_bit+=run_memory_usage_bit;
-				settings[i].memory_usage_bit+=run_memory_usage_bit;
+				settings[i].memory_usage_bit+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio),
+						plr_memory_per_ent(run_coverage_ratio));
 				if(plr_on){
 					settings[i].avg_run_size+=run_size;
 				}
@@ -375,7 +487,8 @@ void lsmtree_tiering_only_test(){
 				settings[i].avg_run_size/=RANGE;
 			}
 		}
-		printf("\n");
+
+		//printf("\n");
 		print_tree_param_new(settings, max_level, divide);
 		free(settings);
 	}
@@ -390,16 +503,13 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	target_level_param.lp=NULL;
 	uint32_t target_buffered_ent;
 	uint32_t target_chunk_num;
-	uint32_t target_divide;
-	for(uint32_t divide=2; true; divide*=2){
+	uint32_t target_WB;
+	for(uint32_t WB=(LOWQDEPTH*(48+48)); WB<=RANGE*48; WB+=(LOWQDEPTH*(48+48))){
 		uint32_t now_memory_limit_bit=memory_limit_bit;
-		uint32_t write_buffer_memory_bit=RANGE*48/divide;
+		uint32_t write_buffer_memory_bit=WB;
 		uint32_t buffered_ent=write_buffer_memory_bit/(48+48);
 		if(write_buffer_memory_bit > now_memory_limit_bit) continue;
 
-		if(buffered_ent < QSIZE*L2PGAP){
-			break;
-		}
 		uint32_t chunk_num=RANGE/buffered_ent+(RANGE%buffered_ent?1:0);
 		uint32_t max_level=get_level(2, chunk_num);
 
@@ -463,7 +573,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 		for(uint32_t i=1; i<=max_level; i++){
 			if(settings[i].isinvalid) continue;
 			if(min_WAF > settings[i].WAF ||
-					(min_WAF==settings[i].WAF && target_divide < divide)){
+					(min_WAF==settings[i].WAF && target_WB > WB)){
 				min_WAF=settings[i].WAF;
 				target_level=i;
 				if(target_level_param.lp){
@@ -474,7 +584,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 				memcpy(target_level_param.lp, settings[i].lp, sizeof(level_param) * (i+1));
 				target_buffered_ent=buffered_ent;
 				target_chunk_num=chunk_num;
-				target_divide=divide;
+				target_WB=WB;
 			}
 		}
 
@@ -488,6 +598,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	print_tree_param(&target_level_param, 1);
 
 	/*setting up lsmtree_parameter*/
+	target_level_param.size_factor=round(target_level_param.size_factor);
 	res.tr=target_level_param;
 
 	res.bf_ptr_guard_rhp.type=HELPER_BF_PTR_GUARD;
@@ -508,16 +619,23 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	res.mapping_num=target_chunk_num;
 	res.last_size_factor=res.normal_size_factor=res.tr.size_factor;
 	res.version_enable=true;
-	res.write_buffer_divide=target_divide;
+	res.write_buffer_bit=target_WB;
 	res.write_buffer_ent=target_buffered_ent-(target_buffered_ent/KP_IN_PAGE*L2PGAP);
 	res.read_amplification=TARGETFPR;
 
-	res.reclaim_ppa_target=target_buffered_ent*ceil(pow(res.tr.size_factor, target_level-1));
+	res.reclaim_ppa_target=(target_buffered_ent*ceil(pow(res.tr.size_factor, target_level-1)));
+	res.reclaim_ppa_target=(res.reclaim_ppa_target/QDEPTH+(res.reclaim_ppa_target%QDEPTH?1:0))*QDEPTH;
+	res.reclaim_ppa_target=(res.reclaim_ppa_target/L2PGAP)+(res.reclaim_ppa_target/KP_IN_PAGE);
 
 	//free(settings);
-	//lsmtree_tiering_only_test();
-	//lsmtree_sf_fix_l0();
-	//lsmtree_l0_fix_sf();
+	/*
+	lsmtree_sf_fix_l0();
+	printf("\n");
+	lsmtree_l0_fix_sf();
+	printf("\n");
+	lsmtree_tiering_only_test2();
+	exit(1);
+	*/
 	return res;
 }
 
@@ -669,6 +787,8 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	res.bf_guard_rhp.target_prob=TARGETFPR;
 	res.bf_guard_rhp.member_num=KP_IN_PAGE;
 
+	//res.plr_rhp=res.bf_ptr_guard_rhp;
+	
 	res.plr_rhp.type=HELPER_PLR;
 	res.plr_rhp.slop_bit=8;
 	res.plr_rhp.range=(uint32_t)((double)TARGETFPR*100/2);

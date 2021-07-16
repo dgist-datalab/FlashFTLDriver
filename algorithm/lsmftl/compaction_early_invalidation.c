@@ -81,7 +81,7 @@ uint32_t compaction_early_invalidation(uint32_t target_version){
 
 	sst_pf_out_stream *pos=NULL;
 
-	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, target_version, LSM.param.LEVELN-1);
+	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, LSM.param.LEVELN-1, target_version);
 	run *target_r=&LSM.disk[LSM.param.LEVELN-1]->array[target_run_idx];
 
 	uint32_t start_idx=0;

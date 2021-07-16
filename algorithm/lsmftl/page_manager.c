@@ -222,6 +222,7 @@ retry:
 	if(pm->remain_data_segment_q->size() && !is_map){
 		temp_used=true;
 		seg=pm->remain_data_segment_q->front();
+		pm->remain_data_segment_q->pop_front();
 	}
 	else{
 		seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
@@ -710,7 +711,7 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t lev_idx,
 	else{
 		sst_file *sptr=NULL;
 		uint32_t round=0;
-		uint32_t ridx=version_to_ridx(LSM.last_run_version, version, lev_idx);
+		uint32_t ridx=version_to_ridx(LSM.last_run_version, lev_idx, version);
 		while(gsn->wb->buffered_entry_num){
 			sptr=sst_init_empty(BLOCK_FILE);
 			uint32_t map_num=gsn->wb->buffered_entry_num/KP_IN_PAGE+

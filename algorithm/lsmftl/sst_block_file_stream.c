@@ -329,7 +329,6 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 			read_helper_stream_insert(bis->rh, map_pair->lba, map_pair->piece_ppa);
 		}
 
-
 		bis->write_issued_kv_num++;
 		if(kvw->free_target_req){
 			inf_free_valueset(kvw->param->data, FS_MALLOC_R);

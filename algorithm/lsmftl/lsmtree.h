@@ -77,7 +77,7 @@ typedef struct lsmtree_parameter{
 	uint32_t mapping_num;
 	double last_size_factor;
 	double normal_size_factor;
-	uint32_t write_buffer_divide;
+	uint32_t write_buffer_bit;
 	uint32_t write_buffer_ent;
 	uint32_t reclaim_ppa_target;
 	float read_amplification;

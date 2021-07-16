@@ -94,9 +94,30 @@ void version_sanity_checker(version *v){
 	}
 	if(remain_empty_size+populate_size!=v->max_valid_version_num){
 		printf("error log : empty-size(%d) populate-size(%d)\n", remain_empty_size, populate_size);
+		for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+			printf("%u: %lu %lu\n", i, v->version_empty_queue[i]->size(), v->version_populate_queue[i]->size());
+		}
 		EPRINT("version sanity error", true);
 	}
 #endif
+}
+
+void version_print_order(version *v, uint32_t lev_idx){
+	printf("version lev:%u print, poped_version_num:%u\n", lev_idx, v->poped_version_num[lev_idx]);
+	uint32_t start_version=version_pick_oldest_version(v, lev_idx);
+	printf("vidx version ridx\n");
+	uint32_t run_num=v->level_run_num[lev_idx];
+	for(uint32_t i=0; i<run_num; i++){
+		uint32_t target_version=(start_version+i)%(v->level_run_num[lev_idx])+v->start_vidx_of_level[lev_idx];
+		uint32_t test=version_to_order(v, lev_idx, target_version);
+
+		if(i!=test){
+			printf("%u - %u\n", i, test);
+			EPRINT("order is differ", true);
+		}
+		uint32_t ridx=version_order_to_ridx(v, lev_idx, i);
+		printf("%u %u %u\n", i, target_version, ridx);
+	}
 }
 
 void version_free(version *v){

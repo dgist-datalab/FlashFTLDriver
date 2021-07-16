@@ -148,6 +148,7 @@ void sst_convert_seq_pf_to_bf(sst_file *src){
 	
 	src->map_num=1;
 	src->block_file_map=mr;
+	src->end_ppa=mr->ppa;
 
 	src->file_addr.piece_ppa=src->start_piece_ppa;
 }
@@ -162,15 +163,16 @@ sst_file *sst_MR_to_sst_file(map_range *mr){
 }
 
 void sst_print(sst_file *sptr){
-	printf("%s range:%u~%u ", sptr->type==PAGE_FILE?"PAGE_FILE":"BLOCK_FILE",
-			sptr->start_lba, sptr->end_lba);
+	printf("%s range:%u~%u seq:%s ", sptr->type==PAGE_FILE?"PAGE_FILE":"BLOCK_FILE",
+			sptr->start_lba, sptr->end_lba, sptr->sequential_file?"t":"f");
 	if(sptr->type==PAGE_FILE){
-		printf("map-ppa:%u\n",sptr->file_addr.map_ppa);
+		printf("map-ppa:%u ",sptr->file_addr.map_ppa);
 	}
 	else{
-		printf("file-ppa:%u~%u map-num:%u\n", sptr->file_addr.piece_ppa, 
+		printf("file-ppa:%u~%u map-num:%u ", sptr->file_addr.piece_ppa, 
 				sptr->end_ppa*L2PGAP, sptr->map_num);
 	}
+	printf("contents_num:%u\n", read_helper_get_cnt(sptr->_read_helper));
 }
 
 void map_print(map_range *mr){

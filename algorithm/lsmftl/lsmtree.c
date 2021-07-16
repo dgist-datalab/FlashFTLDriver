@@ -61,13 +61,14 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
 
-	uint32_t now_level_size=LSM.param.normal_size_factor * LSM.param.write_buffer_ent;
+	uint32_t now_level_size=(LSM.param.normal_size_factor * LSM.param.write_buffer_ent)/KP_IN_PAGE*2;
 	read_helper_param rhp;
+	uint32_t version_num=0;
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
 		rhp=lsmtree_get_target_rhp(i);
-		
 		switch(LSM.param.tr.lp[i+1].level_type){
 			case LEVELING:
+				version_num+=1;
 				LSM.disk[i]=level_init(
 						ENTRY_TO_SST_PF(now_level_size), 1, LEVELING, i, now_level_size, false);
 				printf("L[%d] - size:%u data:%.2lf(%%)H:%s\n",i, LSM.disk[i]->max_sst_num, 
@@ -75,6 +76,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 						read_helper_type(rhp.type));	
 				break;
 			case LEVELING_WISCKEY:
+				version_num+=1;
 				LSM.disk[i]=level_init(
 						ENTRY_TO_SST_PF(now_level_size), 1, LEVELING_WISCKEY, i, now_level_size, false);
 				printf("LW[%d] - size:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_sst_num, 
@@ -82,6 +84,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 						read_helper_type(rhp.type));
 				break;
 			case TIERING:
+				version_num+=LSM.param.normal_size_factor;
 				LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, TIERING, i, now_level_size, false);
 				printf("TI[%d] - run_num:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_run_num, 
 						(double)now_level_size/RANGE*100,
@@ -89,6 +92,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 
 				break;
 			case TIERING_WISCKEY:
+				version_num+=LSM.param.normal_size_factor;
 				LSM.disk[i]=level_init(
 						ENTRY_TO_SST_PF(now_level_size), LSM.param.normal_size_factor, TIERING_WISCKEY, i, now_level_size, false);
 				printf("TW[%d] - run_num:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_run_num,
@@ -102,7 +106,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 		rwlock_init(&LSM.level_rwlock[i]);
 	}
 
-	LSM.last_run_version=version_init(LSM.param.tr.run_num, 
+	LSM.last_run_version=version_init(version_num, 
 			RANGE,
 			LSM.disk,
 			LSM.param.LEVELN);
@@ -240,8 +244,6 @@ static void lsmtree_monitor_print(){
 
 void lsmtree_destroy(lower_info *li, algorithm *){
 	lsmtree_monitor_print();
-
-
 #ifdef LSM_DEBUG
 	uint32_t request_sum=0;
 	uint32_t high_resolution=0;
@@ -263,6 +265,7 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	}
 	average=request_sum/populate_cnt;
 	printf("cnt cdf\n");
+	
 	for(uint32_t i=0; i<151; i++){
 		printf("%u %u %.2f %.2f \n", i, cdf_cnt[i], 
 				i==150?(float)high_resolution/request_sum:(float)cdf_cnt[i]*i/request_sum,
@@ -363,7 +366,7 @@ retry:
 		if(LSM.param.version_enable){
 			if(r_param->prev_run==UINT32_MAX){
 				r_param->prev_run=version_to_ridx(LSM.last_run_version, 
-						r_param->version, r_param->prev_level);
+						 r_param->prev_level, r_param->version);
 			}
 			else{
 				return false;
@@ -858,9 +861,11 @@ void *lsmtree_read_end_req(algo_req *req){
 
 
 void lsmtree_level_summary(lsmtree *lsm){
+#ifdef LSM_DEBUG
 	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
 		printf("ptr:%p ", lsm->disk[i]); level_print(lsm->disk[i]);
 	}
+#endif
 }
 
 void lsmtree_content_print(lsmtree *lsm){
@@ -894,7 +899,7 @@ sst_file *lsmtree_find_target_normal_sst_datagc(uint32_t lba, uint32_t piece_ppa
 		res=level_find_target_run_idx(lev, lba, piece_ppa, &ridx, target_sidx);
 		if(res){
 			*lev_idx=i;
-			*target_version=version_level_to_start_version(LSM.last_run_version, i)+ridx;
+			*target_version=version_ridx_to_version(LSM.last_run_version, i, ridx);
 			return res;
 		}
 	}
