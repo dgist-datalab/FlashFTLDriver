@@ -71,6 +71,7 @@ uint32_t hybrid_map_assign(KEYT* lba, uint32_t max_idx){
 
     lbn = lba[0]/(_PPS* L2PGAP);
     target_lb = h->datablock[lbn].lb_idx;
+
     if(target_lb == -1){
            new_target_lb = find_empty_lb();
            if(new_target_lb == -1){ // when extra log block doesn't exist
@@ -92,9 +93,11 @@ uint32_t hybrid_map_assign(KEYT* lba, uint32_t max_idx){
 
             ppn = bm->get_page_num(bm, h->logblock[new_target_lb].plb);
 	    validate_ppa(ppn,lba,max_idx);
+
             for(uint32_t i=0;i<L2PGAP;i++){
                 offset = lba[i] % (_PPS*L2PGAP);
-              
+             
+		invalidate_ppa(h->datablock[lbn].pba+offset);//check
                 h->logblock[new_target_lb].lbmapping[offset] = ppn*L2PGAP + i;
                 h->logblock[new_target_lb].cnt++;
             }
@@ -106,7 +109,8 @@ uint32_t hybrid_map_assign(KEYT* lba, uint32_t max_idx){
             for(uint32_t i=0;i<L2PGAP;i++){
                 offset = lba[i] % (_PPS*L2PGAP);
 
-                invalidate_ppa(h->logblock[target_lb].lbmapping[offset]);
+                invalidate_ppa(h->logblock[target_lb].lbmapping[offset]);//overlap check 
+		invalidate_ppa(h->datablock[lbn]+offset);//just check once
 
                 h->logblock[target_lb].lbmapping[offset] = ppn*L2PGAP + i;		
                 h->logblock[target_lb].cnt++;
@@ -125,11 +129,11 @@ uint32_t hybrid_map_pick(uint32_t lba) {
     hm_body *h=(hm_body*)hybrid_ftl.algo_body;
     blockmanager *bm = hybrid_ftl.bm;
     uint32_t lbn = lba / (_PPS*L2PGAP);
-    uint32_t offset = lba % (_PPS*LPAGESIZE);
+    uint32_t offset = lba % (_PPS*L2PGAP);
     uint32_t target_lb = h->datablock[lbn].lb_idx;
 
-    if(bm->is_valid_page(bm,h->logblock[target_lb].lbmapping[offset] )){
+    if(bm->is_valid_page(bm,h->logblock[target_lb].lbmapping[offset])){
         return h->logblock[target_lb].lbmapping[offset];
     }
-    return h->datablock[lbn].pba + offset*L2PGAP;
+    return h->datablock[lbn].pba + offset;
 }

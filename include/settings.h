@@ -60,10 +60,12 @@
 #define PAGESIZE (PAGE_TARGET_KILO*K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
 
+
 //#ifdef AMF
 #define NOC 2
 #define BPS (64*NOC)
 #define _PPS (_PPB*BPS)
+#define _LPPS (_PPS * L2PGAP)
 //#else
 //	#define BPS (64)
 //	#define _PPS (_PPB*BPS)

@@ -1,18 +1,18 @@
 #include "../../include/container.h"
+#include "../../include/data_struct/list.h"
 #include "hybridmap.h"
 #include "hmerge.h"
-#include "../../include/datastruct/list.h"
-
-
-
+#include <stdlib.h>
+#include <stdint.h>
 extern algorithm hybrid_ftl;
 
 
 void hybrid_merge(lb_t logblock){
+    
     blockmanager *bm = hybrid_ftl.bm;
     bool sw = true;
-    for(int i=0;i<_PPS*L2PGAP;i++) {
-        if (logblock.lbmapping[i] == -1 || (logblock.lbmapping[i]>logblock.lbmapping[i+1])) {//check 
+    for(int i=0;i<_PPS-1;i++) {
+        if (logblock.lbmapping[i] == -1||(logblock.lbmapping[i]>logblock.lbmapping[i+1])) { 
             sw = false;
             break;
         }
@@ -21,50 +21,44 @@ void hybrid_merge(lb_t logblock){
 
    if(sw)
         do_switch(logblock);
-   else
+    else
         do_merge(logblock);
-	
 }
 
 
-#if 1
+
 
 void do_switch(lb_t logblock){
     uint32_t lbn;
-
     blockmanager* bm = hybrid_ftl.bm;
     hm_body*h = (hm_body*)hybrid_ftl.algo_body;
-    lbn = logblock.db_idx;   	
+    lbn = logblock.db_idx;
 
-    bm->trim_target_segment(bm, h->datablock[lbn].pdb, hybrid_ftl.li);    
-    bm->free_segment(bm, datablock[lbn].pdb);
+    bm->trim_target_segment(bm, h->datablock[lbn].pdb, hybrid_ftl.li);
+    bm->free_segment(bm, h->datablock[lbn].pdb);
+
 
     h->datablock[lbn].pba = logblock.lbmapping[0];
     h->datablock[lbn].pdb = logblock.plb;
-
-    logblock.plb = NULL;
-    
+    logblock.plb = NULL;   
 }
 
 void do_merge(lb_t logblock){
+    printf("\ndo_merge");
     uint32_t lbn, page;
     value_set * value;
-    align_gc_buffer = g_buffer;
-    list * temp_list = list_init();
-    
     blockmanager* bm = hybrid_ftl.bm;
     hm_body*h = (hm_body*)hybrid_ftl.algo_body;                            
     lbn = logblock.db_idx;      
     __segment * merge = hybrid_ftl.bm->get_segment(bm, false);    
     page = h->datablock[lbn].pba;
-
     merge_buffer m_buffer;
-    gc_value * gv;
-
-    
-
-    for(int i=0;i<_LPPS;i++){
-    	if(logblock.lbmapping[i]==-1){	//search datablock	
+    align_gc_buffer g_buffer;
+    list *temp_list=list_init();
+    gc_value *gv;
+    bool should_read = false;
+    for(int i=0;i<_PPS;i++){
+    	if(logblock.lbmapping[i]==-1){		
 		for(uint32_t j=0; j<L2PGAP; j++){
 			bool should_read = false;
 			if(bm->is_invalid_page(bm,page+i*L2PGAP + j)) continue;
@@ -77,51 +71,43 @@ void do_merge(lb_t logblock){
 			gv=send_req(page,GCDR,NULL);
 			list_insert(temp_list,(void*)gv);
 		}else{
-			
-			
 		}
-    	}else{ // search logblock
+    	}
+	else{
 		gv = send_req(logblock.lbmapping[i],GCDR,NULL);
 		list_insert(temp_list,(void*)gv);
 	}
+    li_node *now, *nxt;
+    m_buffer.idx=0;
+    KEYT *lbas;
+    while(temp_list->size){
+        for_each_list_node_safe(temp_list, now,nxt){
+            gv = (gc_value*)now->data;
+            if(!gv->isdone) continue;
+            lbas = (KEYT*)bm->get_oob(bm, gv->ppa);
+            for(uint32_t i=0;i<L2PGAP;i++){
+                    uint32_t offset = lbas[i] %(_PPS * L2PGAP);
+                    if(bm->is_invalid_page(bm, gv->ppa*L2PGAP+i)) continue;
+                    memcpy(&m_buffer.value[offset * LPAGESIZE], &gv->value->value[i*LPAGESIZE], LPAGESIZE);
+                    m_buffer.key[offset] = lbas[i];
+            }
+
+        inf_free_valueset(gv->value, FS_MALLOC_R);
+        free(gv);
+        list_delete_node(temp_list, now);
+        }
     }
-
-    KEYT*lbas;
-    li_node * now, *nex;
-    while(temp_list ->size){
-	for_each_list_node_safe(temp_list, now,nxt){
-		gv = (gc_value*)now->data;
-		if(!gv->isdone) continue;
-
-		lbas = (KEYT*)bm->get_oob(bm, gv->ppa);
-
-		for(uint32_t i=0;i<L2PGAP;i++){
-			uint32_t offset = lbas[i] %(_PPS * L2PGAP);
-			if(bm->is_invalid_page(bm, gv->ppa*L2PGAP+i)) continue;
-
-			memcpy(&m_buffer.value[offset * LPAGESIZE], &gv->value->value[i*LPAGESIZE], LPAGESIZE);
-			m_buffer[i].key = lbas[i];
-
-		}
-
-	inf_free_valueset(gv->value, FS_MALLOC_R);
-	free(gv);
-	list_delete_node(temp_list, now);		
-	}
-    }
-	
-
 
     uint32_t res;
 
     for(int k=0;k<_PPS;k++){
-	for(int i=0;i<L2PGAP;i++){
-		memcpy(&g_buffer.value[i* LPAGESIZE], &m_buffer_buffer.value[i*LPAGESIZE], LPAGESIZE);
-		g_buffer.key[i] = m_buffer[i].key;
+        for(int i=0;i<L2PGAP;i++){
+                memcpy(&g_buffer.value[i* LPAGESIZE], &m_buffer.value[i*LPAGESIZE], LPAGESIZE);
+                g_buffer.key[i] = m_buffer.key;
 
-	}
-	res = hybrid_ftl.bm->get_page_num(hybrid_ftl.bm, merge);	
-	send_req(res, GCDW,inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
+        }
+        res = hybrid_ftl.bm->get_page_num(hybrid_ftl.bm, merge);
+        send_req(res, GCDW,inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
     }
 
 
@@ -130,9 +116,8 @@ void do_merge(lb_t logblock){
     bm->trim_target_segment(bm, h->datablock[lbn].pdb, hybrid_ftl.li);
     bm->trim_target_segment(bm, logblock.plb, hybrid_ftl.li);
     bm->free_segment(bm, logblock.plb);
+    }
 }
-
-
 
 gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value){
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
@@ -161,8 +146,9 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value){
 			break;
 	}
 	return res;
-
 }
+
+
 
 
 
@@ -181,6 +167,3 @@ void *hybrid_merge_end_req(algo_req *input){
 	free(input);
 	return NULL;
 }
-
-#endif
-
