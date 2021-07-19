@@ -501,7 +501,9 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 		}
 	}
 	
-
+	if(ppa==12101880/L2PGAP){
+		printf("break!\n");
+	}
 	io_manager_issue_read(ppa, value, req, sync);
 	return BUFFER_MISS;
 }
@@ -693,6 +695,10 @@ uint32_t lsmtree_write(request *const req){
 #ifdef LSM_DEBUG
 	LSM.LBA_cnt[req->key]++;
 #endif
+
+	if(req->key==debug_lba){
+		printf("insert crc:%u\n", *(uint32_t*)req->value->value);
+	}
 
 	if(write_buffer_isfull(wb)){
 retry:

@@ -121,6 +121,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, struct sst_pf_out_strea
 		struct sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
 		bool all_empty_stop, uint32_t limit, uint32_t version,
 		bool merge_flag,
+		uint32_t skip_entry_version,
 		uint32_t (*invalidate_function)(level *des, uint32_t taget_idx, uint32_t target_version, key_ptr_pair kp, bool merge, bool inplace), bool inplace);
 
 

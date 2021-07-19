@@ -271,6 +271,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 		sst_pf_in_stream *is, std::queue<key_ptr_pair> *kpq, 
 		bool all_empty_stop, uint32_t limit, uint32_t target_version,
 		bool merge_flag,
+		uint32_t skip_entry_version,
 		uint32_t (*invalidate_function)(level *des, uint32_t stream_id, uint32_t target_version, key_ptr_pair kp, bool overlap, bool inplace),
 		bool inplace){
 	bool one_empty=false;
@@ -319,6 +320,11 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 		}
 
 		if(target_pair.lba!=UINT32_MAX){
+			if(version_map_lba(LSM.last_run_version, target_pair.lba)==skip_entry_version){
+				invalidate_piece_ppa(LSM.pm->bm, target_pair.piece_ppa, true);
+				sst_pos_pop(os_set[target_idx]);
+				continue;
+			}
 			
 			compaction_debug_func(target_pair.lba, target_pair.piece_ppa, target_version, des);
 		
@@ -627,6 +633,7 @@ level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(des,read_arg2.to).end_lba),
 				version_order_to_version(LSM.last_run_version, res->idx, 0),
 				false,
+				UINT32_MAX,
 				leveling_invalidation_function, false);
 
 		isstart=false;
@@ -1109,6 +1116,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 				MIN(LEVELING_SST_AT(src,read_arg1.to).end_lba, LEVELING_SST_AT(temp_des_level,read_arg2.to).end_lba),
 				version_order_to_version(LSM.last_run_version, res->idx, 0),
 				false,
+				UINT32_MAX,
 				leveling_invalidation_function, false
 				);
 
@@ -1269,6 +1277,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 					LEVELING_SST_AT(temp_des_level,read_arg2.to).end_lba),
 				target_version,
 				false,
+				UINT32_MAX,
 				leveling_invalidation_function, false
 				);
 

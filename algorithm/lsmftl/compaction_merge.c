@@ -332,6 +332,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 				border_lba,/*limit*/
 				target_version, 
 				true,
+				UINT32_MAX,
 				tiering_invalidation_function, false);
 
 			read_done+=TARGETREADNUM(read_arg1)+TARGETREADNUM(read_arg2);
@@ -435,7 +436,7 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, bool isfirst,sst_pf_ou
 
 		if(isfirst){
 			uint32_t target_version=src?version_order_to_version(LSM.last_run_version, src->idx, stream_num-1-i): 0;
-			printf("debugging needed target_version: %u\n", target_version);
+			//printf("debugging needed target_version: %u\n", target_version);
 			read_arg_set[i].from=0;
 			read_arg_set[i].to=MIN(read_arg_set[i].from+COMPACTION_TAGS/remain_num-1, 
 					read_arg_set[i].max_num-1);
@@ -558,18 +559,18 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 
 	printf("before break!\n");
 #ifdef LSM_DEBUG
-	version_print_order(LSM.last_run_version, src->idx);
+	//version_print_order(LSM.last_run_version, src->idx);
 #endif
 
 	map_range **mr_set=(map_range **)calloc(stream_num, sizeof(map_range*));
 	/*make it reverse order for stream sorting*/
-	printf("target ridx print\n"); 
+	//printf("target ridx print\n"); 
 	for(int32_t i=stream_num-1, j=0; i>=0; i--, j++){
 		uint32_t ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
 		uint32_t sst_file_num=src->array[ridx].now_sst_num;
 		uint32_t map_num=0;
 
-		printf("\tridx:%u\n", ridx);
+		//printf("\tridx:%u\n", ridx);
 		for(uint32_t j=0; j<sst_file_num; j++){
 			map_num+=src->array[ridx].sst_set[j].map_num;
 		}
@@ -605,6 +606,10 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	uint32_t border_lba=UINT32_MAX;
 	bool bis_populate=false;
 //	uint32_t round=0;
+	uint32_t skip_target_version=UINT32_MAX;
+	if(hot_cold_mode){
+		skip_target_version=version_order_to_version(LSM.last_run_version, src->idx, merging_num);
+	}
 	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
 		read_done=update_read_arg_tiering(read_done, isfirst, pos_set, mr_set,
 				read_arg_set, true, stream_num, src, UINT32_MAX);
@@ -632,6 +637,7 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 				border_lba,/*limit*/
 				target_demote_version, 
 				true,
+				hot_cold_mode? skip_target_version:UINT32_MAX,
 				tiering_invalidation_function,
 				inplace);
 
@@ -819,7 +825,7 @@ level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des
 
 	version_poped_update(LSM.last_run_version, src->idx, target_run_num);
 #ifdef LSM_DEBUG
-	version_print_order(LSM.last_run_version, src->idx);
+	//version_print_order(LSM.last_run_version, src->idx);
 #endif
 
 	if(new_run[KEEP_RUN]->now_sst_num){
@@ -895,6 +901,7 @@ level *compaction_TW_convert_LW(compaction_master *cm, level *src){
 				border_lba,/*limit*/
 				target_version, 
 				true,
+				UINT32_MAX,
 				tiering_invalidation_function, false);
 
 		for(uint32_t i=0; i<stream_num; i++){
