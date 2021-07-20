@@ -22,6 +22,7 @@ struct cheeze_req_user *ureq_addr; // sizeof(req) * 1024
 static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
 static uint64_t seq = 0;
 static int trace_fd = 0;
+extern uint32_t test_key;
 //static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
 //static uint32_t trace_crc_buf[CRC_BUFSIZE];
 
@@ -239,8 +240,8 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 #ifdef TRACE_REPLAY
 		if(temp->type==FS_SET_T){
 			read(trace_fd, &CRCMAP[temp->key],sizeof(uint32_t));
-			if(temp->key==0){
-				printf("0 crc value:%u\n", CRCMAP[temp->key]);
+			if(temp->key==test_key){
+				printf("crc value:%u\n", CRCMAP[temp->key]);
 			}
 			*(uint32_t*)temp->value->value=CRCMAP[temp->key];
 		}
@@ -336,7 +337,7 @@ vec_request **get_vectored_request_arr()
 		id = i;
 		ureq = ureq_addr + id;
 		res[req_idx++] = ch_ureq2vec_req(ureq, id);
-		if(cnt%10000){
+		if(cnt%100000){
 			printf("%u\n", cnt++);
 		}
 #ifdef TRACE_COLLECT
@@ -380,7 +381,7 @@ vec_request *get_trace_vectored_request(){
 		}
 		res=ch_ureq2vec_req(&ureq, id);
 		cnt++;
-		if(cnt%1000==0){
+		if(cnt%10000==0){
 			printf("%u\n",cnt);
 		}
 		return res;
@@ -398,10 +399,17 @@ bool cheeze_end_req(request *const req){
 		case FS_NOTFOUND_T:
 			bench_reap_data(req, mp.li);
 			DPRINTF("%u not found!\n",req->key);
+#ifdef TRACE_REPLAY
+			if(req->crc_value!=*(uint32_t*)req->value->value){
+				printf("not_found lba:%u data faile abort!\n", req->key);
+				abort();
+			}
+#endif
 			if(preq->buf){
 				memcpy(&preq->buf[req->seq*LPAGESIZE], null_value,LPAGESIZE);
 			}
 			inf_free_valueset(req->value,FS_MALLOC_R);
+
 			break;
 		case FS_GET_T:
 			bench_reap_data(req, mp.li);
