@@ -132,6 +132,29 @@ void bench_make_data(){
 		case VECTOREDRSET:
 			vectored_set(start,end, _m, false);
 			break;
+#if 1 //NAM
+		case VECTOREDSYNTHS: 
+			vectored_synth(start,end, _m, 1); 
+			break; 
+		case VECTOREDSYNTHR: 
+			vectored_synth(start,end, _m, 2); 
+			break; 
+		case VECTOREDSYNTHZ: 
+			vectored_synth(start,end, _m, 3); 
+			break;
+		case VECTOREDREALW: 
+			vectored_real(start,end, _m, 1); 
+			break; 
+		case VECTOREDREALF: 
+			vectored_real(start,end, _m, 2); 
+			break; 
+		case VECTOREDREALLR: 
+			vectored_real(start,end, _m, 3); 
+			break;
+		case VECTOREDREALTPC:
+			vectored_real(start,end, _m, 4); 
+			break;  
+#endif
 		case VECTOREDRGET:
 			vectored_get(start,end, _m, false);
 			break;

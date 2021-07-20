@@ -187,7 +187,7 @@ static inline bool KEYVALCHECK(KEYT a){
 #define QDEPTH (16384)
 
 #if 1 //NAM 
-#define WBUFF_SIZE (1)
+#define WBUFF_SIZE (16384)
 #endif
 
 #define THPOOL

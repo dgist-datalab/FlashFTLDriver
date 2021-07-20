@@ -168,6 +168,10 @@ void randrw(uint32_t,uint32_t,monitor*);
 void mixed(uint32_t,uint32_t,int percentage,monitor*);
 
 void vectored_set(uint32_t, uint32_t, monitor*, bool isseq);
+#if 1 //NAM
+void vectored_synth(uint32_t, uint32_t, monitor*, uint8_t); 
+void vectored_real(uint32_t, uint32_t, monitor*, uint8_t);
+#endif
 void vectored_get(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_rw(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_unique_rset(uint32_t, uint32_t, monitor*);

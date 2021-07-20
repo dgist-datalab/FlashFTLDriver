@@ -1,6 +1,6 @@
 #include "../../include/container.h"
 #include "../../interface/interface.h"
-#define MAX_PROTECTED _DCE/10
+#define MAX_PROTECTED _DCE/100
 
 #if 0
 typedef struct page_map_body{

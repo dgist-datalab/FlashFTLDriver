@@ -107,8 +107,120 @@ void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
 }
 
 #if 1 //NAM
-void vectored_lr(uint32_t start, uint32_t end, monitor* m, uint8_t trace){ 
+void vectored_synth(uint32_t start, uint32_t end, monitor* m, uint8_t trace){ 
+	FILE* trc_fp; 
+	uint32_t request_per_command=_master->trans_configure.request_num_per_command; 
+	uint32_t number_of_command=(m->m_num)/request_per_command; 
+	m->m_num=number_of_command*request_per_command; 
+	request_num = m->m_num;
 
+	m->tbody=(transaction_bench_value*)malloc(number_of_command * sizeof(transaction_bench_value)); 
+	
+	uint32_t request_buf_size=_master->trans_configure.request_size * request_per_command; 
+
+	m->command_num=number_of_command; 
+	m->command_issue_num=0; 
+	printf("total command : %lu\n", m->command_num); 
+	
+	switch (trace){ 
+		case 1: trc_fp=fopen("../trace/micro_trace/seq/seq_w.trc", "r"); 
+				break; 
+		case 2: trc_fp=fopen("../trace/micro_trace/rand/random_w.trc", "r");
+				break; 
+		case 3: trc_fp=fopen("../trace/micro_trace/zipf/zipf_1.2_W_run.trc", "r"); 
+				break; 
+	}	
+	if(trc_fp == 0){ 
+		printf("Failed open file!\n");
+		return; 
+	} 
+	
+	for(uint32_t i=0; i<number_of_command; i++){ 
+		uint32_t idx=0; 
+		m->tbody[i].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
+		char *buf=m->tbody[i].buf; 
+
+		idx+=sizeof(uint32_t);//tid 
+		(*(uint32_t*)&buf[idx])=request_per_command; 
+		idx+=sizeof(uint32_t); 
+
+		uint32_t j=0; 
+		int lpn; char op[10]; 
+		while(fscanf(trc_fp, "%s %d\n", op, &lpn) != EOF){ 
+			(*(uint8_t*)&buf[idx])=FS_SET_T; 
+			idx+=sizeof(uint8_t); 
+
+			lpn=lpn/8;
+			(*(uint32_t*)&buf[idx])=start+lpn%(end-start); 
+			idx+=sizeof(uint32_t);
+
+			(*(uint32_t*)&buf[idx])=0; //offset
+			idx+=sizeof(uint32_t); 
+			m->write_cnt++; 
+			
+			if(j==(request_per_command-1))
+				break; 
+		} 
+	} 
+} 
+
+void vectored_real(uint32_t start, uint32_t end, monitor* m, uint8_t trace){ 
+	FILE* trc_fp; 
+	uint32_t request_per_command=_master->trans_configure.request_num_per_command; 
+	uint32_t number_of_command=(m->m_num)/request_per_command; 
+	m->m_num=number_of_command*request_per_command; 
+	request_num = m->m_num;
+
+	m->tbody=(transaction_bench_value*)malloc(number_of_command * sizeof(transaction_bench_value)); 
+	
+	uint32_t request_buf_size=_master->trans_configure.request_size * request_per_command; 
+
+	m->command_num=number_of_command; 
+	m->command_issue_num=0; 
+	printf("total command : %lu\n", m->command_num); 
+	
+	switch (trace){ 
+		case 1: trc_fp=fopen("../trace/20210709_sample_trace/webserver.trc", "r");
+				break; 
+		case 2: trc_fp=fopen("../trace/20210709_sample_trace/fileserver.trc", "r");
+				break; 
+		case 3: trc_fp=fopen("../trace/20210709_sample_trace/linkbench_r.trc", "r"); 
+				break; 
+		case 4: trc_fp=fopen("../trace/20210709_sample_trace/tpcc_20_treat.trc", "r"); 
+				break; 
+	}	
+	if(trc_fp == 0){ 
+		printf("Failed open file!\n");
+		return; 
+	} 
+	
+	for(uint32_t i=0; i<number_of_command; i++){ 
+		uint32_t idx=0; 
+		m->tbody[i].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
+		char *buf=m->tbody[i].buf; 
+
+		idx+=sizeof(uint32_t);//tid 
+		(*(uint32_t*)&buf[idx])=request_per_command; 
+		idx+=sizeof(uint32_t); 
+
+		uint32_t j=0; 
+		int lpn; char op[10]; 
+		while(fscanf(trc_fp, "%s %d\n", op, &lpn) != EOF){ 
+			(*(uint8_t*)&buf[idx])=FS_SET_T; 
+			idx+=sizeof(uint8_t); 
+
+			lpn=lpn/8;
+			(*(uint32_t*)&buf[idx])=start+lpn%(end-start); 
+			idx+=sizeof(uint32_t);
+
+			(*(uint32_t*)&buf[idx])=0; //offset
+			idx+=sizeof(uint32_t); 
+			m->write_cnt++; 
+			
+			if(j==(request_per_command-1))
+				break; 
+		} 
+	} 
 } 
 #endif
 

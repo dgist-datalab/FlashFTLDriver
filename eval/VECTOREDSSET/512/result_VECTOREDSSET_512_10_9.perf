@@ -1,64 +1,0 @@
-!!! (SYNC) posix memory NOP:1363148!!!
-total_size: 22333829914
-_DCE: 1331
-bench range:0 ~ 1048576
-range: 1048576!
-2048 X 1024 = 2097152, answer=2097152
-total command : 2097152
- testing...... [0.00%] testing...... [1.00%] testing...... [2.00%] testing...... [3.00%] testing...... [4.00%] testing...... [5.00%] testing...... [6.00%] testing...... [7.00%] testing...... [8.00%] testing...... [9.00%] testing...... [10.00%] testing...... [11.00%] testing...... [12.00%] testing...... [13.00%] testing...... [14.00%] testing...... [15.00%] testing...... [16.00%] testing...... [17.00%] testing...... [18.00%] testing...... [19.00%] testing...... [20.00%] testing...... [21.00%] testing...... [22.00%] testing...... [23.00%] testing...... [24.00%] testing...... [25.00%] testing...... [26.00%] testing...... [27.00%] testing...... [28.00%] testing...... [29.00%] testing...... [30.00%] testing...... [31.00%] testing...... [32.00%] testing...... [33.00%] testing...... [34.00%] testing...... [35.00%] testing...... [36.00%] testing...... [37.00%] testing...... [38.00%] testing...... [39.00%] testing...... [40.00%] testing...... [41.00%] testing...... [42.00%] testing...... [43.00%] testing...... [44.00%] testing...... [45.00%] testing...... [46.00%] testing...... [47.00%] testing...... [48.00%] testing...... [49.00%] testing...... [50.00%] testing...... [51.00%] testing...... [52.00%] testing...... [53.00%] testing...... [54.00%] testing...... [55.00%] testing...... [56.00%] testing...... [57.00%] testing...... [58.00%] testing...... [59.00%] testing...... [60.00%] testing...... [61.00%] testing...... [62.00%] testing...... [63.00%] testing...... [64.00%] testing...... [65.00%] testing...... [66.00%] testing...... [67.00%] testing...... [68.00%] testing...... [69.00%] testing...... [70.00%] testing...... [71.00%] testing...... [72.00%] testing...... [73.00%] testing...... [74.00%] testing...... [75.00%] testing...... [76.00%] testing...... [77.00%] testing...... [78.00%] testing...... [79.00%] testing...... [80.00%] testing...... [81.00%] testing...... [82.00%] testing...... [83.00%] testing...... [84.00%] testing...... [85.00%] testing...... [86.00%] testing...... [87.00%] testing...... [88.00%] testing...... [89.00%] testing...... [90.00%] testing...... [91.00%] testing...... [92.00%] testing...... [93.00%] testing...... [94.00%] testing...... [95.00%] testing...... [96.00%] testing...... [97.00%] testing...... [98.00%] testing...... [99.00%] testing...... [100.00%]testing...... [100%] done!
-
-bench finish
-
-
-
-(0)[cdf]read---
---------------------------------------------
-|            bench type:                   |
---------------------------------------------
-----algorithm----
-[0~100(usec)]: 0
-[100~200(usec)]: 0
-[200~300(usec)]: 0
-[300~400(usec)]: 0
-[400~500(usec)]: 0
-[500~600(usec)]: 0
-[600~700(usec)]: 0
-[700~800(usec)]: 0
-[800~900(usec)]: 0
-[900~1000(usec)]: 0
-[over_ms]: 0
-[over__s]: 0
-----lower----
-[0~100(usec)]: 0
-[100~200(usec)]: 0
-[200~300(usec)]: 0
-[300~400(usec)]: 0
-[400~500(usec)]: 0
-[500~600(usec)]: 0
-[600~700(usec)]: 0
-[700~800(usec)]: 0
-[800~900(usec)]: 0
-[900~1000(usec)]: 0
-[over_ms]: 0
-[over__s]: 0
-----average----
-[avg_algo]: 0.0
-[avg_low]: 0.0
------lower_info----
-[write_op]: 0
-[read_op]: 0
-[trim_op]:0
-[WAF, RAF]: 0.000000, 0.000000
-[if rw test]: 0.000000(WAF), 0.000000(RAF)
-
-----summary----
-[all_time]: 10.665604
-[size]: 8192.000000(mb)
-[FAIL NUM] 0
-[IOPS] 196627.589024
-[cache hit cnt,ratio] 0, -nan
-[cache hit cnt,ratio dftl] 0, 0.000000
-[READ WRITE CNT] 0 2097152
-error cnt:0
-result of ms:
----
