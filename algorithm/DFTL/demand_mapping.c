@@ -250,6 +250,7 @@ static inline void dp_initialize(demand_param *dp){
 
 uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_param *param, 
 		uint32_t target_data_lba){
+	req->type_ftl++;
 	param->flying_map_read_key=target_data_lba;
 	if(req->type==FS_GET_T){
 		if(etr->physical_address==UINT32_MAX){
@@ -264,12 +265,11 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 	if(etr->status==FLYING){
 		DMI.hit_num++;
 		DMI.shadow_hit_num++;
+		req->type_ftl--;
 		//assign_param_ex *ap=(assign_param_ex*)param->param_ex;
 		//printf("overlap %u gtd idx:%u, input_lba:%u target_lba:%u\n",req->seq, etr->idx, target_data_lba, ap->lba[ap->idx]);
 		pending_debug_seq=req->seq;
 		fdriver_lock(&etr->lock);
-
-		req->type_ftl &=~(MAP_MISS);
 		list_insert(etr->pending_req, (void*)req);
 		fdriver_unlock(&etr->lock);
 		return FLYING_HIT_END;
@@ -314,12 +314,12 @@ static inline void write_updated_map(request *req, GTD_entry *target_etr,
 		invalidate_map_ppa(temp);
 	}
 	bool is_map_gc_triggered=false;
-	req->type_ftl|=MAP_WRITE;
+	req->type_lower++;
 	target_etr->physical_address=get_map_ppa(target_etr->idx, &is_map_gc_triggered)*L2PGAP;
 
 
 	if(is_map_gc_triggered){
-		req->type_ftl|=MAP_WRITE_GC;
+		req->type_lower++;
 	}
 #ifdef DFTL_DEBUG
 	mapping_sanity_checker(req->value->value);
@@ -608,8 +608,6 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 		dp->flying_map_read_key=UINT32_MAX;
 		ap=NULL;
 
-		treq->type_ftl|=MAP_EVICT_READ;
-
 		dmm.cache->update_eviction_target_translation(dmm.cache, treq->key, etr, dp->et.mapping, temp_value, dp->cache_private);
 		if(req==treq){
 			list_delete_node(etr->pending_req, now);
@@ -825,7 +823,6 @@ retry:
 					if(flying_request_hit_check(req, now_pair->lba, dp, true)) return FLYING_HIT_END;
 				}
 				
-				req->type_ftl |=(MAP_MISS);
 				DMI.miss_num++;
 				iswrite_path ? DMI.write_miss_num++ : DMI.read_miss_num++;
 				
