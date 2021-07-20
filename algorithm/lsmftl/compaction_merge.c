@@ -190,8 +190,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	run *older=&des->array[idx_set[0]];
 	run	*newer=&des->array[idx_set[1]];
 
-	LSM.global_debug_flag=true;
-
 	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
 		version_unpopulate(LSM.last_run_version, idx_set[i], des->idx);
 	}
@@ -1095,6 +1093,14 @@ sst_file *trivial_move_processing(run *rptr, sst_pf_out_stream *pos,
 	version *v=LSM.last_run_version;
 	sst_file *sptr=NULL;
 	uint32_t min_lba, max_lba;
+	/*
+	static int cnt=0;
+	printf("cnt:%u\n", cnt++);
+	if(cnt==71){
+		LSM.global_debug_flag=true;
+		printf("break!\n");
+	}
+	*/
 	while(!sst_pos_is_empty(pos)){
 		key_ptr_pair target_pair=sst_pos_pick(pos);
 		if(target_pair.lba==UINT32_MAX){
@@ -1164,6 +1170,9 @@ void compaction_trivial_move(run *rptr, uint32_t target_version, uint32_t from_l
 	}
 
 	sst_file *sptr;
+	if(LSM.global_debug_flag){
+		printf("temp_break!\n");
+	}
 	while(read_done!=(1<<stream_num)-1){
 		read_done=update_read_arg_tiering(read_done, isfirst, &pos, &mr_set, &read_arg_set, 
 				false, stream_num, NULL, UINT32_MAX);

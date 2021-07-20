@@ -134,6 +134,7 @@ static inline uint32_t adjust_piece_ppa(uint8_t type, uint32_t hp_result_piece_p
 	switch(type){
 		case HELPER_BF_ONLY_GUARD:
 		case HELPER_BF_ONLY:
+			/*
 			if(sptr->sequential_file){
 				mr=sptr->block_file_map;
 				for(i=0; i<sptr->map_num; i++){
@@ -144,9 +145,9 @@ static inline uint32_t adjust_piece_ppa(uint8_t type, uint32_t hp_result_piece_p
 				}
 				res=hp_result_piece_ppa+start_addr_piece_ppa;
 			}
-			else{
+			else{*/
 				res=hp_result_piece_ppa+start_addr_piece_ppa;
-			}
+			//}
 			break;
 		default:
 			EPRINT("error", true);
@@ -174,6 +175,13 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 		measure_start(&LSM.monitor.RH_check_stopwatch[1]);
 	}
 #endif
+
+#ifdef LSM_DEBUG
+	if(lba==debug_lba){
+		printf("break!\n");
+	}
+#endif
+
 	switch(rh->type){
 		case HELPER_BF_PTR:
 			*piece_ppa_result=bf_set_get_piece_ppa((bf_set*)rh->body, 

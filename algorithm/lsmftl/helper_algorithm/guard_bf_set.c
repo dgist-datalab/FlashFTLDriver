@@ -108,6 +108,12 @@ bool gbf_set_insert(guard_bf_set *gbf, uint32_t lba, uint32_t piece_ppa){
 	
 	uint32_t type=((bf_set*)gbf->body[0].array)->type;
 	uint32_t idx;
+#ifdef LSM_DEBUG
+	if(lba==debug_lba){
+		uint32_t temp=gbf->now/BO_sub_member_num;
+		printf("target %u insert into %u,%u\n", lba, temp, gbf->now%BO_sub_member_num);
+	}
+#endif
 	switch(type){
 		case BLOOM_PTR_PAIR:
 			idx=gbf->now/BP_sub_member_num;

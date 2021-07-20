@@ -907,9 +907,11 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	/*
 	static int cnt=0;
 	printf("LW2TI %u\n", cnt++);
-	if(cnt==4){
+	if(cnt==73){
+	//	LSM.global_debug_flag=true;
 		printf("break!\n");
-	}*/
+	}
+	*/
 	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_version, 
 			&start_sst_file_idx, des->idx); //version_update
 	

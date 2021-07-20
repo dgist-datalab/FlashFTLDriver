@@ -514,6 +514,7 @@ uint32_t lsmtree_read(request *const req){
 	//	printf("now compactioning\n");
 	//	abort();
 	}
+	//printf("read key:%u\n", req->key);
 	lsmtree_read_param *r_param;
 #ifdef LSM_DEBUG
 	if(req->key==debug_lba){
@@ -692,6 +693,7 @@ uint32_t lsmtree_write(request *const req){
 	write_buffer *wb=LSM.wb_array[LSM.now_wb];
 	write_buffer_insert(wb, req->key, req->value);
 
+	//printf("write key:%u\n", req->key);
 #ifdef LSM_DEBUG
 	LSM.LBA_cnt[req->key]++;
 #endif

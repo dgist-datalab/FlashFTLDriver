@@ -106,6 +106,10 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	//printf("max_iter_cnt:%u now_remain_page:%u\n", max_iter_cnt, now_remain_page);
 	uint32_t i=0;
 	read_helper *rh=NULL;
+
+	uint32_t prev_seg_num=UINT32_MAX;
+	uint32_t prev_piece_ppa=UINT32_MAX;
+	bool sequential_file=true;
 	if(make_rh){
 		rh=read_helper_init(lsmtree_get_target_rhp(0));
 	}
@@ -116,6 +120,26 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 			read_helper_stream_insert(rh, kp_set[i].lba, kp_set[i].piece_ppa);
 		}
 		slm_coupling_mem_lev_seg(SEGNUM(kp_set[i].piece_ppa), SEGPIECEOFFSET(kp_set[i].piece_ppa));
+		if(sequential_file){
+			if(prev_piece_ppa==UINT32_MAX){
+				prev_piece_ppa=kp_set[i].piece_ppa;
+			}
+			else{
+				if(!(prev_piece_ppa < kp_set[i].piece_ppa && kp_set[i].piece_ppa-prev_piece_ppa<L2PGAP)){
+					sequential_file=false;
+					continue;
+				}
+			}
+			if(prev_seg_num==UINT32_MAX){
+				prev_seg_num=SEGNUM(kp_set[i].piece_ppa);
+			}
+			else{
+				if(prev_seg_num!=SEGNUM(kp_set[i].piece_ppa)){
+					sequential_file=false;
+				}
+			}
+
+		}
 	}
 	*temp_iter=iter;
 	
@@ -132,10 +156,12 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	res->_read_helper=rh;
 	res->start_piece_ppa=kp_set[0].piece_ppa;
 
+	res->sequential_file=sequential_file;
+	/*
 	if(SEGNUM(kp_set[0].piece_ppa)==SEGNUM(kp_set[last_idx].piece_ppa) && 
 			SEGNUM(kp_set[0].piece_ppa)==map_ppa/_PPS){
 		res->sequential_file=true;
-	}
+	}*/
 
 	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 	write_req->type=MAPPINGW;
