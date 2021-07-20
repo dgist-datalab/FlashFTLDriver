@@ -70,8 +70,7 @@ static inline uint32_t version_ridx_to_order(version *v, uint32_t lev_idx, uint3
 
 static inline uint32_t version_order_to_version(version *v, uint32_t lev_idx, uint32_t order){
 	uint32_t start_version=version_level_to_start_version(v, lev_idx);
-	return (order+v->poped_version_num[lev_idx]+start_version) % 
-		(start_version+v->level_run_num[lev_idx]);
+	return (order+v->poped_version_num[lev_idx]) % (v->level_run_num[lev_idx])+start_version;
 }
 
 static inline uint32_t version_ridx_to_version(version *v, uint32_t lev_idx, uint32_t ridx){
@@ -101,10 +100,11 @@ static inline bool version_belong_level(version *v, int32_t a, uint32_t lev_idx)
 }
 
 static inline int version_to_belong_level(version *v, uint32_t a){
-	for(uint32_t i=0; i<v->leveln; i++){
-		if(v->start_vidx_of_level[i] < a) return i;
+	uint32_t i=0;
+	for(; i<v->leveln; i++){
+		if(v->start_vidx_of_level[i] <=a) return i;
 	}
-	return 0;
+	return v->leveln-1;
 }
 
 static inline int version_to_order(version *v, uint32_t level_idx, int32_t version){

@@ -314,12 +314,17 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 				}
 			}
 		}
-		
+
 		if((!all_empty_stop) && target_pair.lba>limit){
 			break;
 		}
 
 		if(target_pair.lba!=UINT32_MAX){
+
+			if(target_pair.lba==debug_lba && LSM.global_debug_flag){
+				printf("break!\n");
+			}
+
 			if(version_map_lba(LSM.last_run_version, target_pair.lba)==skip_entry_version){
 				invalidate_piece_ppa(LSM.pm->bm, target_pair.piece_ppa, true);
 				sst_pos_pop(os_set[target_idx]);

@@ -190,6 +190,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	run *older=&des->array[idx_set[0]];
 	run	*newer=&des->array[idx_set[1]];
 
+	LSM.global_debug_flag=true;
 
 	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
 		version_unpopulate(LSM.last_run_version, idx_set[i], des->idx);
@@ -557,7 +558,22 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	}
 	thread_arg.set_num=stream_num;
 
-	printf("before break!\n");
+#ifdef LSM_DEBUG
+	if(version_to_belong_level(LSM.last_run_version, target_demote_version)!=des->idx){
+		EPRINT("demote version should be belong to des", true);
+	}
+
+	if(version_to_belong_level(LSM.last_run_version, target_keep_version)!=src->idx){
+		EPRINT("keep version should be belong to src", true);
+	}
+	static int compaction_cnt=0;
+	printf("before break! %u\n", compaction_cnt++);
+
+	if(compaction_cnt==14){
+		printf("bbb\n");
+	}
+#endif
+
 #ifdef LSM_DEBUG
 	//version_print_order(LSM.last_run_version, src->idx);
 #endif
