@@ -238,7 +238,7 @@ void do_gc(){
 	//printf("%s\n", val_buf);
 	fputs(val_buf, vFile);
 	
-	 * print # of current segment number
+	// * print # of current segment number
 	for (int i=0;i<(GNUMBER-1);++i) {
 		printf("current %d group segment number: %d\n", i+1, seg_ratio[i]);
 	}
@@ -259,7 +259,7 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	/*you can check if the gc is needed or not, using this condition*/
 //	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=5)){
 //		new_do_gc();//call gc
-	if (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=1) {
+	if (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=2) {
 		//printf("# of Free Blocks: %d\n",page_ftl.bm->get_free_segment_number(page_ftl.bm)); 
 		do_gc();//call gc
 	}
