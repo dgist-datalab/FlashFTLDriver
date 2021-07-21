@@ -102,6 +102,7 @@ void mh_insert(mh* h, void *data, int number){
 }
 
 void *mh_get_max(mh* h){
+	printf("\nGet max");
 	void *res=(void*)h->body[1].data;
 	h->body[1].data=h->body[h->size].data;
 	h->body[1].cnt=h->body[h->size].cnt;
@@ -124,8 +125,10 @@ void mh_update(mh* h,int number, void *hptr){
 }
 
 void mh_insert_append(mh *h, void *data){
+	printf("\nSize : %d", h->size);
+	printf("\nMax : %d", h->max);
 	if(h->size>h->max){
-		printf("full heap!\n");
+		printf("\nfull heap!\n");
 		abort();
 		return;
 	}

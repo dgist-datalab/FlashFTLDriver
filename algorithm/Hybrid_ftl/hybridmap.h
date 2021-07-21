@@ -13,7 +13,7 @@ typedef struct lb{
     bool empty;
     uint32_t db_idx;
     uint32_t cnt;
-    int lbmapping[_PPS]; //for page mapping
+    int lbmapping[_LPPS]; //for page mapping
 
     __segment *plb; //physical area for log block
 }lb_t;
@@ -21,7 +21,7 @@ typedef struct lb{
 
 typedef struct db{
 	int lb_idx;
-	uint32_t  pba;
+	int  pba;
 
 	__segment*pdb;
 }db_t;

@@ -15,14 +15,9 @@ typedef struct gc_value{
 	bool isdone;
 }gc_value;
 
-typedef struct align_merge_buffer{
-	uint8_t idx;
-	char value[_PPS * PAGESIZE];
-	KEYT key[_LPPS];
-}merge_buffer;
 
-void hybrid_merge(uint32_t lbnum);
-void do_switch(uint32_t lbnum);
-void do_merge(uint32_t lbnum);
+void hybrid_merge(lb_t logblock);
+void do_switch(lb_t logblock);
+void do_merge(lb_t logblock);
 gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value);
 void *hybrid_merge_end_req(algo_req *input); 

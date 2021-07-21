@@ -157,7 +157,6 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	}
 
 	memcpy(res->blocks, free_block_set->blocks, sizeof(__block*)*BPS);
-
 	res->now=0;
 	res->max=BPS;
 	res->invalid_blocks=0;
@@ -335,7 +334,7 @@ void seq_trim_target_segment (struct blockmanager* bm, __segment* gs, struct low
 		memset(b->bitset,0,_PPB*L2PGAP/8);
 		memset(b->oob_list,0,sizeof(b->oob_list));
 	}
-
+        
 	uint32_t segment_idx=segment_startblock_number/BPS;
 	block_set *bs=&p->logical_segment[segment_idx];
 	bs->total_invalid_number=0;
@@ -467,8 +466,6 @@ int seq_erase_bit (struct blockmanager* bm, uint32_t ppa){
 bool seq_is_valid_page (struct blockmanager* bm, uint32_t ppa){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	int a = _NOB;
-	printf("PPB : ******** %d\n", _PPB);
-	printf("PPS : ******** %d\n", _PPS);
 	uint32_t bn=ppa/(_PPB*L2PGAP);
 	uint32_t pn=ppa%(_PPB * L2PGAP);
 	uint32_t bt=pn/8;

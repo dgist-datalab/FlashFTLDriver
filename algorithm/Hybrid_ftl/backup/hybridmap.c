@@ -142,29 +142,10 @@ uint32_t hybrid_map_pick(uint32_t lba) {
     blockmanager *bm = hybrid_ftl.bm;
     uint32_t lbn = lba / (_LPPS);
     uint32_t offset = lba % (_LPPS);
-
     uint32_t target_lb = h->datablock[lbn].lb_idx;
-    uint32_t pba = h->datablock[lbn].pba;
 
-
-    if(pba == -1){  /*when datablock empty*/
-	if(target_lb == -1) return UINT32_MAX;
-		
-	else if(h->logblock[target_lb].lbmapping[offset] != -1 ){
-	     	    return h->logblock[target_lb].lbmapping[offset];
-        }else return UINT32_MAX;
-    }else {
-	if(target_lb == -1) {
-		if(bm->is_valid_page(bm, pba+offset))	
-			return pba+offset;
-		else return UINT32_MAX;
-	}
-	else if(h->logblock[target_lb].lbmapping[offset] != -1 ){
-	     	    return h->logblock[target_lb].lbmapping[offset];
-        }else return UINT32_MAX;
+    if(bm->is_valid_page(bm,h->logblock[target_lb].lbmapping[offset])){
+        return h->logblock[target_lb].lbmapping[offset];
     }
-    
-   
-
-
+    return h->datablock[lbn].pba + offset;
 }

@@ -96,21 +96,20 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa, value_se
 }
 
 uint32_t hybrid_read(request *const req){
-    uint32_t lbn = req->key / (_PPS * L2PGAP);
+    uint32_t lbn = req->key / (_PPS * L2PGAP) ;
     blockmanager * bm = hybrid_ftl.bm;
     for(uint32_t i=0; i<a_buffer[lbn].idx; i++){
         if(req->key==a_buffer[lbn].key[i]){
-            //		printf("buffered read!\n");
+            printf("\nBuffered Hit!");
             memcpy(req->value->value, a_buffer[lbn].value[i]->value, LPAGESIZE);
             req->end_req(req);
             return 1;
         }
     }
-
+    printf("\nRead key: %u",req->key);
     req->value->ppa=hybrid_map_pick(req->key);
 
-    //if(!bm->is_valid_page(bm,req->value->ppa)){
-     if(req->value->ppa == UINT32_MAX){
+    if(!bm->is_valid_page(bm,req->value->ppa)){
         req->type=FS_NOTFOUND_T;
         req->end_req(req);
     }
@@ -150,12 +149,10 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
         value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
         for(uint32_t i=0; i<L2PGAP; i++){
-	    //*(uint32_t*)value->value[i*LPAGESIZE] = req->key;
-            //memcpy(&value->value[i*LPAGESIZE], a_buffer[lbn].value[i]->value, LPAGESIZE);
-            memcpy(&value->value[i*LPAGESIZE], &req->key, sizeof(uint32_t));
-    printf("\n%d\n", req->key);
+            memcpy(&value->value[i*LPAGESIZE], a_buffer[lbn].value[i]->value, LPAGESIZE);
             inf_free_valueset(a_buffer[lbn].value[i], FS_MALLOC_W);
         }
+
         send_user_req(NULL, DATAW, ppa, value);
         a_buffer[lbn].idx=0;
     }
@@ -226,7 +223,6 @@ void *hybrid_end_req(algo_req* input){
     request *res=input->parents;
     if(res){
         res->type_ftl=res->type_lower=0;
- 	printf("\n############## key: %d  value: %d##############\n",(int*)res->key,(int*)param->value->value);
         res->end_req(res);//you should call the parents end_req like this
     }
     free(param);
