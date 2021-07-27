@@ -14,16 +14,20 @@ version *version_init(uint8_t total_version_number, uint32_t LBA_num, level **di
 	res->max_valid_version_num=total_version_number;
 	printf("max_version idx:%u\n", total_version_number);
 
-	res->version_empty_queue=new std::queue<uint32_t>*[leveln];
+	res->version_empty_queue=new std::queue<uint32_t>**[leveln];
 	res->start_vidx_of_level=(uint32_t*)malloc(sizeof(uint32_t)*leveln);
 	res->level_run_num=(uint32_t*)malloc(sizeof(uint32_t)*leveln);
 	res->poped_version_num=(uint32_t*)calloc(leveln, sizeof(uint32_t));
 
 	uint32_t version=0;
 	for(int32_t i=leveln-1; i>=0; i--){
-		res->version_empty_queue[i]=new std::queue<uint32_t>();
+		res->version_empty_queue[i]=new_std::queue<uint32_t>*[3];
+		for(uint32_t j=0; j<3; j++){
+			res->version_empty_queue[i][j]=new std::queue<uint32_t>();
+		}
+
 		res->start_vidx_of_level[i]=version;
-		uint32_t limit=i==leveln-1?LSM.param.last_size_factor:LSM.param.normal_size_factor;
+		uint32_t limit=LSM.disk[i]->max_run_num;
 		switch(disk[i]->level_type){
 			case LEVELING:
 			case LEVELING_WISCKEY:
@@ -40,10 +44,13 @@ version *version_init(uint8_t total_version_number, uint32_t LBA_num, level **di
 		}
 	}
 
-
-	res->version_populate_queue=new std::queue<uint32_t>*[leveln];
+	res->version_invalidate_number=(uint32_t*)calloc(total_version_number, sizeof(uint32_t));
+	res->version_populate_queue=new std::queue<uint32_t>**[leveln];
 	for(uint32_t i=0; i<leveln; i++){
-		res->version_populate_queue[i]=new std::queue<uint32_t>();
+		res->version_populate_queue[i]=new std::queue<uint32_t>()*[3];
+		for(uint32_t j=0; j<3; j++){
+			res->version_populate_queue[i][j]=new std::queue<uint32_t>();
+		}
 	}
 
 	res->total_version_number=total_version_number;
@@ -122,8 +129,10 @@ void version_print_order(version *v, uint32_t lev_idx){
 
 void version_free(version *v){
 	for(uint32_t i=0; i<v->leveln; i++){
-		delete v->version_empty_queue[i];
-		delete v->version_populate_queue[i];
+		for(uint32_t j=0; j<3; j++){
+			delete v->version_empty_queue[i][j];
+			delete v->version_populate_queue[i][j];
+		}
 	}
 	delete[] v->version_empty_queue;
 	delete[] v->version_populate_queue;

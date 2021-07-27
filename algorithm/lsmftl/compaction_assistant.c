@@ -199,19 +199,38 @@ static inline bool check_sequential(std::map<uint32_t, uint32_t> *kp_set, write_
 	}
 }
 
-static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set, write_buffer *wb, uint32_t flushing_target_num){
+static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set, 
+		std::map<uint32_t, uint32_t> * hot_kp_set,
+		write_buffer *wb, uint32_t flushing_target_num){
 	key_ptr_pair *temp_kp_set=write_buffer_flush(wb, flushing_target_num, false);
 	for(uint32_t i=0; i<KP_IN_PAGE && temp_kp_set[i].lba!=UINT32_MAX; i++){
-		std::map<uint32_t, uint32_t>::iterator find_iter=kp_set->find(temp_kp_set[i].lba);
-		if(find_iter!=kp_set->end()){
+		LSM.flushed_kp_seg->insert(temp_kp_set[i].piece_ppa/L2PGAP/_PPS);
+
+		std::map<uint32_t, uint32_t>::iterator find_iter;
+		find_iter=hot_kp_set->find(temp_kp_set[i].lba);
+		if(find_iter!=hot_kp_set->end()){ //hit in hot_kp_set
+			invalidate_kp_entry(find_iter->first, find_iter->second, UINT32_MAX, true);
+			hot_kp_set->erase(find_iter);
+			hot_kp_set->insert(
+				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
+			continue;
+		}
+
+		find_iter=kp_set->find(temp_kp_set[i].lba);
+		if(find_iter!=kp_set->end()){ //move hot_kp_set
 #ifdef LSM_DEBUG
 			if(debug_lba==find_iter->first){
 				printf("target hit in mem level: %u, %u\n", find_iter->first, find_iter->second);
 			}
+	//		printf("%u hit!\n", find_iter->first);
 #endif
 			invalidate_kp_entry(find_iter->first, find_iter->second, UINT32_MAX, true);
 			kp_set->erase(find_iter);
+			hot_kp_set->insert(
+				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
+			continue;
 		}
+
 		kp_set->insert(
 				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));	
 		version_coupling_lba_version(LSM.last_run_version, temp_kp_set[i].lba, UINT8_MAX);
@@ -239,6 +258,7 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	rwlock_write_lock(&LSM.flushed_kp_set_lock);
 	if(LSM.flushed_kp_set==NULL){
 		LSM.flushed_kp_set=new std::map<uint32_t, uint32_t>();
+		LSM.hot_kp_set=new std::map<uint32_t, uint32_t>();
 		LSM.flushed_kp_temp_set=new std::map<uint32_t, uint32_t>();
 	}
 	level *res=NULL;
@@ -281,7 +301,9 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 			making_level=false;
 		}
 		else{
-			flush_and_move(LSM.flushed_kp_set, wb, flushing_entry_num); //inset data to remain space
+			flush_and_move(LSM.flushed_kp_set, 
+					LSM.hot_kp_set,
+					wb, flushing_entry_num); //inset data to remain space
 		}
 
 		if(making_level || (!res && LSM.flushed_kp_set->size()>=LSM.param.write_buffer_ent)){
@@ -293,12 +315,17 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	
 		/*insert remain entry to flushed_temp_kp_set*/
 		if(wb->buffered_entry_num){
-			flush_and_move(LSM.flushed_kp_temp_set, wb, wb->buffered_entry_num);
+			flush_and_move(LSM.flushed_kp_temp_set, 
+					LSM.hot_kp_set,
+					wb, wb->buffered_entry_num);
 		}	
 	}
 	else{
-		flush_and_move(LSM.flushed_kp_set, wb, wb->buffered_entry_num);
-		if(LSM.flushed_kp_set->size() >= LSM.param.write_buffer_ent){
+		flush_and_move(LSM.flushed_kp_set, 
+				LSM.hot_kp_set,
+				wb, wb->buffered_entry_num);
+		if(LSM.flushed_kp_set->size()+LSM.flushed_kp_temp_set->size()+LSM.hot_kp_set->size()
+				>= LSM.param.write_buffer_ent){
 			res=make_pinned_level(LSM.flushed_kp_set);
 		}
 	}
@@ -348,6 +375,10 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	level *lev=NULL;
 	if(temp_level){
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
+		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
+				iter!=LSM.flushed_kp_seg->end(); iter++){	
+			lsmtree_gc_unavailable_set(&LSM, NULL, *iter);
+		}
 	}else{
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 		rwlock_write_lock(&LSM.level_rwlock[start_idx]);
@@ -356,6 +387,17 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	uint32_t end_type=LSM.disk[end_idx]->level_type;
 	level *src_lev=temp_level?temp_level:LSM.disk[start_idx];
 	level *des_lev=LSM.disk[end_idx];
+
+	static uint32_t demote_cnt=0;
+	printf("demote_cnt: %u\n", demote_cnt++);
+	if(des_lev->run_num!=LSM.last_run_version->version_populate_queue[des_lev->idx]->size()){
+		EPRINT("What happend?", true);
+	}
+
+	if(demote_cnt==688){
+		LSM.global_debug_flag=true;
+		printf("break!\n");
+	}
 
 	uint32_t target_version;
 	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
@@ -369,6 +411,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 #ifdef HOT_COLD
 	bool hot_cold_separation_compaction=false;
 #endif
+
 
 	switch(src_lev->level_type){
 		case LEVELING:
@@ -487,18 +530,42 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		std::map<uint32_t, uint32_t> *temp_map=LSM.flushed_kp_set;
 		delete temp_map;
 
-		if(LSM.flushed_kp_temp_set->size()){
-			LSM.flushed_kp_set=LSM.flushed_kp_temp_set;
-			LSM.flushed_kp_temp_set=new std::map<uint32_t, uint32_t>();
+		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
+				iter!=LSM.flushed_kp_seg->end(); iter++){
+			lsmtree_gc_unavailable_unset(&LSM, NULL, *iter);
+		}
+		LSM.flushed_kp_seg->clear();
+
+		if(LSM.flushed_kp_temp_set->size() || LSM.hot_kp_set->size()){
+			bool move_hot_kp_set=false;
+			std::map<uint32_t, uint32_t>::iterator iter;
+			LSM.flushed_kp_set=new std::map<uint32_t, uint32_t>();
+			for(iter=LSM.hot_kp_set->begin(); iter!=LSM.hot_kp_set->end();){
+				LSM.flushed_kp_seg->insert(iter->second/L2PGAP/_PPS);
+				LSM.flushed_kp_set->insert(std::pair<uint32_t,uint32_t>(iter->first, iter->second));
+				LSM.hot_kp_set->erase(iter++);
+			}
+			LSM.hot_kp_set->clear();
+		
+			for(iter=LSM.flushed_kp_temp_set->begin(); iter!=LSM.flushed_kp_temp_set->end();){
+				LSM.flushed_kp_seg->insert(iter->second/L2PGAP/_PPS);
+				LSM.flushed_kp_set->insert(std::pair<uint32_t,uint32_t>(iter->first, iter->second));
+				LSM.flushed_kp_temp_set->erase(iter++);
+			}
+			LSM.flushed_kp_temp_set->clear();
 		}
 		else{
 			delete LSM.flushed_kp_temp_set;
+			delete LSM.hot_kp_set;
 			LSM.flushed_kp_temp_set=NULL;
+			LSM.hot_kp_set=NULL;
 			LSM.flushed_kp_set=NULL;
 		}
+
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 	}
 	else{
+		version_level_invalidate_number_init(LSM.last_run_version, src_lev->idx);
 		rwlock_write_unlock(&LSM.level_rwlock[end_idx]);
 		rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
 	}
@@ -559,12 +626,6 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 
 static inline void do_compaction(compaction_master *cm, compaction_req *req, 
 		level *temp_level, uint32_t start_idx, uint32_t end_idx){
-#ifdef LSM_DEBUG
-	printf("compaction %u %u\n", start_idx, end_idx);
-	if(LSM.global_debug_flag && start_idx==2){
-		printf("break!\n");
-	}
-#endif
 	if(temp_level){
 		do_compaction_demote(cm, req, temp_level, start_idx, end_idx);
 		return;
@@ -601,15 +662,54 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 	version_get_merge_target(LSM.last_run_version, merged_idx_set, LSM.param.LEVELN-1);
 	res=compaction_merge(cm, target_lev, merged_idx_set);
 
+	disk_change(NULL, res, &LSM.disk[res->idx], merged_idx_set);
+	target_lev=res;
+
 	if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
+		printf("target:%u now_remain:%u\n", LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
 		return res;
 	}
 
-	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
-		uint32_t t_version=version_ridx_to_version(LSM.last_run_version, target_lev->idx,  merged_idx_set[i]);
-		LSM.last_run_version->version_invalidation_cnt[t_version]=0;
+	version_invalidate_number_init(LSM.last_run_version, merged_idx_set[0]);
+	version_invalidate_number_init(LSM.last_run_version, merged_idx_set[1]);
+
+	uint32_t round=0;
+	printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
+
+	std::multimap<uint32_t, uint32_t> version_inv_map;
+	uint32_t start_ver=version_level_to_start_version(LSM.last_run_version, target_lev->idx);
+	uint32_t end_ver=version_level_to_start_version(LSM.last_run_version, target_lev->idx-1)-1;
+	for(uint32_t i=start_ver; i<=end_ver;i++ ){
+		version_inv_map.insert(
+				std::pair<uint32_t, uint32_t>(LSM.last_run_version->version_invalidate_number[i], i));
 	}
 
+	std::multimap<uint32_t, uint32_t>::reverse_iterator iter=version_inv_map.rbegin();
+	for(; iter!=version_inv_map.rend(); iter++){
+		uint32_t ridx=version_to_ridx(LSM.last_run_version, target_lev->idx, iter->second);
+		printf("target v:%u inv:%u\n", iter->second, iter->first);
+		if(ridx==merged_idx_set[0] || iter->first==0) continue;
+		run *rptr=LEVEL_RUN_AT_PTR(res, ridx);
+		if(rptr->now_sst_num){
+			LSM.monitor.compaction_reclaim_run_num++;
+			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
+			run_empty_content(rptr, LSM.pm);
+
+			uint32_t t_version=iter->second;
+			version_invalidate_number_init(LSM.last_run_version, t_version);
+			level_update_run_at_move_originality(res, ridx, new_run, false);
+			run_free(new_run);
+#ifdef LSM_DEBUG
+			printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
+#endif
+
+			if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
+				break;
+			}
+		}
+	}
+	version_inv_map.clear();
+	/*
 	run *rptr;
 	uint32_t ridx, cnt;
 	uint32_t round=0;
@@ -622,7 +722,6 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 			run_empty_content(rptr, LSM.pm);
 
 			uint32_t t_version=version_ridx_to_version(LSM.last_run_version, target_lev->idx, ridx);
-			LSM.last_run_version->version_invalidation_cnt[t_version]=0;
 
 			level_update_run_at_move_originality(res, ridx, new_run, false);
 			run_free(new_run);
@@ -631,10 +730,10 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 			break;
 		}
 		else{
-			printf("%u target:%u now_remain:%u\n", round, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
+			printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
 		}
 	}
-
+*/
 	return res;
 }
 
@@ -642,12 +741,10 @@ static void last_level_reclaim(compaction_master *cm, uint32_t level_idx){
 	level *lev=LSM.disk[level_idx];
 	if(lev->level_type!=TIERING) return;
 
-	uint32_t merged_idx_set[MERGED_RUN_NUM];
 	rwlock_write_lock(&LSM.level_rwlock[level_idx]);
 
-	level *src=do_reclaim_level(cm, LSM.disk[level_idx]);
+	do_reclaim_level(cm, LSM.disk[level_idx]);
 
-	disk_change(NULL, src, &LSM.disk[level_idx], merged_idx_set);
 	LSM.monitor.compaction_cnt[level_idx+1]++;
 	rwlock_write_unlock(&LSM.level_rwlock[level_idx]);
 }
@@ -657,7 +754,6 @@ void* compaction_main(void *_cm){
 	queue *req_q=(queue*)cm->req_q;
 	uint32_t above_sst_num;
 #ifdef LSM_DEBUG
-	uint32_t version_inv_cnt;
 	uint32_t contents_num;
 #endif
 	while(!compaction_stop_flag){

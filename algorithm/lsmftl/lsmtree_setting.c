@@ -442,7 +442,7 @@ void lsmtree_tiering_only_test(){
 			//if(settings[i].size_factor<=2) break;
 	//		settings[i].lp=(level_param*)calloc(i+1, sizeof(level_param));	
 			for(uint32_t j=1; j<=i; j++){
-				uint64_t num_range=RANGE;
+				//uint64_t num_range=RANGE;
 				uint32_t run_size;
 				uint64_t level_size=0;
 				if(j==i){

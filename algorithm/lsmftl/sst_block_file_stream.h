@@ -44,6 +44,9 @@ typedef struct sst_bf_in_stream{
 	value_set *now_map_data;
 	uint32_t now_map_data_idx;
 
+	bool using_shared_value;
+	char *prev_buffer;
+
 	bool make_read_helper;
 	read_helper *rh;
 	read_helper_param rhp;
@@ -73,9 +76,11 @@ static inline uint32_t sst_bos_kv_q_size(sst_bf_out_stream *bos){
 //		bool make_read_helper, read_helper_param rhp);
 sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read_helper, read_helper_param rhp);
 bool sst_bis_insert(sst_bf_in_stream *bis, key_value_wrapper *);
-value_set* sst_bis_finish(sst_bf_in_stream*);
-value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *idx, key_ptr_pair *); //it should return unaligned value when it no space
+value_set* sst_bis_finish(sst_bf_in_stream*); value_set*
+sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *idx,
+		key_ptr_pair *, bool free_data); //it should return unaligned value when it no space
 bool sst_bis_ppa_empty(sst_bf_in_stream *bis);
+void sst_bis_set_using_shared_value(sst_bf_in_stream *bist);
 void sst_bis_free(sst_bf_in_stream *bis);
 
 #endif

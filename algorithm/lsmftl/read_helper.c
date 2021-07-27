@@ -129,8 +129,9 @@ uint32_t read_helper_memory_usage(read_helper *rh, uint32_t lba_unit){
 
 static inline uint32_t adjust_piece_ppa(uint8_t type, uint32_t hp_result_piece_ppa, uint32_t start_addr_piece_ppa, sst_file *sptr){
 	uint32_t res=0;
+	/*
 	uint32_t i;
-	map_range *mr;
+	map_range *mr;*/
 	switch(type){
 		case HELPER_BF_ONLY_GUARD:
 		case HELPER_BF_ONLY:

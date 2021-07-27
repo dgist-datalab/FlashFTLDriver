@@ -9,6 +9,7 @@ run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
 	res->start_lba=start_lba;
 	res->end_lba=end_lba;
 	res->now_contents_num=0;
+	res->sst_num_zero_by_gc=false;
 	if(sst_file_num>100000){
 		printf("???\n");
 	}
@@ -22,20 +23,18 @@ void run_space_init(run *res, uint32_t map_num, uint32_t start_lba, uint32_t end
 	res->start_lba=start_lba;
 	res->end_lba=end_lba;
 	res->sst_set=(sst_file*)calloc(map_num, sizeof(sst_file));
+	res->sst_num_zero_by_gc=false;
 }
 
 void run_reinit(run *res){
 	uint32_t sidx;
 	sst_file *sptr;
-	if(LSM.global_debug_flag){
-		printf("break!\n");
-		LSM.global_debug_flag=false;
-	}
 	for_each_sst(res, sptr, sidx){	
 		sst_reinit(sptr);
 	}
 	res->start_lba=UINT32_MAX;
 	res->end_lba=0;
+	res->sst_num_zero_by_gc=false;
 	res->now_contents_num=0;
 	res->now_sst_num=0;
 }

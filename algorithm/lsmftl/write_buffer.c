@@ -125,12 +125,10 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, uint32_t target_num, bool syn
 		res[i].piece_ppa=ppa*L2PGAP+inter_idx;
 		res[i].lba=it->first;
 		prev_version=version_map_lba(LSM.last_run_version, it->first);
+
 #ifdef LSM_DEBUG
 		if(res[i].lba==debug_lba){
 			printf("map target:%u -> %u in buffer\n", res[i].lba, res[i].piece_ppa);
-//			if(res[i].piece_ppa==3423003){
-//				LSM.global_debug_flag=true;
-//			}
 		}
 #endif
 

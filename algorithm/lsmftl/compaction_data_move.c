@@ -133,10 +133,10 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 	return res;
 }
 
-void issue_bis_result(sst_bf_in_stream *bis, uint32_t target_version, bool final){
+void issue_bis_result(sst_bf_in_stream *bis, uint32_t target_version, bool final, bool data_free){
 	uint32_t debug_idx=0;
 	key_ptr_pair debug_kp[L2PGAP];
-	value_set *result=sst_bis_get_result(bis, final, &debug_idx, debug_kp);
+	value_set *result=sst_bis_get_result(bis, final, &debug_idx, debug_kp, data_free);
 
 	uint32_t level_idx=version_to_level_idx(LSM.last_run_version, target_version, LSM.param.LEVELN);
 	for(uint32_t i=0; i<debug_idx; i++){
@@ -166,6 +166,11 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 	uint32_t need_seg_num=need_page_num/_PPS+(need_page_num%_PPS?1:0);
 
 	if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
+		if(LSM.global_debug_flag){
+			uint32_t temp_total_remain_page=page_manager_get_total_remain_page(LSM.pm, false, true);
+			uint32_t temp_total_remain_page2=page_manager_get_total_remain_page(LSM.pm, false, false);
+			printf("break! %u %u\n", temp_total_remain_page, temp_total_remain_page2);
+		}
 		__do_gc(LSM.pm, false, need_seg_num*_PPS);
 	}
 
@@ -189,7 +194,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 
 		if((target && sst_bis_insert(*bis, target)) ||
 				(final && sst_bos_kv_q_size(bos)==1)){
-			issue_bis_result(*bis, target_version, final);
+			issue_bis_result(*bis, target_version, final, true);
 		}
 
 		sst_bos_pop(bos, _cm);
@@ -205,7 +210,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 	}
 	
 	if(final && sst_bos_kv_q_size(bos)==0 && (*bis)->buffer_idx){
-		issue_bis_result(*bis, target_version, final);
+		issue_bis_result(*bis, target_version, final, true);
 	}
 	fdriver_unlock(&LSM.flush_lock);
 	return last_lba;
@@ -215,6 +220,7 @@ uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_str
 		std::queue<uint32_t> *locked_seg_q, run **new_run,
 		int32_t entry_num, uint32_t target_demote_version, uint32_t target_keep_version,
 		uint32_t src_idx,
+	//	std::queue<value_set *> *del_value_q,
 		bool final){
 	int32_t inserted_entry_num=0;
 	uint32_t last_lba=UINT32_MAX;
@@ -230,6 +236,9 @@ uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_str
 		__do_gc(LSM.pm, false, need_seg_num*_PPS);
 	}
 	
+	sst_bis_set_using_shared_value((*bis)[DEMOTE_RUN]);
+	sst_bis_set_using_shared_value((*bis)[KEEP_RUN]);
+
 	bool inserting_demote_run;
 	while(!sst_bos_is_empty(bos)){
 		inserting_demote_run=false;
@@ -263,11 +272,12 @@ uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_str
 
 			if((target && sst_bis_insert(*target_bis, target)) ||
 					(final && sst_bos_kv_q_size(bos)==1)){
+				/*checking memory*/
 				if(inserting_demote_run){
-					issue_bis_result(*target_bis, target_demote_version, final);
+					issue_bis_result(*target_bis, target_demote_version, final, true);
 				}
 				else{
-					issue_bis_result(*target_bis, target_keep_version, final);
+					issue_bis_result(*target_bis, target_keep_version, final, true);
 				}
 			}
 		}
@@ -280,16 +290,17 @@ uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_str
 			sst_free(sptr, LSM.pm);
 			sst_bis_free(*target_bis);
 			*target_bis=tiering_new_bis(locked_seg_q, inserting_demote_run? level_idx:src_idx);
+			sst_bis_set_using_shared_value(*target_bis);
 		}
 		inserted_entry_num++;
 	}
 	
 	if(final && sst_bos_kv_q_size(bos)==0 && ((*bis)[DEMOTE_RUN])->buffer_idx){
-		issue_bis_result((*bis)[DEMOTE_RUN], target_demote_version, final);
+		issue_bis_result((*bis)[DEMOTE_RUN], target_demote_version, final, true);
 	}
 
 	if(final && sst_bos_kv_q_size(bos)==0 && ((*bis)[KEEP_RUN])->buffer_idx){
-		issue_bis_result((*bis)[KEEP_RUN], target_keep_version, final);
+		issue_bis_result((*bis)[KEEP_RUN], target_keep_version, final, true);
 	}
 	fdriver_unlock(&LSM.flush_lock);
 

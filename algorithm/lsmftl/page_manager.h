@@ -83,6 +83,8 @@ __segment *page_manager_get_seg_for_bis(page_manager *pm,  uint32_t type);
 uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_num);
 void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*>*, 
 		struct write_buffer *wb, uint32_t seg_idx);
+void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*, 
+		struct write_buffer *wb, uint32_t seg_idx);
 void page_manager_insert_remain_seg(page_manager *pm, __segment *);
 
 static inline  char *get_seg_type_name(page_manager *pm, uint32_t seg_idx){

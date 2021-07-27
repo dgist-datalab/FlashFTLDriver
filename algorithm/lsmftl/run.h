@@ -17,6 +17,7 @@ typedef struct run{
 	uint32_t start_data_physical_address;
 	uint32_t now_contents_num;
 	bool moved_originality;
+	bool sst_num_zero_by_gc;
 	sst_file *sst_set;
 }run;
 /*

@@ -116,6 +116,9 @@ key_value_wrapper *sst_bos_get_pending(sst_bf_out_stream *bos,
 
 key_value_wrapper* sst_bos_pick(sst_bf_out_stream * bos, bool should_buffer_check){
 	key_value_wrapper *target=bos->kv_wrapper_q->front();
+
+	target->prev_version=get_version_from_piece_ppa(target->piece_ppa);
+
 	if(target->wait_target_req){
 		bos->kv_read_check_done(target->param, false);
 	}
@@ -232,6 +235,8 @@ sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read
 		res->rh=read_helper_init(rhp);
 		res->rhp=rhp;
 	}
+	res->using_shared_value=false;
+
 	return res;
 }
 
@@ -240,6 +245,11 @@ bool sst_bis_insert(sst_bf_in_stream *bis, key_value_wrapper *kv_wrapper){
 		EPRINT("plz check buffer_idx", true);
 	}
 	kv_wrapper->prev_version=get_version_from_piece_ppa(kv_wrapper->piece_ppa);
+	if(bis->using_shared_value){
+		memcpy(&bis->prev_buffer[bis->buffer_idx*LPAGESIZE], 
+				kv_wrapper->kv_ptr.data,
+				LPAGESIZE);
+	}
 	bis->buffer[bis->buffer_idx++]=kv_wrapper;
 
 	if(bis->start_lba>kv_wrapper->kv_ptr.lba){
@@ -272,7 +282,7 @@ value_set* sst_bis_finish(sst_bf_in_stream*){
 
 extern char all_set_page[PAGESIZE];
 
-value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_idx, key_ptr_pair *debug_kp){ 
+value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_idx, key_ptr_pair *debug_kp, bool free_data){ 
 	//it should return unaligned value when it no space
 	if(!last && REMAIN_DATA_PPA(bis)==bis->buffer_idx){
 		//EPRINT("change bis", false);
@@ -287,7 +297,8 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 	}
 
 
-	value_set *res=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+	value_set *res=inf_get_valueset(bis->using_shared_value? bis->prev_buffer:NULL, 
+			FS_MALLOC_W, PAGESIZE);
 //	uint32_t ppa=page_manager_get_new_ppa(bis->pm, false, DATASEG);
 	uint32_t ppa=page_manager_get_new_ppa_from_seg(bis->pm, bis->seg);
 	if(ppa/_PPS != bis->start_piece_ppa/L2PGAP/_PPS){
@@ -315,14 +326,22 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 
 		debug_kp[i].lba=map_pair->lba;
 		debug_kp[i].piece_ppa=map_pair->piece_ppa;
-		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, &kvw->prev_version, true);
 
-		memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], kvw->kv_ptr.data, LPAGESIZE);
+		validate_piece_ppa(bis->pm->bm, 1, &map_pair->piece_ppa, &map_pair->lba, &kvw->prev_version, true);
+		if(!bis->using_shared_value){
+			memcpy(&res->value[(i%L2PGAP)*LPAGESIZE], kvw->kv_ptr.data, LPAGESIZE);
+		}
 		if(kvw->kv_ptr.lba==debug_lba){
-			printf("readed data before_write: %u (%u->%u), copied_data:%u (%u)\n", 
-					*(uint32_t*)kvw->kv_ptr.data,
-					kvw->piece_ppa, map_pair->piece_ppa,
-					*(uint32_t*)&res->value[(i%L2PGAP)*LPAGESIZE], i);
+			if(!bis->using_shared_value){
+				printf("readed data before_write: %u (%u->%u), copied_data:%u (%u)\n", 
+						*(uint32_t*)kvw->kv_ptr.data,
+						kvw->piece_ppa, map_pair->piece_ppa,
+						*(uint32_t*)&res->value[(i%L2PGAP)*LPAGESIZE], i);
+			}
+			else{
+				printf("readed data before_write: (%u) %u\n", 
+						*(uint32_t*)&bis->prev_buffer[(i%L2PGAP)*LPAGESIZE], i);
+			}
 		}
 
 		if(bis->make_read_helper){
@@ -331,7 +350,9 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 
 		bis->write_issued_kv_num++;
 		if(kvw->free_target_req){
-			inf_free_valueset(kvw->param->data, FS_MALLOC_R);
+			if(free_data){
+				inf_free_valueset(kvw->param->data, FS_MALLOC_R);
+			}
 			if(!kvw->no_inter_param_alloc){
 				compaction_free_read_param(LSM.cm, kvw->param);
 			}
@@ -391,8 +412,19 @@ void sst_bis_free(sst_bf_in_stream *bis){
 		page_manager_insert_remain_seg(LSM.pm, bis->seg);
 	}
 
+	if(bis->using_shared_value){
+		free(bis->prev_buffer);
+	}
+
 	delete bis->map_data;
 	free(bis->buffer);
 	free(bis);
 }
 
+void sst_bis_set_using_shared_value(sst_bf_in_stream *bis){
+	if(bis->using_shared_value){
+		return;
+	}
+	bis->prev_buffer=(char*)malloc(PAGESIZE);
+	bis->using_shared_value=true;
+}

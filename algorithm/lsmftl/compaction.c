@@ -163,7 +163,6 @@ void read_sst_job(void *arg, int th_num){
 			else{
 				EPRINT("should_check target!", true);
 			}	
-
 			idx_set[i]++;
 		}
 	}
@@ -294,7 +293,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 				continue;
 			}
 			key_ptr_pair now=sst_pos_pick(os_set[i]);
-			
+
 			if(target_idx==UINT32_MAX){
 				 target_pair=now;
 				 target_idx=i;
@@ -321,12 +320,8 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 
 		if(target_pair.lba!=UINT32_MAX){
 
-			if(target_pair.lba==debug_lba && LSM.global_debug_flag){
-				printf("break!\n");
-			}
-
 			if(version_map_lba(LSM.last_run_version, target_pair.lba)==skip_entry_version){
-				invalidate_piece_ppa(LSM.pm->bm, target_pair.piece_ppa, true);
+				invalidate_kp_entry(target_pair.lba, target_pair.piece_ppa, skip_entry_version, true);
 				sst_pos_pop(os_set[target_idx]);
 				continue;
 			}
@@ -908,7 +903,6 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	static int cnt=0;
 	printf("LW2TI %u\n", cnt++);
 	if(cnt==73){
-	//	LSM.global_debug_flag=true;
 		printf("break!\n");
 	}
 	*/
@@ -934,7 +928,7 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 			level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 			run *rptr; uint32_t ridx;
 			for_each_run_max(des, rptr, ridx){
-				if(rptr->now_sst_num){
+				if(rptr->now_sst_num || rptr->sst_num_zero_by_gc){
 					level_append_run_copy_move_originality(res, rptr, ridx);
 				}
 			}
@@ -957,7 +951,7 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 	run *rptr; uint32_t ridx;
 	for_each_run_max(des, rptr, ridx){
-		if(rptr->now_sst_num){
+		if(rptr->now_sst_num || rptr->sst_num_zero_by_gc){
 			level_append_run_copy_move_originality(res, rptr, ridx);
 		}
 	}
@@ -1345,7 +1339,7 @@ level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	run *rptr;
 	uint32_t ridx;
 	for_each_run_max(des, rptr, ridx){
-		if(rptr->now_sst_num){
+		if(rptr->now_sst_num || rptr->sst_num_zero_by_gc){
 			level_append_run_copy_move_originality(res, rptr, ridx);
 		}
 	}
@@ -1371,7 +1365,7 @@ level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t 
 	run *rptr;
 	uint32_t ridx;
 	for_each_run_max(des, rptr, ridx){
-		if(rptr->now_sst_num){
+		if(rptr->now_sst_num || rptr->sst_num_zero_by_gc){
 			level_append_run_copy_move_originality(res, rptr, ridx);
 		}
 	}

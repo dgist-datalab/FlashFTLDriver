@@ -159,3 +159,58 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*> *gkv,
 		free(head_gmn);
 	}
 }
+
+void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv, 
+		struct write_buffer *wb, uint32_t seg_idx){
+	if(!wb) return;
+	sst_file *now_check_sst=NULL;
+	blockmanager *bm=LSM.pm->bm;
+
+	key_ptr_pair *kp_set;
+	while((kp_set=write_buffer_flush_for_gc(wb, false, seg_idx, NULL, UINT32_MAX, gkv))){
+		free(kp_set);
+	}
+
+	LSM.flushed_kp_seg->erase(seg_idx);
+
+	std::map<uint32_t, gc_mapping_check_node*>::iterator iter=gkv->begin();
+	std::map<uint32_t, uint32_t>::iterator find_iter;
+	for(; iter!=gkv->end(); ){
+		/*flushed_kp_set*/
+		find_iter=LSM.flushed_kp_set->find(iter->first);
+		if(find_iter!=LSM.flushed_kp_set->end()){
+			find_iter->second=iter->second->new_piece_ppa;
+			LSM.flushed_kp_seg->insert(
+					iter->second->new_piece_ppa/L2PGAP/_PPS);
+			free(iter->second);
+			gkv->erase(iter++);
+			continue;
+		}
+
+		/*hot_kp_set*/
+		find_iter=LSM.hot_kp_set->find(iter->first);
+		if(find_iter!=LSM.hot_kp_set->end()){
+			find_iter->second=iter->second->new_piece_ppa;
+			LSM.flushed_kp_seg->insert(
+					iter->second->new_piece_ppa/L2PGAP/_PPS);
+			free(iter->second);
+			gkv->erase(iter++);
+			continue;
+		}
+
+		/*flushed_kp_temp_set*/
+		find_iter=LSM.flushed_kp_temp_set->find(iter->first);
+		if(find_iter!=LSM.flushed_kp_temp_set->end()){
+			find_iter->second=iter->second->new_piece_ppa;
+			LSM.flushed_kp_seg->insert(
+					iter->second->new_piece_ppa/L2PGAP/_PPS);
+			free(iter->second);
+			gkv->erase(iter++);
+			continue;
+		}
+
+		iter++;
+		abort();
+	}
+
+}

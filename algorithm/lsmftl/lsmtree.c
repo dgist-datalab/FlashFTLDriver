@@ -66,6 +66,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	uint32_t version_num=0;
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
 		rhp=lsmtree_get_target_rhp(i);
+		uint32_t target_run_num=LSM.param.normal_size_factor;
 		switch(LSM.param.tr.lp[i+1].level_type){
 			case LEVELING:
 				version_num+=1;
@@ -84,17 +85,27 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 						read_helper_type(rhp.type));
 				break;
 			case TIERING:
-				version_num+=LSM.param.normal_size_factor;
-				LSM.disk[i]=level_init(now_level_size, LSM.param.normal_size_factor, TIERING, i, now_level_size, false);
+#ifdef HOT_COLD
+				if(i!=LSM.param.LEVELN-1){
+					target_run_num++;
+				}
+#endif
+				version_num+=target_run_num;
+				LSM.disk[i]=level_init(now_level_size, target_run_num, TIERING, i, now_level_size, false);
 				printf("TI[%d] - run_num:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_run_num, 
 						(double)now_level_size/RANGE*100,
 						read_helper_type(rhp.type));
 
 				break;
 			case TIERING_WISCKEY:
-				version_num+=LSM.param.normal_size_factor;
+#ifdef HOT_COLD
+				if(i!=LSM.param.LEVELN-1){
+					target_run_num++;
+				}
+#endif
+				version_num+=target_run_num;
 				LSM.disk[i]=level_init(
-						ENTRY_TO_SST_PF(now_level_size), LSM.param.normal_size_factor, TIERING_WISCKEY, i, now_level_size, false);
+						ENTRY_TO_SST_PF(now_level_size), target_run_num, TIERING_WISCKEY, i, now_level_size, false);
 				printf("TW[%d] - run_num:%u data:%.2lf(%%) H:%s\n",i, LSM.disk[i]->max_run_num,
 						(double)now_level_size/RANGE*100,
 						read_helper_type(rhp.type));
@@ -141,6 +152,10 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
+
+	LSM.flushed_kp_seg=new std::set<uint32_t>();
+	LSM.hot_kp_set=NULL;
+
 	rb.buffer_ppa=UINT32_MAX;
 
 	printf("NOS:%lu\n", _NOS);
@@ -243,6 +258,7 @@ static void lsmtree_monitor_print(){
 }
 
 void lsmtree_destroy(lower_info *li, algorithm *){
+	lsmtree_content_print(&LSM, false);
 	lsmtree_monitor_print();
 #ifdef LSM_DEBUG
 	uint32_t request_sum=0;
@@ -264,19 +280,18 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 		}
 	}
 	average=request_sum/populate_cnt;
+	/*
 	printf("cnt cdf\n");
-	
 	for(uint32_t i=0; i<151; i++){
 		printf("%u %u %.2f %.2f \n", i, cdf_cnt[i], 
 				i==150?(float)high_resolution/request_sum:(float)cdf_cnt[i]*i/request_sum,
 				(float)cdf_cnt[i]/RANGE);
 	}
-	/*
 	for(uint32_t i=0; i<=RANGE; i++){
 		if(LSM.LBA_cnt[i]>=average){
 			fprintf(stderr, "%u %u\n", i, LSM.LBA_cnt[i]);
 		}
-	}*/
+	}
 	fprintf(stderr, "average:%u populate:%.2lf\n", average, (float)(populate_cnt)/RANGE);
 
 	for(int i=0; i<LSM.param.LEVELN; i++){
@@ -290,7 +305,7 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 		}
 		printf("\n");
 	}
-
+*/
 	free(LSM.LBA_cnt);
 #endif
 
@@ -312,6 +327,8 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 		rwlock_destroy(&LSM.level_rwlock[i]);
 	}	
 
+	delete LSM.flushed_kp_seg;
+
 	free(LSM.param.tr.lp);
 
 	version_free(LSM.last_run_version);
@@ -328,6 +345,10 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 
 	if(LSM.flushed_kp_set){
 		delete LSM.flushed_kp_set;
+	}
+
+	if(LSM.hot_kp_set){
+		delete LSM.hot_kp_set;
 	}
 
 	if(LSM.flushed_kp_temp_set){
@@ -563,6 +584,19 @@ uint32_t lsmtree_read(request *const req){
 		uint32_t target_piece_ppa=UINT32_MAX;
 		
 		rwlock_read_lock(&LSM.flushed_kp_set_lock);
+		if(LSM.hot_kp_set){
+			std::map<uint32_t, uint32_t>::iterator iter=LSM.hot_kp_set->find(req->key);
+			if(iter!=LSM.hot_kp_set->end()){
+				rwlock_read_unlock(r_param->target_level_rw_lock);//L1 unlock
+				target_piece_ppa=iter->second;
+				r_param->target_level_rw_lock=NULL;
+				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
+				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
+				read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+				return 1;
+			}		
+		}
+
 		for(uint32_t i=0; i<2; i++){
 			std::map<uint32_t, uint32_t> *kp_set=i==0?LSM.flushed_kp_set:LSM.flushed_kp_temp_set;
 			if(!kp_set) continue;
@@ -873,12 +907,13 @@ void lsmtree_level_summary(lsmtree *lsm){
 	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
 		printf("ptr:%p ", lsm->disk[i]); level_print(lsm->disk[i]);
 	}
+	lsmtree_print_WAF(lsm->li);
 #endif
 }
 
-void lsmtree_content_print(lsmtree *lsm){
+void lsmtree_content_print(lsmtree *lsm, bool print_sst){
 	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
-		level_content_print(lsm->disk[i], true);
+		level_content_print(lsm->disk[i], print_sst);
 	}
 }
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa){
@@ -923,6 +958,8 @@ void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
 		lsm->gc_unavailable_seg[seg_idx]++;
 		temp_seg_idx=seg_idx;
 	}
+
+//	printf("%u update to %u\n", temp_seg_idx, lsm->gc_unavailable_seg[temp_seg_idx]);
 
 	if(lsm->gc_unavailable_seg[temp_seg_idx]==1){
 		lsm->gc_locked_seg_num++;
@@ -1061,6 +1098,13 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 				get_seg_type_name(pm, i));
 	}
 
+	printf("wb:\n\t");
+	std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin();
+	for(; iter!=LSM.flushed_kp_seg->end(); iter++){
+		printf("%u ", *iter);
+	}
+	printf("\n");
+	
 	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
 		level *lev_ptr=LSM.disk[i];
 		if(lev_ptr->level_type!=TIERING && lev_ptr->level_type!=LEVELING){
@@ -1094,6 +1138,9 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 }
 
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting){
+	if(old_version!=UINT32_MAX){
+		LSM.last_run_version->version_invalidate_number[old_version]++;
+	}
 	bool res=invalidate_piece_ppa(LSM.pm->bm, piece_ppa, aborting);
 	return res;
 }

@@ -130,7 +130,9 @@ typedef struct lsmtree{
 	write_buffer *flush_wait_wb;
 
 	rwlock flushed_kp_set_lock;
+	std::set<uint32_t> *flushed_kp_seg;
 	std::map<uint32_t, uint32_t> *flushed_kp_set;
+	std::map<uint32_t, uint32_t> *hot_kp_set;
 	std::map<uint32_t, uint32_t> *flushed_kp_temp_set;
 
 	uint32_t* gc_unavailable_seg;
@@ -162,7 +164,7 @@ uint32_t lsmtree_flush(request *const req);
 uint32_t lsmtree_remove(request *const req);
 void lsmtree_compaction_end_req(struct compaction_req*);
 void lsmtree_level_summary(lsmtree *lsm);
-void lsmtree_content_print(lsmtree *lsm);
+void lsmtree_content_print(lsmtree *lsm, bool print_sst);
 void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param);
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
 sst_file *lsmtree_find_target_normal_sst_datagc(uint32_t lba, uint32_t map_ppa,
@@ -178,6 +180,14 @@ void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
 uint32_t lsmtree_testing();
 uint32_t lsmtree_seg_debug(lsmtree *lsm);
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting);
+static void lsmtree_print_WAF(lower_info *li){
+	printf("WAF: %lf\n\n",
+			(double)(li->req_type_cnt[MAPPINGW] +
+				li->req_type_cnt[DATAW]+
+				li->req_type_cnt[GCDW]+
+				li->req_type_cnt[GCMW_DGC]+
+				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
+}
 
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);

@@ -463,6 +463,9 @@ void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
 	memmove(&r->sst_set[sptr_idx], &r->sst_set[sptr_idx+1], sizeof(sst_file) * target_num_sst_file);
 	memset(&r->sst_set[r->now_sst_num-1], 0, sizeof(sst_file));
 	r->now_sst_num--;
+	if(r->now_sst_num==0){
+		r->sst_num_zero_by_gc=true;
+	}
 }
 
 run *level_LE_to_run(level *lev, bool move_originality){

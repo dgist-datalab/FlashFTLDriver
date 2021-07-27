@@ -271,9 +271,8 @@ uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm){
 	while(1){
 		block_set* target=(block_set*)mh_get_max(p->max_heap);
 
-		if(target->total_invalid_number==_PPS*L2PGAP){
+		if(target->total_invalid_number==target->total_valid_number){
 			q_enqueue((void*)target, p->invalid_block_q);
-			res++;
 		}
 		else{
 			uint32_t seg_idx=target->blocks[0]->block_num/BPS;
@@ -282,7 +281,7 @@ uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm){
 		}
 	}
 
-	return res;
+	return p->invalid_block_q->size;
 }
 
 void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_info* li){

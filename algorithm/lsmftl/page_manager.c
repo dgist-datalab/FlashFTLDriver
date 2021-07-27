@@ -217,8 +217,8 @@ retry:
 __segment *page_manager_get_seg(page_manager *pm, bool is_map, uint32_t type){
 	blockmanager *bm=pm->bm;
 	bool temp_used=false;
-	__segment *seg;
 retry:
+	__segment *seg=NULL;
 	if(pm->remain_data_segment_q->size() && !is_map){
 		temp_used=true;
 		seg=pm->remain_data_segment_q->front();
@@ -232,7 +232,7 @@ retry:
 		if(temp_used){
 			temp_used=false;
 			free(seg);
-			pm->remain_data_segment_q->pop_front();
+	//		pm->remain_data_segment_q->pop_front();
 			goto retry;
 		}
 		if(bm->is_gc_needed(bm)){
@@ -569,11 +569,11 @@ retry_logic:
 	goto retry;
 
 out:
-	if(LSM.gc_unavailable_seg[seg_idx]){
+	if(LSM.gc_unavailable_seg[seg_idx] && victim_target->invalidate_number!=victim_target->validate_number){
 //		if(LSM.global_debug_flag) printf("[%lu] %u is locked\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
-	else if(victim_target->invalidate_number<=L2PGAP*2){
+	else if(victim_target->invalidate_number<=L2PGAP*2 && victim_target->invalidate_number!=victim_target->validate_number){
 //		if(LSM.global_debug_flag) printf("[%lu] %u is not enough invalid\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
@@ -871,7 +871,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 							move_sptr(gsn,victim->seg_idx, gsn->lev_idx, gsn->version, gsn->sidx);
 						}
 						else{
-							level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], gsn->version, gsn->sidx);
+							level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], 
+									version_to_ridx(LSM.last_run_version, gsn->lev_idx, gsn->version), 
+									gsn->sidx);
 							gc_sptr_node_free(gsn);
 						}
 					}
@@ -879,10 +881,13 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, level_idx, target_version, sptr_idx);
 				}
 
-				/*for wisckey level*/
+				/*for direct mapping*/
 				if(sptr==NULL || !(sptr && sptr->file_addr.piece_ppa<=piece_ppa && sptr->end_ppa*L2PGAP>=piece_ppa)){
-					lsmtree_level_summary(&LSM);
-					EPRINT("should I implement?", true);
+				//	lsmtree_level_summary(&LSM);
+				//	uint32_t temp_remain_page=page_manager_get_total_remain_page(LSM.pm, false, true);
+				//	lsmtree_seg_debug(&LSM);
+				//	printf("remain total_page:%u\n", temp_remain_page);
+				//	EPRINT("should I implement?", true);
 				
 					/*checking other level*/
 					gmc=(gc_mapping_check_node*)malloc(sizeof(gc_mapping_check_node));
@@ -935,17 +940,14 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 			move_sptr(gsn,victim->seg_idx, gsn->lev_idx, gsn->version, gsn->sidx);
 		}
 		else{
-			level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], gsn->version, gsn->sidx);
+			level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], 
+					version_to_ridx(LSM.last_run_version, gsn->lev_idx, gsn->version), 
+					gsn->sidx);
 			gc_sptr_node_free(gsn);
 		}
 	}
 
-	if(gc_kv_map->size()){
-		printf("[%u] victim invalidation cnt:%u GMC target cnt:%lu ", LSM.monitor.gc_data,victim->invalidate_number, gc_kv_map->size());
-		EPRINT("debug", false);
-		//LSM.global_debug_flag=true;
-	}
-	gc_helper_for_normal(gc_kv_map, wisckey_node_wb, victim->seg_idx); 
+	gc_helper_for_direct_mapping(gc_kv_map, wisckey_node_wb, victim->seg_idx); 
 
 	bm->trim_segment(bm, victim, bm->li);
 	page_manager_change_reserve(pm, false);
