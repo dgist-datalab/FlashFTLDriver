@@ -20,7 +20,11 @@
 #define COMPACTION_REQ_MAX_NUM 1
 #define WRITEBUFFER_NUM (1+1)
 #define TIMERESULT
-#define HOT_COLD
+
+/*OPTIMIZING SET*/
+//#define HOT_COLD
+//#define WB_SEPARATE
+//#define INVALIDATION_COUNT_MERGE
 
 enum{
 	DEMOTE_RUN, KEEP_RUN,
@@ -132,7 +136,9 @@ typedef struct lsmtree{
 	rwlock flushed_kp_set_lock;
 	std::set<uint32_t> *flushed_kp_seg;
 	std::map<uint32_t, uint32_t> *flushed_kp_set;
+#ifdef WB_SEPARATE
 	std::map<uint32_t, uint32_t> *hot_kp_set;
+#endif
 	std::map<uint32_t, uint32_t> *flushed_kp_temp_set;
 
 	uint32_t* gc_unavailable_seg;

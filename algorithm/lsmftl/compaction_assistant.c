@@ -207,13 +207,15 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set,
 		LSM.flushed_kp_seg->insert(temp_kp_set[i].piece_ppa/L2PGAP/_PPS);
 
 		std::map<uint32_t, uint32_t>::iterator find_iter;
-		find_iter=hot_kp_set->find(temp_kp_set[i].lba);
-		if(find_iter!=hot_kp_set->end()){ //hit in hot_kp_set
-			invalidate_kp_entry(find_iter->first, find_iter->second, UINT32_MAX, true);
-			hot_kp_set->erase(find_iter);
-			hot_kp_set->insert(
-				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
-			continue;
+		if(hot_kp_set){
+			find_iter=hot_kp_set->find(temp_kp_set[i].lba);
+			if(find_iter!=hot_kp_set->end()){ //hit in hot_kp_set
+				invalidate_kp_entry(find_iter->first, find_iter->second, UINT32_MAX, true);
+				hot_kp_set->erase(find_iter);
+				hot_kp_set->insert(
+						std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
+				continue;
+			}
 		}
 
 		find_iter=kp_set->find(temp_kp_set[i].lba);
@@ -226,11 +228,15 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set,
 #endif
 			invalidate_kp_entry(find_iter->first, find_iter->second, UINT32_MAX, true);
 			kp_set->erase(find_iter);
-			hot_kp_set->insert(
-				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
-			continue;
+			if(hot_kp_set){
+				hot_kp_set->insert(
+						std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
+				continue;
+			}
 		}
-
+		if(temp_kp_set[i].lba==debug_lba){
+			printf("break!\n");
+		}
 		kp_set->insert(
 				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));	
 		version_coupling_lba_version(LSM.last_run_version, temp_kp_set[i].lba, UINT8_MAX);
@@ -258,8 +264,10 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	rwlock_write_lock(&LSM.flushed_kp_set_lock);
 	if(LSM.flushed_kp_set==NULL){
 		LSM.flushed_kp_set=new std::map<uint32_t, uint32_t>();
-		LSM.hot_kp_set=new std::map<uint32_t, uint32_t>();
 		LSM.flushed_kp_temp_set=new std::map<uint32_t, uint32_t>();
+#ifdef WB_SEPARATE
+		LSM.hot_kp_set=new std::map<uint32_t, uint32_t>();
+#endif
 	}
 	level *res=NULL;
 
@@ -301,8 +309,12 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 			making_level=false;
 		}
 		else{
-			flush_and_move(LSM.flushed_kp_set, 
+			flush_and_move(LSM.flushed_kp_set,
+#ifdef WB_SEPARATE
 					LSM.hot_kp_set,
+#else
+					NULL,
+#endif
 					wb, flushing_entry_num); //inset data to remain space
 		}
 
@@ -315,16 +327,30 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	
 		/*insert remain entry to flushed_temp_kp_set*/
 		if(wb->buffered_entry_num){
-			flush_and_move(LSM.flushed_kp_temp_set, 
+			flush_and_move(LSM.flushed_kp_temp_set,
+#ifdef WB_SEPARATE
 					LSM.hot_kp_set,
-					wb, wb->buffered_entry_num);
+#else
+					NULL,
+#endif
+					wb, wb->buffered_entry_num); //inset data to remain space
 		}	
 	}
 	else{
-		flush_and_move(LSM.flushed_kp_set, 
+		flush_and_move(LSM.flushed_kp_set,
+#ifdef WB_SEPARATE
 				LSM.hot_kp_set,
-				wb, wb->buffered_entry_num);
-		if(LSM.flushed_kp_set->size()+LSM.flushed_kp_temp_set->size()+LSM.hot_kp_set->size()
+#else
+				NULL,
+#endif
+				wb, wb->buffered_entry_num); //inset data to remain space
+
+		if(LSM.flushed_kp_set->size()+LSM.flushed_kp_temp_set->size()+
+#ifdef WB_SEPARATE
+				LSM.hot_kp_set->size()
+#else
+				0
+#endif
 				>= LSM.param.write_buffer_ent){
 			res=make_pinned_level(LSM.flushed_kp_set);
 		}
@@ -373,10 +399,19 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		level *temp_level, uint32_t start_idx, uint32_t end_idx){
 
 	level *lev=NULL;
+	static uint32_t demote_cnt=0;
+	printf("demote_cnt: %u\n", demote_cnt++);
+
+	if(demote_cnt==99){
+		printf("break!\n");
+	}
 	if(temp_level){
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
-				iter!=LSM.flushed_kp_seg->end(); iter++){	
+				iter!=LSM.flushed_kp_seg->end(); iter++){
+			if(LSM.global_debug_flag){
+				printf("unavailable %u\n", *iter);
+			}
 			lsmtree_gc_unavailable_set(&LSM, NULL, *iter);
 		}
 	}else{
@@ -388,18 +423,12 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	level *src_lev=temp_level?temp_level:LSM.disk[start_idx];
 	level *des_lev=LSM.disk[end_idx];
 
-	static uint32_t demote_cnt=0;
-	printf("demote_cnt: %u\n", demote_cnt++);
-	if(des_lev->run_num!=LSM.last_run_version->version_populate_queue[des_lev->idx]->size()){
+	if(des_lev->run_num!=LSM.last_run_version->version_populate_queue[des_lev->idx][VERSION]->size()){
 		EPRINT("What happend?", true);
 	}
 
-	if(demote_cnt==688){
-		LSM.global_debug_flag=true;
-		printf("break!\n");
-	}
-
 	uint32_t target_version;
+	uint32_t target_ridx;
 	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
 		target_version=version_order_to_version(LSM.last_run_version, des_lev->idx, 0);
 	}
@@ -455,7 +484,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 
 	/*populate version*/
 	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
-		if(!LSM.last_run_version->version_populate_queue[des_lev->idx]->size()){
+		if(!LSM.last_run_version->version_populate_queue[des_lev->idx][VERSION]->size()){
 			version_populate(LSM.last_run_version, target_version, des_lev->idx);
 		}
 	}
@@ -466,9 +495,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	/*unpopulate_version*/
 	if(!temp_level){
 		if(src_lev->level_type==LEVELING || src_lev->level_type==LEVELING_WISCKEY){
-			version_unpopulate(LSM.last_run_version,
-					version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
-					src_lev->idx);
+			version_clear_level(LSM.last_run_version, src_lev->idx);
 		}
 		else{
 			/*matching order*/
@@ -481,11 +508,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 					version_get_resort_version(LSM.last_run_version, src_lev->idx);
 				}
 				else{
-					for(uint32_t i=0; i<src_lev->run_num; i++){
-						version_unpopulate(LSM.last_run_version,
-								version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
-								src_lev->idx);
-					}
+					version_clear_level(LSM.last_run_version, src_lev->idx);
 				}
 			}
 #else
@@ -493,11 +516,8 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 				version_get_resort_version(LSM.last_run_version, src_lev->idx);
 			}
 			else{
-				for(uint32_t i=0; i<src_lev->run_num; i++){
-					version_unpopulate(LSM.last_run_version,
-							version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
-							src_lev->idx);
-				}
+				version_clear_level(LSM.last_run_version, src_lev->idx);
+
 			}
 #endif
 		}
@@ -536,16 +556,24 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		}
 		LSM.flushed_kp_seg->clear();
 
-		if(LSM.flushed_kp_temp_set->size() || LSM.hot_kp_set->size()){
+		if(LSM.flushed_kp_temp_set->size() || 
+#ifdef WB_SEPARATE
+				LSM.hot_kp_set->size()
+#else
+				false
+#endif
+				){
 			bool move_hot_kp_set=false;
 			std::map<uint32_t, uint32_t>::iterator iter;
 			LSM.flushed_kp_set=new std::map<uint32_t, uint32_t>();
+#ifdef WB_SEPARATE
 			for(iter=LSM.hot_kp_set->begin(); iter!=LSM.hot_kp_set->end();){
 				LSM.flushed_kp_seg->insert(iter->second/L2PGAP/_PPS);
 				LSM.flushed_kp_set->insert(std::pair<uint32_t,uint32_t>(iter->first, iter->second));
 				LSM.hot_kp_set->erase(iter++);
 			}
 			LSM.hot_kp_set->clear();
+#endif
 		
 			for(iter=LSM.flushed_kp_temp_set->begin(); iter!=LSM.flushed_kp_temp_set->end();){
 				LSM.flushed_kp_seg->insert(iter->second/L2PGAP/_PPS);
@@ -556,16 +584,18 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		}
 		else{
 			delete LSM.flushed_kp_temp_set;
+#ifdef WB_SEPARATE
 			delete LSM.hot_kp_set;
-			LSM.flushed_kp_temp_set=NULL;
 			LSM.hot_kp_set=NULL;
+#endif
+			LSM.flushed_kp_temp_set=NULL;
 			LSM.flushed_kp_set=NULL;
 		}
 
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 	}
 	else{
-		version_level_invalidate_number_init(LSM.last_run_version, src_lev->idx);
+		version_level_invalidate_number_init(LSM.last_run_version, start_idx);
 		rwlock_write_unlock(&LSM.level_rwlock[end_idx]);
 		rwlock_write_unlock(&LSM.level_rwlock[start_idx]);
 	}
@@ -594,11 +624,7 @@ static inline void do_compaction_inplace(compaction_master *cm, compaction_req *
 		version_get_resort_version(LSM.last_run_version, src_lev->idx);
 	}
 	else{
-		for(uint32_t i=0; i<src_lev->run_num; i++){
-			version_unpopulate(LSM.last_run_version,
-					version_pop_oldest_version(LSM.last_run_version, src_lev->idx),
-					src_lev->idx);
-		}	
+		version_clear_level(LSM.last_run_version, src_lev->idx);
 	}
 
 	target_version=version_get_empty_version(LSM.last_run_version, src_lev->idx);
@@ -665,13 +691,14 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 	disk_change(NULL, res, &LSM.disk[res->idx], merged_idx_set);
 	target_lev=res;
 
+	version_invalidate_number_init(LSM.last_run_version, merged_idx_set[0]);
+	version_invalidate_number_init(LSM.last_run_version, merged_idx_set[1]);
+
 	if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
 		printf("target:%u now_remain:%u\n", LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
 		return res;
 	}
-
-	version_invalidate_number_init(LSM.last_run_version, merged_idx_set[0]);
-	version_invalidate_number_init(LSM.last_run_version, merged_idx_set[1]);
+	return res;
 
 	uint32_t round=0;
 	printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));

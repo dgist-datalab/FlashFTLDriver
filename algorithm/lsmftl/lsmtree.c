@@ -154,7 +154,9 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	fdriver_mutex_init(&rb.read_buffer_lock);
 
 	LSM.flushed_kp_seg=new std::set<uint32_t>();
+#ifdef WB_SEPARATE
 	LSM.hot_kp_set=NULL;
+#endif
 
 	rb.buffer_ppa=UINT32_MAX;
 
@@ -346,10 +348,11 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 	if(LSM.flushed_kp_set){
 		delete LSM.flushed_kp_set;
 	}
-
+#ifdef WB_SEPARATE
 	if(LSM.hot_kp_set){
 		delete LSM.hot_kp_set;
 	}
+#endif
 
 	if(LSM.flushed_kp_temp_set){
 		delete LSM.flushed_kp_temp_set;
@@ -584,6 +587,7 @@ uint32_t lsmtree_read(request *const req){
 		uint32_t target_piece_ppa=UINT32_MAX;
 		
 		rwlock_read_lock(&LSM.flushed_kp_set_lock);
+#ifdef WB_SEPARATE
 		if(LSM.hot_kp_set){
 			std::map<uint32_t, uint32_t>::iterator iter=LSM.hot_kp_set->find(req->key);
 			if(iter!=LSM.hot_kp_set->end()){
@@ -596,6 +600,7 @@ uint32_t lsmtree_read(request *const req){
 				return 1;
 			}		
 		}
+#endif
 
 		for(uint32_t i=0; i<2; i++){
 			std::map<uint32_t, uint32_t> *kp_set=i==0?LSM.flushed_kp_set:LSM.flushed_kp_temp_set;
@@ -979,6 +984,10 @@ void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx
 	if(lsm->gc_unavailable_seg[temp_seg_idx]==0){
 		lsm->gc_locked_seg_num--;
 	}
+
+	if(lsm->gc_unavailable_seg[temp_seg_idx]==UINT32_MAX){
+		EPRINT("int under flow error",true);
+	}
 }
 
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
@@ -986,6 +995,7 @@ void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
 	//EPRINT("remove this code for exp", false);
 	for(uint32_t i=0; i<_NOS; i++){
 		if(lsm->gc_unavailable_seg[i]){
+			printf("gc unavailable seg:%u %u", i, lsm->gc_unavailable_seg[i]);
 			EPRINT("should be zero", true);
 		}
 	}

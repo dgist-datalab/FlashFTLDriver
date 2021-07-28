@@ -188,13 +188,15 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	LSM.now_merging_run[0]=idx_set[0];
 	LSM.now_merging_run[1]=idx_set[1];
 
-	run *older=&des->array[idx_set[0]];
-	run	*newer=&des->array[idx_set[1]];
+	uint32_t big_order=MAX(
+			version_to_order(LSM.last_run_version, des->idx, idx_set[0]),
+			version_to_order(LSM.last_run_version, des->idx, idx_set[1]));
+	uint32_t small_order=MIN(
+			version_to_order(LSM.last_run_version, des->idx, idx_set[0]),
+			version_to_order(LSM.last_run_version, des->idx, idx_set[1]));
 
-	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
-		version_unpopulate(LSM.last_run_version, idx_set[i], des->idx);
-	}
-	//version_reinit_early_invalidation(LSM.last_run_version, MERGED_RUN_NUM, idx_set);
+	run *older=&des->array[version_order_to_ridx(LSM.last_run_version, des->idx, small_order)];
+	run *newer=&des->array[version_order_to_ridx(LSM.last_run_version, des->idx, big_order)];
 
 	read_issue_arg read_arg1={0,}, read_arg2={0,};
 	read_issue_arg read_arg1_prev={0,}, read_arg2_prev={0,};
@@ -212,7 +214,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	//uint32_t older_borderline=0;
 	uint32_t border_lba;
 
-	uint32_t target_version=version_get_empty_version(LSM.last_run_version, des->idx);
+	uint32_t target_version=idx_set[0];
 	uint32_t target_ridx=version_to_ridx(LSM.last_run_version,  des->idx, target_version);
 	sst_pf_out_stream *os_set[MERGED_RUN_NUM]={0,};
 
@@ -297,11 +299,11 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 				init=false;
 				os_set[0]=sst_pos_init_mr(&newer_mr[read_arg1.from], read_arg1.param,
 						TARGETREADNUM(read_arg1), 
-						idx_set[1],
+						version_order_to_version(LSM.last_run_version, des->idx, big_order),
 						read_map_done_check, invalid_map_done);
 				os_set[1]=sst_pos_init_mr(&older_mr[read_arg2.from], read_arg2.param,
 						TARGETREADNUM(read_arg2), 
-						idx_set[0],
+						version_order_to_version(LSM.last_run_version, des->idx, small_order),
 						read_map_done_check, invalid_map_done);
 			}
 			else{
@@ -401,7 +403,9 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	}
 
 	level_update_run_at_move_originality(res, target_ridx, new_run, true);
-	version_populate(LSM.last_run_version, target_version, des->idx);
+
+	version_clear_merge_target(LSM.last_run_version, idx_set, des->idx);
+	version_repopulate_merge_target(LSM.last_run_version, idx_set[0], target_ridx, des->idx);
 
 	run_free(new_run);
 
@@ -839,11 +843,14 @@ level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des
 
 //	level_content_print(src, true);
 
-	for(uint32_t i=0; i<target_run_num; i++){
-		uint32_t oldest_version=version_pop_oldest_version(LSM.last_run_version, src->idx);
-		version_unpopulate(LSM.last_run_version, oldest_version, src->idx);
-		uint32_t src_ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
-		level_run_reinit(src, src_ridx);
+	if(target_run_num==src->run_num){
+		for(uint32_t i=0; i<target_run_num; i++){
+			level_run_reinit(src, i);
+		}
+		version_clear_level(LSM.last_run_version, src->idx);
+	}
+	else{
+		EPRINT("not allow", true);
 	}
 
 	version_poped_update(LSM.last_run_version, src->idx, target_run_num);

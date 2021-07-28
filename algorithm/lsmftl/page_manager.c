@@ -859,7 +859,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				gn->lba=oob_lba[i];
 				gn->version=oob_version[i];
 				if(gn->lba==debug_lba){
-					printf("target is moved!\n");
+					if(LSM.global_debug_flag){
+						printf("target is moved!\n");
+					}
 				}
 				
 	//			gc_debug_checking(gn);
@@ -882,7 +884,43 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				}
 
 				/*for direct mapping*/
-				if(sptr==NULL || !(sptr && sptr->file_addr.piece_ppa<=piece_ppa && sptr->end_ppa*L2PGAP>=piece_ppa)){
+				if(sptr==NULL || 
+						!(sptr && sptr->file_addr.piece_ppa<=piece_ppa && sptr->end_ppa*L2PGAP>=piece_ppa)){
+					if(oob_lba[i]==debug_lba){
+						printf("break!\n");
+					}
+					/*filtering invalid data*/
+					recent_version=version_map_lba(LSM.last_run_version, oob_lba[i]);
+					if(recent_version==UINT8_MAX){ //the version is in direct mapping
+						std::map<uint32_t, uint32_t>::iterator find_iter;
+						if(LSM.flushed_kp_set){
+							find_iter=LSM.flushed_kp_set->find(oob_lba[i]);
+							if(find_iter!=LSM.flushed_kp_set->end() &&
+									find_iter->second!=piece_ppa){
+								invalidate_kp_entry(oob_lba[i], piece_ppa, UINT32_MAX, true);
+								continue;
+							}
+						}
+#ifdef WB_SEPARATE
+						if(LSM.hot_kp_set){
+							find_iter=LSM.hot_kp_set->find(oob_lba[i]);
+							if(find_iter!=LSM.hot_kp_set->end() &&
+									find_iter->second!=piece_ppa){
+								invalidate_kp_entry(oob_lba[i], piece_ppa, UINT32_MAX, true);
+								continue;
+							}
+						}
+#endif
+						if(LSM.flushed_kp_temp_set){
+							find_iter=LSM.flushed_kp_temp_set->find(oob_lba[i]);
+							if(find_iter!=LSM.flushed_kp_temp_set->end() &&
+									find_iter->second!=piece_ppa){
+								invalidate_kp_entry(oob_lba[i], piece_ppa, UINT32_MAX, true);
+								continue;
+							}
+						}
+					}
+
 				//	lsmtree_level_summary(&LSM);
 				//	uint32_t temp_remain_page=page_manager_get_total_remain_page(LSM.pm, false, true);
 				//	lsmtree_seg_debug(&LSM);

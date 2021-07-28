@@ -23,10 +23,14 @@ void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t version, l
 			printf("[GOLDEN-same_pice_ppa]");
 		}
 		if(des){
-			printf("[%d] %u,%u (l,p) -> version-number:%u lev:%u\n",++cnt, lba,piece_ppa, version, des->idx);
+			printf("[%d] %u,%u (l,p) -> version-number:%u lev:%u ridx:%u\n",++cnt, lba,piece_ppa, version, des->idx, 
+				version_to_ridx(LSM.last_run_version, des->idx,version));
 		}
 		else{
 			printf("[%d] %u,%u (l,p) -> merging to %u\n",++cnt, lba,piece_ppa, version);
+			if(cnt==9){
+				printf("break!\n");
+			}
 		}
 	}
 #endif

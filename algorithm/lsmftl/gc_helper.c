@@ -166,6 +166,10 @@ void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv
 	sst_file *now_check_sst=NULL;
 	blockmanager *bm=LSM.pm->bm;
 
+	if(LSM.flushed_kp_seg->find(seg_idx)==LSM.flushed_kp_seg->end()){
+		EPRINT("not allowd", true);
+	}
+	
 	key_ptr_pair *kp_set;
 	while((kp_set=write_buffer_flush_for_gc(wb, false, seg_idx, NULL, UINT32_MAX, gkv))){
 		free(kp_set);
@@ -188,6 +192,7 @@ void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv
 		}
 
 		/*hot_kp_set*/
+#ifdef WB_SEPARATE
 		find_iter=LSM.hot_kp_set->find(iter->first);
 		if(find_iter!=LSM.hot_kp_set->end()){
 			find_iter->second=iter->second->new_piece_ppa;
@@ -197,6 +202,7 @@ void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv
 			gkv->erase(iter++);
 			continue;
 		}
+#endif
 
 		/*flushed_kp_temp_set*/
 		find_iter=LSM.flushed_kp_temp_set->find(iter->first);

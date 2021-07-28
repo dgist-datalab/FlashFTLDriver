@@ -166,11 +166,6 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 	uint32_t need_seg_num=need_page_num/_PPS+(need_page_num%_PPS?1:0);
 
 	if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
-		if(LSM.global_debug_flag){
-			uint32_t temp_total_remain_page=page_manager_get_total_remain_page(LSM.pm, false, true);
-			uint32_t temp_total_remain_page2=page_manager_get_total_remain_page(LSM.pm, false, false);
-			printf("break! %u %u\n", temp_total_remain_page, temp_total_remain_page2);
-		}
 		__do_gc(LSM.pm, false, need_seg_num*_PPS);
 	}
 

@@ -118,7 +118,9 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, uint32_t target_num, bool syn
 			target_value->ppa=ppa;
 		//	oob=wb->pm->bm->get_oob(wb->pm->bm, ppa);
 		}	
-
+		if(it->first > 10000000){
+			EPRINT("??", true);
+		}
 		//page_manager_insert_lba(wb->pm, it->first);
 		memcpy(&target_value->value[inter_idx*LPAGESIZE], it->second->data.data->value, LPAGESIZE);//copy value
 		//*(uint32_t*)&oob[sizeof(uint32_t)*inter_idx]=it->first;//copy lba to oob

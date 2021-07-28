@@ -1,4 +1,5 @@
 SRCS +=\
+	   version.c\
 	   io.c\
 	   level.c\
 	   lftl_slab.c\
@@ -9,7 +10,6 @@ SRCS +=\
 	   compaction.c\
 	   compaction_assistant.c\
 	   function_test.c\
-	   version.c\
 	   write_buffer.c\
 	   sst_page_file_stream.c\
 	   sst_block_file_stream.c\
