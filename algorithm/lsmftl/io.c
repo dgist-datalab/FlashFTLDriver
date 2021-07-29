@@ -1,6 +1,8 @@
 #include "io.h"
 #include "../../interface/interface.h"
+#include "lsmtree.h"
 io_manager io_m;
+extern lsmtree LSM;
 void io_manager_init(lower_info *li){
 	io_m.li=li;
 	io_m.tm=tag_manager_init(QSIZE);
@@ -62,8 +64,43 @@ void io_manager_issue_write(uint32_t ppa, value_set *value, algo_req *al_req, bo
 	io_m.li->write(ppa, PAGESIZE ,value, ASYNC, al_req);
 }
 
+
+static inline void *io_seg_lock_end_req(algo_req* al_req){
+	static int cnt=0;
+	sync_wrapper *wrapper=(sync_wrapper*)al_req->param;
+	al_req->end_req=wrapper->end_req;
+	al_req->param=wrapper->param;
+	
+	lsmtree_gc_unavailable_unset(&LSM, NULL, wrapper->ppa/_PPS);
+
+	if(al_req->end_req){
+		al_req->end_req(al_req);
+	}
+	tag_manager_free_tag(io_m.tm, wrapper->tag);
+	return NULL;
+}
+
+static inline void set_seg_lockwrapper(sync_wrapper *wrapper, algo_req *al_req, uint32_t tag, uint32_t ppa){
+	wrapper->tag=tag;
+	wrapper->end_req=al_req->end_req;
+	wrapper->param=al_req->param;
+	wrapper->ppa=ppa;
+
+	al_req->param=(void*)wrapper;
+	al_req->end_req=io_seg_lock_end_req;
+
+	lsmtree_gc_unavailable_set(&LSM, NULL, ppa/_PPS);
+}
+
 void io_manager_issue_read(uint32_t ppa, value_set *value, algo_req *al_req, bool sync){
+#ifdef DEMAND_SEG_LOCK
+	uint32_t tag=tag_manager_get_tag(io_m.tm);
+	sync_wrapper *wrapper=&io_m.wrapper[tag];
+	set_seg_lockwrapper(wrapper, al_req, tag, ppa);
 	io_m.li->read(ppa, PAGESIZE ,value, ASYNC, al_req);
+#else
+	io_m.li->read(ppa, PAGESIZE ,value, ASYNC, al_req);
+#endif
 }
 
 void io_manager_free(){

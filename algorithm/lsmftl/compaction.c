@@ -342,6 +342,10 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 			if(invalidate_function(des, target_idx, query_version, target_pair, false, inplace)){
 				if(kpq){
 					sorting_idx++;
+	
+#ifdef DEMAND_SEG_LOCK
+					lsmtree_gc_unavailable_set(&LSM, NULL, target_pair.piece_ppa/L2PGAP/_PPS);
+#endif
 					kpq->push(target_pair);
 				}
 				else if(is){
@@ -981,13 +985,18 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 }
 
 void compaction_leveling_gc_lock(level *lev, uint32_t from, uint32_t to){
+#ifdef DEMAND_SEG_LOCK
+#else
 	for(uint32_t i=from; i<=to; i++){
 		lsmtree_gc_unavailable_set(&LSM, LEVELING_SST_AT_PTR(lev, i), UINT32_MAX);
 	}
+#endif
 }
 
 void compaction_leveling_gc_unlock(level *lev, uint32_t *unlocked_idx, uint32_t to, 
 		uint32_t border_lba, bool last){
+#ifdef DEMAND_SEG_LOCK
+#else
 	for(uint32_t i=*unlocked_idx; i<=to; i++){
 		sst_file *sptr=LEVELING_SST_AT_PTR(lev, i);
 		if(last){
@@ -1000,6 +1009,7 @@ void compaction_leveling_gc_unlock(level *lev, uint32_t *unlocked_idx, uint32_t 
 		else
 			break;
 	}
+#endif
 }
 
 /*

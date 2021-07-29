@@ -143,13 +143,15 @@ static inline void map_range_preprocessing(mr_free_set free_set, std::list<mr_fr
 
 	//	printf("[%u] %u -> %u~%u\n", cnt++, i, free_set.mr_set[i].ppa, 
 	//			free_set.mr_set[i].ppa/_PPS);
-
+#ifdef DEMAND_SEG_LOCK
+#else
 		if(is_sst_file){
 			lsmtree_gc_unavailable_set(&LSM, &rptr->sst_set[i], UINT32_MAX);
 		}
 		else{
 			lsmtree_gc_unavailable_set(&LSM, NULL, free_set.mr_set[i].ppa/_PPS);
 		}
+#endif
 	}
 	mr_list->push_back(free_set);
 }
@@ -160,6 +162,8 @@ static inline void map_range_postprocessing(std::list<mr_free_set>* mr_list,  ui
 		mr_free_set now=*mr_iter;
 		if(last || now.mr_set[now.map_num].end_lba <= bound_lba){
 			for(uint32_t i=now.start_idx; i<=now.end_idx; i++){
+#ifdef DEMAND_SEG_LOCK
+#else
 				if(is_sst_file){
 					lsmtree_gc_unavailable_unset(&LSM, &now.r->sst_set[i], UINT32_MAX);
 				}
@@ -169,6 +173,7 @@ static inline void map_range_postprocessing(std::list<mr_free_set>* mr_list,  ui
 					//		now.mr_set[i].ppa/_PPS);
 					lsmtree_gc_unavailable_unset(&LSM, NULL, now.mr_set[i].ppa/_PPS);
 				}
+#endif
 			}
 			if(should_free){
 				free(now.mr_set);
@@ -577,11 +582,6 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	}
 	static int compaction_cnt=0;
 	printf("before break! %u\n", compaction_cnt++);
-
-	if(compaction_cnt==5){
-		printf("bbb\n");
-	//	LSM.global_debug_flag=true;
-	}
 #endif
 
 #ifdef LSM_DEBUG
@@ -985,16 +985,21 @@ static uint32_t filter_invalidation(sst_pf_out_stream *pos, std::queue<key_ptr_p
 static inline void gc_lock_run(run *r){
 	sst_file *sptr;
 	uint32_t idx;
+#ifdef DEMAND_SEG_LOCK
+#else
 	for_each_sst(r, sptr, idx){
 	//	printf("lock lba:%u ->sidx:%u segidx:%u\n", sptr->end_lba, idx, sptr->end_ppa/_PPS);
 		lsmtree_gc_unavailable_set(&LSM, sptr, UINT32_MAX);
 	}
+#endif
 }
 
 static inline void gc_unlock_run(run *r, uint32_t *sst_file_num, uint32_t border_lba){
 	if(r->now_sst_num <= *sst_file_num) return;
 	sst_file *sptr;
 	uint32_t idx=*sst_file_num;
+#ifdef DEMAND_SEG_LOCK
+#else
 	for_each_sst_at(r, sptr, idx){
 		if(sptr->end_lba<=border_lba){
 	//		printf("unlock lba:%u ->sidx:%u border:%u\n", sptr->end_lba, idx, border_lba);
@@ -1004,6 +1009,7 @@ static inline void gc_unlock_run(run *r, uint32_t *sst_file_num, uint32_t border
 			break;
 		}
 	}
+#endif
 	*sst_file_num=idx;
 }
 

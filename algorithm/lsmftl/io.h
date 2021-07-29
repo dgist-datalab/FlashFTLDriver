@@ -9,6 +9,7 @@ typedef struct sync_wrapper{
 	void* param;
 	void *(*end_req)(algo_req*);
 	uint32_t tag;
+	uint32_t ppa;
 }sync_wrapper;
 
 typedef struct {

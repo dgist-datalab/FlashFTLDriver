@@ -126,6 +126,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.monitor.compaction_cnt=(uint32_t*)calloc(LSM.param.LEVELN+1, sizeof(uint32_t));
 	slm_init(LSM.param.LEVELN);
 	fdriver_mutex_init(&LSM.flush_lock);
+	fdriver_mutex_init(&LSM.gc_unavailable_seg_lock);
 
 
 	read_helper_prepare(
@@ -144,6 +145,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.flush_wait_wb=NULL;
 
 	LSM.gc_unavailable_seg=(uint32_t*)calloc(_NOS, sizeof(uint32_t));
+	LSM.blocked_invalidation_seg=(uint32_t*)calloc(_NOS, sizeof(uint32_t));
 
 	memset(LSM.now_merging_run, -1, sizeof(uint32_t)*(1+1));
 	LSM.li=li;
@@ -955,6 +957,7 @@ sst_file *lsmtree_find_target_normal_sst_datagc(uint32_t lba, uint32_t piece_ppa
 }
 
 void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
+	fdriver_lock(&LSM.gc_unavailable_seg_lock);
 	uint32_t temp_seg_idx;
 	if(sptr){
 		lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]++;
@@ -969,9 +972,11 @@ void lsmtree_gc_unavailable_set(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
 	if(lsm->gc_unavailable_seg[temp_seg_idx]==1){
 		lsm->gc_locked_seg_num++;
 	}
+	fdriver_unlock(&LSM.gc_unavailable_seg_lock);
 }
 
 void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx){
+	fdriver_lock(&LSM.gc_unavailable_seg_lock);
 	uint32_t temp_seg_idx;
 	if(sptr){
 		lsm->gc_unavailable_seg[sptr->end_ppa/_PPS]--;
@@ -988,6 +993,7 @@ void lsmtree_gc_unavailable_unset(lsmtree *lsm, sst_file *sptr, uint32_t seg_idx
 	if(lsm->gc_unavailable_seg[temp_seg_idx]==UINT32_MAX){
 		EPRINT("int under flow error",true);
 	}
+	fdriver_unlock(&LSM.gc_unavailable_seg_lock);
 }
 
 void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
@@ -995,7 +1001,7 @@ void lsmtree_gc_unavailable_sanity_check(lsmtree *lsm){
 	//EPRINT("remove this code for exp", false);
 	for(uint32_t i=0; i<_NOS; i++){
 		if(lsm->gc_unavailable_seg[i]){
-			printf("gc unavailable seg:%u %u", i, lsm->gc_unavailable_seg[i]);
+			printf("gc unavailable seg:%u %u ", i, lsm->gc_unavailable_seg[i]);
 			EPRINT("should be zero", true);
 		}
 	}
@@ -1103,9 +1109,11 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 	page_manager *pm=lsm->pm;
 	blockmanager *bm=pm->bm;
 	for(uint32_t i=0; i<_NOS; i++){
-		printf("%u block:%s inv:%u type:%s\n", i, lsm->gc_unavailable_seg[i]?"true":"false",
+		printf("%u block:%s inv:%u type:%s locked_num:%u\n", i, lsm->gc_unavailable_seg[i]?"true":"false",
 				bm->get_invalidate_number(bm, i), 
-				get_seg_type_name(pm, i));
+				get_seg_type_name(pm, i),
+				lsm->gc_unavailable_seg[i]
+				);
 	}
 
 	printf("wb:\n\t");
@@ -1143,14 +1151,57 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 			}
 		}
 	}
+
 #endif
 	return 1;
 }
 
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting){
+#ifdef DEMAND_SEG_LOCK
+	if(LSM.blocked_invalidation_seg[piece_ppa/L2PGAP/_PPS]){
+		return true;
+	}
+#endif
 	if(old_version!=UINT32_MAX){
 		LSM.last_run_version->version_invalidate_number[old_version]++;
 	}
 	bool res=invalidate_piece_ppa(LSM.pm->bm, piece_ppa, aborting);
 	return res;
+}
+
+void lsmtree_block_already_gc_seg(lsmtree *lsm, uint32_t seg_idx){
+#ifdef DEMAND_SEG_LOCK
+	LSM.blocked_invalidation_seg[seg_idx]++;
+#endif
+}
+
+void lsmtree_unblock_already_gc_seg(lsmtree *lsm){
+#ifdef DEMAND_SEG_LOCK
+	for(uint32_t i=0; i<_NOS; i++){
+		LSM.blocked_invalidation_seg[i]=0;
+	}
+#endif
+}
+
+void lsmtree_control_gc_lock_on_read(lsmtree *lsm, uint32_t piece_ppa, bool _final){
+#ifdef DEMAND_SEG_LOCK
+	static uint32_t prev_piece_ppa=UINT32_MAX;
+	if(_final){
+		if(prev_piece_ppa!=UINT32_MAX){
+			lsmtree_gc_unavailable_unset(lsm, NULL, prev_piece_ppa/L2PGAP/_PPS);
+			prev_piece_ppa=UINT32_MAX;
+		}
+		return;
+	}
+
+	if(prev_piece_ppa==UINT32_MAX ||
+			prev_piece_ppa/L2PGAP/_PPS!=piece_ppa/L2PGAP/_PPS){
+		if(prev_piece_ppa!=UINT32_MAX){
+			lsmtree_gc_unavailable_unset(lsm, NULL, prev_piece_ppa/L2PGAP/_PPS);
+		}
+
+		lsmtree_gc_unavailable_set(lsm, NULL, piece_ppa/L2PGAP/_PPS);
+		prev_piece_ppa=piece_ppa;
+	}
+#endif
 }

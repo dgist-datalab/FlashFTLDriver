@@ -25,7 +25,7 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 	//	memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 #ifdef LSM_DEBUG
 		if(piece_ppa[i]==debug_piece_ppa){
-			printf("%u ", should_abort?++cnt:cnt);
+			printf("%u lba:%u", should_abort?++cnt:cnt, oob->lba[piece_ppa[i]%L2PGAP]);
 			EPRINT("validate piece here!\n", false);	
 		}
 #endif
@@ -141,6 +141,13 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 }
 
 void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
+
+#ifdef DEMAND_SEG_LOCK
+	if(LSM.blocked_invalidation_seg[map_ppa/_PPS]){
+		return;
+	}
+#endif
+
 #ifdef LSM_DEBUG
 	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
 		static int cnt=0;
@@ -569,7 +576,7 @@ retry_logic:
 	goto retry;
 
 out:
-	if(LSM.gc_unavailable_seg[seg_idx] && victim_target->invalidate_number!=victim_target->validate_number){
+	if(lsmtree_is_gc_available(&LSM, seg_idx) && victim_target->invalidate_number!=victim_target->validate_number){
 //		if(LSM.global_debug_flag) printf("[%lu] %u is locked\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
@@ -787,6 +794,13 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	else if(victim->invalidate_number>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
+
+	if(victim->seg_idx==debug_piece_ppa/L2PGAP/_PPS){
+		printf("break!\n");
+	}
+
+	lsmtree_block_already_gc_seg(&LSM, victim->seg_idx);
+
 	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
 	std::queue<gc_read_node*> *gc_target_queue=new std::queue<gc_read_node*>();
 	uint32_t bidx;
@@ -859,15 +873,14 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				gn->lba=oob_lba[i];
 				gn->version=oob_version[i];
 				if(gn->lba==debug_lba){
-					if(LSM.global_debug_flag){
-						printf("target is moved!\n");
-					}
+					printf("target is moved!\n");
 				}
 				
 	//			gc_debug_checking(gn);
 
 				/*check invalidation*/
-				if(!sptr || (sptr && sptr->end_ppa*L2PGAP<piece_ppa)){ //first round or new sst_file
+				if(!sptr || 
+						(sptr && ((sptr->end_ppa*L2PGAP)<piece_ppa && !is_map_ppa(sptr, piece_ppa/L2PGAP)))){ //first round or new sst_file
 					if(sptr){
 						if(gsn->wb->buffered_entry_num){
 							move_sptr(gsn,victim->seg_idx, gsn->lev_idx, gsn->version, gsn->sidx);
@@ -884,8 +897,8 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				}
 
 				/*for direct mapping*/
-				if(sptr==NULL || 
-						!(sptr && sptr->file_addr.piece_ppa<=piece_ppa && sptr->end_ppa*L2PGAP>=piece_ppa)){
+				if(!sptr || 
+						(sptr && ((sptr->end_ppa*L2PGAP)<piece_ppa && !is_map_ppa(sptr, piece_ppa/L2PGAP)))){
 					if(oob_lba[i]==debug_lba){
 						printf("break!\n");
 					}
@@ -918,7 +931,11 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 								invalidate_kp_entry(oob_lba[i], piece_ppa, UINT32_MAX, true);
 								continue;
 							}
+							if(find_iter==LSM.flushed_kp_temp_set->end()) continue;
 						}
+					}
+					else{
+						EPRINT("???\n", true);
 					}
 
 				//	lsmtree_level_summary(&LSM);

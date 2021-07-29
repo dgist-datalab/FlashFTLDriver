@@ -25,6 +25,7 @@
 //#define HOT_COLD
 //#define WB_SEPARATE
 //#define INVALIDATION_COUNT_MERGE
+#define DEMAND_SEG_LOCK
 
 enum{
 	DEMOTE_RUN, KEEP_RUN,
@@ -141,7 +142,9 @@ typedef struct lsmtree{
 #endif
 	std::map<uint32_t, uint32_t> *flushed_kp_temp_set;
 
+	fdriver_lock_t gc_unavailable_seg_lock;
 	uint32_t* gc_unavailable_seg;
+	uint32_t* blocked_invalidation_seg;
 	uint32_t gc_locked_seg_num;
 
 	lower_info *li;
@@ -183,9 +186,21 @@ uint64_t lsmtree_all_memory_usage(lsmtree *lsm, uint64_t* , uint64_t *, uint32_t
 void lsmtree_tiered_level_all_print();
 void lsmtree_gc_lock_level(lsmtree *lsm, uint32_t level_idx);
 void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
+
+void lsmtree_block_already_gc_seg(lsmtree *lsm, uint32_t seg);
+void lsmtree_unblock_already_gc_seg(lsmtree *lsm);
+void lsmtree_control_gc_lock_on_read(lsmtree *lsm, uint32_t piece_ppa, bool _final);
+
 uint32_t lsmtree_testing();
 uint32_t lsmtree_seg_debug(lsmtree *lsm);
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting);
+static inline bool lsmtree_is_gc_available(lsmtree *lsm, uint32_t seg_idx){
+	bool res;
+	fdriver_lock(&lsm->gc_unavailable_seg_lock);
+	res=lsm->gc_unavailable_seg[seg_idx]!=0?true:false;
+	fdriver_unlock(&lsm->gc_unavailable_seg_lock);
+	return res;
+}
 static void lsmtree_print_WAF(lower_info *li){
 	printf("WAF: %lf\n\n",
 			(double)(li->req_type_cnt[MAPPINGW] +

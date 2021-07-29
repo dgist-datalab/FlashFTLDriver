@@ -87,6 +87,7 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
+
 #ifdef NOTSURE
 		if(slm_invalidate_enable(now_level, kv_wrapper->piece_ppa)){
 			invalidate_kp_entry(kv_wrapper->kv_ptr.lba, kv_wrapper->piece_ppa, UINT32_MAX, true);
@@ -102,6 +103,9 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 				continue;
 			}
 		}
+#ifdef DEMAND_SEG_LOCK
+		lsmtree_gc_unavailable_set(&LSM, NULL, target_pair.piece_ppa/L2PGAP/_PPS);
+#endif
 
 		if((read_target=sst_bos_add(bos, kv_wrapper, _cm))){
 			if(!read_target->param){
@@ -155,8 +159,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 		std::queue<uint32_t> *locked_seg_q,run *new_run,
 		int32_t entry_num, uint32_t target_version, bool final){
 	int32_t inserted_entry_num=0;
-	uint32_t last_lba=UINT32_MAX;
-
+	uint32_t last_lba=UINT32_MAX; 
 	fdriver_lock(&LSM.flush_lock);
 	uint32_t level_idx=version_to_level_idx(LSM.last_run_version, target_version, LSM.param.LEVELN);
 
@@ -183,6 +186,10 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 		}
 
 		if(target){
+			
+#ifdef DEMAND_SEG_LOCK
+			lsmtree_gc_unavailable_unset(&LSM, NULL, target->piece_ppa/L2PGAP/_PPS);
+#endif
 			last_lba=target->kv_ptr.lba;
 			version_coupling_lba_version(LSM.last_run_version, target->kv_ptr.lba, target_version);
 		}

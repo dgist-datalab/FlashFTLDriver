@@ -148,6 +148,15 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	uint32_t map_ppa=page_manager_get_new_ppa(LSM.pm, false, DATASEG); //DATASEG for sequential tiering 
 	validate_map_ppa(LSM.pm->bm, map_ppa, kp_set[0].lba,  kp_set[last_idx].lba, true);
 
+	if(sequential_file){
+		if(prev_seg_num==map_ppa/_PPS && prev_piece_ppa < map_ppa*L2PGAP){
+			sequential_file=true;
+		}
+		else{
+			sequential_file=false;
+		}
+	}
+
 	sst_file *res=sst_init_empty(PAGE_FILE);
 	res->file_addr.map_ppa=map_ppa;
 
@@ -155,6 +164,7 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	res->end_lba=kp_set[last_idx].lba;
 	res->_read_helper=rh;
 	res->start_piece_ppa=kp_set[0].piece_ppa;
+	res->end_ppa=UINT32_MAX;
 
 	res->sequential_file=sequential_file;
 	/*
@@ -409,9 +419,6 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
 				iter!=LSM.flushed_kp_seg->end(); iter++){
-			if(LSM.global_debug_flag){
-				printf("unavailable %u\n", *iter);
-			}
 			lsmtree_gc_unavailable_set(&LSM, NULL, *iter);
 		}
 	}else{
@@ -787,6 +794,9 @@ void* compaction_main(void *_cm){
 		compaction_req *req=(compaction_req*)q_dequeue(req_q);
 		if(!req) continue;
 again:
+#ifdef DEMAND_SEG_LOCK	
+		lsmtree_unblock_already_gc_seg(&LSM);
+#endif
 		level *temp_level=NULL;
 		if(req->start_level==-1 && req->end_level==0){
 			if(req->wb){
