@@ -74,6 +74,8 @@ uint32_t version_level_to_start_version(version *v, uint32_t level_idx);
 
 uint32_t version_get_level_invalidation_cnt(version *v, uint32_t level_idx);
 uint32_t version_get_resort_version(version *v, uint32_t level_idx);
+uint32_t version_decrease_invalidation_number(version *v, uint32_t _version, 
+		int32_t decrease_num);
 
 static inline uint32_t version_order_to_ridx(version *v, uint32_t lev_idx, uint32_t order){
 	return v->O2R_map[lev_idx][order];
@@ -113,7 +115,7 @@ static void version_level_invalidate_number_init(version *v, uint32_t lev_idx){
 	}
 }
 
-void version_print_order(version *v, uint32_t lev_idx);
+void version_print_order(version *v, uint32_t version_number);
 
 static inline bool version_belong_level(version *v, int32_t a, uint32_t lev_idx){
 	uint32_t start_v=v->start_vidx_of_level[lev_idx];

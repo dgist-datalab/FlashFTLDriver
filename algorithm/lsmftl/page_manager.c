@@ -685,6 +685,7 @@ typedef struct gc_sptr_node{
 	uint32_t lev_idx;
 	uint32_t version;
 	uint32_t sidx;
+	uint32_t early_invalidation_cnt;
 	write_buffer *wb;
 }gc_sptr_node;
 
@@ -697,6 +698,7 @@ static gc_sptr_node * gc_sptr_node_init(sst_file *sptr, uint32_t validate_num,
 	res->lev_idx=lev_idx;
 	res->version=version;
 	res->sidx=sidx;
+	res->early_invalidation_cnt=0;
 	return res;
 }
 
@@ -719,6 +721,8 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t lev_idx,
 		sst_file *sptr=NULL;
 		uint32_t round=0;
 		uint32_t ridx=version_to_ridx(LSM.last_run_version, lev_idx, version);
+		uint32_t before_contents_num=read_helper_get_cnt(gsn->sptr->_read_helper);
+		uint32_t after_contents_num=0;
 		while(gsn->wb->buffered_entry_num){
 			sptr=sst_init_empty(BLOCK_FILE);
 			uint32_t map_num=gsn->wb->buffered_entry_num/KP_IN_PAGE+
@@ -764,6 +768,8 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t lev_idx,
 			sptr->end_lba=mr_set[kp_set_idx-1].end_lba;
 			sptr->_read_helper=gsn->wb->rh;
 			read_helper_insert_done(gsn->wb->rh);
+
+			after_contents_num+=read_helper_get_cnt(sptr->_read_helper);
 			if(round==0){
 				level_sptr_update_in_gc(LSM.disk[lev_idx], ridx, sidx, sptr);
 			}
@@ -780,6 +786,11 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t lev_idx,
 			free(sptr);
 			free(kp_set);
 		}
+		//uint32_t after_contents_num=read_helper_get_cnt(sptr->_read_helper);
+		level_contents_num_updates_at_gc(LSM.disk[lev_idx],
+				ridx, before_contents_num-after_contents_num);
+		version_decrease_invalidation_number(LSM.last_run_version, gsn->version, 
+				gsn->early_invalidation_cnt);
 	}
 	gc_sptr_node_free(gsn);
 }
@@ -864,7 +875,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		oob_version=oob->version;
 
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(bm->is_invalid_page(bm, ppa*L2PGAP+i)) continue;
+			if(bm->is_invalid_page(bm, ppa*L2PGAP+i)){
+				continue;
+			}
 			else{
 				if(oob_lba[i]==UINT32_MAX) continue;
 
@@ -886,9 +899,14 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 							move_sptr(gsn,victim->seg_idx, gsn->lev_idx, gsn->version, gsn->sidx);
 						}
 						else{
-							level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], 
-									version_to_ridx(LSM.last_run_version, gsn->lev_idx, gsn->version), 
-									gsn->sidx);
+							uint32_t ridx=version_to_ridx(LSM.last_run_version, gsn->lev_idx, gsn->version);
+							level_contents_num_updates_at_gc(LSM.disk[gsn->lev_idx], 
+									ridx, 
+									read_helper_get_cnt(gsn->sptr->_read_helper));
+							version_decrease_invalidation_number(LSM.last_run_version, 
+									gsn->version, gsn->early_invalidation_cnt);
+							level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], ridx, gsn->sidx);
+
 							gc_sptr_node_free(gsn);
 						}
 					}
@@ -980,6 +998,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 						insert_target_sptr(gsn, gn->lba, &gn->data->value[LPAGESIZE*i]);
 					}
 					else{
+						gsn->early_invalidation_cnt++;
 						invalidate_kp_entry(gn->lba, gn->piece_ppa, UINT32_MAX, true);
 						continue; //already invalidate
 					}
@@ -994,7 +1013,12 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		if(gsn->wb->buffered_entry_num){
 			move_sptr(gsn,victim->seg_idx, gsn->lev_idx, gsn->version, gsn->sidx);
 		}
-		else{
+		else{	
+			uint32_t ridx=version_to_ridx(LSM.last_run_version, gsn->lev_idx, gsn->version);
+			level_contents_num_updates_at_gc(LSM.disk[gsn->lev_idx], 
+					ridx, read_helper_get_cnt(gsn->sptr->_read_helper));
+			version_decrease_invalidation_number(LSM.last_run_version, 
+					gsn->version, gsn->early_invalidation_cnt);
 			level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], 
 					version_to_ridx(LSM.last_run_version, gsn->lev_idx, gsn->version), 
 					gsn->sidx);

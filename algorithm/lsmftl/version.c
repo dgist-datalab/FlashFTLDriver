@@ -331,6 +331,14 @@ void version_coupling_lba_version(version *v, uint32_t lba, uint8_t version){
 	fdriver_unlock(&v->version_lock);
 }
 
+uint32_t version_decrease_invalidation_number(version *v, uint32_t version_number, 
+		int32_t decrease_num){
+	if((int32_t)v->version_invalidate_number[version_number] < decrease_num){
+		EPRINT("version invalidate nubmer should be natuer number", true);
+	}
+	v->version_invalidate_number[version_number]-=decrease_num;
+	return 1;
+}
 /*
 void version_reinit_early_invalidation(version *v, uint32_t version_num, uint32_t *version){
 	EPRINT("should I need it?\n", false);

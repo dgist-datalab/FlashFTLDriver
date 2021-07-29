@@ -468,6 +468,14 @@ void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
 	}
 }
 
+uint32_t level_contents_num_updates_at_gc(level *lev, uint32_t ridx,
+		int32_t decrease_num){
+	lev->now_contents_num-=decrease_num;
+	run *rptr=&lev->array[ridx];
+	rptr->now_contents_num-=decrease_num;
+	return 1;
+}
+
 run *level_LE_to_run(level *lev, bool move_originality){
 	if(lev->level_type!=LEVELING && lev->level_type!=LEVELING_WISCKEY){
 		EPRINT("the lev should be LEVELING", true);
@@ -597,3 +605,5 @@ uint32_t level_run_populate_analysis(run *r){
 	if(cnt_sum==0) return 0;
 	return cnt_sum/contents_num;
 }
+
+

@@ -186,5 +186,7 @@ void level_print(level *lev);
 void level_content_print(level *lev, bool print_sst);
 uint32_t get_level_content_num(level *lev);
 uint32_t level_run_populate_analysis(run *r);
+uint32_t level_contents_num_updates_at_gc(level *lev, 
+		uint32_t ridx,  int32_t decrese_num);
 
 #endif
