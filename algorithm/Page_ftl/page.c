@@ -556,12 +556,26 @@ void insert_max_heap(element element){
 void search_heap(uint32_t idx){ 
 	uint64_t i = 1; 
 	element tmp; 
+//	printf("111\n");	
+	while(h.heap[i].idx != idx){ 
+//		printf("i: %d\n", i);
+		i++;
+#if 1 //TEST over heap case 
+		if(i == _DCE){ 
+			element newElement; 
+			
+			newElement.idx = idx; 
+			newElement.count = 1; 
 	
-	while(h.heap[i].idx != idx)
-		i++; 
-
+			insert_max_heap(newElement); 
+			
+			return;
+		} 
+#endif
+	}
+//	printf("444\n");
 	h.heap[i].count++; 
-
+//	printf("222\n");
 	if(h.heap[i].count > h.heap[i/2].count){ 
 		tmp = h.heap[i]; 
 		
@@ -570,19 +584,26 @@ void search_heap(uint32_t idx){
 			i /= 2; 
 		} 
 		h.heap[i] = tmp; 	
-	}	
+	}
+//	printf("333\n");	
 	return; 
 } 
 
 void delete_max_heap(){ 
 	uint32_t parent, child; 
 	element item, temp; 
-	
+		
 	item = h.heap[1]; 
+//	printf("1111\n");
+#if 1 //TEST over heap case
+	if(h.heap_size == 0) 
+		return; 
+#endif
 	temp = h.heap[(h.heap_size)--]; 
+//	printf("h.heap_size: %d\n", h.heap_size);
 	parent = 1; 
 	child = 2; 
-	
+//	printf("2222\n");	
 	while(child <= h.heap_size){ 
 		if((child < h.heap_size) && ((h.heap[child].count) < h.heap[child + 1].count))
 			child++; 
@@ -593,7 +614,8 @@ void delete_max_heap(){
 		h.heap[parent] = h.heap[child]; 
 		parent = child; 
 		child *= 2; 
-	} 
+	}
+//	printf("3333\n"); 
 	h.heap[parent] = temp; 
 	return; 
 } 

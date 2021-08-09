@@ -55,7 +55,8 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 16L
+//#define GIGAUNIT 16L //default setting
+#define GIGAUNIT 8L
 #define OP 70
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))

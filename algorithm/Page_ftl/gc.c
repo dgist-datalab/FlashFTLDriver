@@ -132,6 +132,7 @@ void do_gc(){
 	//printf("gc: %d\n", cnt++);
 	/*by using this for loop, you can traversal all page in block*/
 	for_each_page_in_seg(target,page,bidx,pidx){
+		//printf("check\n");
 		//this function check the page is valid or not
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
@@ -225,7 +226,11 @@ retry:
 ppa_t get_ppa_mapflush(){ 
 	uint32_t res; 
 	pm_body *p=(pm_body*)page_ftl.algo_body;
-
+#if 0 // gc get_seg test	
+	if(page_ftl.bm->check_full(page_ftl.bm, p->mapflush,MASTER_PAGE) && page_ftl.bm->is_gc_needed(page_ftl.bm)){ 
+		do_gc();//call gc
+	} 
+#endif
 retry: 
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->mapflush); 
 	

@@ -1,6 +1,6 @@
 RSLT_DIR=./eval
 #TRACE="VECTOREDSSET"
-TRACE="realtpc_1"
+TRACE="realtpc_opt_1"
 #TRACE="synths"
 bsize="1 128 256 512 1024 2048 4096 8192 16384" 
 #bsize="64"
