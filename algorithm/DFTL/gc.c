@@ -136,7 +136,7 @@ void do_gc(){
 	while(!target || 
 			p->seg_type_checker[target->seg_idx]!=DATASEG){
 		if(target){
-			if(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS *L2PGAP){
+			if(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==target->validate_number){
 				break;	
 			}
 			temp_queue.push(target->seg_idx);

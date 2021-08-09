@@ -10,6 +10,7 @@ run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
 	res->end_lba=end_lba;
 	res->now_contents_num=0;
 	res->sst_num_zero_by_gc=false;
+	res->update_by_gc=false;
 	if(sst_file_num>100000){
 		printf("???\n");
 	}
@@ -24,6 +25,7 @@ void run_space_init(run *res, uint32_t map_num, uint32_t start_lba, uint32_t end
 	res->end_lba=end_lba;
 	res->sst_set=(sst_file*)calloc(map_num, sizeof(sst_file));
 	res->sst_num_zero_by_gc=false;
+	res->update_by_gc=false;
 }
 
 void run_reinit(run *res){
@@ -32,6 +34,7 @@ void run_reinit(run *res){
 	for_each_sst(res, sptr, sidx){	
 		sst_reinit(sptr);
 	}
+	res->update_by_gc=false;
 	res->start_lba=UINT32_MAX;
 	res->end_lba=0;
 	res->sst_num_zero_by_gc=false;
@@ -86,6 +89,76 @@ sst_file *run_retrieve_close_sst(run *r, uint32_t lba){
 	else{ 
 		return mid-1<0? NULL:&r->sst_set[mid-1];
 	}
+}
+
+uint32_t run_retrieve_close_sst_idx(run *r, uint32_t lba){
+	int s=0, e=r->now_sst_num-1;
+	int mid;
+	bool is_right=false;
+	while(s<=e){
+		mid=(s+e)/2;
+		if(r->sst_set[mid].start_lba<=lba && r->sst_set[mid].end_lba>=lba){
+			return mid;
+		}
+		if(r->sst_set[mid].start_lba > lba){
+			e=mid-1;
+			is_right=false;
+		}
+		else if(r->sst_set[mid].end_lba < lba){
+			s=mid+1;
+			is_right=true;
+		}
+	}
+
+	if(is_right) return mid;
+	else{ 
+		return mid-1<0? 0:mid-1;
+	}
+}
+
+uint32_t run_retrieve_lower_bound_sst_idx(run *r, uint32_t lba){
+	int s=0, e=r->now_sst_num-1;
+	int mid;
+	while(s<e){
+		mid=s+(e-s)/2;
+		if(r->sst_set[mid].start_lba<=lba && r->sst_set[mid].end_lba>=lba){
+			s=mid;
+			break;
+		}
+
+		if(r->sst_set[mid].start_lba >= lba){
+			e=mid;	
+		}
+		else if(r->sst_set[mid].end_lba < lba){
+			s=mid+1;
+		}
+	}
+	if(s < r->now_sst_num-1 && r->sst_set[s].end_lba < lba){
+		s++;
+	}
+	return s;
+}
+
+uint32_t run_retrieve_upper_bound_sst_idx(run *r, uint32_t lba){
+	int s=0, e=r->now_sst_num-1;
+	int mid;
+	while(s<e){
+		mid=s+(e-s)/2;
+
+		if(r->sst_set[mid].end_lba <= lba){
+			s=mid+1;	
+		}
+		else if(r->sst_set[mid].start_lba <= lba && r->sst_set[mid].end_lba > lba){
+			return mid;
+		}
+		else if(r->sst_set[mid].start_lba > lba){
+			e=mid;
+		}
+	}
+	if(s < r->now_sst_num-1 && r->sst_set[s].end_lba <=lba){
+		s++;
+	}
+	return s;
 }
 
 static inline void __do_run_append_sstfile(run *_run, sst_file *sstfile, bool moved_originality){

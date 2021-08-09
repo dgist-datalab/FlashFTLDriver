@@ -2,7 +2,7 @@
 #include <stdlib.h>
 extern lsmtree LSM;
 extern compaction_master *_cm;
-bool early_map_done(inter_read_alreq_param *param){
+bool early_map_done(inter_read_alreq_param *param, bool inv_flag){
 	param->map_target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);

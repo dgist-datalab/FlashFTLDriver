@@ -93,7 +93,7 @@ static inline void set_seg_lockwrapper(sync_wrapper *wrapper, algo_req *al_req, 
 }
 
 void io_manager_issue_read(uint32_t ppa, value_set *value, algo_req *al_req, bool sync){
-#ifdef DEMAND_SEG_LOCK
+#if defined(DEMAND_SEG_LOCK) && !defined(UPDATING_COMPACTION_DATA)
 	uint32_t tag=tag_manager_get_tag(io_m.tm);
 	sync_wrapper *wrapper=&io_m.wrapper[tag];
 	set_seg_lockwrapper(wrapper, al_req, tag, ppa);

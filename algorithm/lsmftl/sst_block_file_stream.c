@@ -9,6 +9,7 @@ sst_bf_out_stream *sst_bos_init(bool (*r_check_done)(inter_read_alreq_param *, b
 	sst_bf_out_stream *res=(sst_bf_out_stream*)calloc(1, sizeof(sst_bf_out_stream));
 	res->kv_read_check_done=r_check_done;
 	res->kv_wrapper_q=new std::queue<key_value_wrapper*>();
+	res->map_for_gc=new std::map<uint32_t, key_value_wrapper*>();
 	res->prev_ppa=UINT32_MAX;
 #ifdef LSM_DEBUG
 	res->prev_lba=UINT32_MAX;
@@ -42,13 +43,13 @@ static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_w
 			kv_wrap_buf[i]->wait_target_req=false;
 		}
 
-#ifndef NOTSURE
-		invalidate_kp_entry(kv_wrap_buf[i]->kv_ptr.lba, kv_wrap_buf[i]->piece_ppa, UINT32_MAX, true);
-#endif
-
 		if(kv_wrap_buf[i]->kv_ptr.lba==debug_lba){
-			printf("wrapping! %u -> offset:%u\n", debug_lba, kv_wrap_buf[i]->piece_ppa%L2PGAP);	
+
+			printf("wrapping! %u -> piece_ppa:%u offset:%u\n", debug_lba, kv_wrap_buf[i]->piece_ppa, kv_wrap_buf[i]->piece_ppa%L2PGAP);	
 		}
+
+		invalidate_kp_entry(kv_wrap_buf[i]->kv_ptr.lba, kv_wrap_buf[i]->piece_ppa, UINT32_MAX, true);
+
 		kv_wrap_buf[i]->kv_ptr.data=&value[LPAGESIZE*(kv_wrap_buf[i]->piece_ppa%L2PGAP)];
 		kv_wrap_buf[i]->prev_version=UINT32_MAX;
 		kv_wrap_buf[i]->free_target_req=false;
@@ -79,7 +80,17 @@ key_value_wrapper *sst_bos_add(sst_bf_out_stream *bos,
 
 	key_value_wrapper *res=NULL;
 
+	if(kv_wrapper->kv_ptr.lba==debug_lba){
+		printf("debug_lba is in bos!\n");
+
+		if(LSM.global_debug_flag){
+			printf("wwwww!\n");
+		}
+	}
+
 	bos->kv_wrapper_q->push(kv_wrapper);
+	bos->map_for_gc->insert(
+			std::pair<uint32_t, key_value_wrapper*>(kv_wrapper->kv_ptr.lba, kv_wrapper));
 
 	if(bos->prev_ppa!=UINT32_MAX && bos->prev_ppa==PIECETOPPA(kv_wrapper->piece_ppa)){
 		bos->kv_wrap_buffer[bos->kv_buf_idx++]=kv_wrapper;
@@ -172,6 +183,7 @@ void sst_bos_pop(sst_bf_out_stream *bos, compaction_master *cm){
 	}
 	*/
 	bos->kv_wrapper_q->pop();
+	bos->map_for_gc->erase(bos->map_for_gc->begin());
 }
 
 bool sst_bos_is_empty(sst_bf_out_stream *bos){
@@ -194,6 +206,7 @@ void sst_bos_free(sst_bf_out_stream *bos, compaction_master *cm){
 	}
 	free(bos->now_kv_wrap);*/
 	delete bos->kv_wrapper_q;
+	delete bos->map_for_gc;
 	free(bos);
 }
 /*
@@ -333,6 +346,7 @@ value_set* sst_bis_get_result(sst_bf_in_stream *bis, bool last, uint32_t *debug_
 		}
 		if(kvw->kv_ptr.lba==debug_lba){
 			if(!bis->using_shared_value){
+
 				printf("readed data before_write: %u (%u->%u), copied_data:%u (%u)\n", 
 						*(uint32_t*)kvw->kv_ptr.data,
 						kvw->piece_ppa, map_pair->piece_ppa,

@@ -30,15 +30,21 @@ typedef struct inter_read_alreq_param{
 	map_range *map_target;
 }inter_read_alreq_param;
 
-typedef struct{
+typedef struct read_issue_arg{
 	level *des;
 	int32_t from;
 	uint32_t to;
 	uint32_t max_num;
+
+	bool page_file;
+	uint32_t version_for_gc;
+	map_range *map_target_for_gc;
+	sst_file *sst_target_for_gc;
+
 	inter_read_alreq_param *param[COMPACTION_TAGS];
 }read_issue_arg;
 
-typedef struct{
+typedef struct read_arg_container{
 	read_issue_arg **arg_set;
 	void *(*end_req)(algo_req*);
 	uint32_t set_num;
@@ -143,14 +149,14 @@ int issue_read_kv_for_bos_stream(struct sst_bf_out_stream *bos,
 
 uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, struct sst_bf_out_stream *bos, 
 		std::queue<uint32_t> *locked_seg_q, run *new_run,
-		int32_t entry_num, uint32_t target_version, bool final_);
+		int32_t entry_num, uint32_t target_version, bool final_, bool *gced);
 
 uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_stream *bos, 
 		std::queue<uint32_t> *locked_seg_q, run **new_run,
 		int32_t entry_num, uint32_t target_demote_version, uint32_t target_keep_version, 
 		uint32_t src_idx, 
 		//std::queue<value_set*> *del_value_q,
-		bool final_);
+		bool final_, bool *gced);
 
 void compaction_trivial_move(run *rptr, uint32_t target_version, 
 		uint32_t from_lev_idx, uint32_t to_lev_idx, bool inplace);
@@ -159,6 +165,8 @@ void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_rid
 void issue_map_read_sst_job(compaction_master *cm, read_arg_container* thread_arg);
 
 
+void compaction_adjust_by_gc(struct read_issue_arg *arg, sst_pf_out_stream *pos, uint32_t last_lba, 
+		run *rptr, map_range **mr, uint32_t sst_file_type, bool force);
 void *comp_alreq_end_req(algo_req *req);
 
 static inline compaction_req * alloc_comp_req(int8_t start, int8_t end, write_buffer *wb,

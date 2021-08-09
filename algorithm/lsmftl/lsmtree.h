@@ -25,7 +25,10 @@
 //#define HOT_COLD
 //#define WB_SEPARATE
 //#define INVALIDATION_COUNT_MERGE
+
+
 #define DEMAND_SEG_LOCK
+#define UPDATING_COMPACTION_DATA
 
 enum{
 	DEMOTE_RUN, KEEP_RUN,
@@ -142,6 +145,12 @@ typedef struct lsmtree{
 #endif
 	std::map<uint32_t, uint32_t> *flushed_kp_temp_set;
 
+	struct read_issue_arg **read_arg_set;
+	struct sst_bf_out_stream *now_compaction_bos;
+	uint32_t now_compaction_stream_num;
+	std::queue<uint32_t> gc_moved_map_ppa;
+	struct sst_pf_out_stream** compactioning_pos_set;
+
 	fdriver_lock_t gc_unavailable_seg_lock;
 	uint32_t* gc_unavailable_seg;
 	uint32_t* blocked_invalidation_seg;
@@ -190,6 +199,8 @@ void lsmtree_gc_unlock_level(lsmtree *lsm, uint32_t level_idx);
 void lsmtree_block_already_gc_seg(lsmtree *lsm, uint32_t seg);
 void lsmtree_unblock_already_gc_seg(lsmtree *lsm);
 void lsmtree_control_gc_lock_on_read(lsmtree *lsm, uint32_t piece_ppa, bool _final);
+void lsmtree_after_compaction_processing(lsmtree *lsm);
+uint32_t lsmtree_total_invalidate_num(lsmtree *lsm);
 
 uint32_t lsmtree_testing();
 uint32_t lsmtree_seg_debug(lsmtree *lsm);

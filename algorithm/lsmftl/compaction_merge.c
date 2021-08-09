@@ -19,31 +19,38 @@ void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 		param=(inter_read_alreq_param*)calloc(1, sizeof(inter_read_alreq_param));
 		param->map_target=&mr[i];
 		mr[i].data=NULL;
+		mr[i].read_done=false;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&param->done_lock, 0);
 		read_arg->param[param_idx++]=param;
 	}
+
+	read_arg->map_target_for_gc=mr;
 }
 
 bool read_map_done_check(inter_read_alreq_param *param, bool check_page_sst){
+	if(check_page_sst && param->map_target->read_done) return true;
+
 	if(check_page_sst){
 		param->map_target->data=param->data->value;
+		param->map_target->read_done=true;
 	}
+	
 	fdriver_lock(&param->done_lock);
 	return true;
 }
 
-static bool invalid_map_done(inter_read_alreq_param *param){
+static bool invalid_map_done(inter_read_alreq_param *param, bool inv_flag){
 	param->map_target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);
-	invalidate_map_ppa(LSM.pm->bm, param->map_target->ppa, true);
+	invalidate_map_ppa(LSM.pm->bm, param->map_target->ppa, inv_flag);
 	free(param);
 	//compaction_free_read_param(_cm, param);
 	return true;
 }
 
-static bool not_invalid_map_done(inter_read_alreq_param *param){
+static bool not_invalid_map_done(inter_read_alreq_param *param, bool inv_flag){
 	param->map_target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);
@@ -88,10 +95,87 @@ static map_range * make_mr_set(sst_file *set, uint32_t start_idx, uint32_t end_i
 	uint32_t mr_idx=0;
 	for(uint32_t i=start_idx; i<=end_idx; i++){
 		for_each_map_range(&set[i], mptr, idx){
-			mr[mr_idx++]=*mptr;
+			mr[mr_idx]=*mptr;
+			mr[mr_idx].data=NULL;
+			mr_idx++;
 		}
 	}
 	return mr;
+}
+
+static map_range * make_mr_set_for_gc(sst_file *set, uint32_t start_idx, uint32_t end_idx,
+		uint32_t border_lba, uint32_t* map_num){
+	uint32_t target_map_num=0;
+	uint32_t start_midx;
+	sst_file *sptr=&set[start_idx];
+	uint32_t first_map_idx=sst_upper_bound_map_idx(sptr, border_lba);
+	target_map_num=sptr->map_num-first_map_idx;
+	map_range *res=NULL;
+	for(uint32_t i=start_idx+1; i<=end_idx; i++){
+		sptr=&set[i];
+		target_map_num+=sptr->map_num;
+	}
+
+	if(!target_map_num) return NULL;
+	res=(map_range*)calloc(target_map_num, sizeof(map_range));
+	
+	uint32_t mr_idx=0;
+	for(uint32_t i=start_idx; i<=end_idx; i++){
+		sptr=&set[i];
+		if(first_map_idx && i==start_idx){
+			for(uint32_t j=first_map_idx; j<sptr->map_num; j++){
+				res[mr_idx]=sptr->block_file_map[j];
+				res[mr_idx].data=NULL;
+				mr_idx++;
+			}
+			continue;
+		}
+		map_range *mptr;
+		uint32_t idx;
+		for_each_map_range(sptr, mptr, idx){
+			res[mr_idx]=*mptr;
+			res[mr_idx].data=NULL;
+			mr_idx++;
+		}
+	}
+
+	*map_num=target_map_num;
+	return res;
+}
+
+void compaction_adjust_by_gc(read_issue_arg *read_arg_set, sst_pf_out_stream *pos, uint32_t last_lba, 
+		run *rptr, map_range **mr, uint32_t sst_file_type, bool force){
+#ifdef UPDATING_COMPACTION_DATA
+	if(!force){
+		if(!rptr->update_by_gc) return;
+	}
+
+	if(sst_file_type==PAGE_FILE){
+		EPRINT("not implemented", true);		
+	}
+	else{
+		free(*mr);
+		uint32_t closed_sidx=run_retrieve_upper_bound_sst_idx(rptr, last_lba);
+		if(closed_sidx==rptr->now_sst_num-1 && rptr->sst_set[closed_sidx].end_lba==last_lba){
+			read_arg_set->max_num=0;
+	//		read_arg_set->mr=NULL;
+			*mr=NULL;
+			return;
+		}
+		uint32_t sst_file_num=rptr->now_sst_num-1;
+		uint32_t map_num=0;
+		
+		*mr=make_mr_set_for_gc(rptr->sst_set, closed_sidx, sst_file_num,
+				last_lba, &map_num);
+		read_arg_set->max_num=map_num;
+		read_arg_set->from=0;
+		read_arg_set->to=read_arg_set->from-1;
+
+		pos->gced_out_stream++;
+	}
+#else
+	return;
+#endif
 }
 
 static uint32_t tiering_invalidation_function(level *des, uint32_t stream_id, uint32_t version,
@@ -212,16 +296,28 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	thread_arg.arg_set[1]=&read_arg2;
 	thread_arg.set_num=MERGED_RUN_NUM;
 
+	LSM.read_arg_set=thread_arg.arg_set;
+	LSM.now_compaction_stream_num=MERGED_RUN_NUM;
+	read_arg1.page_file=false;
+	read_arg2.page_file=false;
+#ifdef LSM_DEBUG
+	static int cnt=0;
+	printf("merge cnt:%u\n", cnt++);
+	if(cnt==31){
+	}
+#endif
+
 	uint32_t newer_sst_idx=0, newer_sst_idx_end;
 	uint32_t older_sst_idx=0, older_sst_idx_end;
 	uint32_t now_newer_map_num=0, now_older_map_num=0;
 	//uint32_t newer_borderline=0;
 	//uint32_t older_borderline=0;
-	uint32_t border_lba;
 
 	uint32_t target_version=idx_set[0];
 	uint32_t target_ridx=version_to_ridx(LSM.last_run_version,  des->idx, target_version);
 	sst_pf_out_stream *os_set[MERGED_RUN_NUM]={0,};
+
+	LSM.compactioning_pos_set=os_set;
 
 	sst_bf_out_stream *bos=NULL;
 	sst_bf_in_stream *bis=NULL;
@@ -232,25 +328,44 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	std::queue<uint32_t> *locked_seg_q=new std::queue<uint32_t>();
 	std::list<mr_free_set> *new_range_set=new std::list<mr_free_set>();
 	std::list<mr_free_set> *old_range_set=new std::list<mr_free_set>();
+	bool gced=false;
+	uint32_t border_lba=UINT32_MAX;
+	uint32_t stream_newer_border_lba=UINT32_MAX;
+	uint32_t stream_older_border_lba=UINT32_MAX;
 	while(!(older_sst_idx==older->now_sst_num && 
 				newer_sst_idx==newer->now_sst_num)){
+
 		now_newer_map_num=now_older_map_num=0;
-		max_target_piece_num=0;
+
 		max_target_piece_num+=
 			newer_sst_idx<newer->now_sst_num?coherence_sst_kp_pair_num(newer,newer_sst_idx, &newer_sst_idx_end, &now_newer_map_num):0;
 		max_target_piece_num+=
 			older_sst_idx<older->now_sst_num?coherence_sst_kp_pair_num(older,older_sst_idx, &older_sst_idx_end, &now_older_map_num):0;
 
-		if(bis){
-			max_target_piece_num+=(bis->map_data->size()+1+1)*L2PGAP; // buffered + additional mapping
+		map_range *newer_mr=NULL, *older_mr=NULL;
+		if(gced){
+			if(newer->update_by_gc){
+				newer_mr=make_mr_set_for_gc(newer->sst_set, newer_sst_idx, newer_sst_idx_end, 
+						stream_newer_border_lba, &now_newer_map_num);
+				newer->update_by_gc=false;
+			}
+
+			if(older->update_by_gc){
+				older_mr=make_mr_set_for_gc(older->sst_set, older_sst_idx, older_sst_idx_end, 
+						stream_older_border_lba, &now_older_map_num);
+				older->update_by_gc=false;
+			}
 		}
 
-		if(bos){
-			max_target_piece_num+=bos->kv_wrapper_q->size()+L2PGAP;
+		if(newer_mr==NULL){
+			newer_mr=make_mr_set(newer->sst_set, newer_sst_idx, newer_sst_idx_end, now_newer_map_num);
 		}
 
-		map_range *newer_mr=make_mr_set(newer->sst_set, newer_sst_idx, newer_sst_idx_end, now_newer_map_num);
-		map_range *older_mr=make_mr_set(older->sst_set, older_sst_idx, older_sst_idx_end, now_older_map_num);
+		if(older_mr==NULL){
+			older_mr=make_mr_set(older->sst_set, older_sst_idx, older_sst_idx_end, now_older_map_num);
+		}
+
+		gced=false;
 
 		if(newer_mr){
 			mr_free_set temp_mr_free_set={newer_mr, newer, newer_sst_idx, newer_sst_idx_end, now_newer_map_num-1};
@@ -266,11 +381,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		uint32_t total_map_num=now_newer_map_num+now_older_map_num;
 		uint32_t read_done=0;
 		uint32_t older_prev=0, newer_prev=0;
-		read_arg1={0,}; read_arg2={0,};
 		while(read_done!=total_map_num){
-	/*		if(LSM.global_debug_flag){
-				printf("merge cnt:%u round info - o_idx:%u n_idx%u read_done:%u\n", LSM.monitor.compaction_cnt[des->idx+1],older_sst_idx, newer_sst_idx, read_done);
-			}*/
 			uint32_t shard=LOWQDEPTH/(1+1);
 
 			if(newer_mr){
@@ -278,6 +389,8 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 				read_arg1.to=MIN(newer_prev+shard, now_newer_map_num-1);
 				if(TARGETREADNUM(read_arg1)){
 					read_map_param_init(&read_arg1, newer_mr);
+					read_arg1.version_for_gc=
+						version_order_to_version(LSM.last_run_version,  des->idx, big_order);
 				}
 			}
 			else{
@@ -290,6 +403,8 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 				read_arg2.to=MIN(older_prev+shard, now_older_map_num-1);
 				if(TARGETREADNUM(read_arg2)){
 					read_map_param_init(&read_arg2, older_mr);
+					read_arg2.version_for_gc=
+						version_order_to_version(LSM.last_run_version,  des->idx, small_order);
 				}
 			}
 			else{
@@ -333,6 +448,14 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 						older_mr[read_arg2.to].end_lba);
 			}
 
+			if(newer_mr){
+				stream_newer_border_lba=newer_mr[read_arg1.to].end_lba;
+			}
+			
+			if(older_mr){
+				stream_older_border_lba=older_mr[read_arg2.to].end_lba;
+			}
+
 			//sorting
 			LSM.monitor.merge_valid_entry_cnt+=stream_sorting(NULL, MERGED_RUN_NUM, os_set, NULL, kpq, 
 				last_round_check,
@@ -350,11 +473,11 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 				older_prev=read_arg2.to+1;
 			}
 
-			thpool_wait(cm->issue_worker);
 		}
 
 		if(bos==NULL){
 			bos=sst_bos_init(read_map_done_check, true);
+			LSM.now_compaction_bos=bos;
 		}
 		if(bis==NULL){
 			bis=tiering_new_bis(locked_seg_q, des->idx);
@@ -362,15 +485,28 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
 				true, idx_set[1], idx_set[0], last_round_check);
+
 		border_lba=issue_write_kv_for_bis(&bis, bos, 
 				locked_seg_q, new_run, entry_num, 
-				target_version, last_round_check);
+				target_version, last_round_check, &gced);
 
 		map_range_postprocessing(new_range_set, border_lba, last_round_check, true, true);
 		map_range_postprocessing(old_range_set, border_lba, last_round_check, true, true);
 
 		newer_sst_idx=newer_sst_idx_end+1;
 		older_sst_idx=older_sst_idx_end+1;
+
+		if(gced){
+			if(newer->update_by_gc){
+				newer_sst_idx=run_retrieve_upper_bound_sst_idx(newer, stream_newer_border_lba);
+				os_set[0]->gced_out_stream++;
+			}
+
+			if(older->update_by_gc){
+				older_sst_idx=run_retrieve_upper_bound_sst_idx(older, stream_older_border_lba);
+				os_set[1]->gced_out_stream++;
+			}
+		}
 		
 		read_arg1_prev=read_arg1;
 		read_arg2_prev=read_arg2;
@@ -422,6 +558,9 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 	LSM.now_merging_run[0]=UINT32_MAX;
 	LSM.now_merging_run[1]=UINT32_MAX;
+	
+	lsmtree_after_compaction_processing(&LSM);
+
 	return res;
 }
 
@@ -440,6 +579,9 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, bool isfirst,sst_pf_ou
 			read_arg_set[i].to=0;
 			read_arg_set[i].from=read_arg_set[i].to+1;
 			read_done_flag|=(1<<i);
+			if(!isfirst){
+				continue;
+			}
 		}
 		if(!isfirst && read_arg_set[i].to==read_arg_set[i].max_num-1){
 			read_arg_set[i].from=read_arg_set[i].to+1;
@@ -572,6 +714,9 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	}
 	thread_arg.set_num=stream_num;
 
+	LSM.read_arg_set=thread_arg.arg_set;
+	LSM.now_compaction_stream_num=stream_num;
+
 #ifdef LSM_DEBUG
 	if(version_to_belong_level(LSM.last_run_version, target_demote_version)!=des->idx){
 		EPRINT("demote version should be belong to des", true);
@@ -580,8 +725,6 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	if(version_to_belong_level(LSM.last_run_version, target_keep_version)!=src->idx){
 		EPRINT("keep version should be belong to src", true);
 	}
-	static int compaction_cnt=0;
-	printf("before break! %u\n", compaction_cnt++);
 #endif
 
 #ifdef LSM_DEBUG
@@ -606,6 +749,8 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 		}*/
 		read_arg_set[j].max_num=map_num;
 		mr_set[j]=make_mr_set(src->array[ridx].sst_set, 0, src->array[ridx].now_sst_num-1, map_num);
+		read_arg_set[j].version_for_gc=version_order_to_version(LSM.last_run_version,  src->idx, i);
+		read_arg_set[j].page_file=false;
 	}
 
 	std::queue<key_ptr_pair> *kpq=new std::queue<key_ptr_pair>();
@@ -620,6 +765,8 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	uint32_t sorting_done=0;
 	uint32_t read_done=0;
 	sst_pf_out_stream **pos_set=(sst_pf_out_stream **)calloc(stream_num, sizeof(sst_pf_out_stream*));
+	LSM.compactioning_pos_set=pos_set;
+
 	sst_bf_out_stream *bos=NULL;
 	sst_bf_in_stream **bis=NULL;
 	if(hot_cold_mode){
@@ -631,6 +778,8 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	bool isfirst=true;
 
 	uint32_t border_lba=UINT32_MAX;
+	uint32_t *stream_border_lba_set=(uint32_t*)malloc(sizeof(uint32_t)*stream_num);
+	memset(stream_border_lba_set, UINT8_MAX, sizeof(uint32_t) * stream_num);
 	bool bis_populate=false;
 //	uint32_t round=0;
 	uint32_t skip_target_version=UINT32_MAX;
@@ -638,16 +787,34 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 		skip_target_version=version_order_to_version(LSM.last_run_version, src->idx, merging_num);
 	}
 
+	bool gced=false;
 	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
+
+		if(gced){
+			if(gced && LSM.global_debug_flag){
+				printf("target_break!\n");
+			}
+			for(int32_t i=stream_num-1, j=0; i>=0; i--, j++){
+				if(read_done & (1<<j)) continue;
+				uint32_t ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
+				compaction_adjust_by_gc(&read_arg_set[j], pos_set[j], stream_border_lba_set[j], 
+						&src->array[ridx], &mr_set[j], BLOCK_FILE, false);
+				src->array[ridx].update_by_gc=false;
+			}
+			/*check finish*/
+		}
+		gced=false;
+
 		read_done=update_read_arg_tiering(read_done, isfirst, pos_set, mr_set,
 				read_arg_set, true, stream_num, src, UINT32_MAX);
-		
+
 //	printf("round:%u\n", round++);
 
 		for(uint32_t k=0; k<stream_num; k++){
 			if(read_done & (1<<k)) continue;
 			mr_free_set temp_MFS=making_MFS(&read_arg_set[k], mr_set[k], LEVEL_RUN_AT_PTR(src, stream_num-1-k));
 			map_range_preprocessing(temp_MFS, MFS_set_ptr[k], false);
+			stream_border_lba_set[k]=mr_set[k][read_arg_set[k].to].end_lba;
 		}
 
 		bool last_round=(read_done==(1<<stream_num)-1);
@@ -669,8 +836,10 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 				tiering_invalidation_function,
 				inplace);
 
+
 		if(bos==NULL){
 			bos=sst_bos_init(read_map_done_check, true);
+			LSM.now_compaction_bos=bos;
 		}
 
 		if(!bis_populate){
@@ -688,16 +857,17 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 			uint32_t read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
 					false, UINT32_MAX, UINT32_MAX, last_round);
 
+			thpool_wait(cm->issue_worker);
 			for(uint32_t k=0; k<stream_num; k++){
 				map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round, false, false);
 			}
 
 			if(hot_cold_mode){
 				border_lba=issue_write_kv_for_bis_hot_cold(&bis, bos, locked_seg_q, new_run, 
-						read_num, target_demote_version, target_keep_version, src->idx, last_round);			
+						read_num, target_demote_version, target_keep_version, src->idx, last_round, &gced);			
 			}else{
 				border_lba=issue_write_kv_for_bis(&bis[DEMOTE_RUN], bos, locked_seg_q, new_run[DEMOTE_RUN], 
-						read_num, target_demote_version, last_round);
+						read_num, target_demote_version, last_round, &gced);
 			}
 		}
 		else{
@@ -709,12 +879,13 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 					map_range_postprocessing(MFS_set_ptr[k], border_lba, last_round, false, false);
 				}
 
+				thpool_wait(cm->issue_worker);
 				if(hot_cold_mode){
 					border_lba=issue_write_kv_for_bis_hot_cold(&bis, bos, locked_seg_q, new_run, 
-							read_num, target_demote_version, target_keep_version, src->idx, last_round);			
+							read_num, target_demote_version, target_keep_version, src->idx, last_round, &gced);			
 				}else{
 					border_lba=issue_write_kv_for_bis(&bis[DEMOTE_RUN], bos, locked_seg_q, new_run[DEMOTE_RUN], 
-							read_num, target_demote_version, last_round);
+							read_num, target_demote_version, last_round, &gced);
 				}
 				moved_num+=read_num;
 			}
@@ -775,8 +946,11 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 		sst_bis_free(bis[DEMOTE_RUN]);
 	}
 
+	lsmtree_after_compaction_processing(&LSM);
+	
 	sst_bos_free(bos, _cm);
 	delete kpq;
+	free(stream_border_lba_set);
 	free(bis);
 	free(pos_set);
 	free(mr_set);
@@ -1043,7 +1217,13 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 	run *new_run=run_init(target_rptr->now_sst_num, UINT32_MAX, 0);
 
 	uint32_t unlocked_sst_idx=0;
+	bool gced=false;
 	while(read_done!=(1<<stream_num)-1){
+		if(gced){
+			compaction_adjust_by_gc(&read_arg_set, pos, border_lba,
+					target_rptr, &mr_set, BLOCK_FILE, false);
+		}
+		gced=false;
 		read_done=update_read_arg_tiering(read_done, isfirst, &pos, &mr_set, 
 				&read_arg_set, true, stream_num, NULL, version);
 		last_round=(read_done==(1<<stream_num)-1);
@@ -1064,7 +1244,7 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 		uint32_t read_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
 				false, UINT32_MAX, UINT32_MAX, last_round);
 		border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
-				read_num, version, last_round);
+				read_num, version, last_round, &gced);
 		
 		gc_unlock_run(target_rptr, &unlocked_sst_idx, border_lba);
 
@@ -1120,7 +1300,6 @@ sst_file *trivial_move_processing(run *rptr, sst_pf_out_stream *pos,
 	printf("cnt:%u\n", cnt++);
 	if(cnt==71){
 		//LSM.global_debug_flag=true;
-		printf("break!\n");
 	}
 	*/
 	while(!sst_pos_is_empty(pos)){
@@ -1234,11 +1413,12 @@ void *merge_end_req(algo_req *req){
 	switch(req->type){
 		case MAPPINGR:
 			r_param=(inter_read_alreq_param*)req->param;
+			r_param->map_target->data=r_param->data->value;
+			r_param->map_target->read_done=true;
 			fdriver_unlock(&r_param->done_lock);
 			break;
 		case COMPACTIONDATAR:
 			kv_wrapper=(key_value_wrapper*)req->param;
-
 			fdriver_unlock(&kv_wrapper->param->done_lock);
 			break;
 

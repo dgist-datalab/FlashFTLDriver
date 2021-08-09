@@ -244,9 +244,7 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set,
 				continue;
 			}
 		}
-		if(temp_kp_set[i].lba==debug_lba){
-			printf("break!\n");
-		}
+
 		kp_set->insert(
 				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));	
 		version_coupling_lba_version(LSM.last_run_version, temp_kp_set[i].lba, UINT8_MAX);
@@ -412,8 +410,9 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	static uint32_t demote_cnt=0;
 	printf("demote_cnt: %u\n", demote_cnt++);
 
-	if(demote_cnt==99){
-		printf("break!\n");
+	if(demote_cnt==570){
+		//LSM.global_debug_flag=true;
+		//printf("break!\n");
 	}
 	if(temp_level){
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
@@ -783,10 +782,26 @@ static void last_level_reclaim(compaction_master *cm, uint32_t level_idx){
 	rwlock_write_unlock(&LSM.level_rwlock[level_idx]);
 }
 
+void check_and_make_available_data(){
+	for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
+			iter!=LSM.flushed_kp_seg->end(); iter++){
+		lsmtree_gc_unavailable_set(&LSM, NULL, *iter);
+	}
+	if(page_manager_get_total_remain_page(LSM.pm, false, true) <_PPS){
+		/*do somthing*/
+	}
+	for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
+			iter!=LSM.flushed_kp_seg->end(); iter++){
+		lsmtree_gc_unavailable_unset(&LSM, NULL, *iter);
+	}
+}
+
 void* compaction_main(void *_cm){
 	compaction_master *cm=(compaction_master*)_cm;
 	queue *req_q=(queue*)cm->req_q;
 	uint32_t above_sst_num;
+	bool force=false;
+	static int round_cnt=0;
 #ifdef LSM_DEBUG
 	uint32_t contents_num;
 #endif
@@ -800,6 +815,8 @@ again:
 		level *temp_level=NULL;
 		if(req->start_level==-1 && req->end_level==0){
 			if(req->wb){
+				/*check and make available data area*/
+		//		check_and_make_available_data();
 				temp_level=flush_memtable(req->wb, false);
 			}
 			else{
@@ -811,37 +828,26 @@ again:
 			goto end;
 		}
 
-
-#ifdef LSM_DEBUG
-		/*
-		if(req->start_level!=-1){
-			version_inv_cnt=version_get_level_invalidation_cnt(LSM.last_run_version, req->start_level);
-			contents_num=get_level_content_num(LSM.disk[req->start_level]);
-			printf("L%u %u %.2f inv_cnt:%u(%.2f) \n", req->start_level, contents_num, (float)contents_num*100/RANGE, version_inv_cnt, 
-					(float)version_inv_cnt/LSM.disk[req->start_level]->max_contents_num);
-			if(req->start_level >= 2){
-				level_tiering_sst_analysis(LSM.disk[req->start_level], LSM.pm->bm, LSM.last_run_version, false);
+		if(force && req->start_level==LSM.param.LEVELN-1){
+			if(level_is_full(LSM.disk[req->start_level], LSM.param.last_size_factor)){
+				last_level_reclaim(cm, LSM.param.LEVELN-1);
 			}
-		}*/
-#endif
-		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
-		lsmtree_level_summary(&LSM);
-
-		if(req->end_level==LSM.param.LEVELN-1){
 			goto end;
 		}
 
+		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
+
+	//	lsmtree_level_summary(&LSM);
+
+
 		if(level_is_full(LSM.disk[req->end_level], LSM.param.last_size_factor)){
 			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)){
-#ifdef LSM_DEBUG
-				/*
-				contents_num=get_level_content_num(LSM.disk[LSM.param.LEVELN-1]);
-				printf("L%u %u %.2f (merge)\n", LSM.param.LEVELN-1, contents_num, (float)contents_num*100/RANGE);
-				level_tiering_sst_analysis(LSM.disk[LSM.param.LEVELN-1], LSM.pm->bm, LSM.last_run_version, true);*/
-#endif
 				last_level_reclaim(cm, LSM.param.LEVELN-1);
-
 			}
+			else if(req->end_level==LSM.param.LEVELN-1){
+				goto end;
+			}
+
 			req->start_level=req->end_level;
 			req->end_level++;
 			goto again;
@@ -867,6 +873,22 @@ again:
 		}
 
 end:
+
+		if(page_manager_get_total_remain_page(LSM.pm, false, true) <_PPS){
+			uint32_t res=lsmtree_total_invalidate_num(&LSM);
+			printf("remain total invalidate_num:%u %u\n", res, _PPS);
+			if(res<_PPS*L2PGAP){
+
+				lsmtree_level_summary(&LSM);
+
+				req->start_level=req->end_level;
+				req->end_level++;
+				force=true;
+				goto again;
+			}
+		}
+
+		force=false;
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);
 	}

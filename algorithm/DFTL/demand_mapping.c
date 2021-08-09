@@ -218,6 +218,9 @@ void demand_map_free(){
 	uint32_t total_logical_page_num=(SHOWINGSIZE/LPAGESIZE);
 	uint32_t total_translation_page_num=total_logical_page_num/(PAGESIZE/sizeof(DMF));
 
+	printf("----- traffic result -----\n");
+
+
 	for(uint32_t i=0; i<total_translation_page_num; i++){
 		fdriver_destroy(&dmm.GTD[i].lock);
 		list_free(dmm.GTD[i].pending_req);
@@ -722,12 +725,10 @@ uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_para
 		printf("break! df\n");
 	}
 */
-	if((req->global_seq==17428294 && now_pair->lba==1671723)){
-		printf("break1 round_cnt: seq%u -> %u\n", req->global_seq, req->round_cnt);
-	//	print_all=true;
+	if(test_key==now_pair->lba){
+		static int cnt=0;
+		printf("%d L:%u P:%u\n", cnt++, now_pair->lba, now_pair->ppa);
 	}
-
-	//debug_size();
 
 	if(print_all){
 		print_all_processed_req();
@@ -1193,7 +1194,7 @@ uint32_t demand_page_read(request *const req){
 	}
 
 	//static uint32_t prev_lba=1437024
-
+	
 	switch((res=cache_traverse_state(req, &dp->target, dp, &mp->prefetching_info[0], false))){
 		case RETRY_END:
 			dp_status_update(dp, NONE);

@@ -57,6 +57,18 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	//	LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
 		LSM.wb_array[i]=write_buffer_init(QDEPTH, LSM.pm, NORMAL_WB);
 	}
+	printf("OP:%u\n", OP);
+#ifdef WB_SEPARATE
+	printf("WB_SEPARATE ENABLE\n");
+#endif
+
+#ifdef HOT_COLD
+	printf("HOT_COLD ENABLE\n");
+#endif
+
+#ifdef INVALIDATION_COUNT_MERGE
+	printf("INVALIDATION_COUNT_MERGE ENABLE\n");
+#endif
 
 	LSM.disk=(level**)calloc(LSM.param.LEVELN, sizeof(level*));
 	LSM.level_rwlock=(rwlock*)malloc(LSM.param.LEVELN * sizeof(rwlock));
@@ -527,9 +539,6 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 		}
 	}
 	
-	if(ppa==12101880/L2PGAP){
-		printf("break!\n");
-	}
 	io_manager_issue_read(ppa, value, req, sync);
 	return BUFFER_MISS;
 }
@@ -1156,16 +1165,29 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 	return 1;
 }
 
+uint32_t lsmtree_total_invalidate_num(lsmtree *lsm){
+	uint32_t res=0;
+	blockmanager *bm=lsm->pm->bm;
+	for(uint32_t i=0; i<_NOS; i++){	
+		if(lsm->gc_unavailable_seg[i]){
+			continue;
+		}
+		res+=bm->get_invalidate_number(bm, i);
+	}
+	return res;
+}
+
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting){
-#ifdef DEMAND_SEG_LOCK
+	bool flag=aborting;
+#if defined(DEMAND_SEG_LOCK) || defined(UPDATING_COMPACTION_DATA)
 	if(LSM.blocked_invalidation_seg[piece_ppa/L2PGAP/_PPS]){
-		return true;
+		flag=false;
 	}
 #endif
 	if(old_version!=UINT32_MAX){
 		LSM.last_run_version->version_invalidate_number[old_version]++;
 	}
-	bool res=invalidate_piece_ppa(LSM.pm->bm, piece_ppa, aborting);
+	bool res=invalidate_piece_ppa(LSM.pm->bm, piece_ppa, false);
 	return res;
 }
 
@@ -1204,4 +1226,18 @@ void lsmtree_control_gc_lock_on_read(lsmtree *lsm, uint32_t piece_ppa, bool _fin
 		prev_piece_ppa=piece_ppa;
 	}
 #endif
+}
+
+
+void lsmtree_after_compaction_processing(lsmtree *lsm){
+	lsm->read_arg_set=NULL;
+	lsm->now_compaction_bos=NULL;
+	lsm->now_compaction_stream_num=0;
+	while(lsm->gc_moved_map_ppa.size()){
+		uint32_t target_map_ppa=lsm->gc_moved_map_ppa.front();
+		invalidate_map_ppa(lsm->pm->bm, target_map_ppa, false);
+		lsm->gc_moved_map_ppa.pop();
+	}
+	lsm->compactioning_pos_set=NULL;
+	//lsm->gc_moved_map_ppa.clear();
 }

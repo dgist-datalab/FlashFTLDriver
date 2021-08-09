@@ -4,17 +4,22 @@
 #include "../../interface/interface.h"
 #include "compaction.h"
 #include <queue>
+#include <map>
 enum {
-SST_PAGE_FILE_STREAM, KP_PAIR_STREAM, MAP_FILE_STREAM,
+	SST_PAGE_FILE_STREAM, KP_PAIR_STREAM, MAP_FILE_STREAM,
 };
 
 typedef struct sst_pf_out_stream{
 	uint8_t type;
 	bool (*check_done)(struct inter_read_alreq_param *check_flag, bool check_file_sst);
-	bool (*file_done)(struct inter_read_alreq_param* check_flag);
+	bool (*file_done)(struct inter_read_alreq_param* check_flag, bool inv_flag);
 	std::queue<sst_file*> *sst_file_set;
 	std::queue<map_range*> *mr_set;
 	std::queue<struct inter_read_alreq_param*> *check_flag_set;
+
+	std::multimap<uint32_t, sst_file*> *sst_map_for_gc;
+	std::multimap<uint32_t, map_range*> *mr_map_for_gc;
+
 	key_ptr_pair *kp_data;
 	sst_file *now;
 	map_range *now_mr;
@@ -23,10 +28,10 @@ typedef struct sst_pf_out_stream{
 	bool file_set_empty;
 	uint32_t version_idx;
 	uint32_t total_poped_num;
-#ifdef LSM_DEBUG
-	bool isstart;
+
+	int32_t gced_out_stream;
 	uint32_t prev_lba;
-#endif
+	bool isstart;
 }sst_pf_out_stream;
 
 typedef struct sst_pf_in_stream{
@@ -43,13 +48,13 @@ sst_pf_out_stream* sst_pos_init_sst(sst_file *, struct inter_read_alreq_param **
 		uint32_t set_number,
 		uint32_t version_number,
 		bool(*check_done)( struct inter_read_alreq_param*, bool), 
-		bool (*file_done)(struct inter_read_alreq_param *));
+		bool (*file_done)(struct inter_read_alreq_param *, bool));
 
 sst_pf_out_stream* sst_pos_init_mr(map_range *, struct inter_read_alreq_param **,
 		uint32_t set_number, 
 		uint32_t version_number,
 		bool(*check_done)( struct inter_read_alreq_param*, bool), 
-		bool (*file_done)(struct inter_read_alreq_param *));
+		bool (*file_done)(struct inter_read_alreq_param *, bool));
 
 sst_pf_out_stream *sst_pos_init_kp(key_ptr_pair *data);
 void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *, 

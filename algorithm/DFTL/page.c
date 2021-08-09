@@ -44,6 +44,13 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 void page_destroy (lower_info* li, algorithm *algo){
 	demand_map_free();
 	printf("read buffer hit:%u\n", read_buffer_hit_cnt);
+
+	printf("WAF: %lf\n\n",
+			(double)(li->req_type_cnt[MAPPINGW] +
+				li->req_type_cnt[DATAW]+
+				li->req_type_cnt[GCDW]+
+				li->req_type_cnt[GCMW_DGC]+
+				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	free(a_buffer.value);
 
 	delete rb.pending_req;
@@ -132,6 +139,9 @@ uint32_t page_write(request *const req){
 		}
 	}
 	else{*/
+	if(req->key==test_key){
+		printf("insert key:%u\n", req->key);
+	}
 	if(!align_buffering(req, req->key, req->value)){
 		req->end_req(req);
 	}

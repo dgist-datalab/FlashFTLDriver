@@ -14,7 +14,7 @@ level *level_init(uint32_t max_sst_num, uint32_t max_run_num, uint32_t level_typ
 	}
 	res->level_type=level_type;
 	if(res->level_type!=TIERING && res->level_type!=TIERING_WISCKEY){
-		res->run_num=1;
+		res->run_num=1;	
 	}
 
 	res->now_sst_num=0;
@@ -250,9 +250,7 @@ void level_free(level *lev, page_manager *pm){
 }
 
 uint32_t level_update_run_at_move_originality(level *lev, uint32_t idx, run *r, bool new_run){
-	if(lev->idx==0 && idx==14 && r->now_sst_num==0){
-		printf("break!\n");
-	}
+
 	if(lev->level_type!=TIERING && lev->level_type !=TIERING_WISCKEY){
 		EPRINT("it must be tiering level", true);
 	}
@@ -356,6 +354,7 @@ void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	read_helper_free(org_sptr->_read_helper);*/
 	sst_reinit(org_sptr);
 
+	lev->array[ridx].update_by_gc=true;
 	lev->array[ridx].sst_set[sptr_idx]=(*sptr);
 
 	sst_file *nxt_sstfile, *prev_sstfile;
@@ -390,6 +389,8 @@ void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	if(lev->level_type!=TIERING && lev->level_type!=TIERING_WISCKEY){
 		EPRINT("only tier available", true);
 	}
+
+	lev->array[ridx].update_by_gc=true;
 
 	/*range check*/
 	sst_file *nxt_sstfile, *prev_sstfile;
@@ -463,6 +464,7 @@ void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
 	memmove(&r->sst_set[sptr_idx], &r->sst_set[sptr_idx+1], sizeof(sst_file) * target_num_sst_file);
 	memset(&r->sst_set[r->now_sst_num-1], 0, sizeof(sst_file));
 	r->now_sst_num--;
+	r->update_by_gc=true;
 	if(r->now_sst_num==0){
 		r->sst_num_zero_by_gc=true;
 	}

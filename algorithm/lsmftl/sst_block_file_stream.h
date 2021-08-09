@@ -6,6 +6,7 @@
 #include "page_manager.h"
 #include "read_helper.h"
 #include <queue>
+#include <map>
 
 #define REMAIN_DATA_PPA(bis) \
 	((int32_t)(((bis)->piece_ppa_length) - \
@@ -14,6 +15,7 @@
 
 typedef struct sst_bf_out_stream{
 	bool (*kv_read_check_done)(struct inter_read_alreq_param*, bool check);
+	std::map<uint32_t, struct key_value_wrapper*> *map_for_gc;
 	std::queue<struct key_value_wrapper *> *kv_wrapper_q;
 	uint32_t prev_ppa;
 	uint8_t kv_buf_idx;

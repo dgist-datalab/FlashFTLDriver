@@ -77,7 +77,7 @@ uint32_t sst_find_map_addr(sst_file *sstfile, uint32_t lba){
 	}
 	uint32_t res=UINT32_MAX;
 
-	int s=0, e=sstfile->map_num;
+	int s=0, e=sstfile->map_num-1;
 	while(s<=e){
 		int mid=(s+e)/2;
 		map_range *mr=&sstfile->block_file_map[mid];
@@ -94,6 +94,91 @@ uint32_t sst_find_map_addr(sst_file *sstfile, uint32_t lba){
 	}
 
 	return res;
+}
+
+uint32_t sst_find_map_idx(sst_file *sstfile, uint32_t lba){
+	if(sstfile->type!=BLOCK_FILE){
+		EPRINT("cannot have map!", true);
+	}
+	uint32_t res=UINT32_MAX;
+
+	int s=0, e=sstfile->map_num-1;
+	int mid=UINT32_MAX;
+	while(s<=e){
+		mid=(s+e)/2;
+		map_range *mr=&sstfile->block_file_map[mid];
+		if(mr->start_lba<=lba && mr->end_lba>=lba){
+			break;
+		}
+		if(mr->start_lba > lba){
+			e=mid-1;
+		}
+		else if(mr->end_lba<lba){
+			s=mid+1;
+		}
+	}
+	return mid;
+}
+
+uint32_t sst_lower_bound_map_idx(sst_file *sstfile, uint32_t lba){
+	if(sstfile->type!=BLOCK_FILE){
+		EPRINT("cannot have map!", true);
+	}
+	uint32_t res=UINT32_MAX;
+
+	int s=0, e=sstfile->map_num-1;
+	int mid=UINT32_MAX;
+	while(s<e){
+		mid=s+(e-s)/2;
+		map_range *mr=&sstfile->block_file_map[mid];
+		if(mr->start_lba<=lba && mr->end_lba>=lba){
+			s=mid;
+			break;
+		}
+
+		if(mr->start_lba >= lba){
+			e=mid;
+		}
+		else if(mr->end_lba<lba){
+			s=mid+1;
+		}
+	}
+
+	if(s < sstfile->map_num-1 && sstfile->block_file_map[s].end_lba < lba){
+		s++;
+	}
+
+	return s;
+}
+
+uint32_t sst_upper_bound_map_idx(sst_file *sstfile, uint32_t lba){
+	if(sstfile->type!=BLOCK_FILE){
+		EPRINT("cannot have map!", true);
+	}
+	uint32_t res=UINT32_MAX;
+
+	int s=0, e=sstfile->map_num-1;
+	int mid=UINT32_MAX;
+	while(s<e){
+		mid=s+(e-s)/2;
+		map_range *mr=&sstfile->block_file_map[mid];
+
+		if(mr->end_lba <= lba){
+			s=mid+1;
+		}
+		else if(mr->start_lba <=lba && mr->end_lba > lba){
+			return mid;
+		}
+		else if(mr->start_lba > lba){
+			e=mid;
+		}
+	}
+
+	if(s < sstfile->map_num-1 && sstfile->block_file_map[s].end_lba <= lba){
+		s++;
+	}
+
+	return s;
 }
 
 void sst_free(sst_file* sstfile, page_manager *pm){

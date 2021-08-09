@@ -27,9 +27,6 @@ uint32_t issue_read_kv_for_bos_sorted_set(sst_bf_out_stream *bos,
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 	
-		if(kv_wrapper->kv_ptr.lba==debug_lba && kv_wrapper->piece_ppa==debug_piece_ppa){
-			printf("break!\n");
-		}
 #ifdef NOTSURE
 		invalidate_kp_entry(kv_wrapper->kv_ptr.lba, kv_wrapper->piece_ppa, UINT32_MAX, true);
 #endif
@@ -87,7 +84,6 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 		kv_wrapper->piece_ppa=target_pair.piece_ppa;
 		kv_wrapper->kv_ptr.lba=target_pair.lba;
 
-
 #ifdef NOTSURE
 		if(slm_invalidate_enable(now_level, kv_wrapper->piece_ppa)){
 			invalidate_kp_entry(kv_wrapper->kv_ptr.lba, kv_wrapper->piece_ppa, UINT32_MAX, true);
@@ -103,7 +99,8 @@ int issue_read_kv_for_bos_stream(sst_bf_out_stream *bos,
 				continue;
 			}
 		}
-#ifdef DEMAND_SEG_LOCK
+
+#if defined(DEMAND_SEG_LOCK) && !defined(UPDATING_COMPACTION_DATA)
 		lsmtree_gc_unavailable_set(&LSM, NULL, target_pair.piece_ppa/L2PGAP/_PPS);
 #endif
 
@@ -157,7 +154,9 @@ void issue_bis_result(sst_bf_in_stream *bis, uint32_t target_version, bool final
 
 uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos, 
 		std::queue<uint32_t> *locked_seg_q,run *new_run,
-		int32_t entry_num, uint32_t target_version, bool final){
+		int32_t entry_num, uint32_t target_version, bool final, bool *gced){
+
+	thpool_wait(LSM.cm->issue_worker);
 	int32_t inserted_entry_num=0;
 	uint32_t last_lba=UINT32_MAX; 
 	fdriver_lock(&LSM.flush_lock);
@@ -170,6 +169,10 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 
 	if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
 		__do_gc(LSM.pm, false, need_seg_num*_PPS);
+		*gced=true;
+	}
+	else{
+		*gced=false;
 	}
 
 	while(!sst_bos_is_empty(bos)){
@@ -186,8 +189,7 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 		}
 
 		if(target){
-			
-#ifdef DEMAND_SEG_LOCK
+#if defined(DEMAND_SEG_LOCK) && !defined(UPDATING_COMPACTION_DATA)
 			lsmtree_gc_unavailable_unset(&LSM, NULL, target->piece_ppa/L2PGAP/_PPS);
 #endif
 			last_lba=target->kv_ptr.lba;
@@ -223,7 +225,8 @@ uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_str
 		int32_t entry_num, uint32_t target_demote_version, uint32_t target_keep_version,
 		uint32_t src_idx,
 	//	std::queue<value_set *> *del_value_q,
-		bool final){
+		bool final, bool *gced){
+	thpool_wait(LSM.cm->issue_worker);
 	int32_t inserted_entry_num=0;
 	uint32_t last_lba=UINT32_MAX;
 
@@ -236,6 +239,10 @@ uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_str
 	uint32_t need_seg_num=need_page_num/_PPS+(need_page_num%_PPS?1:0);
 	if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
 		__do_gc(LSM.pm, false, need_seg_num*_PPS);
+		*gced=true;
+	}
+	else{
+		*gced=false;
 	}
 	
 	sst_bis_set_using_shared_value((*bis)[DEMOTE_RUN]);

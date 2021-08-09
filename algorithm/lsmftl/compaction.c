@@ -28,13 +28,12 @@ void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t version, l
 		}
 		else{
 			printf("[%d] %u,%u (l,p) -> merging to %u\n",++cnt, lba,piece_ppa, version);
-			if(cnt==9){
-				printf("break!\n");
-			}
+
 		}
 	}
 #endif
 }
+
 
 static inline void compaction_error_check
 (key_ptr_pair *kp_set, level *src, level *des, level *res, uint32_t compaction_num){
@@ -198,6 +197,7 @@ static void read_param_init(read_issue_arg *read_arg){
 	for(int i=0; i<read_arg->to-read_arg->from+1; i++){
 		param=compaction_get_read_param(_cm);
 		param->target=LEVELING_SST_AT_PTR(read_arg->des, read_arg->from+i);
+		param->target->read_done=false;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&param->done_lock, 0);
 		read_arg->param[i]=param;
@@ -205,18 +205,20 @@ static void read_param_init(read_issue_arg *read_arg){
 }
 
 bool read_done_check(inter_read_alreq_param *param, bool check_page_sst){
+	if(check_page_sst && param->target->read_done) return true;
 	if(check_page_sst){
 		param->target->data=param->data->value;
+		param->target->read_done=true;
 	}
 	fdriver_lock(&param->done_lock);
 	return true;
 }
 
-bool file_done(inter_read_alreq_param *param){
+bool file_done(inter_read_alreq_param *param, bool inv_flag){
 	param->target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);
-	invalidate_map_ppa(LSM.pm->bm, param->target->file_addr.map_ppa, true);
+	invalidate_map_ppa(LSM.pm->bm, param->target->file_addr.map_ppa, inv_flag);
 	compaction_free_read_param(_cm, param);
 	return true;
 }
@@ -297,6 +299,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 				continue;
 			}
 			key_ptr_pair now=sst_pos_pick(os_set[i]);
+	
 
 			if(target_idx==UINT32_MAX){
 				 target_pair=now;
@@ -318,8 +321,16 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 			}
 		}
 
+
+		if(target_pair.lba==debug_lba){
+	//		printf("prev debug_is sorting!\n");
+		}
 		if((!all_empty_stop) && target_pair.lba>limit){
 			break;
+		}
+
+		if(target_pair.lba==debug_lba){
+	//		printf("after debug_is sorting!\n");
 		}
 
 		if(target_pair.lba!=UINT32_MAX){
@@ -343,7 +354,7 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 				if(kpq){
 					sorting_idx++;
 	
-#ifdef DEMAND_SEG_LOCK
+#if defined(DEMAND_SEG_LOCK) && !defined(UPDATING_COMPACTION_DATA)
 					lsmtree_gc_unavailable_set(&LSM, NULL, target_pair.piece_ppa/L2PGAP/_PPS);
 #endif
 					kpq->push(target_pair);
@@ -812,8 +823,15 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 	thread_arg.arg_set[0]=&read_arg;
 	thread_arg.set_num=1;
 
+	read_arg.page_file=true;
+	read_arg.version_for_gc=UINT8_MAX;
+	LSM.read_arg_set=thread_arg.arg_set;
+	LSM.now_compaction_stream_num=1;
+
 	sst_pf_out_stream *pos=NULL;
 	sst_bf_out_stream *bos=sst_bos_init(read_done_check, false);
+	LSM.now_compaction_bos=bos;
+
 	std::queue<uint32_t>* locked_seg_q=new std::queue<uint32_t>();
 	sst_bf_in_stream *bis=tiering_new_bis(locked_seg_q, src->idx+1);
 
@@ -835,7 +853,14 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		lsmtree_gc_lock_level(&LSM, src->idx);
 	}
 
+	bool gced=false;
+	uint32_t last_lba=UINT32_MAX;
 	for(uint32_t i=0; i<round; i++){
+		if(gced){
+			/*not needed because the level's data is not removed by GC*/
+		}
+		gced=false;
+
 		read_arg.from=start_idx+i*tier_compaction_tags;
 		if(i!=round-1){
 			read_arg.to=start_idx+(i+1)*tier_compaction_tags-1;
@@ -844,6 +869,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 			read_arg.to=src->now_sst_num-1;	
 		}
 		read_param_init(&read_arg);
+
 
 		if(i==0){
 			pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
@@ -858,7 +884,6 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		read_sst_job((void*)&thread_arg,-1);
 		
 		uint32_t round2_tier_compaction_tags, picked_kv_num;
-
 		do{ 
 			round2_tier_compaction_tags=cm->read_param_queue->size();
 			picked_kv_num=issue_read_kv_for_bos_stream(bos, pos, round2_tier_compaction_tags, 
@@ -867,10 +892,13 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
 			total_moved_num+=picked_kv_num;
 			temp_final=((i==round-1 && sst_pos_is_empty(pos)));
-			issue_write_kv_for_bis(&bis, bos, 
+
+			thpool_wait(cm->issue_worker);
+
+			last_lba=issue_write_kv_for_bis(&bis, bos, 
 					locked_seg_q, new_run, 
 					round2_tier_compaction_tags, target_version, 
-					temp_final);
+					temp_final, &gced);
 			j++;
 		}
 		while(!temp_final && !sst_pos_is_empty(pos));
@@ -896,6 +924,8 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		lsmtree_gc_unlock_level(&LSM, src->idx);
 	}
 
+	lsmtree_after_compaction_processing(&LSM);
+
 	release_locked_seg_q(locked_seg_q);
 	sst_pos_free(pos);
 	sst_bis_free(bis);
@@ -907,13 +937,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){ 
 	_cm=cm;
 	uint32_t start_sst_file_idx=UINT32_MAX;
-	/*
-	static int cnt=0;
-	printf("LW2TI %u\n", cnt++);
-	if(cnt==73){
-		printf("break!\n");
-	}
-	*/
+
 	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_version, 
 			&start_sst_file_idx, des->idx); //version_update
 	
@@ -1100,7 +1124,12 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	bool isstart=true;
 	uint32_t stream_cnt=0;
 	uint32_t upper_unlocked_idx=0, lower_unlocked_idx=0;
+	bool gced=false;
 	for_each_sst_level_at(src, rptr, ridx, sptr, sidx){
+		if(gced){
+			EPRINT("not implemented\n", true);
+			/*adjusting sidx*/
+		}
 		read_params_setting(&read_arg1, &read_arg2, src, temp_des_level, sptr, &sidx, 
 				des_start_idx, &des_end_idx, compaction_read_param_remain_num(_cm));
 		sidx=read_arg1.to;
@@ -1108,6 +1137,8 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	
 		compaction_leveling_gc_lock(src, read_arg1.from, read_arg1.to);
 		compaction_leveling_gc_lock(des, read_arg2.from, read_arg2.to);
+
+		gced=false;
 
 		if(isstart){
 			os_set[0]=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg1.from), read_arg1.param, 
@@ -1148,7 +1179,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 				false, UINT32_MAX, UINT32_MAX, final_flag);
 
 		border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
-				entry_num, lower_version, final_flag);
+				entry_num, lower_version, final_flag, &gced);
 
 		compaction_leveling_gc_unlock(src, &upper_unlocked_idx, read_arg1.to, 
 				border_lba, final_flag);
@@ -1263,11 +1294,19 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 
 	bool isstart=true;
 	uint32_t stream_cnt=0;
+	bool gced=false;
+	uint32_t last_lba=UINT32_MAX;
 	for_each_sst_level_at(temp_src_level, rptr, ridx, sptr, sidx){
+		if(gced){
+			EPRINT("not implemented", true);
+			/*adjusting sidx*/
+		}
 		read_params_setting(&read_arg1, &read_arg2, temp_src_level, temp_des_level, sptr, &sidx, 
 				des_start_idx, &des_end_idx, compaction_read_param_remain_num(_cm));
 		sidx=read_arg1.to;
 		bool final_flag=sidx==temp_src_level->now_sst_num-1;
+
+		gced=false;
 
 		if(isstart){
 			os_set[0]=sst_pos_init_sst(LEVELING_SST_AT_PTR(temp_src_level, read_arg1.from), read_arg1.param, 
@@ -1308,8 +1347,8 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 				false, UINT32_MAX, UINT32_MAX,
 				final_flag);
 
-		issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
-				entry_num, lower_version, final_flag);
+		last_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
+				entry_num, lower_version, final_flag, &gced);
 		isstart=false;
 		des_start_idx=des_end_idx+1;
 		stream_cnt++;
@@ -1417,6 +1456,8 @@ void *comp_alreq_end_req(algo_req *req){
 			break;
 		case MAPPINGR:
 			r_param=(inter_read_alreq_param*)req->param;
+			r_param->target->data=r_param->data->value;
+			r_param->target->read_done=true;
 			fdriver_unlock(&r_param->done_lock);
 			break;
 		case COMPACTIONDATAR:

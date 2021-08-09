@@ -296,12 +296,10 @@ retry:
 		if(debug_lba==res[i].lba){
 			static int cnt=0;
 			printf("[%u] gc %u -> %u\n", cnt++, res[i].lba, res[i].piece_ppa);
+
 		}
 #endif
 		validate_piece_ppa(wb->pm->bm, 1, &res[i].piece_ppa, &res[i].lba,  &prev_version, true);
-		if(wb->rh){
-			read_helper_stream_insert(wb->rh, res[i].lba, res[i].piece_ppa);
-		}
 
 		if(gkv){
 			if(gkv_iter->first!=it->first){
@@ -325,6 +323,11 @@ retry:
 			//oob=NULL;
 			target_value=NULL;
 		}
+
+		if(wb->rh){
+			read_helper_stream_insert(wb->rh, res[i].lba, res[i].piece_ppa);
+		}
+
 		wb->buffered_entry_num--;
 		wb->data->erase(it++);
 

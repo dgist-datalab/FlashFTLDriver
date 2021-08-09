@@ -8,14 +8,19 @@ extern lsmtree LSM;
 
 sst_pf_out_stream* sst_pos_init_sst(sst_file *sst_set, inter_read_alreq_param **param, 
 		uint32_t set_num, uint32_t version_number,
-		bool(*check_done)(inter_read_alreq_param *, bool), bool (*file_done)(inter_read_alreq_param*)){
+		bool(*check_done)(inter_read_alreq_param *, bool), bool (*file_done)(inter_read_alreq_param*, bool)){
 	sst_pf_out_stream *res=(sst_pf_out_stream*)calloc(1, sizeof(sst_pf_out_stream));
 	res->type=SST_PAGE_FILE_STREAM;
 	res->sst_file_set=new std::queue<sst_file*>();
 	res->check_flag_set=new std::queue<inter_read_alreq_param *>();
+	res->sst_map_for_gc=new std::multimap<uint32_t, sst_file*>();
+	res->mr_map_for_gc=NULL;
+
 	for(uint32_t i=0; i<set_num; i++){
 		res->sst_file_set->push(&sst_set[i]);
 		res->check_flag_set->push(param[i]);
+		res->sst_map_for_gc->insert(
+				std::pair<uint32_t, sst_file*>(sst_set[i].start_lba, &sst_set[i]));
 	}
 	res->check_done=check_done;
 	res->file_done=file_done;
@@ -24,21 +29,28 @@ sst_pf_out_stream* sst_pos_init_sst(sst_file *sst_set, inter_read_alreq_param **
 	res->now_file_empty=true;
 	res->file_set_empty=false;
 	res->version_idx=version_number;
+	res->gced_out_stream=0;
+
 	return res;
 }
 
 sst_pf_out_stream* sst_pos_init_mr(map_range *mr_set, inter_read_alreq_param **param, 
 		uint32_t set_num, uint32_t version_number,
 		bool(*check_done)(inter_read_alreq_param *, bool), 
-		bool (*file_done)(inter_read_alreq_param*)){
+		bool (*file_done)(inter_read_alreq_param*, bool)){
 	sst_pf_out_stream *res=(sst_pf_out_stream*)calloc(1, sizeof(sst_pf_out_stream));
 	res->type=MAP_FILE_STREAM;
 	//res->sst_file_set=new std::queue<sst_file*>();
 	res->mr_set=new std::queue<map_range*>();
 	res->check_flag_set=new std::queue<inter_read_alreq_param *>();
+	res->mr_map_for_gc=new std::multimap<uint32_t, map_range*>();
+	res->sst_map_for_gc=NULL;
+
 	for(uint32_t i=0; i<set_num; i++){
 		res->mr_set->push(&mr_set[i]);
 		res->check_flag_set->push(param[i]);
+		res->mr_map_for_gc->insert(
+				std::pair<uint32_t, map_range*>(mr_set[i].start_lba, &mr_set[i]));
 	}
 	res->check_done=check_done;
 	res->file_done=file_done;
@@ -47,6 +59,7 @@ sst_pf_out_stream* sst_pos_init_mr(map_range *mr_set, inter_read_alreq_param **p
 	res->now_file_empty=true;
 	res->file_set_empty=false;
 	res->version_idx=version_number;
+	res->gced_out_stream=0;
 	return res;
 }
 
@@ -57,6 +70,8 @@ sst_pf_out_stream *sst_pos_init_kp(key_ptr_pair *data){
 	res->idx=0;
 	res->now_file_empty=false;
 	res->file_set_empty=true;
+	res->mr_map_for_gc=NULL;
+	res->sst_map_for_gc=NULL;
 	return res;
 }
 
@@ -67,6 +82,7 @@ void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *sst_set, inter_read_alreq_
 	for(uint32_t i=0; i<set_num; i++){
 		os->sst_file_set->push(&sst_set[i]);
 		os->check_flag_set->push(param[i]);
+		os->sst_map_for_gc->insert(std::pair<uint32_t, sst_file*>(sst_set[i].start_lba, &sst_set[i]));
 	}
 	os->file_set_empty=os->sst_file_set->size()==0;
 }
@@ -78,23 +94,112 @@ void sst_pos_add_mr(sst_pf_out_stream *os, map_range *mr_set, inter_read_alreq_p
 	for(uint32_t i=0; i<set_num; i++){
 		os->mr_set->push(&mr_set[i]);
 		os->check_flag_set->push(param[i]);
+		os->mr_map_for_gc->insert(std::pair<uint32_t, map_range*>(mr_set[i].start_lba, &mr_set[i]));
 	}
 	os->file_set_empty=os->mr_set->size()==0;
 }
 
-static inline void move_next_file(sst_pf_out_stream *os){
-	os->file_done(os->check_flag_set->front());
+static inline void move_next_file(sst_pf_out_stream *os, bool inv_flag){
+	os->file_done(os->check_flag_set->front(), os->gced_out_stream? false: inv_flag);
+	sst_file *file;
+	map_range *mr;
+	std::multimap<uint32_t, sst_file*>::iterator f_iter;
+	std::multimap<uint32_t, map_range*>::iterator m_iter;
 	switch(os->type){
 		case SST_PAGE_FILE_STREAM:
+			file=os->sst_file_set->front();
 			os->sst_file_set->pop();
+			for(f_iter=os->sst_map_for_gc->find(file->start_lba);
+					f_iter!=os->sst_map_for_gc->end() && f_iter->first==file->start_lba;){
+				if(f_iter->second==file){
+					os->sst_map_for_gc->erase(f_iter++);
+				}
+				else{
+					f_iter++;
+				}
+			}
 			os->file_set_empty=os->sst_file_set->size()==0;
 			break;
 		case MAP_FILE_STREAM:
+			mr=os->mr_set->front();
 			os->mr_set->pop();
+			for(m_iter=os->mr_map_for_gc->find(mr->start_lba); 
+					m_iter!=os->mr_map_for_gc->end() && m_iter->first==mr->start_lba;){
+				if(m_iter->second==mr){
+					os->mr_map_for_gc->erase(m_iter++);
+				}
+				else{
+					m_iter++;
+				}
+			}
 			os->file_set_empty=os->mr_set->size()==0;
 			break;
 	}
 	os->check_flag_set->pop();
+}
+
+key_ptr_pair sst_pos_adjust_and_pick(sst_pf_out_stream *os, uint32_t prev_lba){
+	uint32_t s=0, e=LAST_KP_IDX, mid;
+	key_ptr_pair *target_data;
+	key_ptr_pair temp;
+retry:
+	switch(os->type){
+		case SST_PAGE_FILE_STREAM:
+			target_data=(key_ptr_pair*)os->now->data;
+			break;
+		case MAP_FILE_STREAM:
+			target_data=(key_ptr_pair*)os->now_mr->data;
+			break;
+	}
+	while(s<e){
+		mid=s+(e-s)/2;
+		if(prev_lba >= target_data[mid].lba){
+			s=mid+1;
+		}
+		else{
+			e=mid;
+		}
+	}
+
+	if(s<LAST_KP_IDX && target_data[s].lba<=prev_lba){
+		s++;
+	}
+	os->idx=s+1;
+	if(s >= LAST_KP_IDX){
+	//	EPRINT("All data is not used, can it be?", true);
+		os->now_file_empty=true;
+		switch(os->type){
+			case SST_PAGE_FILE_STREAM:
+				if(os->sst_file_set->size()==0){
+					temp.lba=UINT32_MAX; temp.piece_ppa=UINT32_MAX;
+					os->file_set_empty=true;
+					return temp;
+				}
+				break;
+			case MAP_FILE_STREAM:
+				if(os->mr_set->size()==0){
+					temp.lba=UINT32_MAX; temp.piece_ppa=UINT32_MAX;
+					os->file_set_empty=true;
+					return temp;
+				}
+				break;
+		}
+		move_next_file(os, false);
+
+		switch(os->type){
+			case SST_PAGE_FILE_STREAM:
+				os->now=os->sst_file_set->front();
+				break;
+			case MAP_FILE_STREAM:
+				os->now_mr=os->mr_set->front();
+				break;
+		}
+		os->check_done(os->check_flag_set->front(), true);
+		os->idx=0;
+		os->now_file_empty=false;
+		goto retry;
+	}
+	return target_data[s];
 }
 
 key_ptr_pair sst_pos_pick(sst_pf_out_stream *os){
@@ -184,26 +289,28 @@ retry:
 	else if(res.lba==UINT32_MAX){ //now retry
 		os->now_file_empty=true;
 		if(os->type==SST_PAGE_FILE_STREAM || os->type==MAP_FILE_STREAM){
-			move_next_file(os);
+			move_next_file(os, true);
 		}
 		goto retry;
 	}
 
-
-#ifdef LSM_DEBUG
 	if(!os->isstart){
 		os->isstart=true;
 		os->prev_lba=res.lba;
 	}
 	else{
+check_again:
 		if(!(os->prev_lba<=res.lba)){
-			EPRINT("data error!", true);
+			if(os->gced_out_stream>0){
+				res=sst_pos_adjust_and_pick(os, os->prev_lba);
+	//			os->gced_out_stream--;
+				goto check_again;
+			}
+			else{
+				EPRINT("data error!", true);
+			}
 		}
 		os->prev_lba=res.lba;
-	}
-#endif
-	if(res.lba==UINT32_MAX){
-		EPRINT("???", false);
 	}
 	return res;
 }
@@ -215,7 +322,7 @@ void sst_pos_pop(sst_pf_out_stream *os){
 		os->now_file_empty=true;
 		if(os->type==SST_PAGE_FILE_STREAM || os->type==MAP_FILE_STREAM){
 			if(!os->file_set_empty){
-				move_next_file(os);
+				move_next_file(os, true);
 			}
 		}
 	}
@@ -239,6 +346,13 @@ void sst_pos_free(sst_pf_out_stream *os){
 
 	if(os->type!=KP_PAIR_STREAM && os->check_flag_set->size()){
 		EPRINT("remain param!", true);
+	}
+	if(os->sst_map_for_gc){
+		delete os->sst_map_for_gc;
+	}
+
+	if(os->mr_map_for_gc){
+		delete os->mr_map_for_gc;
 	}
 	delete os->mr_set;
 	delete os->sst_file_set;
