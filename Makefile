@@ -11,7 +11,7 @@ export TARGET_LOWER=posix_memory
 export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-
+export USER_DEF
 PPWD=$(pwd)
 
 DEBUGFLAGS=\
@@ -20,7 +20,7 @@ DEBUGFLAGS=\
 			-g\
 #-fsanitize=address\
 
-export COMMONFLAGS=\
+export COMMONFLAGS+=\
 			-Wno-write-strings\
 			-Wno-sign-compare\
 			-Wno-unused-function\
@@ -29,12 +29,15 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-	-O3 -march=native -mtune=native -flto=20 \
-#-DLSM_DEBUG\
+			-DTRACE_REPLAY\
+			-DLSM_DEBUG\
+-O3 -march=native -mtune=native -flto=20 \
 #-DDFTL_DEBUG\
 
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
+
+COMMONFLAGS+=$(USER_DEF)\
 
 export CFLAGS_ALGO=\
 			 -fPIC\
@@ -136,7 +139,7 @@ LIBS +=\
 		-ljemalloc\
 #	-laio\
 
-all: cheeze_block_driver
+all: driver
 
 DEBUG: debug_driver
 

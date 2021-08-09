@@ -400,7 +400,7 @@ bool cheeze_end_req(request *const req){
 			bench_reap_data(req, mp.li);
 			DPRINTF("%u not found!\n",req->key);
 #ifdef TRACE_REPLAY
-			if(req->crc_value!=*(uint32_t*)req->value->value){
+			if(req->crc_value && req->crc_value!=*(uint32_t*)req->value->value){
 				printf("not_found lba:%u data faile abort!\n", req->key);
 				abort();
 			}

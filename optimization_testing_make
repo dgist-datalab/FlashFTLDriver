@@ -1,0 +1,27 @@
+#!/bin/bash
+
+OP=(70 75 80 85)
+
+for i in ${OP[@]}; do
+	mkdir ./OPT_TESTING/$i/
+	make clean
+	make USER_DEF="-DOP=$i" cheeze_trace_block_driver -j
+	mv cheeze_trace_block_driver ./OPT_TESTING/$i/NORMAL_LFTL
+
+	make clean
+	make USER_DEF="-DOP=$i -DWB_SEPARATE" cheeze_trace_block_driver -j
+	mv cheeze_trace_block_driver ./OPT_TESTING/$i/WB_ENB_LFTL
+	
+	make clean
+	make USER_DEF="-DOP=$i -DHOT_COLD -DWB_SEPARATE"  cheeze_trace_block_driver -j
+	mv cheeze_trace_block_driver ./OPT_TESTING/$i/HC_ENB_LFTL
+
+	make clean
+	make USER_DEF="-DOP=$i -DWB_SEPARATE -DINVALIDATION_COUNT_MERGE"  cheeze_trace_block_driver -j
+	mv cheeze_trace_block_driver ./OPT_TESTING/$i/INV_ENB_LFTL
+	
+	make clean
+	make USER_DEF="-DOP=$i -DHOT_COLD -DWB_SEPARATE -DINVALIDATION_COUNT_MERGE"  cheeze_trace_block_driver -j
+	mv cheeze_trace_block_driver ./OPT_TESTING/$i/ALL_ENB_LFTL
+done
+

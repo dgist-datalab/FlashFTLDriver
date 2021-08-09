@@ -459,6 +459,17 @@ int seq_get_page_num(struct blockmanager* bm,__segment *s){
 		if(s->blocks[BPS-1]->now==_PPB) return -1;
 	}
 
+#ifdef LSM_DEBUG
+	uint32_t total_num=0;	
+	for(uint32_t i=0; i<BPS; i++){
+		total_num+=s->blocks[i]->now;
+	}
+	if(total_num!=s->used_page_num){
+		abort();
+	}
+#endif
+
+
 	__block *b=s->blocks[s->now];
 	if(b->now==_PPB){
 		s->now++;
@@ -472,6 +483,10 @@ int seq_get_page_num(struct blockmanager* bm,__segment *s){
 	if(page>_PPB) abort();
 	s->used_page_num++;
 	bm->assigned_page++;
+
+	if(s->used_page_num!=res%_PPS+1){
+		abort();
+	}
 	return res;
 }
 
