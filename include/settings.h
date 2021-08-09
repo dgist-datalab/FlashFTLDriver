@@ -52,7 +52,9 @@
 #elif defined(SLC)
 
 #define GIGAUNIT 16L
-#define OP 80
+#ifndef OP
+#define OP 75
+#endif
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
 #define REALSIZE (512L*G)
