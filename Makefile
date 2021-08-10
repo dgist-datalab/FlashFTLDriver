@@ -7,6 +7,7 @@ export CC=g++
 export CXX=g++
 
 TARGET_INF=interface
+#export TARGET_LOWER=bdbm_drv
 export TARGET_LOWER=posix_memory
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
