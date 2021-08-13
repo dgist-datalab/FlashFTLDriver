@@ -163,8 +163,6 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*> *gkv,
 void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv, 
 		struct write_buffer *wb, uint32_t seg_idx){
 	if(!wb) return;
-	sst_file *now_check_sst=NULL;
-	blockmanager *bm=LSM.pm->bm;
 
 	if(LSM.flushed_kp_seg->find(seg_idx)==LSM.flushed_kp_seg->end()){
 		EPRINT("not allowd", true);

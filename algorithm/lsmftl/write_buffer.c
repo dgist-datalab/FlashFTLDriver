@@ -130,7 +130,8 @@ key_ptr_pair* write_buffer_flush(write_buffer *wb, uint32_t target_num, bool syn
 
 #ifdef LSM_DEBUG
 		if(res[i].lba==debug_lba){
-			printf("map target:%u -> %u in buffer\n", res[i].lba, res[i].piece_ppa);
+			static int cnt=0;
+			printf("[%d]map target:%u -> %u in buffer\n",++cnt, res[i].lba, res[i].piece_ppa);
 		}
 #endif
 
@@ -234,7 +235,8 @@ uint32_t write_buffer_insert_for_gc(write_buffer *wb, uint32_t lba, char *gc_dat
 		wb->buffered_entry_num++;
 	}
 	else{/*update data*/
-		EPRINT("not allowed!", true);
+		printf("lba:%u", lba);
+		EPRINT("updating in wb in gc not allowed!", true);
 	}
 
 	return encode_return_code(SUCCESSED, WB_NONE);

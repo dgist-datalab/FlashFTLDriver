@@ -106,7 +106,6 @@ static map_range * make_mr_set(sst_file *set, uint32_t start_idx, uint32_t end_i
 static map_range * make_mr_set_for_gc(sst_file *set, uint32_t start_idx, uint32_t end_idx,
 		uint32_t border_lba, uint32_t* map_num){
 	uint32_t target_map_num=0;
-	uint32_t start_midx;
 	sst_file *sptr=&set[start_idx];
 	uint32_t first_map_idx=sst_upper_bound_map_idx(sptr, border_lba);
 	target_map_num=sptr->map_num-first_map_idx;
@@ -150,11 +149,16 @@ void compaction_adjust_by_gc(read_issue_arg *read_arg_set, sst_pf_out_stream *po
 		if(!rptr->update_by_gc) return;
 	}
 
+	if(LSM.global_debug_flag){
+		printf("break!\n");
+	}
+
 	if(sst_file_type==PAGE_FILE){
 		EPRINT("not implemented", true);		
 	}
 	else{
-		free(*mr);
+		sst_pos_delay_free(pos, (void*)*mr);
+	//	free(*mr);
 		uint32_t closed_sidx=run_retrieve_upper_bound_sst_idx(rptr, last_lba);
 		if(closed_sidx==rptr->now_sst_num-1 && rptr->sst_set[closed_sidx].end_lba==last_lba){
 			read_arg_set->max_num=0;
@@ -221,7 +225,10 @@ static inline mr_free_set making_MFS(read_issue_arg *arg, map_range *mr_set, run
 }
 
 static inline void map_range_preprocessing(mr_free_set free_set, std::list<mr_free_set>* mr_list, bool is_sst_file){
+#ifdef DEMAND_SEG_LOCK
+#else
 	run *rptr=free_set.r;
+#endif
 	uint32_t start_sst_idx=free_set.start_idx, end_idx=free_set.end_idx;
 	for(uint32_t i=start_sst_idx; i<=end_idx; i++){
 
@@ -344,6 +351,9 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 		map_range *newer_mr=NULL, *older_mr=NULL;
 		if(gced){
+			if(LSM.global_debug_flag){
+				printf("break!\n");
+			}
 			if(newer->update_by_gc){
 				newer_mr=make_mr_set_for_gc(newer->sst_set, newer_sst_idx, newer_sst_idx_end, 
 						stream_newer_border_lba, &now_newer_map_num);
@@ -1157,10 +1167,10 @@ static uint32_t filter_invalidation(sst_pf_out_stream *pos, std::queue<key_ptr_p
 }
 
 static inline void gc_lock_run(run *r){
-	sst_file *sptr;
-	uint32_t idx;
 #ifdef DEMAND_SEG_LOCK
 #else
+	sst_file *sptr;
+	uint32_t idx;
 	for_each_sst(r, sptr, idx){
 	//	printf("lock lba:%u ->sidx:%u segidx:%u\n", sptr->end_lba, idx, sptr->end_ppa/_PPS);
 		lsmtree_gc_unavailable_set(&LSM, sptr, UINT32_MAX);
@@ -1170,10 +1180,10 @@ static inline void gc_lock_run(run *r){
 
 static inline void gc_unlock_run(run *r, uint32_t *sst_file_num, uint32_t border_lba){
 	if(r->now_sst_num <= *sst_file_num) return;
-	sst_file *sptr;
-	uint32_t idx=*sst_file_num;
 #ifdef DEMAND_SEG_LOCK
 #else
+	sst_file *sptr;
+	uint32_t idx=*sst_file_num;
 	for_each_sst_at(r, sptr, idx){
 		if(sptr->end_lba<=border_lba){
 	//		printf("unlock lba:%u ->sidx:%u border:%u\n", sptr->end_lba, idx, border_lba);
@@ -1183,8 +1193,8 @@ static inline void gc_unlock_run(run *r, uint32_t *sst_file_num, uint32_t border
 			break;
 		}
 	}
-#endif
 	*sst_file_num=idx;
+#endif
 }
 
 run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t version){

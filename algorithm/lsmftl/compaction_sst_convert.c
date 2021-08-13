@@ -65,7 +65,6 @@ static sst_file *pf_queue_to_sstfile(sst_queue *pf_q){
 static uint32_t stream_make_rh(sst_pf_out_stream *os, sst_file *file, 
 		uint32_t target_version, uint32_t src_idx){
 	uint32_t res=0;
-	uint32_t end_ppa=file->end_ppa;
 	uint32_t start_piece_ppa=file->file_addr.piece_ppa;
 	while(1){
 		key_ptr_pair kp=sst_pos_pick(os);

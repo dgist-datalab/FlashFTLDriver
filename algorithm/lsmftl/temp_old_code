@@ -1,0 +1,129 @@
+typedef std::map<uint32_t, guard_range>::iterator guard_iterator;
+typedef std::map<uint32_t, uint32_t>::iterator map_iter;
+
+static inline void insert_close_open_gr(std::map<uint32_t, guard_range> *guard_map, 
+		std::map<uint32_t, uint32_t> *kp_set, uint32_t start_lba, uint32_t border){
+	guard_range new_guard;
+	map_iter m_iter=kp_set->lower_bound(border);
+	while(m_iter->first >= border){
+		m_iter--;
+	}
+	new_guard={start_lba, m_iter->first, true};
+	guard_map->insert(std::<uint32_t, guard_range>(start_lba, new_guard));
+}
+
+static inline void insert_open_close_gr(std::map<uint32_t, guard_range> *guard_map, 
+		std::map<uint32_t, uint32_t> *kp_set, uint32_t end_lba, uint32_t border){
+	guard_range new_guard;
+	map_iter m_iter=kp_set->upper_bound(overlap_closed_start);
+	new_guard={m_iter->first, end_lba, true};
+	guard_map->insert(std::<uint32_t, guard_range>(m_iter->first, new_guard));
+}
+static inline uint32_t making_guard(std::map<uint32_t, guard_range> *guard_map, guard_range gr, 
+		std::map<uint32_t, uint32_t> *old_one, std::map<uint32_t, uint32_t> *new_one, uint32_t guard_limit){
+
+	guard_iterator guard_iter=guard_map->lower_bound(gr.start_lba);
+	if(guard_iter != LSM.flushing_guard->begin()){
+		guard_iterator temp_iter=--guard_iter;
+		if(temp_iter->second->end_lba <= gr.end_lba){
+			gurad_iter=temp_iter;
+		}
+	}
+
+	if(guard_iter==guard_map->end() || 
+			gr.start_lba > guard_iter->second->end_lba ||
+			gr.end_lba < guard_iter->second->start_lba){ /*sequential*/
+		guard_map->insert(std::pair<uint32_t, guard_range>(gr.start_lba, gr));
+		return guard_map->size();
+	}
+
+	uint32_t overlap_closed_start=MAX(gr.start_lba, guard_iter->second->start_lba);
+	uint32_t overlap_closed_end=MIN(gr.end_lba, guard_iter->second->end_lba);
+
+	guard_range org_gr=*guard_iter->second;
+	guar_map->erase(guard_iter);
+	if(org_gr.start_lba < overlap_closed_start){
+		insert_close_open_gr(guard_map, old_one, org_gr.start_lba, overlap_closed_start);
+	}
+	if(org_gr.end_lba > overlap_closed_end){
+		insert_open_close_gr(guard_map, old_one, org_gr.end_lba, overlap_closed_end);
+	}
+
+	if(gr.start_lba < overlap_closed_start){
+		insert_close_open_gr(guard_map, new_one, gr.start_lba, overlap_closed_start);
+	}
+	if(gr.end_lba > overlap_closed_end){
+		insert_open_close_gr(guard_map, old_one, gr.end_lba, overlap_closed_end);
+	}
+
+	uint32_t now_start_lba=overlap_closed_start;
+	map_iter old_iter=old_one->lower_bound(now_start_lba);
+	map_iter new_iter=new_one->lower_bound(now_start_lba);
+	guard_range new_gr;
+	bool is_start_old=false;
+	if(old_iter->first==now_start_lba && new_iter->first!=now_start_lba){
+		is_start_old=true;
+	}
+
+	map_iter old_nxt_iter, new_nxt_iter;
+	while(1){
+		if(is_start_old){
+			old_nxt_iter=old_one->lower_bound(new_iter->first);
+			old_iter=old_nxt_iter;
+			while( old_nxt_iter==old_one->end() || old_nxt_iter->first >=new_iter->first){
+				old_nxt_iter--;
+			}
+			new_gr={now_start_lba, old_nxt_iter->first, true};
+		}
+		else{
+			new_nxt_iter=new_one->lower_bound(old_iter->first);
+			while(old_iter->first==new_nxt_iter->first){ //skip the same lba
+				old_iter++;
+				new_nxt_iter++;
+			}
+			new_iter=new_nxt_iter;
+			while(new_nxt_iter==new_one->end() || new_nxt_iter->first >= old_iter->first){
+				new_nxt_iter--;
+			}
+			new_gr={now_start_lba, new_nxt_iter->first, true};
+		}
+
+		guard_map->insert(std::<uint32_t, guard_range>(new_gr.start_lba, new_gr));
+
+		if(guard_map->size() > guard_limit){
+			return guard_map->size();
+		}
+
+		if(old_iter==old_one->end()){
+			new_gr={new_iter->first, overlap_closed_end, true};
+			guard_map->insert(std::<uint32_t, guard_range>(new_gr.start_lba, new_gr));
+			break;
+		}
+		if(new_iter==new_one->end()){
+			new_gr={old_iter->first, overlap_closed_end, true};
+			guard_map->insert(std::<uint32_t, guard_range>(new_gr.start_lba, new_gr));
+			break;
+		}
+
+		now_start_lba=is_start_old?new_iter->first:old_iter->first;
+		is_start_old=!is_start_old;
+	}
+}
+
+static inline uint32_t find_flushing_closed_limit_lba(write_buffer *wb, 
+		uint32_t now_remain_page_num, bool *isover_guard, 
+		std::map<uint32_t, guard_range> **temp_guard){
+
+	
+
+	if(now_guard_num + new_guard_num > FLUSH_ALIGN_GRAIN){
+		*isover_guard=true;
+		LSM.sequential_pinned_level=false;
+		return UINT32_MAX;
+	}
+
+	*isover_guard=false;
+	return res;
+}
+
+

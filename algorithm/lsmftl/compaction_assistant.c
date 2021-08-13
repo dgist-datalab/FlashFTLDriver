@@ -5,6 +5,7 @@
 #include <math.h>
 extern lsmtree LSM;
 extern uint32_t debug_lba;
+extern uint32_t debug_piece_ppa;
 
 void* compaction_main(void *);
 static volatile bool compaction_stop_flag;
@@ -90,6 +91,35 @@ static inline void first_level_slm_coupling(key_ptr_pair *kp_set, bool is_gc_dat
 		}
 	}
 }
+
+static inline bool check_sequential(std::map<uint32_t, uint32_t> *kp_set, write_buffer *wb){
+	uint32_t start, end;
+	if(kp_set->size()==0){
+		start=wb->data->begin()->first;
+		end=wb->data->rbegin()->first;	
+		if(end-start+1==wb->buffered_entry_num) return true;
+		else return false;
+	}
+	start=kp_set->begin()->first;
+	end=kp_set->rbegin()->first;
+	if(end-start+1==kp_set->size()){
+		uint32_t prev_end=end;
+		start=wb->data->begin()->first;
+		end=wb->data->rbegin()->first;
+		if(prev_end+1==start && 
+			end-start+1==wb->buffered_entry_num){
+			return true;	
+		}
+		else{
+			return false;
+		}
+	}
+	else{
+		return false;
+	}
+}
+
+#ifndef MIN_ENTRY_PER_SST
 extern char all_set_page[PAGESIZE];
 static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set, 
 		std::map<uint32_t, uint32_t>::iterator *temp_iter, bool make_rh){
@@ -113,9 +143,13 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	if(make_rh){
 		rh=read_helper_init(lsmtree_get_target_rhp(0));
 	}
+
+	std::map<uint32_t, uint32_t> reverse_map;
 	for(; iter!=flushed_kp_set->end() && i<max_iter_cnt; i++, iter++ ){
 		kp_set[i].lba=iter->first;
 		kp_set[i].piece_ppa=iter->second;
+
+		reverse_map.insert(std::pair<uint32_t, uint32_t>(kp_set[i].piece_ppa, kp_set[i].lba));
 		if(make_rh){
 			read_helper_stream_insert(rh, kp_set[i].lba, kp_set[i].piece_ppa);
 		}
@@ -125,10 +159,14 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 				prev_piece_ppa=kp_set[i].piece_ppa;
 			}
 			else{
-				if(!(prev_piece_ppa < kp_set[i].piece_ppa && kp_set[i].piece_ppa-prev_piece_ppa<L2PGAP)){
+				if(!(prev_piece_ppa < kp_set[i].piece_ppa && prev_seg_num==SEGNUM(kp_set[i].piece_ppa))){
+					printf("[not sequential:%u] prev:<%u %u,%u> now<%u %u,%u>\n",i, kp_set[i-1].lba, 
+							kp_set[i-1].piece_ppa, SEGNUM(kp_set[i-1].piece_ppa),
+							kp_set[i].lba, kp_set[i].piece_ppa, SEGNUM(kp_set[i].piece_ppa));
 					sequential_file=false;
 					continue;
 				}
+				prev_piece_ppa=kp_set[i].piece_ppa;
 			}
 			if(prev_seg_num==UINT32_MAX){
 				prev_seg_num=SEGNUM(kp_set[i].piece_ppa);
@@ -136,9 +174,20 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 			else{
 				if(prev_seg_num!=SEGNUM(kp_set[i].piece_ppa)){
 					sequential_file=false;
+					printf("prev_seg_num:%u now:%u\n", prev_seg_num, SEGNUM(kp_set[i].piece_ppa));
 				}
+				prev_seg_num=SEGNUM(kp_set[i].piece_ppa);
 			}
-
+		}
+	}
+	
+	if(!sequential_file){
+		uint32_t j=0;
+		std::map<uint32_t, uint32_t>::iterator l_iter, p_iter;
+		l_iter=temp_iter?*temp_iter:flushed_kp_set->begin();
+		p_iter=reverse_map.begin();
+		for(uint32_t j=0; j<i; j++, l_iter++, p_iter++){
+			printf("<%u, %u> <%u, %u>\n", l_iter->first, l_iter->second, p_iter->first, p_iter->second);
 		}
 	}
 	*temp_iter=iter;
@@ -182,40 +231,18 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	return res;
 }
 
-static inline bool check_sequential(std::map<uint32_t, uint32_t> *kp_set, write_buffer *wb){
-	uint32_t start, end;
-	if(kp_set->size()==0){
-		start=wb->data->begin()->first;
-		end=wb->data->rbegin()->first;	
-		if(end-start+1==wb->buffered_entry_num) return true;
-		else return false;
-	}
-	start=kp_set->begin()->first;
-	end=kp_set->rbegin()->first;
-	if(end-start+1==kp_set->size()){
-		uint32_t prev_end=end;
-		start=wb->data->begin()->first;
-		end=wb->data->rbegin()->first;
-		if(prev_end+1==start && 
-			end-start+1==wb->buffered_entry_num){
-			return true;	
-		}
-		else{
-			return false;
-		}
-	}
-	else{
-		return false;
-	}
-}
-
 static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set, 
 		std::map<uint32_t, uint32_t> * hot_kp_set,
 		write_buffer *wb, uint32_t flushing_target_num){
 	key_ptr_pair *temp_kp_set=write_buffer_flush(wb, flushing_target_num, false);
+	bool test_flag=kp_set==LSM.flushed_kp_temp_set?true:false;
+//	static uint32_t cnt=0;
+//	printf("[%u]temp_kp_set first:<%u %u,%u>\n", cnt++,temp_kp_set[0].lba, temp_kp_set[0].piece_ppa, SEGNUM(temp_kp_set[0].piece_ppa));
 	for(uint32_t i=0; i<KP_IN_PAGE && temp_kp_set[i].lba!=UINT32_MAX; i++){
 		LSM.flushed_kp_seg->insert(temp_kp_set[i].piece_ppa/L2PGAP/_PPS);
-
+		if(test_flag && temp_kp_set[i].piece_ppa==debug_piece_ppa){
+			printf("%u target is moved to temp_ppa\n", temp_kp_set[i].piece_ppa);
+		}
 		std::map<uint32_t, uint32_t>::iterator find_iter;
 		if(hot_kp_set){
 			find_iter=hot_kp_set->find(temp_kp_set[i].lba);
@@ -239,6 +266,9 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set,
 			invalidate_kp_entry(find_iter->first, find_iter->second, UINT32_MAX, true);
 			kp_set->erase(find_iter);
 			if(hot_kp_set){
+				if(debug_piece_ppa==temp_kp_set[i].piece_ppa){
+					printf("%u is moved to hot set\n", debug_piece_ppa);
+				}
 				hot_kp_set->insert(
 						std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
 				continue;
@@ -262,8 +292,7 @@ static inline level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
 	}
 	return res;
 }
-
-static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
+level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	if(page_manager_get_total_remain_page(LSM.pm, false, false) < wb->buffered_entry_num/L2PGAP){
 		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
 	}
@@ -371,6 +400,7 @@ static inline level* flush_memtable(write_buffer *wb, bool is_gc_data){
 
 	return res;
 }
+#endif
 
 static inline void managing_remain_space_for_wisckey(level *src, level *des){
 	uint32_t needed_map_page_num=src->now_sst_num+(des?des->now_sst_num:0);
@@ -434,7 +464,6 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	}
 
 	uint32_t target_version;
-	uint32_t target_ridx;
 	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
 		target_version=version_order_to_version(LSM.last_run_version, des_lev->idx, 0);
 	}
@@ -553,14 +582,26 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	if(temp_level){
 		rwlock_write_unlock(&LSM.level_rwlock[end_idx]);
 		rwlock_write_lock(&LSM.flushed_kp_set_lock);
-		std::map<uint32_t, uint32_t> *temp_map=LSM.flushed_kp_set;
-		delete temp_map;
 
 		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
 				iter!=LSM.flushed_kp_seg->end(); iter++){
 			lsmtree_gc_unavailable_unset(&LSM, NULL, *iter);
 		}
 		LSM.flushed_kp_seg->clear();
+	
+		/*coupling version*/
+		if(LSM.global_debug_flag){
+			printf("break!\n");
+		}
+		std::map<uint32_t, uint32_t>::iterator map_iter;
+		for(map_iter=LSM.flushed_kp_set->begin(); map_iter!=LSM.flushed_kp_set->end(); map_iter++){
+			if(LSM.global_debug_flag && map_iter->first==debug_lba){
+				printf("break!\n");
+			}
+			version_coupling_lba_version(LSM.last_run_version, map_iter->first, target_version);
+		}
+		delete LSM.flushed_kp_set;
+		LSM.flushed_kp_set=NULL;
 
 		if(LSM.flushed_kp_temp_set->size() || 
 #ifdef WB_SEPARATE
@@ -569,7 +610,6 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 				false
 #endif
 				){
-			bool move_hot_kp_set=false;
 			std::map<uint32_t, uint32_t>::iterator iter;
 			LSM.flushed_kp_set=new std::map<uint32_t, uint32_t>();
 #ifdef WB_SEPARATE
@@ -598,6 +638,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 			LSM.flushed_kp_set=NULL;
 		}
 
+		LSM.pinned_level=NULL;
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 	}
 	else{
@@ -801,7 +842,6 @@ void* compaction_main(void *_cm){
 	queue *req_q=(queue*)cm->req_q;
 	uint32_t above_sst_num;
 	bool force=false;
-	static int round_cnt=0;
 #ifdef LSM_DEBUG
 	uint32_t contents_num;
 #endif
@@ -837,8 +877,7 @@ again:
 
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
 
-	//	lsmtree_level_summary(&LSM);
-
+		//lsmtree_level_summary(&LSM);
 
 		if(level_is_full(LSM.disk[req->end_level], LSM.param.last_size_factor)){
 			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)){
@@ -876,7 +915,7 @@ end:
 
 		if(page_manager_get_total_remain_page(LSM.pm, false, true) <_PPS){
 			uint32_t res=lsmtree_total_invalidate_num(&LSM);
-			printf("remain total invalidate_num:%u %u\n", res, _PPS);
+			//printf("remain total invalidate_num:%u %u\n", res, _PPS);
 			if(res<_PPS*L2PGAP){
 
 				lsmtree_level_summary(&LSM);

@@ -1,6 +1,8 @@
 #include "guard_bf_set.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "../lsmtree.h"
+extern lsmtree LSM;
 static volatile uint32_t BP_sub_member_num=UINT32_MAX;
 static volatile uint32_t BO_sub_member_num=UINT32_MAX;
 static volatile uint32_t prev_bit=UINT32_MAX;
@@ -112,6 +114,9 @@ bool gbf_set_insert(guard_bf_set *gbf, uint32_t lba, uint32_t piece_ppa){
 	if(lba==debug_lba){
 		uint32_t temp=gbf->now/BO_sub_member_num;
 		printf("target %u insert into %u,%u\n", lba, temp, gbf->now%BO_sub_member_num);
+		if(LSM.global_debug_flag){
+			printf("break!\n");
+		}
 	}
 #endif
 	switch(type){

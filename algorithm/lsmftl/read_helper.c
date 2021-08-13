@@ -165,6 +165,10 @@ bool read_helper_check(read_helper *rh, uint32_t lba, uint32_t *piece_ppa_result
 		return true;
 	}
 
+	if(lba==debug_lba && LSM.global_debug_flag){
+		printf("break!\n");
+	}
+
 	if((*idx)==UINT32_MAX) 
 		return false;
 	bool result=true;

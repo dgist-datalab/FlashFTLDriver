@@ -14,6 +14,7 @@ sst_pf_out_stream* sst_pos_init_sst(sst_file *sst_set, inter_read_alreq_param **
 	res->sst_file_set=new std::queue<sst_file*>();
 	res->check_flag_set=new std::queue<inter_read_alreq_param *>();
 	res->sst_map_for_gc=new std::multimap<uint32_t, sst_file*>();
+	res->free_list_for_gc=new std::queue<void*>();
 	res->mr_map_for_gc=NULL;
 
 	for(uint32_t i=0; i<set_num; i++){
@@ -44,6 +45,7 @@ sst_pf_out_stream* sst_pos_init_mr(map_range *mr_set, inter_read_alreq_param **p
 	res->mr_set=new std::queue<map_range*>();
 	res->check_flag_set=new std::queue<inter_read_alreq_param *>();
 	res->mr_map_for_gc=new std::multimap<uint32_t, map_range*>();
+	res->free_list_for_gc=new std::queue<void*>();
 	res->sst_map_for_gc=NULL;
 
 	for(uint32_t i=0; i<set_num; i++){
@@ -97,6 +99,10 @@ void sst_pos_add_mr(sst_pf_out_stream *os, map_range *mr_set, inter_read_alreq_p
 		os->mr_map_for_gc->insert(std::pair<uint32_t, map_range*>(mr_set[i].start_lba, &mr_set[i]));
 	}
 	os->file_set_empty=os->mr_set->size()==0;
+}
+
+void sst_pos_delay_free(sst_pf_out_stream *os, void *ptr){
+	os->free_list_for_gc->push(ptr);
 }
 
 static inline void move_next_file(sst_pf_out_stream *os, bool inv_flag){
@@ -301,7 +307,15 @@ retry:
 	else{
 check_again:
 		if(!(os->prev_lba<=res.lba)){
-			if(os->gced_out_stream>0){
+			if(os->prev_lba==UINT32_MAX){
+				printf("prev UINT32_MAX: now res %u:%u\n", res.lba, res.piece_ppa);
+				while(!os->file_set_empty){
+					move_next_file(os, true);	
+				}
+				os->now_file_empty=true;
+				res.lba=os->prev_lba;
+			}
+			else if(os->gced_out_stream>0){
 				res=sst_pos_adjust_and_pick(os, os->prev_lba);
 	//			os->gced_out_stream--;
 				goto check_again;
@@ -354,9 +368,17 @@ void sst_pos_free(sst_pf_out_stream *os){
 	if(os->mr_map_for_gc){
 		delete os->mr_map_for_gc;
 	}
+
+	while(os->free_list_for_gc->size()){
+		void *ptr=os->free_list_for_gc->front();
+		free(ptr);
+		os->free_list_for_gc->pop();
+	}
+
 	delete os->mr_set;
 	delete os->sst_file_set;
 	delete os->check_flag_set;
+	delete os->free_list_for_gc;
 	free(os);
 }
 

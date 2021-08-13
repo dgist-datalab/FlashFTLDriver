@@ -19,6 +19,7 @@ typedef struct sst_pf_out_stream{
 
 	std::multimap<uint32_t, sst_file*> *sst_map_for_gc;
 	std::multimap<uint32_t, map_range*> *mr_map_for_gc;
+	std::queue<void*> *free_list_for_gc;
 
 	key_ptr_pair *kp_data;
 	sst_file *now;
@@ -59,6 +60,7 @@ sst_pf_out_stream* sst_pos_init_mr(map_range *, struct inter_read_alreq_param **
 sst_pf_out_stream *sst_pos_init_kp(key_ptr_pair *data);
 void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *, 
 		inter_read_alreq_param **, uint32_t num);
+void sst_pos_delay_free(sst_pf_out_stream *os, void *ptr);
 void sst_pos_add_mr(sst_pf_out_stream *os, map_range *, 
 		inter_read_alreq_param **, uint32_t num);
 key_ptr_pair sst_pos_pick(sst_pf_out_stream *os);
