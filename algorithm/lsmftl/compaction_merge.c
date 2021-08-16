@@ -10,12 +10,16 @@
 extern compaction_master *_cm;
 extern lsmtree LSM;
 extern uint32_t debug_lba;
+extern uint32_t debug_piece_ppa;
 void *merge_end_req(algo_req *);
 void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 	inter_read_alreq_param *param;
 	uint32_t param_idx=0;
 	for(int i=read_arg->from; i<=read_arg->to; i++){
 		//param=compaction_get_read_param(_cm);
+		if(LSM.pm->bm->is_invalid_page(LSM.pm->bm, mr[i].ppa*L2PGAP)){
+			printf("ppa:%u piece_ppa:%u break!\n", mr[i].ppa, mr[i].ppa*L2PGAP);
+		}
 		param=(inter_read_alreq_param*)calloc(1, sizeof(inter_read_alreq_param));
 		param->map_target=&mr[i];
 		mr[i].data=NULL;
@@ -95,6 +99,9 @@ static map_range * make_mr_set(sst_file *set, uint32_t start_idx, uint32_t end_i
 	uint32_t mr_idx=0;
 	for(uint32_t i=start_idx; i<=end_idx; i++){
 		for_each_map_range(&set[i], mptr, idx){
+			if(LSM.global_debug_flag && mptr->ppa==debug_piece_ppa/L2PGAP){
+				printf("break!\n");
+			}
 			mr[mr_idx]=*mptr;
 			mr[mr_idx].data=NULL;
 			mr_idx++;
@@ -108,6 +115,11 @@ static map_range * make_mr_set_for_gc(sst_file *set, uint32_t start_idx, uint32_
 	uint32_t target_map_num=0;
 	sst_file *sptr=&set[start_idx];
 	uint32_t first_map_idx=sst_upper_bound_map_idx(sptr, border_lba);
+
+	if(sptr->block_file_map[first_map_idx].end_lba==border_lba){
+		first_map_idx++;
+	}
+
 	target_map_num=sptr->map_num-first_map_idx;
 	map_range *res=NULL;
 	for(uint32_t i=start_idx+1; i<=end_idx; i++){
@@ -115,7 +127,12 @@ static map_range * make_mr_set_for_gc(sst_file *set, uint32_t start_idx, uint32_
 		target_map_num+=sptr->map_num;
 	}
 
-	if(!target_map_num) return NULL;
+	
+
+	if(!target_map_num) {
+		*map_num=0;
+		return NULL;
+	}
 	res=(map_range*)calloc(target_map_num, sizeof(map_range));
 	
 	uint32_t mr_idx=0;
@@ -124,7 +141,10 @@ static map_range * make_mr_set_for_gc(sst_file *set, uint32_t start_idx, uint32_
 		if(first_map_idx && i==start_idx){
 			for(uint32_t j=first_map_idx; j<sptr->map_num; j++){
 				res[mr_idx]=sptr->block_file_map[j];
-				res[mr_idx].data=NULL;
+				res[mr_idx].data=NULL;	
+				if(LSM.global_debug_flag && res[mr_idx].ppa==debug_piece_ppa/L2PGAP){
+					printf("break!\n");
+				}
 				mr_idx++;
 			}
 			continue;
@@ -310,7 +330,8 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 #ifdef LSM_DEBUG
 	static int cnt=0;
 	printf("merge cnt:%u\n", cnt++);
-	if(cnt==31){
+	if(cnt==32){
+		printf("break!\n");
 	}
 #endif
 
@@ -806,6 +827,9 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 			}
 			for(int32_t i=stream_num-1, j=0; i>=0; i--, j++){
 				if(read_done & (1<<j)) continue;
+				if(LSM.global_debug_flag && j==12){
+					printf("break!\n");
+				}
 				uint32_t ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
 				compaction_adjust_by_gc(&read_arg_set[j], pos_set[j], stream_border_lba_set[j], 
 						&src->array[ridx], &mr_set[j], BLOCK_FILE, false);

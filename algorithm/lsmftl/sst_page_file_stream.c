@@ -82,6 +82,7 @@ void sst_pos_add_sst(sst_pf_out_stream *os, sst_file *sst_set, inter_read_alreq_
 		os->now=NULL;
 	}
 	for(uint32_t i=0; i<set_num; i++){
+	//	if(sst_set[i].read_done) continue;//after GC, some sstfile will be read again
 		os->sst_file_set->push(&sst_set[i]);
 		os->check_flag_set->push(param[i]);
 		os->sst_map_for_gc->insert(std::pair<uint32_t, sst_file*>(sst_set[i].start_lba, &sst_set[i]));
@@ -94,6 +95,7 @@ void sst_pos_add_mr(sst_pf_out_stream *os, map_range *mr_set, inter_read_alreq_p
 		os->now_mr=NULL;
 	}
 	for(uint32_t i=0; i<set_num; i++){
+	//	if(mr_set[i].read_done) continue; //after GC, some sstfile will be read again.
 		os->mr_set->push(&mr_set[i]);
 		os->check_flag_set->push(param[i]);
 		os->mr_map_for_gc->insert(std::pair<uint32_t, map_range*>(mr_set[i].start_lba, &mr_set[i]));

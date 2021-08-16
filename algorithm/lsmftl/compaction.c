@@ -810,6 +810,8 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 	bool gced=false;
 	uint32_t last_lba=UINT32_MAX;
 	uint32_t array_idx=0;
+	uint32_t nxt_array_start_idx=start_idx;
+	
 	for(uint32_t i=0; i<round; i++){
 		if(gced){
 			/*not needed because the level's data is not removed by GC*/
@@ -817,6 +819,14 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		gced=false;
 		if(index_array){
 			read_arg.from=start_idx+i;
+			while(i<round){
+				if(index_array[start_idx+i]+1==index_array[start_idx+i+1]){
+					i++;
+				}
+				else{
+					break;
+				}
+			}
 			read_arg.to=start_idx+i;
 		}
 		else{
@@ -837,7 +847,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		}
 
 
-		if(i==0){
+		if(!pos){
 			if(index_array){
 				uint32_t j=0;
 				pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, index_array[array_idx++]), 
@@ -868,19 +878,19 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		
 		uint32_t round2_tier_compaction_tags, picked_kv_num;
 		do{ 
-			if(index_array){
-				round2_tier_compaction_tags=UINT32_MAX;
-			}
-			else{
+	//		if(index_array){
+	//			round2_tier_compaction_tags=UINT32_MAX;
+	//		}
+	//		else{
 				round2_tier_compaction_tags=cm->read_param_queue->size();
-			}
+	//		}
 			picked_kv_num=issue_read_kv_for_bos_stream(bos, pos, round2_tier_compaction_tags, 
 					src->idx, demote, true);
 			LSM.monitor.tiering_valid_entry_cnt+=picked_kv_num;
 			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
 			total_moved_num+=picked_kv_num;
 			if(index_array){
-				temp_final=true;
+				temp_final=sst_pos_is_empty(pos);
 			}
 			else{
 				temp_final=((i==round-1 && sst_pos_is_empty(pos)));
@@ -939,32 +949,6 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 	return new_run;
 }
 
-/*
-static inline run *filter_sequential_file(level *src, run *unfiltered_run, uint32_t max_sst_num, 
-		uint32_t target_version, uint32_t des_idx){
-	run *new_run=run_init(max_sst_num, UINT32_MAX, 0);
-	bool moved=false;
-	run *rptr;
-	sst_file *sptr;
-	uint32_t ridx, sidx;
-	for_each_sst_level(src, rptr, ridx, sptr, sidx){
-		moved=true;
-		if(sptr->type==PAGE_FILE){
-			if(LSM.disk[des_idx]->level_type==LEVELING || LSM.disk[des_idx]->level_type==TIERING){
-				sst_convert_seq_pf_to_bf(sptr);
-			}
-		}
-		run_append_sstfile_move_originality(new_run, sptr);
-	}
-
-	if(moved){
-		*start_sst_file_idx=sidx;
-	}
-	return new_run;
-}
-*/
-
-
 level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){ 
 	_cm=cm;
 	run *seq_run=run_init(src->now_sst_num, UINT32_MAX, 0);
@@ -987,7 +971,6 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	if(seq_run->now_sst_num && src->idx!=UINT32_MAX){
 		compaction_trivial_move(new_run, target_version, src->idx, des->idx, false);
 	}
-
 
 	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, 
 			des->idx, target_version);

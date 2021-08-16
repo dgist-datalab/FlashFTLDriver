@@ -440,9 +440,8 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	static uint32_t demote_cnt=0;
 	printf("demote_cnt: %u\n", demote_cnt++);
 
-	if(demote_cnt==570){
-		//LSM.global_debug_flag=true;
-		//printf("break!\n");
+	if(demote_cnt==699){
+		printf("break!\n");
 	}
 	if(temp_level){
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
@@ -912,7 +911,7 @@ again:
 		}
 
 end:
-
+/*
 		if(page_manager_get_total_remain_page(LSM.pm, false, true) <_PPS){
 			uint32_t res=lsmtree_total_invalidate_num(&LSM);
 			//printf("remain total invalidate_num:%u %u\n", res, _PPS);
@@ -926,7 +925,7 @@ end:
 				goto again;
 			}
 		}
-
+*/
 		force=false;
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);

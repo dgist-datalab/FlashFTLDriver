@@ -8,8 +8,9 @@
 #include<queue>
 
 extern lsmtree LSM;
-//uint32_t debug_piece_ppa=3198977;
-uint32_t debug_piece_ppa=UINT32_MAX;
+//uint32_t debug_piece_ppa=1105510*L2PGAP;
+uint32_t debug_piece_ppa=4376864;
+//uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
 
@@ -38,8 +39,8 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 	//	memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 #ifdef LSM_DEBUG
 		if(piece_ppa[i]==debug_piece_ppa){
-			printf("%u lba:%u", should_abort?++cnt:cnt, oob->lba[piece_ppa[i]%L2PGAP]);
-			EPRINT("validate piece here!\n", false);
+			printf("%u lba:%u ppa:%u", should_abort?++cnt:cnt, oob->lba[piece_ppa[i]%L2PGAP], debug_piece_ppa);
+			EPRINT("validate piece here!\n", false );
 		}
 #endif
 
@@ -87,11 +88,8 @@ bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abor
 #ifdef LSM_DEBUG
 	if(piece_ppa==debug_piece_ppa){
 		static uint32_t cnt=0;
-		printf("%u ", should_abort?++cnt:++cnt);
+		printf("%u %u", should_abort?++cnt:++cnt, debug_piece_ppa);
 		EPRINT("invalidate piece here!\n",false);
-		if(cnt==12 || cnt==11){
-			printf("break!\n");
-		}
 	}
 #endif
 
@@ -171,7 +169,7 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 #ifdef LSM_DEBUG
 	if(map_ppa==debug_piece_ppa/L2PGAP){
 		static int cnt=0;
-		printf("%u ", should_abort?++cnt:cnt);
+		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("validate map here!\n", false);
 	}
 #endif
@@ -194,9 +192,9 @@ void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 #ifdef LSM_DEBUG
 	if(map_ppa==debug_piece_ppa/L2PGAP){
 		static int cnt=0;
-		printf("%u ", should_abort?++cnt:cnt);
-
+		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("invalidate map here!\n", false);
+		LSM.global_debug_flag=true;
 	}
 #endif
 
@@ -1020,9 +1018,10 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	}
 
 	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
-	if(LSM.monitor.gc_data==522){
-		LSM.global_debug_flag=true;
-	}
+	/*
+	if(LSM.monitor.gc_data==531){
+		//LSM.global_debug_flag=true;
+	}*/
 	std::queue<gc_read_node*> *gc_target_queue=new std::queue<gc_read_node*>();
 	uint32_t bidx;
 	uint32_t pidx, page;
