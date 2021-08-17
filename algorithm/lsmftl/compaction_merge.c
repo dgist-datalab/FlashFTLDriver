@@ -684,10 +684,45 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 	run *res=run_init(src->max_sst_num, UINT32_MAX, 0);
 	std::map<uint32_t, run*>::iterator iter;
 
+	read_helper_param rhp=lsmtree_get_target_rhp(des_idx);
 	for(iter=temp_run.begin(); iter!=temp_run.end(); iter++){
 		run *rptr=iter->second;
 		if(target_version!=UINT32_MAX && src->idx!=UINT32_MAX){
-			compaction_trivial_move(rptr, target_version, src->idx, des_idx, inplace);
+			/*filtering sequential file*/
+			run *temp_rptr=run_init(rptr->now_sst_num, UINT32_MAX, 0);
+			uint32_t sidx;
+			sst_file *temp_sptr;
+			uint32_t *moved_sidx=(uint32_t*)calloc(rptr->now_sst_num, sizeof(uint32_t));
+			for_each_sst(rptr, temp_sptr, sidx){
+				if(temp_sptr->_read_helper && rhp.type==temp_sptr->_read_helper->type){
+					uint32_t contents_num=read_helper_get_cnt(temp_sptr->_read_helper);
+					float density=(float)(contents_num-1)/(temp_sptr->end_lba-temp_sptr->start_lba);
+					if(density >= 0.9){
+						version_update_for_trivial_move(LSM.last_run_version,
+								temp_sptr->start_lba, temp_sptr->end_lba,
+								src->idx, des_idx, target_version);
+						moved_sidx[sidx]=UINT32_MAX;
+						continue;
+					}
+				}
+
+				moved_sidx[sidx]=temp_rptr->now_sst_num;
+				run_append_sstfile(temp_rptr, temp_sptr);
+			}
+
+			if(temp_rptr->now_sst_num){
+				compaction_trivial_move(temp_rptr, target_version, src->idx, des_idx, inplace);
+				for_each_sst(rptr, temp_sptr, sidx){
+					if(moved_sidx[sidx]==UINT32_MAX) continue;
+					else{
+						temp_sptr->_read_helper=temp_rptr->sst_set[moved_sidx[sidx]]._read_helper;	
+					}
+				}
+			}
+			
+			run_free(temp_rptr);
+			free(moved_sidx);
+			
 		}
 		sst_file *sptr; uint32_t sidx;
 		for_each_sst(rptr, sptr, sidx){
@@ -1329,13 +1364,7 @@ sst_file *trivial_move_processing(run *rptr, sst_pf_out_stream *pos,
 	version *v=LSM.last_run_version;
 	sst_file *sptr=NULL;
 	uint32_t min_lba, max_lba;
-	/*
-	static int cnt=0;
-	printf("cnt:%u\n", cnt++);
-	if(cnt==71){
-		//LSM.global_debug_flag=true;
-	}
-	*/
+
 	while(!sst_pos_is_empty(pos)){
 		key_ptr_pair target_pair=sst_pos_pick(pos);
 		if(target_pair.lba==UINT32_MAX){

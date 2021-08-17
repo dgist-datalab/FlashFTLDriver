@@ -9,8 +9,8 @@
 
 extern lsmtree LSM;
 //uint32_t debug_piece_ppa=1105510*L2PGAP;
-uint32_t debug_piece_ppa=4376864;
-//uint32_t debug_piece_ppa=UINT32_MAX;
+//uint32_t debug_piece_ppa=4376864;
+uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
 

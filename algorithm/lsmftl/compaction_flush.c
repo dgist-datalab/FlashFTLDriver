@@ -98,7 +98,7 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set,
 				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
 
 		find_iter=res_iter.first;
-		if(find_iter!=kp_set->begin()){
+		if(LSM.sst_sequential_available_flag && find_iter!=kp_set->begin()){
 			find_iter--;
 			if(SEGNUM(find_iter->second)!=SEGNUM(temp_kp_set[i].piece_ppa) || 
 					find_iter->second > temp_kp_set[i].piece_ppa){
@@ -150,11 +150,6 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	if(SEGNUM(page_manager_pick_new_ppa(LSM.pm, false, DATASEG)*L2PGAP) != SEGNUM(iter->second)){
 		/*this is an inevitable situation*/
 		now_sequential_file=false;
-	}
-
-
-	if(now_sequential_file && make_rh){
-		rh=read_helper_init(lsmtree_get_target_rhp(0));
 	}
 
 	uint32_t prev_processed_entry_num=*processed_entry_num;
@@ -248,12 +243,25 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		}
 	}
 	
-	/*if(LSM.global_debug_flag){
-		printf("cutted %u seq_flag:%u\n",i, LSM.sst_sequential_available_flag);
-		if(!LSM.sst_sequential_available_flag){
-			printf("break!\n");
+	if(make_rh){
+#ifdef DYNAMIC_HELPER_ASSIGN
+		float density=(float)(i-1)/(kp_set[i-1].lba-kp_set[0].lba);
+		if(density > LSM.param.BF_PLR_border && now_sequential_file){
+			rh=read_helper_init(lsmtree_get_target_rhp(LSM.param.LEVELN-1));
 		}
-	}*/
+		else{
+			rh=read_helper_init(lsmtree_get_target_rhp(0));
+		}
+#else
+		rh=read_helper_init(lsmtree_get_target_rhp(0));
+#endif
+		//read_helper
+		for(uint32_t j=0; j<i; j++){
+			read_helper_stream_insert(rh, kp_set[j].lba, kp_set[j].piece_ppa);
+		}	
+		read_helper_insert_done(rh);
+	}
+
 	*processed_entry_num+=i;
 	*temp_iter=iter;
 
@@ -317,14 +325,14 @@ static inline uint32_t now_buffered_entry_num(){
 }
 
 static inline level *fa_make_pinned_level(level *pinned_level, run **r, std::map<uint32_t, uint32_t> *kp_set, uint32_t limit_sst_file_num){
-	static int cnt=0;
-	++cnt;
 
 	if(r && LSM.unaligned_sst_file_set){
 		*r=NULL;
 		return NULL;
 	}
-
+#ifdef LSM_DEBUG
+	static int cnt=0;
+	++cnt;
 	printf("make pinned level cnt:%u %p \n",++cnt, r);
 	if(cnt>=1644){
 		//LSM.global_debug_flag=true;
@@ -345,6 +353,7 @@ static inline level *fa_make_pinned_level(level *pinned_level, run **r, std::map
 			}
 		}
 	}
+#endif
 	level *res=NULL;
 	run *res_r=NULL;
 	if(pinned_level){

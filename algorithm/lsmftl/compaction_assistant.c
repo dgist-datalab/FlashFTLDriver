@@ -140,9 +140,6 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	uint32_t prev_seg_num=UINT32_MAX;
 	uint32_t prev_piece_ppa=UINT32_MAX;
 	bool sequential_file=true;
-	if(make_rh){
-		rh=read_helper_init(lsmtree_get_target_rhp(0));
-	}
 
 	std::map<uint32_t, uint32_t> reverse_map;
 	for(; iter!=flushed_kp_set->end() && i<max_iter_cnt; i++, iter++ ){
@@ -150,9 +147,10 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		kp_set[i].piece_ppa=iter->second;
 
 		reverse_map.insert(std::pair<uint32_t, uint32_t>(kp_set[i].piece_ppa, kp_set[i].lba));
+		/*
 		if(make_rh){
 			read_helper_stream_insert(rh, kp_set[i].lba, kp_set[i].piece_ppa);
-		}
+		}*/
 		slm_coupling_mem_lev_seg(SEGNUM(kp_set[i].piece_ppa), SEGPIECEOFFSET(kp_set[i].piece_ppa));
 		if(sequential_file){
 			if(prev_piece_ppa==UINT32_MAX){
@@ -179,6 +177,24 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 				prev_seg_num=SEGNUM(kp_set[i].piece_ppa);
 			}
 		}
+	}
+
+	if(make_rh){
+#ifdef DYNAMIC_HELPER_ASSIGN
+		float density=(float)(i-1)/(kp_set[i-1].lba-kp_set[0].lba);
+		if(density > LSM.param.BF_PLR_border && sequential_file){
+			rh=read_helper_init(lsmtree_get_target_rhp(LSM.param.LEVELN-1));
+		}
+		else{
+			rh=read_helper_init(lsmtree_get_target_rhp(0));
+		}
+#else
+		rh=read_helper_init(lsmtree_get_target_rhp(0));
+#endif
+		//read_helper
+		for(uint32_t j=0; j<i; j++){
+			read_helper_stream_insert(rh, kp_set[j].lba, kp_set[j].piece_ppa);
+		}	
 	}
 	
 	if(!sequential_file){
@@ -286,7 +302,7 @@ static inline level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
 	level *res=level_init(kp_set->size()/KP_IN_PAGE+(kp_set->size()%KP_IN_PAGE?1:0),1, LEVELING_WISCKEY, UINT32_MAX, kp_set->size(), false);
 	sst_file *sptr=NULL;
 	std::map<uint32_t, uint32_t>::iterator iter=kp_set->begin();
-	while((sptr=kp_to_sstfile(kp_set, &iter, false))){
+	while((sptr=kp_to_sstfile(kp_set, &iter, true))){
 		level_append_sstfile(res, sptr, true);
 		sst_free(sptr, LSM.pm);
 	}
@@ -876,7 +892,7 @@ again:
 
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
 
-		//lsmtree_level_summary(&LSM);
+		lsmtree_level_summary(&LSM);
 
 		if(level_is_full(LSM.disk[req->end_level], LSM.param.last_size_factor)){
 			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)){

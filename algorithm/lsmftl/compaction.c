@@ -822,11 +822,15 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 			while(i<round){
 				if(index_array[start_idx+i]+1==index_array[start_idx+i+1]){
 					i++;
+					if(start_idx+i+1==round){
+						break;
+					}
 				}
 				else{
 					break;
 				}
 			}
+			
 			read_arg.to=start_idx+i;
 		}
 		else{

@@ -42,6 +42,9 @@ static void print_level_param(){
 	printf("[param] write_buffer ent: %u\n", LSM.param.write_buffer_ent);
 	printf("[param] write_buffer byte: %u\n", LSM.param.write_buffer_bit/8);
 	printf("[param] reclaim ppa target: %u (%u)\n", LSM.param.reclaim_ppa_target, LSM.param.reclaim_ppa_target*L2PGAP);
+#ifdef DYNAMIC_HELPER_ASSIGN
+	printf("[param] dynamic helper assign border:%.2lf\n", LSM.param.BF_PLR_border);
+#endif
 
 	printf("[PERF] WAF:%.2lf+GC\n", tr.WAF);
 	printf("[PERF] RAF:%.3lf\n", LSM.param.read_amplification+1);
@@ -629,6 +632,17 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	res.reclaim_ppa_target=(target_buffered_ent*ceil(pow(res.tr.size_factor, target_level-1)));
 	res.reclaim_ppa_target=(res.reclaim_ppa_target/QDEPTH+(res.reclaim_ppa_target%QDEPTH?1:0))*QDEPTH;
 	res.reclaim_ppa_target=(res.reclaim_ppa_target/L2PGAP)+(res.reclaim_ppa_target/KP_IN_PAGE);
+#ifdef DYNAMIC_HELPER_ASSIGN
+	for(uint32_t i=1; i<=1000; i++){
+		uint64_t bf_memory=bf_memory_per_ent((float)i/1000);
+		uint64_t plr_memory=plr_memory_per_ent((float)i/1000);
+		if(bf_memory > plr_memory){
+			res.BF_PLR_border=(float)i/1000;
+			break;
+		}
+	}
+
+#endif
 
 	//free(settings);
 	/*

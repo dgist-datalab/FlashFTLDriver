@@ -109,9 +109,6 @@ uint32_t version_get_empty_version(version *v, uint32_t level_idx){
 	v->O2R_map[level_idx][order]=ridx;
 
 	v->level_order_token[level_idx]++;
-#ifdef LSM_DEBUG
-	printf("version info: v-%u vidx-%u ridx-%u order-%u\n", res,  vidx, ridx, order);
-#endif
 	return res;
 }
 

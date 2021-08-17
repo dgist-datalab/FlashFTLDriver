@@ -28,6 +28,7 @@
 #define MIN_SEQ_ENTRY_NUM 4
 #define WB_SEPARATE
 #define INVALIDATION_COUNT_MERGE
+#define DYNAMIC_HELPER_ASSIGN
 
 #define DEMAND_SEG_LOCK
 #define UPDATING_COMPACTION_DATA
@@ -89,6 +90,10 @@ typedef struct lsmtree_parameter{
 	double normal_size_factor;
 	uint32_t write_buffer_bit;
 	uint32_t write_buffer_ent;
+#ifdef DYNAMIC_HELPER_ASSIGN
+	float BF_PLR_border;
+#endif
+
 #ifdef MIN_ENTRY_PER_SST
 	uint32_t max_sst_in_pinned_level;
 #endif
