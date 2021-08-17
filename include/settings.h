@@ -53,7 +53,7 @@
 
 #define GIGAUNIT 16L
 #ifndef OP
-#define OP 75
+#define OP 85
 #endif
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
