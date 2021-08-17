@@ -40,10 +40,12 @@ static inline uint32_t run_file_size(run *r){
 
 run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba);
 sst_file *run_retrieve_sst(run *r, uint32_t lba);
+uint32_t run_retrieve_sst_idx(run *r, uint32_t lba);
 sst_file *run_retrieve_close_sst(run *r, uint32_t lba);
 uint32_t run_retrieve_close_sst_idx(run *r, uint32_t lba);
 uint32_t run_retrieve_lower_bound_sst_idx(run *r, uint32_t lba);
 uint32_t run_retrieve_upper_bound_sst_idx(run *r, uint32_t lba);
+uint32_t run_remove_sst_file_at(run *r, uint32_t idx);
 
 map_range *run_to_MR(run *r, uint32_t* map_num);
 void run_space_init(run *,uint32_t map_num, uint32_t start_lba, uint32_t end_lba);

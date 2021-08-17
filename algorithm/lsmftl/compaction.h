@@ -21,7 +21,6 @@
 #define COMPACTION_TAGS ((QDEPTH)*4)
 #define TARGETREADNUM(read_arg) (read_arg.to-read_arg.from+1)
 #define COMPACTION_LEVEL_NUM (2)
-#define CEILING_TARGET(N, G) ((N)/(G) + (N%G?1:0))
 
 typedef struct inter_read_alreq_param{
 	fdriver_lock_t done_lock;
@@ -105,7 +104,8 @@ level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *me
 run* compaction_reclaim_run(compaction_master *cm, run *r, uint32_t version);
 run *compaction_wisckey_to_normal(compaction_master *cm, level *src, 
 		run *previous_run, uint32_t *moved_entry_num,  
-		uint32_t start_sst_file_idx, uint32_t target_ridx, bool demote);
+		uint32_t start_sst_file_idx, uint32_t total_sst_num, uint32_t *index_array,
+		uint32_t target_version, bool demote);
 
 sst_file *compaction_seq_pagesst_to_blocksst(sst_queue *, uint32_t des_idx, uint32_t target_version);
 
@@ -168,6 +168,7 @@ void issue_map_read_sst_job(compaction_master *cm, read_arg_container* thread_ar
 void compaction_adjust_by_gc(struct read_issue_arg *arg, sst_pf_out_stream *pos, uint32_t last_lba, 
 		run *rptr, map_range **mr, uint32_t sst_file_type, bool force);
 void *comp_alreq_end_req(algo_req *req);
+level* flush_memtable(write_buffer *wb, bool is_gc_data);
 
 static inline compaction_req * alloc_comp_req(int8_t start, int8_t end, write_buffer *wb,
 		void (*end_req)(compaction_req *), void *param, bool is_gc_data){

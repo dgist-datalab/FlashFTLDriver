@@ -173,6 +173,7 @@ void read_sst_job(void *arg, int th_num){
 	free(param_set);
 }
 
+
 void issue_map_read_sst_job(compaction_master *cm, read_arg_container *thread_arg){
 #ifdef LSM_DEBUG
 	/*sanity check*/
@@ -197,6 +198,18 @@ static void read_param_init(read_issue_arg *read_arg){
 	for(int i=0; i<read_arg->to-read_arg->from+1; i++){
 		param=compaction_get_read_param(_cm);
 		param->target=LEVELING_SST_AT_PTR(read_arg->des, read_arg->from+i);
+		param->target->read_done=false;
+		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+		fdriver_lock_init(&param->done_lock, 0);
+		read_arg->param[i]=param;
+	}
+}
+
+static void read_param_init_with_array(read_issue_arg *read_arg, uint32_t *target_array){
+	inter_read_alreq_param *param;
+	for(int i=0; i<read_arg->to-read_arg->from+1; i++){
+		param=compaction_get_read_param(_cm);
+		param->target=LEVELING_SST_AT_PTR(read_arg->des, target_array[read_arg->from+i]);
 		param->target->read_done=false;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&param->done_lock, 0);
@@ -737,82 +750,18 @@ sst_bf_in_stream *tiering_new_bis(std::queue<uint32_t> *locked_seg_q, uint32_t l
 	sst_bf_in_stream *bis=sst_bis_init(seg, LSM.pm, true, temp_rhp);
 	return bis;
 }
-/*
-static inline run *filter_sequential_file(level *src, uint32_t max_sst_num, 
-		uint32_t target_version, uint32_t* start_sst_file_idx, uint32_t des_idx){
-	run *new_run=run_init(max_sst_num, UINT32_MAX, 0);
-	bool moved=false;
-	run *rptr;
-	sst_file *sptr;
-	sst_file *prev_sptr=NULL;
-	uint32_t ridx, sidx;
-	sst_queue *pf_queue=NULL;
-	for_each_sst_level(src, rptr, ridx, sptr, sidx){
-		if(!sptr->sequential_file) break;
-		moved=true;
-		if(prev_sptr==NULL){
-			prev_sptr=sptr;
-			pf_queue=new sst_queue();
-			pf_queue->push(sptr);
-		}
-		else{
-			if(prev_sptr->file_addr.map_ppa/_PPS == sptr->file_addr.map_ppa/_PPS){
-				pf_queue->push(sptr);
-			}
-			else{
-				sst_file *block_file=compaction_seq_pagesst_to_blocksst(pf_queue, des_idx, target_version);
-				run_append_sstfile_move_originality(new_run, block_file);
-				sst_free(block_file, LSM.pm);
-				delete pf_queue;
-				pf_queue=new sst_queue();
-				pf_queue->push(sptr);
-			}
-			prev_sptr=sptr;
-		}
-	}
-
-	if(pf_queue){
-		sst_file *block_file=compaction_seq_pagesst_to_blocksst(pf_queue, des_idx, target_version);
-		run_append_sstfile_move_originality(new_run, block_file);
-		sst_free(block_file, LSM.pm);
-		delete pf_queue;
-	}
-
-	if(moved){
-		*start_sst_file_idx=sidx;
-	}
-	return new_run;
-}*/
-
-
-static inline run *filter_sequential_file(level *src, uint32_t max_sst_num, 
-		uint32_t target_version, uint32_t* start_sst_file_idx, uint32_t des_idx){
-	run *new_run=run_init(max_sst_num, UINT32_MAX, 0);
-	bool moved=false;
-	run *rptr;
-	sst_file *sptr;
-	uint32_t ridx, sidx;
-	for_each_sst_level(src, rptr, ridx, sptr, sidx){
-		if(!sptr->sequential_file) break;
-		moved=true;
-		if(sptr->type==PAGE_FILE){
-			if(LSM.disk[des_idx]->level_type==LEVELING || LSM.disk[des_idx]->level_type==TIERING){
-				sst_convert_seq_pf_to_bf(sptr);
-			}
-		}
-		run_append_sstfile_move_originality(new_run, sptr);
-	}
-
-	if(moved){
-		*start_sst_file_idx=sidx;
-	}
-	return new_run;
-}
 
 run *compaction_wisckey_to_normal(compaction_master *cm, level *src, 
 		run *previous_run, uint32_t *moved_entry_num, 
-		uint32_t start_sst_file_idx, uint32_t target_version,
+		uint32_t start_sst_file_idx, uint32_t total_sst_num, uint32_t *index_array,
+		uint32_t target_version,
 		bool demote){
+
+	if(start_sst_file_idx==UINT32_MAX || total_sst_num==UINT32_MAX){
+		printf("start_sst_file_idx:%u total_sst_num:%u ",start_sst_file_idx, total_sst_num);
+		EPRINT("invalid parameter", true);
+	}
+
 	_cm=cm;
 	run *new_run=previous_run?previous_run:run_init(src->now_sst_num, UINT32_MAX, 0);
 	read_issue_arg read_arg;
@@ -835,12 +784,17 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 	std::queue<uint32_t>* locked_seg_q=new std::queue<uint32_t>();
 	sst_bf_in_stream *bis=tiering_new_bis(locked_seg_q, src->idx+1);
 
-	uint32_t total_num=(start_sst_file_idx==UINT32_MAX?src->now_sst_num:src->now_sst_num-(start_sst_file_idx));
-	start_sst_file_idx=(start_sst_file_idx==UINT32_MAX?0:start_sst_file_idx);
+	uint32_t total_num=total_sst_num;
 
 	uint32_t start_idx=start_sst_file_idx;
 	uint32_t tier_compaction_tags=COMPACTION_TAGS/COMPACTION_LEVEL_NUM;
-	uint32_t round=total_num/tier_compaction_tags+(total_num%tier_compaction_tags?1:0);
+	uint32_t round=0;
+	if(index_array){
+		round=total_num;
+	}
+	else{
+		round=total_num/tier_compaction_tags+(total_num%tier_compaction_tags?1:0);
+	}
 
 	uint32_t total_moved_num=0;
 
@@ -855,43 +809,96 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 
 	bool gced=false;
 	uint32_t last_lba=UINT32_MAX;
+	uint32_t array_idx=0;
+	uint32_t nxt_array_start_idx=start_idx;
+	
 	for(uint32_t i=0; i<round; i++){
 		if(gced){
 			/*not needed because the level's data is not removed by GC*/
 		}
 		gced=false;
-
-		read_arg.from=start_idx+i*tier_compaction_tags;
-		if(i!=round-1){
-			read_arg.to=start_idx+(i+1)*tier_compaction_tags-1;
+		if(index_array){
+			read_arg.from=start_idx+i;
+			while(i<round){
+				if(index_array[start_idx+i]+1==index_array[start_idx+i+1]){
+					i++;
+					if(start_idx+i+1==round){
+						break;
+					}
+				}
+				else{
+					break;
+				}
+			}
+			
+			read_arg.to=start_idx+i;
 		}
 		else{
-			read_arg.to=src->now_sst_num-1;	
+			read_arg.from=start_idx+i*tier_compaction_tags;
+			if(i!=round-1){
+				read_arg.to=start_idx+(i+1)*tier_compaction_tags-1;
+			}
+			else{
+				read_arg.to=total_num-1;
+			}
 		}
-		read_param_init(&read_arg);
 
-
-		if(i==0){
-			pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
-					read_arg.to-read_arg.from+1, now_version,
-					read_done_check, file_done);
+		if(index_array){
+			read_param_init_with_array(&read_arg, index_array);
 		}
 		else{
-			sst_pos_add_sst(pos, LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
-					read_arg.to-read_arg.from+1);
+			read_param_init(&read_arg);
+		}
+
+
+		if(!pos){
+			if(index_array){
+				uint32_t j=0;
+				pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, index_array[array_idx++]), 
+						&read_arg.param[j++], 1, now_version, read_done_check, file_done);
+				for(; j<read_arg.to-read_arg.from+1; j++){
+					sst_pos_add_sst(pos, LEVELING_SST_AT_PTR(src, index_array[array_idx++]), &read_arg.param[j], 1);
+				}
+			}
+			else{
+				pos=sst_pos_init_sst(LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
+						read_arg.to-read_arg.from+1, now_version,
+						read_done_check, file_done);
+			}
+		}
+		else{
+			if(index_array){
+				for(uint32_t j=0; j<read_arg.to-read_arg.from+1; j++){
+					sst_pos_add_sst(pos, LEVELING_SST_AT_PTR(src, index_array[array_idx++]), &read_arg.param[j], 1);
+				}
+			}
+			else{
+				sst_pos_add_sst(pos, LEVELING_SST_AT_PTR(src, read_arg.from), read_arg.param,
+						read_arg.to-read_arg.from+1);
+			}
 		}
 
 		read_sst_job((void*)&thread_arg,-1);
 		
 		uint32_t round2_tier_compaction_tags, picked_kv_num;
 		do{ 
-			round2_tier_compaction_tags=cm->read_param_queue->size();
+	//		if(index_array){
+	//			round2_tier_compaction_tags=UINT32_MAX;
+	//		}
+	//		else{
+				round2_tier_compaction_tags=cm->read_param_queue->size();
+	//		}
 			picked_kv_num=issue_read_kv_for_bos_stream(bos, pos, round2_tier_compaction_tags, 
 					src->idx, demote, true);
 			LSM.monitor.tiering_valid_entry_cnt+=picked_kv_num;
 			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
 			total_moved_num+=picked_kv_num;
-			temp_final=((i==round-1 && sst_pos_is_empty(pos)));
+			if(index_array){
+				temp_final=sst_pos_is_empty(pos);
+			}
+			else{
+				temp_final=((i==round-1 && sst_pos_is_empty(pos)));
+			}
 
 			thpool_wait(cm->issue_worker);
 
@@ -902,6 +909,18 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 			j++;
 		}
 		while(!temp_final && !sst_pos_is_empty(pos));
+
+		if(index_array){
+			sst_file *last_file;
+			if((last_file=bis_to_sst_file(bis))){
+				run_append_sstfile_move_originality(new_run, last_file);
+				sst_free(last_file, LSM.pm);
+			}
+			if(i+1<round){
+				sst_bis_free(bis);
+				bis=tiering_new_bis(locked_seg_q, src->idx+1);
+			}
+		}
 	}
 
 	thpool_wait(cm->issue_worker);
@@ -936,74 +955,105 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 
 level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){ 
 	_cm=cm;
-	uint32_t start_sst_file_idx=UINT32_MAX;
+	run *seq_run=run_init(src->now_sst_num, UINT32_MAX, 0);
+	run *new_run=run_init(src->now_sst_num, UINT32_MAX, 0);
 
-	run *new_run=filter_sequential_file(src, des->max_sst_num/des->max_run_num, target_version, 
-			&start_sst_file_idx, des->idx); //version_update
-	
-	if(new_run->now_sst_num){
+	run *rptr;
+	sst_file *sptr;
+	uint32_t sidx, ridx;
+	uint32_t *unseq_sidx_array=(uint32_t*)calloc(src->now_sst_num, sizeof(uint32_t));
+	uint32_t unseq_idx=0;
+	for_each_sst_level(src, rptr, ridx, sptr, sidx){
+		if(sptr->sequential_file){
+			run_append_sstfile_move_originality(seq_run, sptr);
+		}
+		else{
+			unseq_sidx_array[unseq_idx++]=sidx;
+		}
+	}
+
+	if(seq_run->now_sst_num && src->idx!=UINT32_MAX){
 		compaction_trivial_move(new_run, target_version, src->idx, des->idx, false);
 	}
 
 	uint32_t target_run_idx=version_to_ridx(LSM.last_run_version, 
-			 des->idx, target_version);
-	
-	//level_content_print(LSM.disk[1], true);
-
-	uint32_t needed_seg_num=0;
-	if(start_sst_file_idx==UINT32_MAX){
-		needed_seg_num=(((src->now_sst_num)*KP_IN_PAGE/L2PGAP+(src->now_sst_num))/_PPS+1+1);
-	//	start_sst_file_idx=0;
-	}
-	else{
-		if(src->now_sst_num==start_sst_file_idx){//all_sequential_file
-			level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
-			run *rptr; uint32_t ridx;
-			for_each_run_max(des, rptr, ridx){
-				if(rptr->now_sst_num || rptr->sst_num_zero_by_gc){
-					level_append_run_copy_move_originality(res, rptr, ridx);
-				}
-			}
-			if(res->array[target_run_idx].now_sst_num){
-				run_reinit(&res->array[target_run_idx]);
-			}
-			level_update_run_at_move_originality(res, target_run_idx, new_run, true);
-			tiering_compaction_error_check(src, NULL, NULL, new_run, LSM.monitor.compaction_cnt[des->idx]);
-			run_free(new_run);
-			return res;
-		}
-		else{
-			needed_seg_num=(((src->now_sst_num-start_sst_file_idx)*KP_IN_PAGE/L2PGAP+(src->now_sst_num-start_sst_file_idx))/_PPS+1+1);
-		}
-	}
+			des->idx, target_version);
 
 	uint32_t total_moved_num=0;
-	new_run=compaction_wisckey_to_normal(cm, src, new_run, &total_moved_num, start_sst_file_idx, target_version, true);
+	if(unseq_idx){
+		new_run=compaction_wisckey_to_normal(cm, src, new_run, &total_moved_num, 0, unseq_idx, unseq_sidx_array,
+			target_version,true);
+	}
 
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
-	run *rptr; uint32_t ridx;
+
 	for_each_run_max(des, rptr, ridx){
 		if(rptr->now_sst_num || rptr->sst_num_zero_by_gc){
 			level_append_run_copy_move_originality(res, rptr, ridx);
 		}
 	}
 
-	//level_append_run(res, new_run);
-	if(total_moved_num){
-		if(res->array[target_run_idx].now_sst_num){
-			run_reinit(&res->array[target_run_idx]);
+	/*mergeing two run*/
+	run *temp_new_run=run_init(src->now_sst_num, UINT32_MAX, 0);
+	uint32_t new_sidx=0, seq_sidx=0;
+	sst_file *new_sptr=new_run->now_sst_num?&new_run->sst_set[new_sidx]:NULL;
+	sst_file *seq_sptr=seq_run->now_sst_num?&seq_run->sst_set[seq_sidx]:NULL;
+
+	while(1){
+		if(!new_sptr){
+			while(seq_sidx < seq_run->now_sst_num){
+				run_append_sstfile_move_originality(temp_new_run, seq_sptr);
+				seq_sidx++;
+				if(seq_run->now_sst_num > seq_sidx){
+					seq_sptr=&seq_run->sst_set[seq_sidx];
+				}
+				else{
+					seq_sptr=NULL;
+				}
+			}
+			break;
 		}
-		level_update_run_at_move_originality(res, target_run_idx, new_run, true);
-		/*
-		if(level_is_full(res)){
-			version_make_early_invalidation_enable_old(LSM.last_run_version);
-		}*/
-	}
-	else{
-		EPRINT("no data move", true);
+		if(!seq_sptr){
+			while(new_sidx < new_run->now_sst_num){
+				run_append_sstfile_move_originality(temp_new_run, new_sptr);
+				new_sidx++;
+				if(new_run->now_sst_num > new_sidx){
+					new_sptr=&new_run->sst_set[new_sidx];
+				}
+				else{
+					new_sptr=NULL;
+				}
+			}
+			break;
+		}
+
+		if(seq_sptr->start_lba < new_sptr->start_lba){
+			run_append_sstfile_move_originality(temp_new_run, seq_sptr);
+			seq_sidx++;
+			if(seq_run->now_sst_num > seq_sidx){
+				seq_sptr=&seq_run->sst_set[seq_sidx];
+			}
+			else{
+				seq_sptr=NULL;
+			}
+		}
+		else{
+			run_append_sstfile_move_originality(temp_new_run, new_sptr);
+			new_sidx++;
+			if(new_run->now_sst_num > new_sidx){
+				new_sptr=&new_run->sst_set[new_sidx];
+			}
+			else{
+				new_sptr=NULL;
+			}
+		}
 	}
 
+	level_update_run_at_move_originality(res, target_run_idx, temp_new_run, true);
 	run_free(new_run);
+	run_free(seq_run);
+	run_free(temp_new_run);
+	free(unseq_sidx_array);
 	/*finish logic*/
 	return res;
 }
@@ -1043,7 +1093,7 @@ void compaction_leveling_gc_unlock(level *lev, uint32_t *unlocked_idx, uint32_t 
 level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t target_version){
 	_cm=cm;
 	if(!level_check_overlap(src, des)){ //sequential
-		run *new_run=compaction_wisckey_to_normal(cm, src, NULL, NULL, UINT32_MAX, target_version, true);
+		run *new_run=compaction_wisckey_to_normal(cm, src, NULL, NULL, 0, src->now_sst_num, NULL, target_version, true);
 		level *res=level_init(des->max_sst_num, des->run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 		sst_file *sptr;
 		run *rptr; 
@@ -1078,7 +1128,7 @@ level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	run *new_run=NULL;
 	if(trivial_move){
 		level *temp_level=level_split_lw_run_to_lev(&src->array[0], 0, closed_upper_from-1);
-		new_run=compaction_wisckey_to_normal(cm, temp_level, NULL, NULL, closed_upper_from, target_version, true);
+		new_run=compaction_wisckey_to_normal(cm, temp_level, NULL, NULL, closed_upper_from, UINT32_MAX, NULL, target_version, true);
 		sst_file *sptr;
 		uint32_t sidx;
 		for_each_sst(new_run, sptr, sidx){
@@ -1456,8 +1506,14 @@ void *comp_alreq_end_req(algo_req *req){
 			break;
 		case MAPPINGR:
 			r_param=(inter_read_alreq_param*)req->param;
-			r_param->target->data=r_param->data->value;
-			r_param->target->read_done=true;
+			if(r_param->target){
+				r_param->target->data=r_param->data->value;
+				r_param->target->read_done=true;
+			}
+			else{
+				r_param->map_target->data=r_param->data->value;
+				r_param->map_target->read_done=true;
+			}
 			fdriver_unlock(&r_param->done_lock);
 			break;
 		case COMPACTIONDATAR:

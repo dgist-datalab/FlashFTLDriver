@@ -1241,3 +1241,15 @@ void lsmtree_after_compaction_processing(lsmtree *lsm){
 	lsm->compactioning_pos_set=NULL;
 	//lsm->gc_moved_map_ppa.clear();
 }
+
+void lsmtree_init_ordering_param(){
+	LSM.sst_sequential_available_flag=true;
+	LSM.randomness_check=0;
+	LSM.now_pinned_sst_file_num=0;
+	LSM.processed_entry_num=0;
+	LSM.processing_lba=UINT32_MAX;
+	if(LSM.unaligned_sst_file_set){
+		run_free(LSM.unaligned_sst_file_set);
+		LSM.unaligned_sst_file_set=NULL;
+	}
+}

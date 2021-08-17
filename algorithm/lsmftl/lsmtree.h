@@ -20,11 +20,16 @@
 #define COMPACTION_REQ_MAX_NUM 1
 #define WRITEBUFFER_NUM (1+1)
 #define TIMERESULT
+#define CEILING_TARGET(N, G) ((N)/(G) + (N%G?1:0))
 
 /*OPTIMIZING SET*/
 //#define HOT_COLD
+
+#define MIN_ENTRY_PER_SST 128
+#define MIN_SEQ_ENTRY_NUM 4
 #define WB_SEPARATE
 #define INVALIDATION_COUNT_MERGE
+#define DYNAMIC_HELPER_ASSIGN
 
 #define DEMAND_SEG_LOCK
 #define UPDATING_COMPACTION_DATA
@@ -86,6 +91,13 @@ typedef struct lsmtree_parameter{
 	double normal_size_factor;
 	uint32_t write_buffer_bit;
 	uint32_t write_buffer_ent;
+#ifdef DYNAMIC_HELPER_ASSIGN
+	float BF_PLR_border;
+#endif
+
+#ifdef MIN_ENTRY_PER_SST
+	uint32_t max_sst_in_pinned_level;
+#endif
 	uint32_t reclaim_ppa_target;
 	float read_amplification;
 
@@ -100,6 +112,12 @@ typedef struct lsmtree_parameter{
 enum{
 	NOCHECK, K2VMAP, DATA, PLR,
 };
+
+typedef struct guard_range{
+	uint32_t start_lba;
+	uint32_t end_lba;
+	uint64_t flushing_cnt;
+}guard_range;
 
 typedef struct lsmtree_read_param{
 	uint32_t check_type;
@@ -124,6 +142,16 @@ typedef struct lsmtree{
 	write_buffer **wb_array;
 	struct version *last_run_version;
 	struct level **disk;
+	struct level *pinned_level;
+
+#ifdef MIN_ENTRY_PER_SST
+	bool sst_sequential_available_flag;
+	uint32_t randomness_check;
+	int32_t now_pinned_sst_file_num;
+	uint32_t processing_lba;
+	uint32_t processed_entry_num;
+	struct run * unaligned_sst_file_set;
+#endif
 	
 	rwlock *level_rwlock;
 
@@ -139,6 +167,7 @@ typedef struct lsmtree{
 	rwlock flushed_kp_set_lock;
 	std::set<uint32_t> *flushed_kp_seg;
 	std::map<uint32_t, uint32_t> *flushed_kp_set;
+
 #ifdef WB_SEPARATE
 	std::map<uint32_t, uint32_t> *hot_kp_set;
 #endif
@@ -222,6 +251,7 @@ static void lsmtree_print_WAF(lower_info *li){
 
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);
+void lsmtree_init_ordering_param();
 #define MAKE_L0COMP_REQ(wb, param, is_gc_data)\
 	alloc_comp_req(-1,0,(wb),lsmtree_compaction_end_req, (void*)(param), (is_gc_data))
 

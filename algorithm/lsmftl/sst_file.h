@@ -31,6 +31,7 @@ typedef struct sst_file{
 
 	p_addr file_addr;
 	uint32_t start_piece_ppa;
+	uint32_t seq_data_end_piece_ppa;
 	uint32_t end_ppa;
 	uint32_t map_num;
 

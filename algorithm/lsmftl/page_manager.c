@@ -8,7 +8,8 @@
 #include<queue>
 
 extern lsmtree LSM;
-//uint32_t debug_piece_ppa=393088;
+//uint32_t debug_piece_ppa=1105510*L2PGAP;
+//uint32_t debug_piece_ppa=4376864;
 uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
@@ -38,8 +39,8 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 	//	memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 #ifdef LSM_DEBUG
 		if(piece_ppa[i]==debug_piece_ppa){
-			printf("%u lba:%u", should_abort?++cnt:cnt, oob->lba[piece_ppa[i]%L2PGAP]);
-			EPRINT("validate piece here!\n", false);	
+			printf("%u lba:%u ppa:%u", should_abort?++cnt:cnt, oob->lba[piece_ppa[i]%L2PGAP], debug_piece_ppa);
+			EPRINT("validate piece here!\n", false );
 		}
 #endif
 
@@ -86,8 +87,8 @@ bool page_manager_oob_lba_checker(page_manager *pm, uint32_t piece_ppa, uint32_t
 bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abort){
 #ifdef LSM_DEBUG
 	if(piece_ppa==debug_piece_ppa){
-		static int cnt=0;
-		printf("%u ", should_abort?++cnt:cnt);
+		static uint32_t cnt=0;
+		printf("%u %u", should_abort?++cnt:++cnt, debug_piece_ppa);
 		EPRINT("invalidate piece here!\n",false);
 	}
 #endif
@@ -111,9 +112,9 @@ page_manager* page_manager_init(struct blockmanager *_bm){
 	pm->seg_type_checker[pm->current_segment[DATA_S]->seg_idx]=SEPDATASEG;
 	pm->reserve_segment[DATA_S]=_bm->get_segment(_bm, true);
 
-	pm->current_segment[MAP_S]=_bm->get_segment(_bm, false);
-	pm->seg_type_checker[pm->current_segment[MAP_S]->seg_idx]=MAPSEG;
-	pm->reserve_segment[MAP_S]=_bm->get_segment(_bm, true);
+	//pm->current_segment[MAP_S]=_bm->get_segment(_bm, false);
+	//pm->seg_type_checker[pm->current_segment[MAP_S]->seg_idx]=MAPSEG;
+	//pm->reserve_segment[MAP_S]=_bm->get_segment(_bm, true);
 
 	pm->remain_data_segment_q=new std::list<__segment*>();
 
@@ -166,9 +167,9 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 //	((uint32_t*)oob)[0]=start_lba;
 //	((uint32_t*)oob)[1]=end_lba;
 #ifdef LSM_DEBUG
-	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
+	if(map_ppa==debug_piece_ppa/L2PGAP){
 		static int cnt=0;
-		printf("%u ", should_abort?++cnt:cnt);
+		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("validate map here!\n", false);
 	}
 #endif
@@ -189,11 +190,11 @@ void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 #endif
 
 #ifdef LSM_DEBUG
-	if(map_ppa*L2PGAP==debug_piece_ppa || map_ppa*L2PGAP+1==debug_piece_ppa){
+	if(map_ppa==debug_piece_ppa/L2PGAP){
 		static int cnt=0;
-		printf("%u ", should_abort?++cnt:cnt);
-
+		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("invalidate map here!\n", false);
+		LSM.global_debug_flag=true;
 	}
 #endif
 
@@ -752,6 +753,7 @@ static void insert_target_sptr(gc_sptr_node* gsn, uint32_t lba, char *value){
 }
 
 bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_t lba, uint32_t new_piece_ppa){
+	bool res=false;
 	if(lba==debug_lba && LSM.global_debug_flag){
 		printf("updating break!\n");
 	}
@@ -767,15 +769,18 @@ bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_
 				std::multimap<uint32_t, sst_file*>::iterator f_iter=
 					pos->sst_map_for_gc->lower_bound(lba);
 
-				if(f_iter!=pos->sst_map_for_gc->end() && f_iter!=pos->sst_map_for_gc->begin()){
-					std::multimap<uint32_t, sst_file*>::iterator f_iter_temp=--f_iter;
-					file=f_iter_temp->second;
-					if(file->start_lba <=lba && file->end_lba >=lba){
-						f_iter=f_iter_temp;
-					}
-					else{
-						f_iter++;
-					}
+				if(f_iter!=pos->sst_map_for_gc->begin()){
+					do{
+						std::multimap<uint32_t, sst_file*>::iterator f_iter_temp=--f_iter;
+						file=f_iter_temp->second;
+						if(file->start_lba <=lba && file->end_lba >=lba){
+							f_iter=f_iter_temp;
+						}
+						else{
+							f_iter++;
+							break;
+						}
+					}while(f_iter!=pos->sst_map_for_gc->begin());
 				}
 
 				for(;f_iter!=pos->sst_map_for_gc->end(); f_iter++){
@@ -788,21 +793,25 @@ bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_
 					uint32_t kp_idx=kp_find_idx(lba, (char*)kp_set);
 					if(kp_idx==UINT32_MAX || kp_set[kp_idx].piece_ppa/L2PGAP/_PPS!=seg_idx) continue;
 					kp_set[kp_idx].piece_ppa=new_piece_ppa;
+					res=true;
 				}
 			}
 			else{
 				std::multimap<uint32_t, map_range*>::iterator m_iter;
 				m_iter=pos->mr_map_for_gc->lower_bound(lba); 
 
-				if(m_iter!=pos->mr_map_for_gc->end() && m_iter!=pos->mr_map_for_gc->begin()){
-					std::multimap<uint32_t, map_range*>::iterator m_iter_temp=--m_iter;
-					mr=m_iter_temp->second;
-					if(mr->start_lba <= lba && mr->end_lba>=lba){
-						m_iter=m_iter_temp;
-					}
-					else{
-						m_iter++;
-					}
+				if(m_iter!=pos->mr_map_for_gc->begin()){
+					do{
+						std::multimap<uint32_t, map_range*>::iterator m_iter_temp=--m_iter;
+						mr=m_iter_temp->second;
+						if(mr->start_lba <= lba && mr->end_lba>=lba){
+							m_iter=m_iter_temp;
+						}
+						else{
+							m_iter++;
+							break;
+						}
+					}while(m_iter!=pos->mr_map_for_gc->begin());
 				}
 
 				for(; m_iter!=pos->mr_map_for_gc->end(); m_iter++){
@@ -815,6 +824,7 @@ bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_
 					uint32_t kp_idx=kp_find_idx(lba, (char*)kp_set);
 					if(kp_idx==UINT32_MAX || kp_set[kp_idx].piece_ppa/L2PGAP/_PPS!=seg_idx) continue;
 					kp_set[kp_idx].piece_ppa=new_piece_ppa;
+					res=true;
 				}
 			}
 		}
@@ -858,7 +868,6 @@ bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_
 				}
 #endif
 				kp_set[kp_idx].piece_ppa=new_piece_ppa;
-				return true;
 			}
 		}
 	}
@@ -877,10 +886,13 @@ bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_
 			}
 #endif
 			iter->second->piece_ppa=new_piece_ppa;
-			return true;
+			res=true;
 		}
 	}
-	return false;
+	if(lba==debug_lba && LSM.global_debug_flag){
+		printf("updating end res:%u! \n", res);
+	}
+	return res;
 }
 
 bool inserting_new_map_ppa_for_invalidation(uint32_t new_ppa, uint32_t version){
@@ -1005,11 +1017,11 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		EPRINT("????", true);
 	}
 
-
 	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
-	if(LSM.monitor.gc_data==722){
-		LSM.global_debug_flag=true;
-	}
+	/*
+	if(LSM.monitor.gc_data==531){
+		//LSM.global_debug_flag=true;
+	}*/
 	std::queue<gc_read_node*> *gc_target_queue=new std::queue<gc_read_node*>();
 	uint32_t bidx;
 	uint32_t pidx, page;
@@ -1090,7 +1102,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 				/*check invalidation*/
 				if(!sptr || 
-						(sptr && ((sptr->end_ppa*L2PGAP)<piece_ppa && !is_map_ppa(sptr, piece_ppa/L2PGAP)))){ //first round or new sst_file
+						(sptr && (((!sptr->sequential_file && sptr->end_ppa*L2PGAP<piece_ppa ) || (sptr->sequential_file && sptr->seq_data_end_piece_ppa<piece_ppa))
+								  && !is_map_ppa(sptr, piece_ppa/L2PGAP))))
+				{
 					if(sptr){
 						if(gsn->wb->buffered_entry_num){
 							move_sptr(gsn,victim->seg_idx, gsn->lev_idx, gsn->version, gsn->sidx);
@@ -1108,12 +1122,22 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 						}
 					}
 					sptr=lsmtree_find_target_normal_sst_datagc(gn->lba, gn->piece_ppa, &level_idx, &target_version, &sptr_idx);
+					if(sptr){
+						for(uint32_t temp_idx=0; temp_idx<sptr->map_num; temp_idx++){
+							if(sptr->block_file_map[temp_idx].ppa/_PPS!=victim->seg_idx){
+								EPRINT("wtf", true);
+							}
+							invalidate_map_ppa(bm, sptr->block_file_map[temp_idx].ppa, true);
+						}
+					}
 					gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, level_idx, target_version, sptr_idx);
 				}
 
 				/*for direct mapping*/
 				if(!sptr || 
-						(sptr && ((sptr->end_ppa*L2PGAP)<piece_ppa && !is_map_ppa(sptr, piece_ppa/L2PGAP)))){
+						(sptr && (((!sptr->sequential_file && sptr->end_ppa*L2PGAP<piece_ppa ) || (sptr->sequential_file && sptr->seq_data_end_piece_ppa<piece_ppa))
+								  && !is_map_ppa(sptr, piece_ppa/L2PGAP))))
+				{
 					if(oob_lba[i]==debug_lba){
 						printf("debug hit break! at %u\n", piece_ppa);
 					}

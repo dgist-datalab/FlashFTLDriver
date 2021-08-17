@@ -47,6 +47,23 @@ static inline void update_range(run *_run, uint32_t start, uint32_t end){
 	if(_run->end_lba < end) _run->end_lba=end;
 }
 
+uint32_t run_remove_sst_file_at(run *r, uint32_t idx){
+	if(r->now_sst_num==0){
+		EPRINT("???", true);
+	}
+	sst_reinit(&r->sst_set[idx]);
+	sst_file *des_sst_file=(sst_file*)calloc(r->max_sst_num, sizeof(sst_file));
+	memcpy(&des_sst_file[0], &r->sst_set[0], idx * sizeof(sst_file));
+	uint32_t copy_num=r->now_sst_num-1-idx;
+	if(copy_num){
+		memcpy(&des_sst_file[idx], &r->sst_set[idx+1], copy_num * sizeof(sst_file));
+	}
+
+	free(r->sst_set);
+	r->sst_set=des_sst_file;
+	r->now_sst_num--;
+	return r->now_sst_num;
+}
 
 sst_file *run_retrieve_sst(run *r, uint32_t lba){
 	int s=0, e=r->now_sst_num-1;
@@ -63,6 +80,23 @@ sst_file *run_retrieve_sst(run *r, uint32_t lba){
 		}
 	}
 	return NULL;
+}
+
+uint32_t run_retrieve_sst_idx(run *r, uint32_t lba){
+	int s=0, e=r->now_sst_num-1;
+	while(s<=e){
+		int mid=(s+e)/2;
+		if(r->sst_set[mid].start_lba<=lba && r->sst_set[mid].end_lba>=lba){
+			return mid;
+		}
+		if(r->sst_set[mid].start_lba > lba){
+			e=mid-1;
+		}
+		else if(r->sst_set[mid].end_lba < lba){
+			s=mid+1;
+		}
+	}
+	return UINT32_MAX;
 }
 
 sst_file *run_retrieve_close_sst(run *r, uint32_t lba){
@@ -263,3 +297,5 @@ map_range *run_to_MR(run *r, uint32_t *map_num){
 	*map_num=count;
 	return res;
 }
+
+

@@ -100,8 +100,6 @@ uint32_t sst_find_map_idx(sst_file *sstfile, uint32_t lba){
 	if(sstfile->type!=BLOCK_FILE){
 		EPRINT("cannot have map!", true);
 	}
-	uint32_t res=UINT32_MAX;
-
 	int s=0, e=sstfile->map_num-1;
 	int mid=UINT32_MAX;
 	while(s<=e){
@@ -124,8 +122,6 @@ uint32_t sst_lower_bound_map_idx(sst_file *sstfile, uint32_t lba){
 	if(sstfile->type!=BLOCK_FILE){
 		EPRINT("cannot have map!", true);
 	}
-	uint32_t res=UINT32_MAX;
-
 	int s=0, e=sstfile->map_num-1;
 	int mid=UINT32_MAX;
 	while(s<e){
@@ -155,7 +151,6 @@ uint32_t sst_upper_bound_map_idx(sst_file *sstfile, uint32_t lba){
 	if(sstfile->type!=BLOCK_FILE){
 		EPRINT("cannot have map!", true);
 	}
-	uint32_t res=UINT32_MAX;
 
 	int s=0, e=sstfile->map_num-1;
 	int mid=UINT32_MAX;

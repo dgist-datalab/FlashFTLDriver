@@ -66,7 +66,6 @@ void io_manager_issue_write(uint32_t ppa, value_set *value, algo_req *al_req, bo
 
 
 static inline void *io_seg_lock_end_req(algo_req* al_req){
-	static int cnt=0;
 	sync_wrapper *wrapper=(sync_wrapper*)al_req->param;
 	al_req->end_req=wrapper->end_req;
 	al_req->param=wrapper->param;

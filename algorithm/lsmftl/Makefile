@@ -1,4 +1,5 @@
 SRCS +=\
+	   compaction_flush.c\
 	   version.c\
 	   io.c\
 	   level.c\

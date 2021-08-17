@@ -267,7 +267,6 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	mh_construct(p->max_heap);
-	uint32_t res=0;
 	while(1){
 		block_set* target=(block_set*)mh_get_max(p->max_heap);
 
@@ -378,7 +377,6 @@ bool seq_query_bit(struct blockmanager *bm, uint32_t ppa){
 	uint32_t pn=ppa%(_PPB * L2PGAP);
 	uint32_t bt=pn/8;
 	uint32_t of=pn%8;
-	__block *b=&p->seq_block[bn];
 
 	return p->seq_block[bn].bitset[bt]&(1<<of);
 }
