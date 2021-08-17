@@ -50,6 +50,7 @@ void page_destroy (lower_info* li, algorithm *algo){
 				li->req_type_cnt[DATAW]+
 				li->req_type_cnt[GCDW]+
 				li->req_type_cnt[GCMW_DGC]+
+				li->req_type_cnt[GCMW]+
 				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	free(a_buffer.value);
 

@@ -1420,7 +1420,7 @@ uint32_t demand_argument(int argc, char **argv){
 
 	if(!cache_size){
 		//physical_page_num=((SHOWINGSIZE/K)/4)/PAGESIZE;
-		physical_page_num=((SHOWINGSIZE/K))/4/PAGESIZE;
+		physical_page_num=(((SHOWINGSIZE/K))/100*21)/PAGESIZE;
 	}
 	dmm.max_caching_pages=physical_page_num;
 	return 1;
