@@ -327,6 +327,7 @@ int seq_populate_bit (struct blockmanager* bm, uint32_t ppa){
 	uint32_t bt=pn/8;
 	uint32_t of=pn%8;
 
+//	printf("ppa: %d  bn: %d\n", ppa, bn);
 	__block *b=&p->seq_block[bn];
 	b->validate_number++;
 	uint32_t segment_idx=b->block_num/BPS;

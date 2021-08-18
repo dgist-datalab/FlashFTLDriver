@@ -1,7 +1,7 @@
 RSLT_DIR=./eval
 #TRACE="VECTOREDSSET"
-TRACE="realtpc_opt_1"
-#TRACE="synths"
+#TRACE="realtpc_opt_1"
+TRACE="realtpc_gc"
 bsize="1 128 256 512 1024 2048 4096 8192 16384" 
 #bsize="64"
 MAX_QSIZE=16384
@@ -21,7 +21,7 @@ for trc in $TRACE; do
 	for iter in $bsize; do
 #		echo $qsize
 		echo $iter
-		cat include/settings_orig.h | sed -e "s/WBUFF_SIZE (128)/WBUFF_SIZE ($iter)/" > include/settings.h
+		cat include/settings_orig.h | sed -e "s/WBUFF_SIZE (16384)/WBUFF_SIZE ($iter)/" > include/settings.h
 #		cat include/settings_orig.h | sed -e "s/WBUFF_SIZE (128)/WBUFF_SIZE (1)/" > include/settings.h
 		make clean 
 		make -j

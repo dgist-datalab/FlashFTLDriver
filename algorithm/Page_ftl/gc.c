@@ -166,6 +166,7 @@ void do_gc(){
 
 				if(g_buffer.idx==L2PGAP){
 					uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP);
+					//printf("res: %d\n", res);
 					validate_ppa(res, g_buffer.key, g_buffer.idx);
 					send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 					g_buffer.idx=0;
@@ -196,6 +197,73 @@ void do_gc(){
 	list_free(temp_list);
 }
 
+#if 1 // first gc
+void do_map_gc(){ 
+	__gsegment *target=page_ftl.bm->get_gc_target(page_ftl.bm); 
+	uint32_t page; 
+	uint32_t bidx, pidx; 
+	blockmanager *bm=page_ftl.bm; 
+	pm_body *p=(pm_body*)page_ftl.algo_body;
+	list *temp_list=list_init();
+	align_gc_buffer g_buffer; 
+	gc_value *gv; 
+
+	for_each_page_in_seg(target,page,bidx,pidx){ 
+		//this function check the page is valid or not
+		bool should_read=false; 
+		for(uint32_t i=0; i<L2PGAP; i++){ 
+			if(bm->is_invalid_page(bm,page*L2PGAP+i)) continue; 
+			else{
+				should_read=true; 
+				break;  
+			}
+		} 
+		if(should_read){ 
+			gv=send_req(page,GCDR,NULL); //change GCDR
+			list_insert(temp_list,(void*)gv); 
+		} 
+	}
+	li_node *now, *nxt; 
+	g_buffer.idx=0; 
+	KEYT *lbas; 
+	while(temp_list->size){ 
+		for_each_list_node_safe(temp_list,now,nxt){ 
+			gv=(gc_value*)now->data; 
+			if(!gv->isdone) continue; 
+			lbas=(KEYT*)bm->get_oob(bm, gv->ppa); 
+			for(uint32_t i=0; i<L2PGAP; i++){
+				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i))continue; 
+				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
+				g_buffer.key[g_buffer.idx]=lbas[i];
+				g_buffer.idx++; 
+
+				if(g_buffer.idx==L2PGAP){ 
+					uint32_t res=page_meta_map_gc_update(g_buffer.key, L2PGAP); 
+					validate_ppa(res, g_buffer.key, g_buffer.idx);
+					send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
+					g_buffer.idx=0; 
+				}  
+			}	
+			inf_free_valueset(gv->value, FS_MALLOC_R); 
+			free(gv); 
+			list_delete_node(temp_list,now); 
+		}
+	}
+	if(g_buffer.idx!=0){ 
+		uint32_t res=page_meta_map_gc_update(g_buffer.key, g_buffer.idx);
+		validate_ppa(res, g_buffer.key, g_buffer.idx); 
+		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE)); 
+		g_buffer.idx=0; 
+	} 
+	
+	bm->trim_segment(bm,target,page_ftl.li); //erase a block
+	bm->free_segment(bm,p->map_active);
+
+	p->map_active=p->map_reserve; //make reserved to active block
+	p->map_reserve=bm->change_reserve(bm,p->map_reserve); //get new reserve block from block_manager
+	list_free(temp_list); 
+} 
+#endif
 
 ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	uint32_t res;
@@ -223,22 +291,26 @@ retry:
 }
 
 #if 1 //NAM
-ppa_t get_ppa_mapflush(){ 
+ppa_t get_ppa_mapflush(KEYT *lbas, uint32_t max_idx){ 
 	uint32_t res; 
 	pm_body *p=(pm_body*)page_ftl.algo_body;
-#if 0 // gc get_seg test	
-	if(page_ftl.bm->check_full(page_ftl.bm, p->mapflush,MASTER_PAGE) && page_ftl.bm->is_gc_needed(page_ftl.bm)){ 
-		do_gc();//call gc
+#if 1 // gc get_seg test	
+	if(page_ftl.bm->check_full(page_ftl.bm, p->map_active,MASTER_PAGE) && page_ftl.bm->is_gc_needed(page_ftl.bm)){ 
+		//do_gc();//call gc
+		do_map_gc(); 
 	} 
 #endif
 retry: 
-	res=page_ftl.bm->get_page_num(page_ftl.bm,p->mapflush); 
+	res=page_ftl.bm->get_page_num(page_ftl.bm,p->map_active); 
 	
 	if(res==UINT32_MAX){ 
-		page_ftl.bm->free_segment(page_ftl.bm, p->mapflush); 
-		p->mapflush=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
+		page_ftl.bm->free_segment(page_ftl.bm, p->map_active); 
+		p->map_active=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
 		goto retry; 
 	}
+	
+	/*validate a page*/
+	page_ftl.bm->populate_bit(page_ftl.bm,res*max_idx);
 	
 	return res; 
 } 

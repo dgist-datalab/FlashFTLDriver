@@ -55,12 +55,12 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 16L
+#define GIGAUNIT 8L
 #define OP 70
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
 #define REALSIZE (512L*G)
-#define PAGE_TARGET_KILO (16)
+#define PAGE_TARGET_KILO (8)
 #define PAGESIZE (PAGE_TARGET_KILO*K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
 
@@ -187,7 +187,7 @@ static inline bool KEYVALCHECK(KEYT a){
 #define QDEPTH (16384)
 
 #if 1 //NAM 
-#define WBUFF_SIZE (128)
+#define WBUFF_SIZE (16384)
 #endif
 
 #define THPOOL

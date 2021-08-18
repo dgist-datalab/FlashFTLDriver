@@ -22,8 +22,10 @@ void page_map_create(){
 #if 1 //NAM
 #if 1 //dirty check with bit
 	p->dirty_check=(unsigned char*)malloc(sizeof(unsigned char)*_DCE); 
+	p->meta_mapping=(uint32_t*)malloc(sizeof(uint32_t)*_DCE);
 	for(int i=0; i<_DCE; i++){ 
-		p->dirty_check[i]=0; 
+		p->dirty_check[i]=0;
+		p->meta_mapping[i]=UINT_MAX; 
 	} 
 #endif
 #if 1 //dirty check for flush
@@ -31,7 +33,9 @@ void page_map_create(){
 #endif
 	p->tot_dirty_pages = 0; 
 	p->tot_flush_count = 0; 
-	p->mapflush=page_ftl.bm->get_segment(page_ftl.bm,false); //add the other active block for inserted mapping
+//	p->mapflush=page_ftl.bm->get_segment(page_ftl.bm,false); //add the other active block for inserted mapping
+	p->map_active=page_ftl.bm->get_segment(page_ftl.bm,false); 
+	p->map_reserve=page_ftl.bm->get_segment(page_ftl.bm,true); 
 #endif	
 	p->reserve=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
 	p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //now active block for inserted request.
@@ -78,12 +82,31 @@ int32_t page_map_flush(){
 #if 1 //dirty check with list for flush
 	while(p->dirty_check_list != NULL){
 		uint32_t fidx = p->dirty_check_list->idx;  
+		uint32_t ffidx = fidx >> _PMES;
+
 		if(p->dirty_check[fidx] & dirty_option){ 
+#if 0 //first gc
 			ppa_t ppa=get_ppa_mapflush(); 
 			value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE); 
 			memcpy(&value->value[0], &p->mapping[fidx*8192], 8192); 
 			send_user_req(NULL, DATAW, ppa, value); 
 			p->dirty_check[fidx] &= ~dirty_option; 
+#endif
+			ppa_t ppa=get_ppa_mapflush(&p->mapping[fidx*2048], L2PGAP); 
+			value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+			memcpy(&value->value[0], &p->mapping[fidx*2048], 8192); 
+			send_user_req(NULL, DATAW, ppa, value); 
+			p->dirty_check[fidx] &= ~dirty_option; 
+
+			if(p->meta_mapping[fidx]!=UINT_MAX){
+				/*when mapping was updated, the old one is checked as a invalid*/
+				invalidate_ppa(p->meta_mapping[fidx]); 
+			}
+			else{ 
+			
+			} 
+			
+			p->meta_mapping[fidx]=ppa*L2PGAP;
 		} 
 		else{
 			printf("dirty check error!\n"); 
@@ -150,8 +173,16 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
 	uint32_t res=0;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 
+retry: 
 	/*when the gc phase, It should get a page from the reserved block*/
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve);
+#if 1 //seq debug
+	if(res==UINT32_MAX){
+		page_ftl.bm->free_segment(page_ftl.bm, p->reserve); 
+		p->reserve=page_ftl.bm->get_segment(page_ftl.bm, false);
+		goto retry; 
+	}
+#endif
 	uint32_t old_ppa, new_ppa;
 	for(uint32_t i=0; i<idx; i++){
 		KEYT t_lba=lba[i];
@@ -173,6 +204,37 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
 */
 	return res;
 }
+
+#if 1 //first gc
+uint32_t page_meta_map_gc_update(KEYT *lba, uint32_t idx){ 
+	uint32_t res=0; 
+	pm_body *p=(pm_body*)page_ftl.algo_body; 
+	
+retry: 
+	res=page_ftl.bm->get_page_num(page_ftl.bm,p->map_reserve); 
+	
+	if(res==UINT32_MAX){
+		page_ftl.bm->free_segment(page_ftl.bm,p->map_reserve); 
+		p->map_reserve=page_ftl.bm->get_segment(page_ftl.bm, false);
+		goto retry; 
+	} 
+	
+	uint32_t old_ppa, new_ppa; 
+	for(uint32_t i=0; i<idx; i++){ 
+		KEYT t_lba=lba[i]; 
+		//maybe change p->meta_mapping!!? 
+		if(p->mapping[t_lba]!=UINT_MAX){ 
+	
+		} 
+		/*mapping update*/
+		p->mapping[t_lba]=res*L2PGAP+i; 
+		if(t_lba==test_key){ 
+
+		} 
+	}
+	return res;  
+} 
+#endif
 
 void page_map_free(){
 	pm_body *p=(pm_body*)page_ftl.algo_body;

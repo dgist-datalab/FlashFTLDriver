@@ -69,6 +69,7 @@ char *get_vectored_bench(uint32_t *mark){
 void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
 	uint32_t request_per_command=_master->trans_configure.request_num_per_command;
 	uint32_t number_of_command=(m->m_num)/request_per_command;
+	printf("m->m_num: %d  request_per_command: %d\n", m->m_num, request_per_command);
 	m->m_num=number_of_command*request_per_command;
 	m->tbody=(transaction_bench_value*)malloc(number_of_command * sizeof(transaction_bench_value));
 	request_num = m->m_num; 
@@ -92,7 +93,8 @@ void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
 			idx+=sizeof(uint8_t);
 
 			if(isseq){
-				(*(uint32_t*)&buf[idx])=start+i*request_per_command+j;
+				//seq dubug (*(uint32_t*)&buf[idx])=start+i*request_per_command+j;
+				(*(uint32_t*)&buf[idx])=start+(i*request_per_command+j)%(end-start);
 				idx+=sizeof(uint32_t);
 			}
 			else{
@@ -195,6 +197,7 @@ void vectored_real(uint32_t start, uint32_t end, monitor* m, uint8_t trace){
 	} 
 	
 	for(uint32_t i=0; i<number_of_command; i++){ 
+		//printf("noc:%d\n", i);
 		uint32_t idx=0; 
 		m->tbody[i].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
 		char *buf=m->tbody[i].buf; 

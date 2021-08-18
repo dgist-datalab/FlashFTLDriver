@@ -23,6 +23,7 @@ typedef struct dirty_page_list{
 
 typedef struct page_map_body{ 
 	uint32_t *mapping; 
+	uint32_t *meta_mapping; 
 	unsigned char *dirty_check; //checked mapping table's dirty condition  
 	struct dirty_page_list *dirty_check_list; 
 	uint32_t heap_index; 
@@ -34,7 +35,9 @@ typedef struct page_map_body{
 	/*segment is a kind of Physical Block*/ 
 	__segment *reserve; //for gc
 	__segment *active; //for gc
-	__segment *mapflush; //for map
+	//__segment *mapflush; //for map
+	__segment *map_reserve; 
+	__segment *map_active; 
 }pm_body; 
 #endif
 
@@ -47,5 +50,6 @@ uint32_t page_map_assign(KEYT *lba, uint32_t max_idx);
 uint32_t page_map_pick(uint32_t lba);
 uint32_t page_map_trim(uint32_t lba);
 uint32_t page_map_gc_update(KEYT* lba, uint32_t idx);
+uint32_t page_meta_map_gc_update(KEYT* lba, uint32_t idx);
 void page_map_free();
 void page_map_dirtyCheck_list(uint32_t idx);
