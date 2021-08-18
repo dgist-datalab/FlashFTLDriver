@@ -1129,8 +1129,11 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 							}
 							invalidate_map_ppa(bm, sptr->block_file_map[temp_idx].ppa, true);
 						}
+						gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, level_idx, target_version, sptr_idx);
 					}
-					gsn=gc_sptr_node_init(sptr, valid_piece_ppa_num, level_idx, target_version, sptr_idx);
+					else{
+						gsn=NULL;
+					}
 				}
 
 				/*for direct mapping*/
@@ -1198,6 +1201,10 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					gmc->mapping_data=NULL;
 					write_buffer_insert_for_gc(wisckey_node_wb, gmc->lba, gmc->data_ptr);
 					gc_kv_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
+
+					if(gsn){
+						gc_sptr_node_free(gsn);
+					}
 				}
 				else{
 					//sptr->trimed_sst_file=true;

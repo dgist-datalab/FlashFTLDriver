@@ -335,14 +335,19 @@ void lsmtree_destroy(lower_info *li, algorithm *){
 				li->req_type_cnt[GCMW_DGC]+
 				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	compaction_free(LSM.cm);
+	if(LSM.pinned_level){
+		level_free(LSM.pinned_level, LSM.pm);
+	}
 
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 		write_buffer_free(LSM.wb_array[i]);
 	}
 	for(uint32_t  i=0; i<LSM.param.LEVELN; i++){
+		level_free(LSM.disk[i], LSM.pm);
 		rwlock_destroy(&LSM.level_rwlock[i]);
 	}	
 
+	free(LSM.disk);
 	delete LSM.flushed_kp_seg;
 
 	free(LSM.param.tr.lp);
@@ -872,8 +877,8 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 			LSM.li->req_type_cnt[DATAR]--;
 			LSM.li->req_type_cnt[MISSDATAR]++;
 			parents->type_ftl++;
-			free(req);
 		}
+		free(req);
 		if(!inf_assign_try(parents)){
 			EPRINT("why cannot retry?", true);
 		}	

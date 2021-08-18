@@ -330,8 +330,9 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 #ifdef LSM_DEBUG
 	static int cnt=0;
 	printf("merge cnt:%u\n", cnt++);
-	if(cnt==32){
-		printf("break!\n");
+	if(cnt==7){
+		//LSM.global_debug_flag=true;
+//		printf("break!\n");
 	}
 #endif
 
@@ -372,9 +373,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 		map_range *newer_mr=NULL, *older_mr=NULL;
 		if(gced){
-			if(LSM.global_debug_flag){
-				printf("break!\n");
-			}
 			if(newer->update_by_gc){
 				newer_mr=make_mr_set_for_gc(newer->sst_set, newer_sst_idx, newer_sst_idx_end, 
 						stream_newer_border_lba, &now_newer_map_num);
@@ -505,7 +503,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 			}
 
 		}
-
 		if(bos==NULL){
 			bos=sst_bos_init(read_map_done_check, true);
 			LSM.now_compaction_bos=bos;
@@ -516,10 +513,21 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 		uint32_t entry_num=issue_read_kv_for_bos_sorted_set(bos, kpq, &border_lba,
 				true, idx_set[1], idx_set[0], last_round_check);
-
-		border_lba=issue_write_kv_for_bis(&bis, bos, 
+	
+		uint32_t written_border_lba=issue_write_kv_for_bis(&bis, bos, 
 				locked_seg_q, new_run, entry_num, 
 				target_version, last_round_check, &gced);
+		if(!last_round_check){
+			if(written_border_lba==UINT32_MAX){
+				//there are no pages to write	
+			}
+			else{
+				border_lba=written_border_lba;
+			}
+		}
+		else{
+			border_lba=written_border_lba;
+		}
 
 		map_range_postprocessing(new_range_set, border_lba, last_round_check, true, true);
 		map_range_postprocessing(old_range_set, border_lba, last_round_check, true, true);

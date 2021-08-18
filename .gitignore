@@ -17,6 +17,7 @@ robusta*
 *log
 *log
 *trace*
+!./interface/mainfiles/cheeze_trace_block_main.c
 driver
 range_driver
 driver_sanity

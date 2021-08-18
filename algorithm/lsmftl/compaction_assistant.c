@@ -652,7 +652,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 			LSM.flushed_kp_temp_set=NULL;
 			LSM.flushed_kp_set=NULL;
 		}
-
+		level_free(temp_level, LSM.pm);
 		LSM.pinned_level=NULL;
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
 	}
