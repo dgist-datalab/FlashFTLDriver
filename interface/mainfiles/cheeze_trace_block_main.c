@@ -21,6 +21,8 @@ void log_print(int sig){
 	fflush(stderr);
 	sync();
 	printf("before exit\n");
+
+
 	exit(1);
 }
 
