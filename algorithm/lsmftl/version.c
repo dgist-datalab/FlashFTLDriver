@@ -170,7 +170,6 @@ void version_update_mapping_merge(version *v, uint32_t *version_set, uint32_t le
 }
 
 void version_clear_merge_target(version *v, uint32_t *version_set, uint32_t level_idx){
-
 	for(uint32_t i=0; i<MERGED_RUN_NUM; i++){
 		uint32_t target_version=version_set[i];
 
@@ -233,6 +232,12 @@ static inline void version_unpopulate(version *v, uint32_t version, uint32_t lev
 	v->version_invalidate_number[version]=0;
 }
 
+void version_reunpopulate(version *v, uint32_t version, uint32_t level_idx){
+	v->version_empty_queue[level_idx][VERSION]->push_front(version);
+	v->version_empty_queue[level_idx][RUNIDX]->push_front(version_to_ridx(v, level_idx, version));
+	v->version_invalidate_number[version]=0;
+	v->level_order_token[level_idx]--;
+}
 void version_clear_level(version *v, uint32_t level_idx){
 	uint32_t max_run_num=v->level_run_num[level_idx];
 	for(uint32_t i=0; i<max_run_num; i++){

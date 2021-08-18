@@ -90,14 +90,14 @@ void compaction_issue_req(compaction_master *cm, compaction_req *);
 void compaction_wait(compaction_master *cm);
 //level* compaction_first_leveling(compaction_master *cm, key_ptr_pair *, level *des);
 level* compaction_LW2LW(compaction_master *cm, level *src, level *des, uint32_t target_version); //done and debug
-level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version); //done and debug
+level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated); //done and debug
 level* compaction_LW2LE(compaction_master *cm, level *src, level *des, uint32_t target_version);
-level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version);
+level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated);
 level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t target_version);
-level* compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version);	
-level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t target_version); //done
+level* compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated);	
+level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated); //done
 level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des,
-		uint32_t target_version, bool *hot_cold_separation);
+		uint32_t target_version, bool *hot_cold_separation, bool *populated);
 level *compaction_TW_convert_LW(compaction_master *cm, level *src);
 
 level* compaction_merge(compaction_master *cm, level *tiered_level, uint32_t *merge_ridx); //done and debug

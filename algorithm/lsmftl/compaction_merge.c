@@ -327,8 +327,8 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	LSM.now_compaction_stream_num=MERGED_RUN_NUM;
 	read_arg1.page_file=false;
 	read_arg2.page_file=false;
-#ifdef LSM_DEBUG
 	static int cnt=0;
+#ifdef LSM_DEBUG
 	printf("merge cnt:%u\n", cnt++);
 	if(cnt==7){
 		//LSM.global_debug_flag=true;
@@ -582,10 +582,19 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 		}
 	}
 
-	level_update_run_at_move_originality(res, target_ridx, new_run, true);
-
 	version_clear_merge_target(LSM.last_run_version, idx_set, des->idx);
-	version_repopulate_merge_target(LSM.last_run_version, idx_set[0], target_ridx, des->idx);
+	if(new_run->now_sst_num==0){
+		printf("break!\n");
+	}
+	printf("prev - merge :%u run_num:%u new_run sst_size:%u\n", cnt, res->run_num, new_run->now_sst_num);
+	if(new_run->now_sst_num){
+		level_update_run_at_move_originality(res, target_ridx, new_run, true);
+		version_repopulate_merge_target(LSM.last_run_version, idx_set[0], target_ridx, des->idx);
+	}
+	else{
+	//	level_run_reinit(res, target_ridx);
+	}
+	printf("after - merge :%u run_num:%u new_run sst_size:%u\n", cnt++, res->run_num, new_run->now_sst_num);
 
 	run_free(new_run);
 
@@ -1036,7 +1045,7 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	return new_run;
 }
 
-level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){
+level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated){
 	_cm=cm;
 	bool issequential;
 	run **new_run=compaction_TI2RUN(cm, src, des, src->run_num, target_version, UINT32_MAX, &issequential, false, false);
@@ -1052,7 +1061,13 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		}
 	}
 
-	level_update_run_at_move_originality(res, target_run_idx, new_run[0], true);
+	if(new_run[0]->now_sst_num){
+		level_update_run_at_move_originality(res, target_run_idx, new_run[0], true);
+		*populated=true;
+	}
+	else{
+		*populated=false;
+	}
 
 	run_free(new_run[DEMOTE_RUN]);
 	free(new_run);
@@ -1062,7 +1077,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 }
 
 level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des,
-		uint32_t target_version, bool *hot_cold_separation){
+		uint32_t target_version, bool *hot_cold_separation, bool *populated){
 	bool issequential;
 	uint32_t target_run_num=src->run_num;
 	uint32_t target_keep_version=version_pick_oldest_version(LSM.last_run_version, src->idx);
@@ -1080,7 +1095,15 @@ level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des
 			level_append_run_copy_move_originality(res, rptr, ridx);
 		}
 	}
-	level_update_run_at_move_originality(res, target_run_idx, new_run[DEMOTE_RUN], true);
+
+
+	if(new_run[DEMOTE_RUN]->now_sst_num){
+		level_update_run_at_move_originality(res, target_run_idx, new_run[DEMOTE_RUN], true);
+		*populated=true;
+	}
+	else{
+		*populated=false;
+	}
 	/*
 	if(issequential) {
 		*hot_cold_separation=false;
@@ -1335,6 +1358,10 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 	if((last_file=bis_to_sst_file(bis))){
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
+	}
+
+	if(new_run->now_sst_num==0){
+		EPRINT("should delete version", true);
 	}
 
 	sst_bis_free(bis);

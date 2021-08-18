@@ -426,7 +426,7 @@ static inline void managing_remain_space_for_wisckey(level *src, level *des){
 }
 
 static inline level *TW_compaction(compaction_master *cm, level *src, level *des,
-		uint32_t target_version){
+		uint32_t target_version, bool *populated){
 	level *res=NULL;
 	managing_remain_space_for_wisckey(src, NULL);
 	level *temp=compaction_TW_convert_LW(cm, src);
@@ -439,10 +439,10 @@ static inline level *TW_compaction(compaction_master *cm, level *src, level *des
 			res=compaction_LW2LW(cm, temp, des, target_version);
 			break;
 		case TIERING:
-			res=compaction_LW2TI(cm, temp, des, target_version);
+			res=compaction_LW2TI(cm, temp, des, target_version, populated);
 			break;
 		case TIERING_WISCKEY:
-			res=compaction_LW2TW(cm, temp, des, target_version);
+			res=compaction_LW2TW(cm, temp, des, target_version, populated);
 			break;
 	}
 	level_free(temp, LSM.pm);
@@ -479,6 +479,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	}
 
 	uint32_t target_version;
+	bool populated=true;
 	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
 		target_version=version_order_to_version(LSM.last_run_version, des_lev->idx, 0);
 	}
@@ -498,7 +499,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 				lev=compaction_LE2LE(cm, src_lev, des_lev, target_version);
 			}
 			else{
-				lev=compaction_LE2TI(cm, src_lev, des_lev, target_version);
+				lev=compaction_LE2TI(cm, src_lev, des_lev, target_version, &populated);
 			}
 			break;
 		case LEVELING_WISCKEY:
@@ -512,34 +513,44 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 					break;
 				case TIERING_WISCKEY:
 					/*managing_remain_space_for_wisckey(src_lev, des_lev); no need to write data*/
-					lev=compaction_LW2TW(cm, src_lev, des_lev, target_version);
+					lev=compaction_LW2TW(cm, src_lev, des_lev, target_version, &populated);
 					break;
 				case TIERING:
-					lev=compaction_LW2TI(cm, src_lev, des_lev, target_version);
+					lev=compaction_LW2TI(cm, src_lev, des_lev, target_version, &populated);
 					break;
 			}
 			break;
 		case TIERING:
 #ifdef HOT_COLD
 			lev=compaction_TI2TI_separation(cm ,src_lev, des_lev, target_version, 
-					&hot_cold_separation_compaction);
+					&hot_cold_separation_compaction, &populated);
 #else
-			lev=compaction_TI2TI(cm, src_lev, des_lev, target_version);
+			lev=compaction_TI2TI(cm, src_lev, des_lev, target_version, &populated);
 #endif
 			break;
 		case TIERING_WISCKEY:
-			lev=TW_compaction(cm, src_lev, des_lev, target_version);
+			lev=TW_compaction(cm, src_lev, des_lev, target_version, &populated);
 			break;
 	}
 
 	/*populate version*/
 	if(des_lev->level_type==LEVELING || des_lev->level_type==LEVELING_WISCKEY){
 		if(!LSM.last_run_version->version_populate_queue[des_lev->idx][VERSION]->size()){
-			version_populate(LSM.last_run_version, target_version, des_lev->idx);
+			if(populated){
+				version_populate(LSM.last_run_version, target_version, des_lev->idx);
+			}
+			else{
+				version_reunpopulate(LSM.last_run_version, target_version, des_lev->idx);	
+			}
 		}
 	}
-	else{	
-		version_populate(LSM.last_run_version, target_version, des_lev->idx);
+	else{
+		if(populated){
+			version_populate(LSM.last_run_version, target_version, des_lev->idx);
+		}
+		else{
+			version_reunpopulate(LSM.last_run_version, target_version, des_lev->idx);	
+		}
 	}
 
 	/*unpopulate_version*/
@@ -762,66 +773,66 @@ static inline level* do_reclaim_level(compaction_master *cm, level *target_lev){
 	}
 	return res;
 
-	uint32_t round=0;
-	printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
-
-	std::multimap<uint32_t, uint32_t> version_inv_map;
-	uint32_t start_ver=version_level_to_start_version(LSM.last_run_version, target_lev->idx);
-	uint32_t end_ver=version_level_to_start_version(LSM.last_run_version, target_lev->idx-1)-1;
-	for(uint32_t i=start_ver; i<=end_ver;i++ ){
-		version_inv_map.insert(
-				std::pair<uint32_t, uint32_t>(LSM.last_run_version->version_invalidate_number[i], i));
-	}
-
-	std::multimap<uint32_t, uint32_t>::reverse_iterator iter=version_inv_map.rbegin();
-	for(; iter!=version_inv_map.rend(); iter++){
-		uint32_t ridx=version_to_ridx(LSM.last_run_version, target_lev->idx, iter->second);
-		printf("target v:%u inv:%u\n", iter->second, iter->first);
-		if(ridx==merged_idx_set[0] || iter->first==0) continue;
-		run *rptr=LEVEL_RUN_AT_PTR(res, ridx);
-		if(rptr->now_sst_num){
-			LSM.monitor.compaction_reclaim_run_num++;
-			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
-			run_empty_content(rptr, LSM.pm);
-
-			uint32_t t_version=iter->second;
-			version_invalidate_number_init(LSM.last_run_version, t_version);
-			level_update_run_at_move_originality(res, ridx, new_run, false);
-			run_free(new_run);
-#ifdef LSM_DEBUG
-			printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
-#endif
-
-			if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
-				break;
-			}
-		}
-	}
-	version_inv_map.clear();
 	/*
-	run *rptr;
-	uint32_t ridx, cnt;
-	uint32_t round=0;
-	for_each_old_ridx_in_lev(LSM.last_run_version, ridx, cnt, target_lev->idx){
-		if(ridx==merged_idx_set[0]) continue;
-		rptr=LEVEL_RUN_AT_PTR(res, ridx);
-		if(rptr->now_sst_num){
-			LSM.monitor.compaction_reclaim_run_num++;
-			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
-			run_empty_content(rptr, LSM.pm);
-
-			uint32_t t_version=version_ridx_to_version(LSM.last_run_version, target_lev->idx, ridx);
-
-			level_update_run_at_move_originality(res, ridx, new_run, false);
-			run_free(new_run);
-		}
-		if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
-			break;
-		}
-		else{
-			printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
-		}
-	}
+//	uint32_t round=0;
+//	printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
+//
+//	std::multimap<uint32_t, uint32_t> version_inv_map;
+//	uint32_t start_ver=version_level_to_start_version(LSM.last_run_version, target_lev->idx);
+//	uint32_t end_ver=version_level_to_start_version(LSM.last_run_version, target_lev->idx-1)-1;
+//	for(uint32_t i=start_ver; i<=end_ver;i++ ){
+//		version_inv_map.insert(
+//				std::pair<uint32_t, uint32_t>(LSM.last_run_version->version_invalidate_number[i], i));
+//	}
+//
+//	std::multimap<uint32_t, uint32_t>::reverse_iterator iter=version_inv_map.rbegin();
+//	for(; iter!=version_inv_map.rend(); iter++){
+//		uint32_t ridx=version_to_ridx(LSM.last_run_version, target_lev->idx, iter->second);
+//		printf("target v:%u inv:%u\n", iter->second, iter->first);
+//		if(ridx==merged_idx_set[0] || iter->first==0) continue;
+//		run *rptr=LEVEL_RUN_AT_PTR(res, ridx);
+//		if(rptr->now_sst_num){
+//			LSM.monitor.compaction_reclaim_run_num++;
+//			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
+//			run_empty_content(rptr, LSM.pm);
+//
+//			uint32_t t_version=iter->second;
+//			version_invalidate_number_init(LSM.last_run_version, t_version);
+//			level_update_run_at_move_originality(res, ridx, new_run, false);
+//			run_free(new_run);
+//#ifdef LSM_DEBUG
+//			printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
+//#endif
+//
+//			if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
+//				break;
+//			}
+//		}
+//	}
+//	version_inv_map.clear();
+//	run *rptr;
+//	uint32_t ridx, cnt;
+//	uint32_t round=0;
+//	for_each_old_ridx_in_lev(LSM.last_run_version, ridx, cnt, target_lev->idx){
+//		if(ridx==merged_idx_set[0]) continue;
+//		rptr=LEVEL_RUN_AT_PTR(res, ridx);
+//		if(rptr->now_sst_num){
+//			LSM.monitor.compaction_reclaim_run_num++;
+//			run *new_run=compaction_reclaim_run(cm, rptr, ridx);
+//			run_empty_content(rptr, LSM.pm);
+//
+//			uint32_t t_version=version_ridx_to_version(LSM.last_run_version, target_lev->idx, ridx);
+//
+//			level_update_run_at_move_originality(res, ridx, new_run, false);
+//			run_free(new_run);
+//		}
+//		if(page_manager_get_total_remain_page(LSM.pm, false, true) > LSM.param.reclaim_ppa_target){
+//			break;
+//		}
+//		else{
+//			printf("%u target:%u now_remain:%u\n", round++, LSM.param.reclaim_ppa_target, page_manager_get_total_remain_page(LSM.pm, false, true));
+//		}
+//	}
 */
 	return res;
 }

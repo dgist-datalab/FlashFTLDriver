@@ -953,7 +953,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 	return new_run;
 }
 
-level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){ 
+level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated){ 
 	_cm=cm;
 	run *seq_run=run_init(src->now_sst_num, UINT32_MAX, 0);
 	run *new_run=run_init(src->now_sst_num, UINT32_MAX, 0);
@@ -1049,7 +1049,13 @@ level* compaction_LW2TI(compaction_master *cm, level *src, level *des, uint32_t 
 		}
 	}
 
-	level_update_run_at_move_originality(res, target_run_idx, temp_new_run, true);
+	if(temp_new_run->now_sst_num){
+		*populated=true;
+		level_update_run_at_move_originality(res, target_run_idx, temp_new_run, true);
+	}
+	else{
+		*populated=false;
+	}
 	run_free(new_run);
 	run_free(seq_run);
 	run_free(temp_new_run);
@@ -1434,7 +1440,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 	In this function, the above level just moves to the next level's empty run.
 	There is no special logic for sequential workload.
  */
-level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version){
+level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated){
 	leveling_update_meta_for_trivial_move(src, des, target_version);
 	run *new_run=level_LE_to_run(src, true);
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
@@ -1449,13 +1455,19 @@ level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t 
 
 
 	uint32_t target_ridx=version_to_ridx(LSM.last_run_version, des->idx, target_version);
-	level_update_run_at_move_originality(res, target_ridx, new_run, true);
+	if(new_run->now_sst_num){
+		*populated=true;
+		level_update_run_at_move_originality(res, target_ridx, new_run, true);
+	}
+	else{
+		*populated=false;
+	}
 	run_free(new_run);
 	return res;
 }
 
 
-level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version){
+level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated){
 	static int cnt=0;
 	if(cnt==528){
 		printf("LW2TW cnt:\n");
@@ -1481,7 +1493,13 @@ level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t 
 			src->idx, des->idx, target_version);*/
 
 	uint32_t target_ridx=version_to_ridx(LSM.last_run_version, des->idx, target_version);
-	level_update_run_at_move_originality(res, target_ridx, new_run, true);
+	if(new_run->now_sst_num){
+		*populated=true;
+		level_update_run_at_move_originality(res, target_ridx, new_run, true);
+	}
+	else{
+		*populated=false;
+	}
 	run_free(new_run);
 	return res;
 }
