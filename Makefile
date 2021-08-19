@@ -166,10 +166,6 @@ duma_driver: ./interface/main.c libdriver.a
 jni: libdriver.a ./jni/DriverInterface.c
 	$(CC) -fPIC -o libdriver.so -shared -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux ./object/* $(LIBS)
 
-libart.o:
-	make -C ./include/data_struct/libart/
-	mv ./include/data_struct/libart/src/libart.o ./
-
 libfdsock.a:
 	cd ./include/flash_sock/ && $(MAKE) libfdsock.a && mv ./libfdsock.a ../../ && cd ../../
 
