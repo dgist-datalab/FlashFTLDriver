@@ -879,6 +879,13 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 			LSM.li->req_type_cnt[MISSDATAR]++;
 			parents->type_ftl++;
 		}
+
+		if(r_param && r_param->target_level_rw_lock){
+#ifdef RWLOCK_PRINT
+			printf("%u read_unlock - %u\n", rw_lock_lev, r_param->prev_level);
+#endif
+			rwlock_read_unlock(r_param->target_level_rw_lock);
+		}
 		free(req);
 		if(!inf_assign_try(parents)){
 			EPRINT("why cannot retry?", true);
