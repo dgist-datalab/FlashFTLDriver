@@ -1,6 +1,7 @@
 *.o
 *.a
 *.out
+*.so
 buse
 driver
 driver_memory_check
