@@ -55,7 +55,8 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
 	//	LSM.wb_array[i]=write_buffer_init(KP_IN_PAGE-L2PGAP, LSM.pm, NORMAL_WB);
-		LSM.wb_array[i]=write_buffer_init(QDEPTH, LSM.pm, NORMAL_WB);
+	//	LSM.wb_array[i]=write_buffer_init(QDEPTH, LSM.pm, NORMAL_WB);
+		LSM.wb_array[i]=write_buffer_init(L2PGAP, LSM.pm, NORMAL_WB);
 	}
 	printf("OP:%u\n", OP);
 #ifdef WB_SEPARATE
@@ -785,7 +786,7 @@ retry:
 			free(done_lock);
 		}
 
-		LSM.wb_array[LSM.now_wb]=write_buffer_init(QDEPTH, LSM.pm, NORMAL_WB);
+		LSM.wb_array[LSM.now_wb]=write_buffer_init(L2PGAP, LSM.pm, NORMAL_WB);
 		if(++LSM.now_wb==WRITEBUFFER_NUM){
 			LSM.now_wb=0;
 		}
