@@ -139,10 +139,10 @@ DEBUG: debug_driver
 
 duma_sim: duma_driver
 
-debug_driver: ./interface/main.c libdriver_d.a libart.a
+debug_driver: ./interface/main.c libdriver_d.a libart.o
 	$(CC) $(CFLAGS) -DDEBUG -o $@ $^ $(LIBS)
 
-driver: ./interface/vectored_main.c libdriver.a libart.a
+driver: ./interface/vectored_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a
