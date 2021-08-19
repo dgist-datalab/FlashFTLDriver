@@ -26,7 +26,13 @@ void sftl_mapping_verify(sftl_cache* sc){
 		}
 		i++;
 	}
+	if(ppa_list_idx!=max_head){
+		sftl_print_mapping(sc);
+		abort();
+	}
 }
+
+
 
 void sftl_print_mapping(sftl_cache *sc){
 	bool isset;
@@ -37,7 +43,7 @@ void sftl_print_mapping(sftl_cache *sc){
 	uint32_t seq_cnt=0;
 	uint32_t i=0;
 	bool isstart=true;
-	printf("--------print_sc: size:%u max_offset:%u\n", scm.gtd_size[sc->etr->idx], max);
+	printf("--------%u print_sc: size:%u max_offset:%u\n",sc->etr->idx, scm.gtd_size[sc->etr->idx], max);
 
 	bool debug_flag=false;
 	for_each_bitmap_forward(sc->map, offset, isset, max){

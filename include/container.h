@@ -36,13 +36,16 @@ typedef struct value_set{
 
 
 typedef struct vectored_request{
+	uint32_t tag_id;
 	uint32_t size;
 	uint32_t done_cnt;
 	uint32_t tid;
 	char* buf;
+
 	request *req_array;
 	uint32_t mark;
 	void* (*end_req)(void*);
+	void* origin_req;
 } vec_request;
 
 struct request {
@@ -54,8 +57,10 @@ struct request {
 	uint32_t length;
 	char *buf;
 	
+	uint32_t crc_value;
 	uint64_t ppa;/*it can be the iter_idx*/
 	uint32_t seq;
+	uint32_t global_seq;
 #ifdef hash_dftl
 	volatile int num; /*length of requests*/
 	volatile int cpl; /*number of completed requests*/
@@ -70,6 +75,7 @@ struct request {
 	void *(*special_func)(void *);
 	bool (*added_end_req)(struct request *const);
 	bool isAsync;
+	bool flush_all;
 	uint8_t magic;
 	void *param;
 	void *__hash_node;
@@ -78,6 +84,7 @@ struct request {
 	int mark;
 	bool is_sequential_start;
 	uint32_t consecutive_length; 
+	uint32_t round_cnt;
 
 /*s:for application req
 	char *target_buf;
@@ -173,7 +180,7 @@ struct algorithm{
 };
 
 typedef struct __OOBT{
-	char d[64];
+	char d[128];
 }__OOB;
 
 typedef struct masterblock{
@@ -208,7 +215,7 @@ typedef struct ghostsegment{ //for gc
 	uint16_t now;
 	uint16_t max;
 	uint32_t invalidate_number;
-	uint16_t validate_number;
+	uint32_t validate_number;
 }__gsegment;
 
 struct blockmanager{
@@ -226,6 +233,7 @@ struct blockmanager{
 	void (*free_segment)(struct blockmanager *,__segment*);
 	int (*populate_bit) (struct blockmanager*, uint32_t ppa);
 	int (*unpopulate_bit) (struct blockmanager*, uint32_t ppa);
+	bool (*query_bit) (struct blockmanager *, uint32_t ppa);
 	int (*erase_bit)(struct blockmanager*, uint32_t ppa);
 	bool (*is_valid_page) (struct blockmanager*, uint32_t ppa);
 	bool (*is_invalid_page) (struct blockmanager*, uint32_t ppa);

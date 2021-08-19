@@ -4,7 +4,7 @@
 
 extern demand_map_manager dmm;
 
-void *demend_end_req(algo_req * my_req){
+void *demand_end_req(algo_req * my_req){
 	request *parents=my_req->parents;
 	demand_param *dp;
 	std::map<uint32_t, bool>::iterator iter;
@@ -14,7 +14,7 @@ void *demend_end_req(algo_req * my_req){
 			dp=(demand_param *)my_req->param;
 			iter=dmm.flying_map_read_flag_set->find(GETGTDIDX(dp->flying_map_read_key));
 			if(iter==dmm.flying_map_read_flag_set->end()){
-				printf("issued key is not inserted into flying set\n");
+				printf("%u issued key is not inserted into flying set\n", iter->first);
 				abort();
 			}
 			else{
@@ -36,7 +36,7 @@ void *demend_end_req(algo_req * my_req){
 	return NULL;
 }
 
-void *demend_inter_end_req(algo_req *my_req){
+void *demand_inter_end_req(algo_req *my_req){
 	gc_map_value *gmv=(gc_map_value*)my_req->param;
 	switch(my_req->type){
 		case GCMR_DGC:
@@ -56,7 +56,7 @@ algo_req* demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *
 	my_req->type=MAPPINGR;
 	my_req->parents=req;
 	my_req->type_lower=0;
-	my_req->end_req=demend_end_req;
+	my_req->end_req=demand_end_req;
 	my_req->param=param;
 	my_req->ppa=ppa;
 	li->read(ppa, PAGESIZE, req->value, ASYNC, my_req);
@@ -68,7 +68,7 @@ void demand_mapping_write(uint32_t ppa, lower_info *li, request *req, void *para
 	my_req->type=MAPPINGW;
 	my_req->parents=req;
 	my_req->type_lower=0;
-	my_req->end_req=demend_end_req;
+	my_req->end_req=demand_end_req;
 	my_req->param=param;
 	my_req->ppa=ppa;
 	li->write(ppa, PAGESIZE, req->value, ASYNC, my_req);
@@ -79,7 +79,7 @@ void demand_mapping_inter_read(uint32_t ppa, lower_info *li, gc_map_value *param
 	my_req->type=GCMR_DGC;
 	my_req->parents=NULL;
 	my_req->type_lower=0;
-	my_req->end_req=demend_inter_end_req;
+	my_req->end_req=demand_inter_end_req;
 	my_req->param=(void *)param;
 	my_req->ppa=ppa;
 
@@ -91,7 +91,7 @@ void demand_mapping_inter_write(uint32_t ppa, lower_info *li, gc_map_value *para
 	my_req->type=GCMW_DGC;
 	my_req->parents=NULL;
 	my_req->type_lower=0;
-	my_req->end_req=demend_inter_end_req;
+	my_req->end_req=demand_inter_end_req;
 	my_req->param=(void *)param;
 	my_req->ppa=ppa;
 

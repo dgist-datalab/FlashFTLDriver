@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=Page_ftl
+export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
@@ -139,10 +139,10 @@ DEBUG: debug_driver
 
 duma_sim: duma_driver
 
-debug_driver: ./interface/main.c libdriver_d.a
+debug_driver: ./interface/main.c libdriver_d.a libart.a
 	$(CC) $(CFLAGS) -DDEBUG -o $@ $^ $(LIBS)
 
-driver: ./interface/vectored_main.c libdriver.a
+driver: ./interface/vectored_main.c libdriver.a libart.a
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a
@@ -183,6 +183,11 @@ libdriver.a: $(TARGETOBJ)
 	mv ./include/utils/*.o ./object/
 	mv ./interface/*.o ./object/ && mv ./bench/*.o ./object/ && mv ./include/*.o ./object/
 	$(AR) r $(@) ./object/*
+
+libart.o:
+	make -C ./include/data_struct/libart/
+	mv ./include/data_struct/libart/src/libart.o ./
+
 
 %_mem.o: %.c
 	$(CC) $(CFLAGS) -DLEAKCHECK -c $< -o $@ $(LIBS)

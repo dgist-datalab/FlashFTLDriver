@@ -15,6 +15,22 @@
 typedef enum {
 	DEMAND_COARSE, DEMAND_FINE, SFTL, TPFTL,
 }cache_algo_type;
+
+enum{
+	MAP_READ_ISSUE_END, FLYING_HIT_END, RETRY_END, MAP_WRITE_END, 
+	DONE_END, MISS_STATUS_DONE, NOTFOUND_END,
+};
+
+enum{
+	 HAVE_SPACE, NORMAL_EVICTION, EMPTY_EVICTION,
+};
+
+enum{
+	MAP_MISS=1,
+	MAP_EVICT_READ=2,
+	MAP_WRITE=4,
+	MAP_WRITE_GC=8,
+};
 #define CACHE_TYPE_MAX_NUM (TPFTL+1)
 
 typedef enum GTD_ETR_STATUS{
@@ -56,10 +72,10 @@ typedef struct demand_param{
 	MAP_ASSIGN_STATUS prev_status[10];
 	uint32_t now_eviction_hint;
 	uint32_t log;
-	GTD_entry *etr;
 	evict_target et;
 	mapping_entry target;
 	void *param_ex;
+	void *cache_private;
 	bool is_hit_eviction;
 
 	uint32_t flying_map_read_key;
@@ -69,13 +85,9 @@ typedef struct assign_param_ex{
 	KEYT *lba;
 	KEYT *physical;
 	uint32_t *prefetching_info;
+	uint32_t max_idx;
 	uint8_t idx;
 }assign_param_ex;
-
-
-typedef struct pick_param_ex{
-	KEYT lba;
-}pick_param_ex;
 
 typedef struct demand_map_manager{
 	uint32_t max_caching_pages;
@@ -84,11 +96,16 @@ typedef struct demand_map_manager{
 	my_cache *cache;
 	lower_info *li;
 	uint32_t eviction_hint;
+	//uint32_t eviction_req_cnt;
+	bool global_debug_flag;
+	uint32_t now_mapping_read_cnt;
 	//uint32_t flying_lba_idx;
 	//uint32_t flying_lba_array[QDEPTH*2];
 	fdriver_lock_t flying_map_read_lock;
 	std::map<uint32_t, request*> *flying_map_read_req_set;
 	std::map<uint32_t, bool> *flying_map_read_flag_set;
+	std::map<uint32_t, request*> *flying_req;//pair<req->seq, request*>
+	std::map<uint32_t, request*> *all_now_req;//pair<req->seq, request*>
 	blockmanager *bm;
 }demand_map_manager;
 

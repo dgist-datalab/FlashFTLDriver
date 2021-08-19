@@ -8,6 +8,7 @@
 #include "page.h"
 #include "gc.h"
 extern uint32_t test_key;
+extern uint32_t debug_lba;
 align_buffer a_buffer;
 extern MeasureTime mt;
 struct algorithm demand_ftl={
@@ -17,7 +18,7 @@ struct algorithm demand_ftl={
 	.read=page_read,
 	.write=page_write,
 	.flush=page_flush,
-	.remove=NULL,
+	.remove=page_remove,
 };
 
 page_read_buffer rb;
@@ -43,6 +44,14 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 void page_destroy (lower_info* li, algorithm *algo){
 	demand_map_free();
 	printf("read buffer hit:%u\n", read_buffer_hit_cnt);
+
+	printf("WAF: %lf\n\n",
+			(double)(li->req_type_cnt[MAPPINGW] +
+				li->req_type_cnt[DATAW]+
+				li->req_type_cnt[GCDW]+
+				li->req_type_cnt[GCMW_DGC]+
+				li->req_type_cnt[GCMW]+
+				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	free(a_buffer.value);
 
 	delete rb.pending_req;
@@ -65,17 +74,34 @@ uint32_t page_read(request *const req){
 }
 
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
+
+	bool overlap=false;
+	uint32_t overlapped_idx=UINT32_MAX;
+	for(uint32_t i=0; i<a_buffer.idx; i++){
+		if(a_buffer.key[i]==req->key){
+			overlapped_idx=i;
+			overlap=true;
+			break;
+		}
+	}
+
+	uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
+
 	if(req){
-		memcpy(&a_buffer.value[a_buffer.idx*LPAGESIZE], req->value->value, LPAGESIZE);
-		a_buffer.key[a_buffer.idx]=req->key;
-		a_buffer.prefetching_info[a_buffer.idx]=req->consecutive_length;
+		memcpy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE);
+		a_buffer.key[target_idx]=req->key;
+		a_buffer.prefetching_info[target_idx]=req->consecutive_length;
 	}
 	else{
-		memcpy(&a_buffer.value[a_buffer.idx*LPAGESIZE], req->value->value, LPAGESIZE);
-		a_buffer.key[a_buffer.idx]=key;
-		a_buffer.prefetching_info[a_buffer.idx]=req->consecutive_length;
+		memcpy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE);
+		a_buffer.key[target_idx]=key;
+		a_buffer.prefetching_info[target_idx]=req->consecutive_length;
 	}
-	a_buffer.idx++;
+	if(req->key==debug_lba){
+		printf("%u is buffered\n", debug_lba);
+	}
+
+	if(!overlap){ a_buffer.idx++;}
 
 	if(a_buffer.idx==L2PGAP){
 		ppa_t ppa=get_ppa(a_buffer.key, a_buffer.idx);
@@ -85,7 +111,10 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		KEYT physical[L2PGAP];
 
 		for(uint32_t i=0; i<L2PGAP; i++){
-			physical[i]=ppa*L2PGAP+i;
+			physical[i]=ppa*L2PGAP+i;	
+			if(a_buffer.key[i]==debug_lba){
+				printf("%u -> %u[%u] %u \n", debug_lba, physical[i], i ,*(uint32_t*)&a_buffer.value[LPAGESIZE*i]);
+			}
 		}
 
 		demand_map_assign(req, a_buffer.key, physical, a_buffer.prefetching_info);
@@ -111,11 +140,20 @@ uint32_t page_write(request *const req){
 		}
 	}
 	else{*/
-	if(!align_buffering(req, 0, NULL)){
+	if(req->key==test_key){
+		printf("insert key:%u\n", req->key);
+	}
+	if(!align_buffering(req, req->key, req->value)){
 		req->end_req(req);
 	}
 	/*}*/
 
+	return 0;
+}
+
+
+uint32_t page_remove(request *const req){
+	req->end_req(req);
 	return 0;
 }
 
@@ -134,7 +172,6 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 		if(ppa==rb.buffer_ppa){
 			read_buffer_hit_cnt++;
 			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-			req->type_ftl=req->type_lower=0;
 			req->end_req(req);
 			fdriver_unlock(&rb.read_buffer_lock);
 			return;
@@ -180,7 +217,7 @@ static void processing_pending_req(algo_req *req, value_set *v){
 	request *parents=req->parents;
 	page_params *params=(page_params*)req->param;
 	memcpy(params->value->value, &v->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-	parents->type_ftl=parents->type_lower=0;
+	//parents->type_ftl=parents->type_lower=0;
 	parents->end_req(parents);
 	free(params);
 	free(req);
@@ -220,7 +257,7 @@ void *page_end_req(algo_req* input){
 	}
 	request *res=input->parents;
 	if(res){
-		res->type_ftl=res->type_lower=0;
+		//res->type_ftl=res->type_lower=0;
 		res->end_req(res);//you should call the parents end_req like this
 	}
 	free(params);

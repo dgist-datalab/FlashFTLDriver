@@ -9,7 +9,9 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
+uint32_t debug_lba=UINT32_MAX;
 uint32_t test_ppa=UINT32_MAX;
+uint32_t test_ppa2=UINT32_MAX;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -31,11 +33,16 @@ void pm_body_destroy(pm_body *pm){
 	free(pm->map_reserve);
 	free(pm->reserve);
 }
+
 void invalidate_ppa(uint32_t t_ppa){
 	/*when the ppa is invalidated this function must be called*/
 	if(t_ppa==test_ppa){
-		printf("%u unpopulated!\n",test_ppa);
+		printf("%u unpopulated!\n",t_ppa);
 	}
+	if(t_ppa==test_ppa2){
+		printf("%u unpopulated!\n",t_ppa);
+	}
+
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
 		printf("target:%u ",t_ppa);
 		EPRINT("double invalidation!", true);
@@ -47,6 +54,9 @@ void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx){
 	for(uint32_t i=0; i<max_idx; i++){
 		if(ppa*L2PGAP+i==test_ppa){
 			printf("%u populated, it is ppa for %u!\n", test_ppa,lbas[i]);
+		}
+		if(ppa*L2PGAP+i==test_ppa2){
+			printf("%u populated, it is ppa for %u!\n", test_ppa2,lbas[i]);
 		}
 		if(!demand_ftl.bm->populate_bit(demand_ftl.bm,ppa * L2PGAP+i)){
 			printf("target:%u ", ppa*L2PGAP+i);
@@ -93,6 +103,28 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 }
 
 uint32_t debug_gc_lba;
+
+void segment_print(bool is_data_gc){
+	if(is_data_gc){
+		printf("is data gc!\n");
+	}
+	else{
+		printf("is map gc!\n");
+	}
+
+	pm_body *p=(pm_body*)demand_ftl.algo_body;
+	blockmanager *bm=demand_ftl.bm;
+	for(uint32_t i=0; i<_NOS; i++){
+		uint32_t invalidate_number=bm->get_invalidate_number(bm, i);
+		printf("%u %s inv:%u - %s\n", i,
+				p->seg_type_checker[i]==DATASEG?"DATASEG":"MAPSEG",
+				invalidate_number,
+				invalidate_number==_PPS*L2PGAP?"all":"no");
+	}
+
+	printf("\n");
+}
+
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
@@ -104,7 +136,7 @@ void do_gc(){
 	while(!target || 
 			p->seg_type_checker[target->seg_idx]!=DATASEG){
 		if(target){
-			if(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS){
+			if(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==target->validate_number){
 				break;	
 			}
 			temp_queue.push(target->seg_idx);
@@ -113,6 +145,10 @@ void do_gc(){
 		target=bm->get_gc_target(bm);
 	} 
 
+/*
+	segment_print(true);
+	printf("target seg_idx:%u\n", target->seg_idx);
+*/
 	uint32_t seg_idx;
 	while(temp_queue.size()){
 		seg_idx=temp_queue.front();
@@ -128,7 +164,7 @@ void do_gc(){
 	list *temp_list=NULL;
 	mapping_entry *update_target=NULL;
 	if((p->seg_type_checker[target->seg_idx]==DATASEG && target->invalidate_number==_PPS*L2PGAP) ||
-			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS)){
+			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS * L2PGAP)){
 		goto finish;
 	}
 	temp_list=list_init();
@@ -180,19 +216,22 @@ void do_gc(){
 					}
 				}
 
-				if(gv->ppa*L2PGAP+i==test_ppa){
-					debug_gc_lba=lbas[i];
-					printf("the gc for %u\n", test_ppa);
-				}
-
 				invalidate_ppa(gv->ppa*L2PGAP+i);
 				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
+
+				if(test_key==lbas[i]){
+					printf("gc org:%u -> %u data:%u\n", lbas[i], gv->ppa*L2PGAP+i, *(uint32_t*)&g_buffer.value[g_buffer.idx*LPAGESIZE]);
+				}
+				
 				g_buffer.idx++;
 
 				if(g_buffer.idx==L2PGAP){
 					uint32_t res=get_rppa(g_buffer.key, L2PGAP, update_target, &update_target_idx);
+
+		//			gc_data_check(g_buffer);
+
 					send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE), NULL);
 					g_buffer.idx=0;
 				}
@@ -207,6 +246,7 @@ void do_gc(){
 
 	if(g_buffer.idx!=0){
 		uint32_t res=get_rppa(g_buffer.key, g_buffer.idx, update_target, &update_target_idx);
+//		gc_data_check(g_buffer);
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE), NULL);
 		g_buffer.idx=0;	
 	}
@@ -272,9 +312,6 @@ ppa_t get_rppa(KEYT *lbas, uint8_t idx, mapping_entry *target, uint32_t *_target
 		target[target_idx].lba=t_lba;
 		target[target_idx].ppa=res*L2PGAP+i;
 		target_idx++;
-		if(res*L2PGAP+i==test_ppa){
-			printf("%u is map for %u in rppa\n",test_ppa, lbas[i]);	
-		}
 		demand_ftl.bm->populate_bit(demand_ftl.bm, res*L2PGAP+i);
 	}
 	(*_target_idx)=target_idx;

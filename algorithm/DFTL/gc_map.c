@@ -4,24 +4,33 @@
 extern struct algorithm demand_ftl;
 extern uint32_t test_ppa;
 extern uint32_t test_key;
+extern demand_map_manager dmm;
+
 void invalidate_map_ppa(uint32_t piece_ppa){
-	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa)){
-		EPRINT("double invalidation!", true);
+	for(uint32_t i=0; i<L2PGAP; i++){
+		if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa+i)){
+			EPRINT("double invalidation!", true);
+		}
 	}
 }
 
 void validate_map_ppa(uint32_t piece_ppa, KEYT gtd_idx){
-	if(!demand_ftl.bm->populate_bit(demand_ftl.bm, piece_ppa)){
-		EPRINT("double validation!", true);
+	for(uint32_t i=0; i<L2PGAP; i++){
+		if(!demand_ftl.bm->populate_bit(demand_ftl.bm, piece_ppa+i)){
+			EPRINT("double validation!", true);
+		}
 	}
 	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)&gtd_idx, sizeof(KEYT), piece_ppa/L2PGAP);
 }
 
-ppa_t get_map_ppa(KEYT gtd_idx){
+ppa_t get_map_ppa(KEYT gtd_idx, bool *gc_triggered){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	if(demand_ftl.bm->check_full(demand_ftl.bm, p->map_active,MASTER_PAGE) && demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 		do_map_gc();//call gc
+		if(gc_triggered){
+			*gc_triggered=true;
+		}
 	}
 
 retry:
@@ -32,10 +41,10 @@ retry:
 		p->seg_type_checker[p->map_active->seg_idx]=MAPSEG;
 		goto retry;
 	}
-	
+	/*
 	if(GETGTDIDX(test_key)==gtd_idx){
 		printf("%u mapping change to %u\n", test_key, res*L2PGAP);
-	}
+	}*/
 
 	validate_map_ppa(res*L2PGAP, gtd_idx);
 	return res;
@@ -57,7 +66,7 @@ void do_map_gc(){
 
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	blockmanager *bm=demand_ftl.bm;
-//	printf("map gc:%u\n", ++cnt);
+	//printf("map gc:%u\n", ++cnt);
 	__gsegment *target=NULL;
 	std::queue<uint32_t> temp_queue;
 	while(!target || 
@@ -71,6 +80,9 @@ void do_map_gc(){
 		}
 		target=bm->get_gc_target(bm);
 	} 
+/*
+	segment_print(false);*/
+	//printf("map_gc target seg_idx:%u\n", target->seg_idx);
 
 	uint32_t seg_idx;
 	while(temp_queue.size()){
@@ -87,7 +99,7 @@ void do_map_gc(){
 	uint32_t page;
 	uint32_t bidx, pidx;
 	if((p->seg_type_checker[target->seg_idx]==DATASEG && target->invalidate_number==_PPS*L2PGAP) ||
-			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS)){
+			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS *L2PGAP)){
 		goto finish;
 	}
 
@@ -96,9 +108,6 @@ void do_map_gc(){
 		//this function check the page is valid or not
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(page*L2PGAP==98016){
-				printf("%u gc invalidation check!\n", 98016);
-			}
 			if(bm->is_invalid_page(bm,page*L2PGAP)) continue;
 			else{
 				should_read=true;
