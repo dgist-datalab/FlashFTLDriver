@@ -7,6 +7,9 @@ extern uint32_t test_key;
 extern demand_map_manager dmm;
 
 void invalidate_map_ppa(uint32_t piece_ppa){
+#ifdef DFTL_DEBUG
+	printf("map invalidate :%u\n", piece_ppa);
+#endif
 	for(uint32_t i=0; i<L2PGAP; i++){
 		if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, piece_ppa+i)){
 			EPRINT("double invalidation!", true);

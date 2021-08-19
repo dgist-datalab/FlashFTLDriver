@@ -341,6 +341,23 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 
 #ifdef DFTL_DEBUG
 		printf("insert debug_lba %u:%u %u-th\n", lba+i, ppa_list[tc->offset], i);
+		if(ppa_list[tc->offset]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,ppa_list[tc->offset])){
+			if(etr){
+				printf("invalidated ppa read %u:%u (l,p), map_ppa:%u\n", lba+i, ppa_list[tc->offset], etr->physical_address);
+				for(uint32_t j=0; j<L2PGAP; j++){
+					if(!demand_ftl.bm->query_bit(demand_ftl.bm, etr->physical_address+j)){
+						EPRINT("double invalidated ppa in map!", false);
+					}
+					else{
+						printf("valid:%u\n",j);
+					}
+				}
+			}
+			else{
+				printf("etr is null???\n");
+			}
+//			abort();
+		}
 #endif
 
 		if(i==0){

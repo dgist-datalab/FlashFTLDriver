@@ -45,6 +45,7 @@ void invalidate_ppa(uint32_t t_ppa){
 
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
 		printf("target:%u ",t_ppa);
+		print_stacktrace();
 		EPRINT("double invalidation!", true);
 	}
 }
