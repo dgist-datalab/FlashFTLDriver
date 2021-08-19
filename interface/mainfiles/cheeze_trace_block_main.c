@@ -51,6 +51,7 @@ int main(int argc,char* argv[]){
 	pthread_join(thr, NULL);
 
 	free_trace_cheeze();
+	sleep(10);
 	inf_free();
 	return 0;
 }

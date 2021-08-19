@@ -309,7 +309,7 @@ static inline level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
 	return res;
 }
 level* flush_memtable(write_buffer *wb, bool is_gc_data){
-	if(page_manager_get_total_remain_page(LSM.pm, false, false) < wb->buffered_entry_num/L2PGAP){
+	if(page_manager_get_total_remain_page(LSM.pm, false, false) < MAX(wb->buffered_entry_num/L2PGAP,2)){
 		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
 	}
 	

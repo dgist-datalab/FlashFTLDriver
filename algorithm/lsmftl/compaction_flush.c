@@ -498,7 +498,9 @@ out:
 
 #ifdef MIN_ENTRY_PER_SST
 level* flush_memtable(write_buffer *wb, bool is_gc_data){
-	if(page_manager_get_total_remain_page(LSM.pm, false, false) < wb->buffered_entry_num/L2PGAP){
+	//static int cnt=0;
+	//printf("flush cnt:%u\n", cnt++);
+	if(page_manager_get_total_remain_page(LSM.pm, false, false) < MAX(wb->buffered_entry_num/L2PGAP, 2)){
 		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
 	}
 	rwlock_write_lock(&LSM.flush_wait_wb_lock);
