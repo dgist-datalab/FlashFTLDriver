@@ -20,6 +20,7 @@ struct blockmanager seq_bm={
 	.free_segment=seq_free_segment,
 	.populate_bit=seq_populate_bit,
 	.unpopulate_bit=seq_unpopulate_bit,
+	.query_bit=seq_query_bit,
 	.erase_bit=seq_erase_bit,
 	.is_valid_page=seq_is_valid_page,
 	.is_invalid_page=seq_is_invalid_page,
@@ -266,13 +267,11 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	mh_construct(p->max_heap);
-	uint32_t res=0;
 	while(1){
 		block_set* target=(block_set*)mh_get_max(p->max_heap);
 
-		if(target->total_invalid_number==_PPS*L2PGAP){
+		if(target->total_invalid_number==target->total_valid_number){
 			q_enqueue((void*)target, p->invalid_block_q);
-			res++;
 		}
 		else{
 			uint32_t seg_idx=target->blocks[0]->block_num/BPS;
@@ -281,7 +280,7 @@ uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm){
 		}
 	}
 
-	return res;
+	return p->invalid_block_q->size;
 }
 
 void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_info* li){
@@ -327,7 +326,6 @@ int seq_populate_bit (struct blockmanager* bm, uint32_t ppa){
 	uint32_t bt=pn/8;
 	uint32_t of=pn%8;
 
-//	printf("ppa: %d  bn: %d\n", ppa, bn);
 	__block *b=&p->seq_block[bn];
 	b->validate_number++;
 	uint32_t segment_idx=b->block_num/BPS;
@@ -370,6 +368,17 @@ int seq_unpopulate_bit (struct blockmanager* bm, uint32_t ppa){
 		//abort();
 	}
 	return res;
+}
+
+
+bool seq_query_bit(struct blockmanager *bm, uint32_t ppa){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	uint32_t bn=ppa/(_PPB * L2PGAP);
+	uint32_t pn=ppa%(_PPB * L2PGAP);
+	uint32_t bt=pn/8;
+	uint32_t of=pn%8;
+
+	return p->seq_block[bn].bitset[bt]&(1<<of);
 }
 
 
@@ -448,6 +457,17 @@ int seq_get_page_num(struct blockmanager* bm,__segment *s){
 		if(s->blocks[BPS-1]->now==_PPB) return -1;
 	}
 
+#ifdef LSM_DEBUG
+	uint32_t total_num=0;	
+	for(uint32_t i=0; i<BPS; i++){
+		total_num+=s->blocks[i]->now;
+	}
+	if(total_num!=s->used_page_num){
+		abort();
+	}
+#endif
+
+
 	__block *b=s->blocks[s->now];
 	if(b->now==_PPB){
 		s->now++;
@@ -461,6 +481,10 @@ int seq_get_page_num(struct blockmanager* bm,__segment *s){
 	if(page>_PPB) abort();
 	s->used_page_num++;
 	bm->assigned_page++;
+
+	if(s->used_page_num!=res%_PPS+1){
+		abort();
+	}
 	return res;
 }
 
@@ -519,3 +543,4 @@ uint32_t seq_get_invalidate_number(struct blockmanager *bm, uint32_t seg_idx){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	return p->logical_segment[seg_idx].total_invalid_number;
 }
+
