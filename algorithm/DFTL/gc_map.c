@@ -67,9 +67,10 @@ extern demand_map_manager dmm;
 
 void do_map_gc(){
 
+	static int cnt=0;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	blockmanager *bm=demand_ftl.bm;
-	//printf("map gc:%u\n", ++cnt);
+	printf("map gc:%u\n", ++cnt);
 	__gsegment *target=NULL;
 	std::queue<uint32_t> temp_queue;
 	while(!target || 

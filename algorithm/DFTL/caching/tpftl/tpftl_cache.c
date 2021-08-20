@@ -281,6 +281,7 @@ uint32_t tp_update_entry_gc(struct my_cache *, GTD_entry *e, uint32_t lba, uint3
 
 uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uint32_t lba, char *data, 
 		uint32_t *eviction_hint, uint32_t now_eviction_hint){
+	uint32_t res=1;
 	if(etr->status==EMPTY){
 		printf("try to read not populated entry! %s:%d\n",__FILE__, __LINE__);
 		abort();
@@ -339,9 +340,8 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 			continue;
 		}*/
 
-#ifdef DFTL_DEBUG
-		printf("insert debug_lba %u:%u %u-th\n", lba+i, ppa_list[tc->offset], i);
 		if(ppa_list[tc->offset]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,ppa_list[tc->offset])){
+			printf("insert debug_lba %u:%u %u-th pref:%u\n", lba+i, ppa_list[tc->offset], i, prefetching_len);
 			if(etr){
 				printf("invalidated ppa read %u:%u (l,p), map_ppa:%u\n", lba+i, ppa_list[tc->offset], etr->physical_address);
 				for(uint32_t j=0; j<L2PGAP; j++){
@@ -356,9 +356,8 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 			else{
 				printf("etr is null???\n");
 			}
-//			abort();
+			abort();
 		}
-#endif
 
 		if(i==0){
 			tc->lru_node=lru_push(tn->tp_lru,(void*)tc);
@@ -379,7 +378,7 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 
 	(*eviction_hint)-=org_now_eviction_hint;
 
-	return 1;
+	return res;
 }
 
 uint32_t tp_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa){
@@ -525,6 +524,7 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t n
 		free(dirty_evicting_set);
 	}
 	else{
+	//	printf("additional data_set\n");
 		dirty_evicting_set->evicting_num=dirty_set_idx;
 		(*additional_data)=(void*)dirty_evicting_set;
 	}
@@ -555,6 +555,10 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba,
 				old_ppa=ppa_list[tc->offset];
 				ppa_list[tc->offset]=tc->ppa;
 				tc->dirty_bit=0;
+				if(!demand_ftl.bm->query_bit(demand_ftl.bm, tc->ppa)){
+					printf("wtf1! %u:%u\n", GETLBA(tn, tc), tc->ppa);
+					abort();
+				}
 #ifdef DFTL_DEBUG
 				if(!demand_ftl.bm->query_bit(demand_ftl.bm, tc->ppa)){
 					printf("wtf1! %u:%u\n", GETLBA(tn, tc), tc->ppa);
@@ -578,6 +582,10 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba,
 			mapping_entry temp=dirty_eviction_set->map[i];
 
 			ppa_list[GETOFFSET(temp.lba)]=temp.ppa;
+			if(!demand_ftl.bm->query_bit(demand_ftl.bm, temp.ppa)){
+				printf("wtf2! %u:%u\n", temp.lba, temp.ppa);
+				abort();
+			}
 #ifdef DFTL_DEBUG
 			if(!demand_ftl.bm->query_bit(demand_ftl.bm, temp.ppa)){
 				printf("wtf2! %u:%u\n", temp.lba, temp.ppa);

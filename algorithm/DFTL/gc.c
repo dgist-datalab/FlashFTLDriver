@@ -9,8 +9,8 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
-uint32_t debug_lba=UINT32_MAX;
-uint32_t test_ppa=UINT32_MAX;
+uint32_t debug_lba=2179072;
+uint32_t test_ppa=17454;
 uint32_t test_ppa2=UINT32_MAX;
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
@@ -44,8 +44,8 @@ void invalidate_ppa(uint32_t t_ppa){
 	}
 
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
-		printf("target:%u ",t_ppa);
-		print_stacktrace();
+		printf("target: %u,%u (l,p)",((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, t_ppa/L2PGAP))[t_ppa%L2PGAP], t_ppa);
+	//	print_stacktrace();
 		EPRINT("double invalidation!", true);
 	}
 }
@@ -132,8 +132,8 @@ void do_gc(){
 	__gsegment *target=NULL;
 	std::queue<uint32_t> temp_queue;
 	blockmanager *bm=demand_ftl.bm;
-	//static int cnt=0;
-	//printf("gc:%u\n", ++cnt);
+	static int cnt=0;
+	printf("gc:%u\n", ++cnt);
 	while(!target || 
 			p->seg_type_checker[target->seg_idx]!=DATASEG){
 		if(target){

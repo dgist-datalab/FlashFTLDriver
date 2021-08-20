@@ -82,9 +82,22 @@ static inline void mapping_sanity_checker(char *value){
 	uint32_t *map=(uint32_t*)value;
 	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
 		if(map[i]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm, map[i])){
-			uint32_t lba=((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, map[i]/4))[map[i]%4];
+			uint32_t lba=((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, map[i]/L2PGAP))[map[i]%L2PGAP];
 			printf("%u %u mapping sanity error\n", lba, map[i]);
 			abort();
+		}
+	}
+}
+
+static inline void mapping_sanity_checker_with_cache(char *value){
+	uint32_t *map=(uint32_t*)value;
+	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
+		if(map[i]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm, map[i])){
+			uint32_t lba=((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, map[i]/L2PGAP))[map[i]%L2PGAP];
+			if(!dmm.cache->exist(dmm.cache, lba)){
+				printf("%u %u mapping sanity error\n", lba, map[i]);
+				abort();
+			}
 		}
 	}
 }
@@ -324,8 +337,8 @@ static inline void write_updated_map(request *req, GTD_entry *target_etr,
 	if(is_map_gc_triggered){
 		req->type_lower++;
 	}
-#ifdef DFTL_DEBUG
 	mapping_sanity_checker(req->value->value);
+#ifdef DFTL_DEBUG
 	printf("entry write:%u:%u\n\n",target_etr->idx, target_etr->physical_address);
 #endif
 
@@ -529,6 +542,9 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	}
 	else{
 		temp_value=req->value->value;
+	}
+	if(etr->physical_address!=UINT32_MAX){
+		mapping_sanity_checker_with_cache(temp_value);
 	}
 
 	etr->status=POPULATE;
