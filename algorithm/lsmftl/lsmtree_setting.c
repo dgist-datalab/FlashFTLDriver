@@ -209,7 +209,7 @@ void print_tree_param_new(tree_param *set, uint32_t number, uint32_t divide){
 
 void lsmtree_l0_fix_sf(){
 	double size_factor=2;
-	printf("BUF\tLEVEL\tTABLE\tBPE\tSUM\t\n");
+	printf("BUF\tL0\tLEVEL\tTABLE\tBPE\tSUM\t\n");
 	for(uint32_t WB=(LOWQDEPTH*(48+48)); WB<=RANGE*48; WB*=2){
 		double write_buffer_memory_bit=WB;
 		double buffered_ent=write_buffer_memory_bit/(48+48);
@@ -261,7 +261,7 @@ void lsmtree_l0_fix_sf(){
 		double bit_per_entry=plr_bit/total_level_size;
 		memory_size+=bit_per_entry*RANGE;
 
-		printf("%u\t%.3lf\t%.3lf\t%.3lf\t%.3lf\n", WB/LOWQDEPTH, max_level, table_bit/(RANGE*48), 
+		printf("%u\t%.3lf\t%.3lf\t%.3lf\t%.3lf\t%.3lf\n", WB/LOWQDEPTH,(float)WB/memory_size, max_level, table_bit/(RANGE*48), 
 			bit_per_entry/48, memory_size/(RANGE*48));
 	}
 }
@@ -353,19 +353,44 @@ void lsmtree_sf_fix_l0(){
 //	}
 }
 
-void lsmtree_tiering_only_test2(){
+typedef struct parameter_combination_info{
+	uint32_t max_level;
+	uint32_t size_factor;
+	double total_memory;
+	double bf_memory;
+	double plr_memory;
+	double wb_memory;
+	double table_memory;
+}_pci;
+
+void lsmtree_tiering_memory_waf_calculator(uint32_t limit_round){
+	uint32_t sf_multiple=4;
+	uint32_t wb_multiple=6;
 	//printf("BUF\tSF\tLEVEL\tTABLE\tBPE\tSUM\t\n");
-	printf("\t");
-	for(uint32_t size_factor=2; size_factor<=1024; size_factor*=4){
+	_pci **pci_set=(_pci**)calloc(limit_round, sizeof(_pci*));
+	/*pci_set[L0-idx][SF-idx]*/
+	for(uint32_t i=0; i<limit_round; i++){
+		pci_set[i]=(_pci*)calloc(limit_round, sizeof(_pci));	
+	}
+
+	printf("memory usage---\n");
+	printf("\t\t");
+	for(uint32_t size_factor=2, i=0; size_factor<=1024 && i<limit_round; size_factor*=sf_multiple, i++){
 		printf("%u\t", size_factor);
 	}
 	printf("\n");
-	for(uint32_t WB=(LOWQDEPTH*(48+48)); WB<=RANGE*48; WB*=4){	
+	for(uint32_t WB=(LOWQDEPTH*(48+48)), j=0; WB<=RANGE*48 && j<limit_round; WB*=wb_multiple, j++){	
 		double write_buffer_memory_bit=WB;
 		double buffered_ent=write_buffer_memory_bit/(48+48);
 		double chunk_num=(double)RANGE/buffered_ent;
-		printf("%u\t",WB/LOWQDEPTH);
-		for(uint32_t size_factor=2; size_factor<=1024; size_factor*=4){
+		printf("%u\t%.1f\t",WB/LOWQDEPTH, (float)WB/K);
+		for(uint32_t size_factor=2, i=0; size_factor<=1024 && i<limit_round; size_factor*=sf_multiple, i++){
+			double sum_plr_memory=0;
+			double sum_bf_memory=0;
+
+			uint64_t num_bf_entry=0;
+			uint64_t num_plr_entry=0;
+
 			double max_level=get_double_level(size_factor, chunk_num);
 			double table_bit=ceil(log2(ceil(max_level)*size_factor)) * RANGE;
 			double memory_size=0;
@@ -403,11 +428,29 @@ void lsmtree_tiering_only_test2(){
 				}
 
 				double run_coverage_ratio=(double)run_size/total_level_size;
+				if(bf_memory_per_ent(run_coverage_ratio) < plr_memory_per_ent(run_coverage_ratio)){
+					sum_bf_memory+=level_size*bf_memory_per_ent(run_coverage_ratio);
+					num_bf_entry+=level_size;
+				}
+				else{
+					sum_plr_memory+=level_size*plr_memory_per_ent(run_coverage_ratio);
+					num_plr_entry+=level_size;
+				}
 				plr_bit+=level_size * MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
 			}
 
 			double bit_per_entry=plr_bit/total_level_size;
 			memory_size+=RANGE*bit_per_entry;
+			
+			pci_set[j][i].size_factor=size_factor;
+			pci_set[j][i].max_level=max_level;
+			pci_set[j][i].total_memory=memory_size;
+
+			pci_set[j][i].bf_memory=sum_bf_memory/plr_bit*(RANGE*bit_per_entry);
+			pci_set[j][i].plr_memory=sum_plr_memory/plr_bit*(RANGE*bit_per_entry);
+
+			pci_set[j][i].table_memory=table_bit;
+			pci_set[j][i].wb_memory=WB;
 
 			printf("%.3lf\t", memory_size/(RANGE*48));
 	//		printf("%.3lf\t", max_level);
@@ -417,6 +460,44 @@ void lsmtree_tiering_only_test2(){
 		}
 		printf("\n");
 	}
+
+	printf("\nWAF---\n");
+	printf("\t\t");
+	for(uint32_t size_factor=2, i=0; size_factor<=1024 && i<limit_round; size_factor*=sf_multiple, i++){
+		printf("%u\t", size_factor);
+	}
+	printf("\n");
+	for(uint32_t WB=(LOWQDEPTH*(48+48)), j=0; WB<=RANGE*48 && j<limit_round; WB*=wb_multiple, j++){	
+		double write_buffer_memory_bit=WB;
+		double buffered_ent=write_buffer_memory_bit/(48+48);
+		double chunk_num=(double)RANGE/buffered_ent;
+		printf("%u\t%.1f\t",WB/LOWQDEPTH, (float)WB/K);
+		for(uint32_t size_factor=2, i=0; size_factor<=1024 && i<limit_round; size_factor*=sf_multiple, i++){
+			printf("%u\t", pci_set[j][i].max_level);
+		}
+		printf("\n");
+	}
+	
+	printf("\n");
+	printf("memory_break down\n");
+	printf("(L0,SF)  \t[L0]\t[BF]\t[PLR]\t[TLB]\n");
+	for(uint32_t j=0; j<limit_round; j++){
+		for(uint32_t i=0; i<limit_round; i++){
+			printf("(%.1f,%u)  \t",	pci_set[i][j].wb_memory/K,	pci_set[i][j].size_factor);
+			printf("%.2f\t",		pci_set[i][j].wb_memory /	pci_set[i][j].total_memory);
+			printf("%.2f\t",		pci_set[i][j].bf_memory /	pci_set[i][j].total_memory);
+			printf("%.2f\t",		pci_set[i][j].plr_memory /	pci_set[i][j].total_memory);
+			printf("%.2f\t",		pci_set[i][j].table_memory/ pci_set[i][j].total_memory);
+			printf("\n");
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	for(uint32_t i=0; i<limit_round; i++){
+		free(pci_set[i]);
+	}
+	free(pci_set);
 }
 
 void lsmtree_tiering_only_test(){
@@ -645,14 +726,14 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 #endif
 
 	//free(settings);
-	/*
+	
 	lsmtree_sf_fix_l0();
 	printf("\n");
 	lsmtree_l0_fix_sf();
 	printf("\n");
-	lsmtree_tiering_only_test2();
-	exit(1);
-	*/
+	lsmtree_tiering_memory_waf_calculator(4);
+	//exit(1);
+	
 	return res;
 }
 
