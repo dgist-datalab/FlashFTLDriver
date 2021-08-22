@@ -281,6 +281,7 @@ static inline void dp_initialize(demand_param *dp){
 	dp_prev_init(dp);
 	dp->now_eviction_hint=0;
 	dp->is_hit_eviction=false;
+	dp->is_fresh_miss=false;
 }
 
 uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_param *param, 
@@ -920,7 +921,9 @@ retry:
 eviction_path:
 					
 					if(!dp->is_hit_eviction && !double_eviction){
-						dmm.eviction_hint+=dp->now_eviction_hint;
+						if(!dp->is_fresh_miss){
+							dmm.eviction_hint+=dp->now_eviction_hint;
+						}
 					}
 //eviction_again:
 					DMI.eviction_cnt++;
@@ -994,7 +997,15 @@ eviction_path:
 							return map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba);
 						}
 						else{
+							if(!dp->is_fresh_miss){
+								dp->is_fresh_miss=true;
+								goto retry;
+							}
+
+							dp->now_eviction_hint*=2;
 							dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
+							dp->now_eviction_hint=0;
+							dp->is_fresh_miss=false;
 							if((int)dmm.eviction_hint<0){
 								printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
 								abort();
@@ -1030,6 +1041,10 @@ hit_eviction:
 			abort(); //not covered case 
 		case HIT:
 			if(iswrite_path){
+				if(dp->is_fresh_miss){
+					dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
+					dp->now_eviction_hint=0;
+				}
 				update_cache_entry_wrapper(now_etr, now_pair->lba, now_pair->ppa, false);
 			}
 			else{

@@ -79,6 +79,7 @@ typedef struct demand_param{
 	void *param_ex;
 	void *cache_private;
 	bool is_hit_eviction;
+	bool is_fresh_miss;
 
 	uint32_t flying_map_read_key;
 }demand_param;

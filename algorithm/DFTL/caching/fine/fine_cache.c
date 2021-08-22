@@ -90,16 +90,22 @@ uint32_t fine_free(struct my_cache *mc){
 }
 
 static inline void map_size_check(uint32_t *eviction_hint){
-	if(fcm.max_caching_map < fcm.now_caching_map+(*eviction_hint)-fcm.now_evicting_map){
-		printf("now caching map bigger!!!! %s:%d\n", __FILE__, __LINE__);
-		abort();
+	if(fcm.max_caching_map < fcm.now_caching_map+(*eviction_hint)){
+		//printf("[mc]%u > %u+%u-%u=%u\n", fcm.max_caching_map, fcm.now_caching_map, (*eviction_hint), fcm.now_evicting_map,fcm.now_caching_map+(*eviction_hint)-fcm.now_evicting_map, fcm.now_caching_map+(*eviction_hint));
+	//	printf("now caching map bigger!!!! %u %s:%d\n",fcm.now_caching_map+(*eviction_hint)-fcm.max_caching_map, __FILE__, __LINE__);
+	//	abort();
 	}
+	//printf("[mc]%u > %u+%u-%u=%u, %u\n", fcm.max_caching_map, fcm.now_caching_map, (*eviction_hint), fcm.now_evicting_map,fcm.now_caching_map+(*eviction_hint)-fcm.now_evicting_map, fcm.now_caching_map+(*eviction_hint));
 }
 
 uint32_t fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t eviction_hint){
-	if(fcm.max_caching_map ==fcm.now_caching_map +(eviction_hint) -fcm.now_evicting_map) 
+//	printf("[ne]%u > %u+%u-%u=%u, %u\n", fcm.max_caching_map, fcm.now_caching_map, (eviction_hint), fcm.now_evicting_map,fcm.now_caching_map+(eviction_hint)-fcm.now_evicting_map, fcm.now_caching_map+(eviction_hint));
+	if(eviction_hint < fcm.now_evicting_map){
+	//	printf("break!\n");
+	}
+	if(fcm.max_caching_map <=fcm.now_caching_map+ (eviction_hint)/*-fcm.now_evicting_map*/) 
 		return fcm.now_caching_map?NORMAL_EVICTION:EMPTY_EVICTION;
-	map_size_check(&eviction_hint);
+	//map_size_check(&eviction_hint);
 	return HAVE_SPACE;
 }
 
@@ -283,6 +289,10 @@ mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t
 			}
 			set_flag(fc, EVICTING_FLAG);	
 			fcm.now_evicting_map++;
+	//		printf("lba:%u target_lba:%u\n", lba, fc->lba);
+			if(lba==2804820){
+				printf("break!\n");
+			}
 			/*
 			lru_delete(fcm.lru, get_ln(fc));
 #ifdef SEARCHSPEEDUP
@@ -326,13 +336,21 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 				abort();
 			}
 			if(!fc || get_flag(fc)==CLEAN_FLAG) continue;
-			if(get_flag(fc)==EVICTING_FLAG){
+			if(get_flag(fc)==EVICTING_FLAG && fc->lba==map->lba){
 				fcm.now_evicting_map--;
+				//printf("remove target_lba:%u\n", fc->lba);
 				if(fcm.now_evicting_map<0){
 					EPRINT("fcm.now_evicting_map should be natuer number", true);
 				}
+				set_flag(fc,CLEAN_FLAG);
 			}
-			set_flag(fc,CLEAN_FLAG);
+
+			if(get_flag(fc)==EVICTING_FLAG){
+
+			}
+			else{
+				set_flag(fc,CLEAN_FLAG);
+			}
 
 #ifdef DFTL_DEBUG
 			printf("%u %u dirty update\n",fc->lba, fc->ppa);
@@ -350,11 +368,13 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 			}
 			if(GETGTDIDX(fc->lba)!=gtd_idx) continue;
 			if(get_flag(fc)==CLEAN_FLAG) continue;
-			if(get_flag(fc)==EVICTING_FLAG){
+			if(get_flag(fc)==EVICTING_FLAG && fc->lba==map->lba){
 				fcm.now_evicting_map--;
+	//			printf("remove target_lba:%u\n", fc->lba);
 				if(fcm.now_evicting_map<0){
 					EPRINT("fcm.now_evicting_map should be natuer number", true);
 				}
+				set_flag(fc,CLEAN_FLAG);
 			}
 
 			set_flag(fc,CLEAN_FLAG);
@@ -393,6 +413,15 @@ bool fine_evict_target(struct my_cache *, GTD_entry *, mapping_entry *fc){
 		EPRINT("it was updated in updating mapping logic", true);
 	}
 
+	if(get_flag(fc)==EVICTING_FLAG){
+		fcm.now_evicting_map--;
+//		printf("remove target_lba:%u\n", fc->lba);
+		if(fcm.now_evicting_map<0){
+			EPRINT("fcm.now_evicting_map should be natuer number", true);
+		}
+		set_flag(fc,CLEAN_FLAG);	
+	}
+
 	lru_delete(fcm.lru, get_ln(fc));
 #ifdef SEARCHSPEEDUP
 	fcm.cl_mapping->fc_array[fc->lba]=NULL;
@@ -400,7 +429,6 @@ bool fine_evict_target(struct my_cache *, GTD_entry *, mapping_entry *fc){
 	bitmap_unset(fcm.populated_cache_entry, fc->lba);
 	free(fc->private_data);
 	free(fc);
-
 	fcm.now_caching_map--;
 	return true;
 }
