@@ -207,7 +207,7 @@ struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *, uint32_t lba)
 	return NULL;
 }
 
-bool coarse_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr,mapping_entry *map, char *data, void *){
+bool coarse_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr,mapping_entry *map, char *data, void *, bool){
 	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
 	memcpy(data, c_data, PAGESIZE);
 	free(c_data);

@@ -41,7 +41,7 @@ uint32_t sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *, uint
 uint32_t sftl_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa);
 uint32_t sftl_get_mapping(struct my_cache *, uint32_t lba);
 struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *, uint32_t lba);//if return value is NULL, it is clean eviction.
-bool sftl_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr, mapping_entry * map, char *data, void *);
+bool sftl_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr, mapping_entry * map, char *data, void *, bool);
 bool sftl_exist(struct my_cache *, uint32_t lba);
 void sftl_update_dynamic_size(struct my_cache *, uint32_t lba,char *data);
 

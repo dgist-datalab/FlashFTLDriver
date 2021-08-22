@@ -90,14 +90,15 @@ uint32_t fine_free(struct my_cache *mc){
 }
 
 static inline void map_size_check(uint32_t *eviction_hint){
-	if(fcm.max_caching_map < fcm.now_caching_map+(*eviction_hint)){
+	if(fcm.max_caching_map < fcm.now_caching_map+(*eviction_hint)-fcm.now_evicting_map){
 		printf("now caching map bigger!!!! %s:%d\n", __FILE__, __LINE__);
 		abort();
 	}
 }
 
 uint32_t fine_is_needed_eviction(struct my_cache *mc, uint32_t , uint32_t *, uint32_t eviction_hint){
-	if(fcm.max_caching_map ==fcm.now_caching_map+ (eviction_hint) ) return fcm.now_caching_map?NORMAL_EVICTION:EMPTY_EVICTION;
+	if(fcm.max_caching_map ==fcm.now_caching_map +(eviction_hint) -fcm.now_evicting_map) 
+		return fcm.now_caching_map?NORMAL_EVICTION:EMPTY_EVICTION;
 	map_size_check(&eviction_hint);
 	return HAVE_SPACE;
 }
@@ -176,7 +177,7 @@ static inline uint32_t __update_entry(GTD_entry *etr,uint32_t lba, uint32_t ppa,
 		printf("target update in cache %u,%u\n", lba, ppa);
 	}
 last:
-	set_flag(fc,1);
+	set_flag(fc, DIRTY_FLAG);
 	if(!isgc){
 		lru_update(fcm.lru, get_ln(fc));
 	}
@@ -231,7 +232,7 @@ uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 
 	//printf("inserted lba:%u\n", lba);
 	get_ln(fc)=lru_push(fcm.lru, (void*)fc);
-	set_flag(fc,0);
+	set_flag(fc,CLEAN_FLAG);
 	(*eviction_hint)-=org_eviction_hint;
 	fcm.now_caching_map++;
 	map_size_check(eviction_hint);
@@ -251,13 +252,16 @@ uint32_t fine_get_mapping(struct my_cache *, uint32_t lba){
 	return fc->ppa;
 }
 
-mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t, void **){
+mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t, void **, bool *all_entry_evicting){
 	lru_node *target;
+	*all_entry_evicting=false;
 	//checking_lba_exist(1778630);
 	for_each_lru_backword(fcm.lru, target){
 		fine_cache *fc=(fine_cache*)target->data;
 	//	printf("eviction lba:%u ppa:%u gtdidx:%u dirty:%u\n", fc->lba, fc->ppa, GETGTDIDX(fc->lba), get_flag(fc));
-		if(get_flag(fc)==0){
+		if(get_flag(fc)==EVICTING_FLAG) continue;
+
+		if(get_flag(fc)==CLEAN_FLAG){
 			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
 				printf("eviction invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 				abort();
@@ -277,19 +281,24 @@ mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t
 				printf("eviction invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 				abort();
 			}
+			set_flag(fc, EVICTING_FLAG);	
+			fcm.now_evicting_map++;
+			/*
 			lru_delete(fcm.lru, get_ln(fc));
 #ifdef SEARCHSPEEDUP
 			fcm.cl_mapping->fc_array[fc->lba]=NULL;
 #endif
 			bitmap_unset(fcm.populated_cache_entry, fc->lba);
 			fcm.now_caching_map--;
+			 */
 			return fc;
 		}
 	}
+	*all_entry_evicting=true;
 	return NULL;
 }
 
-bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr, mapping_entry *map, char *data, void *){
+bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr, mapping_entry *map, char *data, void *, bool batch_update){
 	uint32_t gtd_idx=GETGTDIDX(map->lba);
 	if(fcm.GTD_internal_state[gtd_idx]==0){
 		fcm.GTD_internal_state[gtd_idx]=1;
@@ -306,49 +315,62 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 		printf("target tr_page evicting [prev]: %u,%u\n", debug_lba, ((uint32_t*)data)[GETOFFSET(debug_lba)]);
 	}
 
+	if(batch_update){
+		bool find_target_entry=false;
 #ifdef SEARCHSPEEDUP
-	uint32_t unit=PAGESIZE/sizeof(DMF);
-	for(uint32_t i=0; i<unit; i++){
-		fc=__find_lru_map(gtd_idx*unit+i);
-		if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
-			printf("update invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
-			abort();
-		}
-		if(!fc || !get_flag(fc)) continue;
-#ifdef DFTL_DEBUG
-		printf("%u %u dirty update\n",fc->lba, fc->ppa);
-#endif
-		old_ppa=ppa_list[GETOFFSET(fc->lba)];
-		ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
-		/*
-		if(old_ppa!=UINT32_MAX && !dmm.bm->is_invalid_page(dmm.bm, old_ppa)){
-			invalidate_ppa(old_ppa);
-		}*/
-		set_flag(fc,0);
-	}
-#else
-	lru_node *target;
-	for_each_lru_list(fcm.lru, target){
-		fc=(fine_cache*)target->data;
-		if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
-			printf("update invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
-			abort();
-		}
-		if(GETGTDIDX(fc->lba)!=gtd_idx) continue;
-		if(!get_flag(fc)) continue;
-#ifdef DFTL_DEBUG
-		printf("%u %u dirty update\n",fc->lba, fc->ppa);
-#endif
-		old_ppa=ppa_list[GETOFFSET(fc->lba)];
-		ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
-		/*
-		if(old_ppa!=UINT32_MAX && !dmm.bm->is_invalid_page(dmm.bm, old_ppa)){
-			invalidate_ppa(old_ppa);
-		}*/
-		set_flag(fc,0);
+		uint32_t unit=PAGESIZE/sizeof(DMF);
+		for(uint32_t i=0; i<unit; i++){
+			fc=__find_lru_map(gtd_idx*unit+i);
+			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
+				printf("update invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
+				abort();
+			}
+			if(!fc || get_flag(fc)==CLEAN_FLAG) continue;
+			if(get_flag(fc)==EVICTING_FLAG){
+				fcm.now_evicting_map--;
+				if(fcm.now_evicting_map<0){
+					EPRINT("fcm.now_evicting_map should be natuer number", true);
+				}
+			}
+			set_flag(fc,CLEAN_FLAG);
 
-	}
+#ifdef DFTL_DEBUG
+			printf("%u %u dirty update\n",fc->lba, fc->ppa);
 #endif
+			old_ppa=ppa_list[GETOFFSET(fc->lba)];
+			ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
+		}
+#else
+		lru_node *target;
+		for_each_lru_list(fcm.lru, target){
+			fc=(fine_cache*)target->data;
+			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
+				printf("update invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
+				abort();
+			}
+			if(GETGTDIDX(fc->lba)!=gtd_idx) continue;
+			if(get_flag(fc)==CLEAN_FLAG) continue;
+			if(get_flag(fc)==EVICTING_FLAG){
+				fcm.now_evicting_map--;
+				if(fcm.now_evicting_map<0){
+					EPRINT("fcm.now_evicting_map should be natuer number", true);
+				}
+			}
+
+			set_flag(fc,CLEAN_FLAG);
+
+#ifdef DFTL_DEBUG
+			printf("%u %u dirty update\n",fc->lba, fc->ppa);
+#endif
+			old_ppa=ppa_list[GETOFFSET(fc->lba)];
+			ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
+		}
+#endif
+	}
+	else{
+		set_flag((fine_cache*)map,CLEAN_FLAG);
+	}
+
 	if(etr->idx==GETGTDIDX(debug_lba)){
 		printf("target tr_page evicting [post]: %u,%u\n", debug_lba, ((uint32_t*)data)[GETOFFSET(debug_lba)]);
 	}
@@ -358,14 +380,18 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 		abort();
 	}
 
-	free(map->private_data);
-	free(map);
+	fine_evict_target(NULL, NULL, map);
 	return  true;
 }
 
 
 bool fine_evict_target(struct my_cache *, GTD_entry *, mapping_entry *fc){
-	return true;
+	if(!get_ln(fc)){
+		EPRINT("it must have lru_node", true);
+	}
+	if(get_flag(fc)==DIRTY_FLAG){
+		EPRINT("it was updated in updating mapping logic", true);
+	}
 
 	lru_delete(fcm.lru, get_ln(fc));
 #ifdef SEARCHSPEEDUP

@@ -9,9 +9,14 @@
 extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
-uint32_t debug_lba=2179072;
-uint32_t test_ppa=17454;
+uint32_t debug_lba=test_key;
+uint32_t test_ppa=3166396;
 uint32_t test_ppa2=UINT32_MAX;
+
+uint32_t now_gc_target=UINT32_MAX;
+uint32_t prev_gc_target=UINT32_MAX;
+char **backtrace_check[_PPS*L2PGAP];
+
 pm_body *pm_body_create(blockmanager *bm){
 	pm_body *res=(pm_body*)malloc(sizeof(pm_body));
 
@@ -44,9 +49,23 @@ void invalidate_ppa(uint32_t t_ppa){
 	}
 
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
-		printf("target: %u,%u (l,p)",((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, t_ppa/L2PGAP))[t_ppa%L2PGAP], t_ppa);
-	//	print_stacktrace();
+		printf("target: %u,%u-%u(l,p)",((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, t_ppa/L2PGAP))[t_ppa%L2PGAP], t_ppa, t_ppa/L2PGAP/_PPS);
+		printf("now\n");
+		print_stacktrace();
+/*
+		printf("before\n");
+		for(uint32_t i=0; i<16; i++){
+			printf("%s\n", backtrace_check[t_ppa%(L2PGAP*_PPS)][i]);
+		}*/
 		EPRINT("double invalidation!", true);
+	}
+	else{
+		if(t_ppa/L2PGAP/_PPS==prev_gc_target){
+			//printf("target %u is invalidate!\n", t_ppa);	
+	//		void * array[16];
+	//		int stack_num = backtrace(array, 16);
+	//		backtrace_check[t_ppa%(L2PGAP*_PPS)]=backtrace_symbols(array, stack_num);
+		}
 	}
 }
 
@@ -132,8 +151,7 @@ void do_gc(){
 	__gsegment *target=NULL;
 	std::queue<uint32_t> temp_queue;
 	blockmanager *bm=demand_ftl.bm;
-	static int cnt=0;
-	printf("gc:%u\n", ++cnt);
+
 	while(!target || 
 			p->seg_type_checker[target->seg_idx]!=DATASEG){
 		if(target){
@@ -168,6 +186,16 @@ void do_gc(){
 			(p->seg_type_checker[target->seg_idx]==MAPSEG && target->invalidate_number==_PPS * L2PGAP)){
 		goto finish;
 	}
+	static int cnt=0;
+	printf("gc:%u %u\n", ++cnt,target->seg_idx);
+
+	prev_gc_target=now_gc_target;
+	for(uint32_t i=0; i<_PPS*L2PGAP; i++){
+		free(backtrace_check[i]);
+		backtrace_check[i]=NULL;
+	}
+	now_gc_target=target->seg_idx;
+
 	temp_list=list_init();
 	align_gc_buffer g_buffer;
 	gc_value *gv;
@@ -215,6 +243,7 @@ void do_gc(){
 			//			update_target_idx++;
 						continue;
 					}
+			//		printf("cache_in_gc:%u\n", gv->ppa*L2PGAP);
 				}
 
 				invalidate_ppa(gv->ppa*L2PGAP+i);

@@ -28,6 +28,8 @@ typedef struct fine_cache_node{
 typedef struct fine_cache_monitor{
 	uint32_t max_caching_map;
 	uint32_t now_caching_map;
+	
+	int32_t now_evicting_map;
 	bitmap *populated_cache_entry;
 	LRU *lru;
 	char *GTD_internal_state;
@@ -46,8 +48,8 @@ uint32_t fine_update_entry_gc(struct my_cache *, GTD_entry *, uint32_t lba, uint
 uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *, uint32_t lba, char *data, uint32_t *eviction_hint, uint32_t);
 uint32_t fine_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa);
 uint32_t fine_get_mapping(struct my_cache *, uint32_t lba);
-mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t now_eviction_hint, void **);
-bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t, GTD_entry *etr, mapping_entry *map, char *data, void *);
+mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t now_eviction_hint, void **, bool *all_entry_evicting);
+bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t, GTD_entry *etr, mapping_entry *map, char *data, void *, bool batch);
 bool fine_evict_target(struct my_cache *, GTD_entry *, mapping_entry *etr);
 bool fine_exist(struct my_cache *, uint32_t lba);
 void fine_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *, uint32_t lba);

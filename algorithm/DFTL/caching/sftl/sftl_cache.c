@@ -594,7 +594,7 @@ struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *, uint32_t lba){
 }
 
 
-bool sftl_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr,mapping_entry *map, char *data, void *){
+bool sftl_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr,mapping_entry *map, char *data, void *, bool){
 	sftl_cache *sc=(sftl_cache*)((lru_node*)etr->private_data)->data;
 
 	bool target;

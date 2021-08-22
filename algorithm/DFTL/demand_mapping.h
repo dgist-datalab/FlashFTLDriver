@@ -6,19 +6,21 @@
 #include "../../include/sem_lock.h"
 #include "../../include/container.h"
 #include <map>
+#include <list>
 
 
 #define GETGTDIDX(lba) ((lba)/(PAGESIZE/sizeof(DMF)))
 #define TRANSOFFSET(lba) ((lba)%(PAGESIZE/sizeof(DMF)))
 #define GTDNUM (RANGE/(PAGESIZE/sizeof(DMF)) + (RANGE%(PAGESIZE/sizeof(DMF))?1:0))
 #define GETETR(dmm, lba) (&(dmm).GTD[GETGTDIDX(lba)])
+#define GTD_IDX_TO_FIRST_LBA(idx) ((idx)*PAGESIZE/sizeof(DMF))
 typedef enum {
 	DEMAND_COARSE, DEMAND_FINE, SFTL, TPFTL,
 }cache_algo_type;
 
 enum{
 	MAP_READ_ISSUE_END, FLYING_HIT_END, RETRY_END, MAP_WRITE_END, 
-	DONE_END, MISS_STATUS_DONE, NOTFOUND_END,
+	DONE_END, MISS_STATUS_DONE, NOTFOUND_END, NO_EVICTIONING_ENTRY
 };
 
 enum{
@@ -106,6 +108,7 @@ typedef struct demand_map_manager{
 	std::map<uint32_t, bool> *flying_map_read_flag_set;
 	std::map<uint32_t, request*> *flying_req;//pair<req->seq, request*>
 	std::map<uint32_t, request*> *all_now_req;//pair<req->seq, request*>
+	std::list<request *> *stopped_request;
 	blockmanager *bm;
 }demand_map_manager;
 

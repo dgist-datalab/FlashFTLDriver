@@ -10,10 +10,16 @@
 #define MAXOFFSET ((PAGESIZE/sizeof(uint32_t))-1)
 #define PREFETCHINGTH -3
 
+#define set_tc_flag(a, b) (a->dirty_bit=b)
+#define get_tc_flag(a) (a->dirty_bit)
+
+#define get_tn_flag(a) get_tc_flag(a)
+#define set_tn_flag(a,b) set_tc_flag(a,b)
+
 typedef struct tp_entry{
 	uint16_t offset;
 	uint32_t ppa;
-	bool dirty_bit;
+	uint8_t dirty_bit;
 	struct lru_node *lru_node;
 }tp_cache_node; 
 
@@ -21,6 +27,7 @@ typedef struct tp_node{
 	struct lru_node *lru_node;
 	LRU *tp_lru;
 	uint32_t idx; //transaction page number
+	uint8_t dirty_bit;
 }tp_node;
 
 typedef struct tp_cache_monitor{
@@ -29,6 +36,8 @@ typedef struct tp_cache_monitor{
 	bitmap *populated_cache_entry;
 	char *GTD_internal_state;
 	int8_t tp_node_change_cnt;
+
+	int32_t evicting_cache_size;
 	//bool prefetching_mode;
 	LRU *lru;
 }tp_cache_monitor;
@@ -48,8 +57,8 @@ uint32_t tp_update_entry_gc(struct my_cache *, GTD_entry *, uint32_t lba, uint32
 uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *, uint32_t lba, char *data, uint32_t *eviction_hint, uint32_t now_eviction_hint);
 uint32_t tp_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa);
 uint32_t tp_get_mapping(struct my_cache *, uint32_t lba);
-mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t now_eviction_hint, void **);
-bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_entry *etr, mapping_entry *map, char *data, void *);
+mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t now_eviction_hint, void **, bool *all_entry_evicting);
+bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba, GTD_entry *etr, mapping_entry *map, char *data, void *, bool batch_update);
 bool tp_evict_target(struct my_cache *, GTD_entry *, mapping_entry *etr);
 bool tp_exist(struct my_cache *, uint32_t lba);
 void tp_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *,uint32_t);

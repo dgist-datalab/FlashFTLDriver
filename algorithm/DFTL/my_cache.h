@@ -2,6 +2,10 @@
 #define __MY_CACHE_H__
 #include <stdint.h>
 
+enum{
+	CLEAN_FLAG, DIRTY_FLAG, EVICTING_FLAG,
+};
+
 typedef enum {
 	COARSE, FINE
 } CACHE_TYPE;
@@ -30,8 +34,8 @@ typedef struct my_cache{
 	uint32_t (*update_from_translation_gc)(struct my_cache *, char *data, uint32_t lba, uint32_t ppa);
 	uint32_t (*get_mapping)(struct my_cache *, uint32_t lba);
 	struct GTD_entry *(*get_eviction_GTD_entry)(struct my_cache *, uint32_t lba);//if return value is NULL, it is clean eviction.
-	struct mapping_entry *(*get_eviction_mapping_entry)(struct my_cache *, uint32_t lba, uint32_t now_eviction_hint, void **tp_data);//if return value is NULL, it is clean eviction.
-	bool (*update_eviction_target_translation)(struct my_cache* , uint32_t lba, GTD_entry *etr, mapping_entry *map, char *data, void *additional_data);
+	struct mapping_entry *(*get_eviction_mapping_entry)(struct my_cache *, uint32_t lba, uint32_t now_eviction_hint, void **tp_data, bool *all_entry_evictinig);//if return value is NULL, it is clean eviction.
+	bool (*update_eviction_target_translation)(struct my_cache* , uint32_t lba, GTD_entry *etr, mapping_entry *map, char *data, void *additional_data, bool batch_update);
 	bool (*evict_target)(struct my_cache *,GTD_entry *, mapping_entry *);
 	void (*update_dynamic_size)(struct my_cache *, uint32_t lba, char *data);
 	bool (*exist)(struct my_cache *, uint32_t lba);
