@@ -50,9 +50,9 @@ void invalidate_ppa(uint32_t t_ppa){
 
 	if(!demand_ftl.bm->unpopulate_bit(demand_ftl.bm, t_ppa)){
 		printf("target: %u,%u-%u(l,p)",((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, t_ppa/L2PGAP))[t_ppa%L2PGAP], t_ppa, t_ppa/L2PGAP/_PPS);
-		printf("now\n");
+/*	
+	printf("now\n");
 		print_stacktrace();
-/*
 		printf("before\n");
 		for(uint32_t i=0; i<16; i++){
 			printf("%s\n", backtrace_check[t_ppa%(L2PGAP*_PPS)][i]);
@@ -60,12 +60,13 @@ void invalidate_ppa(uint32_t t_ppa){
 		EPRINT("double invalidation!", true);
 	}
 	else{
+		/*
 		if(t_ppa/L2PGAP/_PPS==prev_gc_target){
 			//printf("target %u is invalidate!\n", t_ppa);	
-	//		void * array[16];
-	//		int stack_num = backtrace(array, 16);
-	//		backtrace_check[t_ppa%(L2PGAP*_PPS)]=backtrace_symbols(array, stack_num);
-		}
+			void * array[16];
+			int stack_num = backtrace(array, 16);
+			backtrace_check[t_ppa%(L2PGAP*_PPS)]=backtrace_symbols(array, stack_num);
+		}*/
 	}
 }
 
@@ -190,10 +191,11 @@ void do_gc(){
 	printf("gc:%u %u\n", ++cnt,target->seg_idx);
 
 	prev_gc_target=now_gc_target;
+	/*
 	for(uint32_t i=0; i<_PPS*L2PGAP; i++){
 		free(backtrace_check[i]);
 		backtrace_check[i]=NULL;
-	}
+	}*/
 	now_gc_target=target->seg_idx;
 
 	temp_list=list_init();

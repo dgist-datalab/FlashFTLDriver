@@ -92,6 +92,9 @@ static inline char *cache_type(cache_algo_type t){
 
 
 static inline void mapping_sanity_checker_with_cache(char *value, uint32_t etr_idx){
+#ifndef DFTL_DEBUG
+	return;
+#endif
 	uint32_t *map=(uint32_t*)value;
 	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
 		if(map[i]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm, map[i])){
@@ -923,8 +926,8 @@ eviction_path:
 					DMI.eviction_cnt++;
 
 					if(dmm.cache->type==COARSE){
-						dp_status_update(dp, EVICTIONW); 
 						if(!(dp->et.gtd=dmm.cache->get_eviction_GTD_entry(dmm.cache, now_pair->lba))){
+							dp_status_update(dp, EVICTIONW); 
 							DMI.clean_eviction++;
 							goto retry;
 						}
@@ -1057,6 +1060,7 @@ hit_eviction:
 }
 
 static inline uint32_t check_flying_req(request *req, assign_param_ex *mp){
+	return L2PGAP;
 	uint32_t res=L2PGAP;
 	std::map<uint32_t, request *>::iterator iter;
 	mapping_entry now_entry;
@@ -1081,6 +1085,8 @@ static inline uint32_t check_flying_req(request *req, assign_param_ex *mp){
 					printf("%u %u->%u  is update in flying\n", tmp->lba[tnow], tmp->lba[tnow], now_entry.ppa);
 #endif
 					invalidate_ppa(tmp->physical[tnow]);
+					printf("seq:(%u,%u)tdp:%s lba:%u ppa:%u\n", treq->global_seq, req->global_seq,
+							cache_traverse_type(tdp->status), tmp->lba[tnow], tmp->physical[tnow]);
 					tmp->physical[tnow]=now_entry.ppa;
 
 					if(i+1<res){
