@@ -8,6 +8,7 @@
 #include <map>
 #include <list>
 
+//#define CHECKING_TEST_TIME
 
 #define GETGTDIDX(lba) ((lba)/(PAGESIZE/sizeof(DMF)))
 #define TRANSOFFSET(lba) ((lba)%(PAGESIZE/sizeof(DMF)))
@@ -82,6 +83,16 @@ typedef struct demand_param{
 	bool is_fresh_miss;
 
 	uint32_t flying_map_read_key;
+
+	MeasureTime mt;
+
+	uint8_t write_w_num;
+	uint8_t write_r_num;
+	uint8_t write_d_num;
+
+	uint8_t read_w_num;
+	uint8_t read_r_num;
+	uint8_t read_d_num;
 }demand_param;
 
 typedef struct assign_param_ex{
@@ -137,6 +148,13 @@ typedef struct demand_map_monitoer{
 	uint32_t hit_eviction;
 	uint32_t dirty_eviction;
 	uint32_t clean_eviction;
+
+	uint32_t write_cnt;
+	uint32_t write_data[10][10][10];
+	uint64_t write_time[10][10][10];
+	uint32_t read_cnt;
+	uint32_t read_data[10][10][10];
+	uint64_t read_time[10][10][10];
 }dmi;
 
 uint32_t demand_argument(int argc, char **argv);

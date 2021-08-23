@@ -10,7 +10,8 @@ extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern uint32_t test_key;
 uint32_t debug_lba=test_key;
-uint32_t test_ppa=458164;
+//uint32_t test_ppa=458164;
+uint32_t test_ppa=UINT32_MAX;
 uint32_t test_ppa2=UINT32_MAX;
 
 uint32_t now_gc_target=UINT32_MAX;
