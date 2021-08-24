@@ -31,6 +31,7 @@ typedef struct seq_bm_private{
 
 uint32_t seq_create (struct blockmanager*, lower_info *li);
 uint32_t seq_destroy (struct blockmanager*);
+uint32_t seq_free_seg_num(struct blockmanager*);
 __block* seq_get_block (struct blockmanager*, __segment *);
 __block *seq_pick_block(struct blockmanager *, uint32_t page_num);
 __segment* seq_get_segment (struct blockmanager*, bool isreserve);

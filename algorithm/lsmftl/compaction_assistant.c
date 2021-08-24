@@ -298,7 +298,7 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set,
 	free(temp_kp_set);
 }
 
-static inline level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
+level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
 	level *res=level_init(kp_set->size()/KP_IN_PAGE+(kp_set->size()%KP_IN_PAGE?1:0),1, LEVELING_WISCKEY, UINT32_MAX, kp_set->size(), false);
 	sst_file *sptr=NULL;
 	std::map<uint32_t, uint32_t>::iterator iter=kp_set->begin();
@@ -899,6 +899,36 @@ again:
 				last_level_reclaim(cm, LSM.param.LEVELN-1);
 			}
 			goto end;
+		}
+
+		static uint32_t temp_level_cnt=0;
+		if(temp_level){
+			uint32_t remain_page=page_manager_get_total_remain_page(LSM.pm, false, true);
+			uint32_t needed_page_num=LSM.flushed_kp_set->size()/L2PGAP+1+
+				temp_level->now_sst_num;
+			if(remain_page < needed_page_num){
+				if(__do_gc(LSM.pm, false, needed_page_num)){
+					sst_file *sptr;
+					run *rptr;
+					uint32_t sidx, ridx;
+					for_each_sst_level(temp_level, rptr, ridx, sptr, sidx){
+						if(sptr->type==BLOCK_FILE){
+							map_range *mptr;
+							uint32_t midx;
+							for_each_map_range(sptr, mptr, midx){
+								invalidate_map_ppa(LSM.pm->bm, mptr->ppa, true);
+							}
+						}
+						else{
+							invalidate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, true);
+						}
+					}
+
+					level_free(temp_level, LSM.pm);
+					LSM.pinned_level=NULL;
+					temp_level=make_pinned_level(LSM.flushed_kp_set);
+				}
+			}
 		}
 
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);

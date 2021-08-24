@@ -49,9 +49,9 @@ typedef struct lsmtree_monitor{
 
 	uint64_t merge_total_entry_cnt;
 	uint64_t merge_valid_entry_cnt;
-	uint64_t tiering_valid_entry_cnt;
 	uint64_t max_memory_usage_bit;
-	uint64_t tiering_total_entry_cnt;
+	uint64_t tiering_valid_entry_cnt[10];
+	uint64_t tiering_total_entry_cnt[10];
 
 	/*time*/
 	MeasureTime RH_check_stopwatch[2]; //0 -> leveling 1-> tiering

@@ -7,6 +7,7 @@ struct blockmanager base_bm={
 	.destroy=base_destroy,
 	.get_block=base_get_block,
 	.pick_block=base_pick_block,
+	.free_seg_num=NULL,
 	.get_segment=base_get_segment,
 	.get_page_num=base_get_page_num,
 	.pick_page_num=base_pick_page_num,

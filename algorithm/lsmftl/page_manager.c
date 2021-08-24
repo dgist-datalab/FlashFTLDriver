@@ -9,7 +9,7 @@
 
 extern lsmtree LSM;
 //uint32_t debug_piece_ppa=1105510*L2PGAP;
-//uint32_t debug_piece_ppa=4376864;
+//uint32_t debug_piece_ppa=1422588;
 uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
@@ -625,6 +625,10 @@ out:
 		goto retry_logic;
 	}
 
+	if(LSM.flushed_kp_seg->find(seg_idx)!=LSM.flushed_kp_seg->end()){
+		res=true;
+	}
+
 	switch(pm->seg_type_checker[seg_idx]){
 		case DATASEG:
 		case SEPDATASEG:
@@ -633,7 +637,7 @@ out:
 				pm->bm->reinsert_segment(pm->bm, seg_idx);
 				diff_type_queue.pop();
 			}
-			res=__gc_data(pm, pm->bm, victim_target);
+			__gc_data(pm, pm->bm, victim_target);
 			remain_page=page_manager_get_total_remain_page(LSM.pm, false, false);
 			break;
 		case MAPSEG:
@@ -642,7 +646,7 @@ out:
 				pm->bm->reinsert_segment(pm->bm, seg_idx);
 				diff_type_queue.pop();
 			}
-			res=__gc_mapping(pm, pm->bm, victim_target);
+			__gc_mapping(pm, pm->bm, victim_target);
 			remain_page=page_manager_get_total_remain_page(LSM.pm, true, false);
 			break;
 	}

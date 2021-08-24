@@ -200,12 +200,15 @@ static void lsmtree_monitor_print(){
 			(double)LSM.monitor.merge_valid_entry_cnt/LSM.monitor.merge_total_entry_cnt,
 			LSM.monitor.merge_valid_entry_cnt,
 			LSM.monitor.merge_total_entry_cnt);
-	printf("tiering efficienty:%.2f (%lu/%lu - valid/total)\n", 
-			(double)LSM.monitor.tiering_valid_entry_cnt/LSM.monitor.tiering_total_entry_cnt,
-			LSM.monitor.tiering_valid_entry_cnt,
-			LSM.monitor.tiering_total_entry_cnt);
-	printf("\n");
+	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
+		if(!LSM.monitor.tiering_total_entry_cnt[i]) continue;
+		printf("[%u] tiering efficienty:%.2f (%lu/%lu - valid/total)\n", i,
+				(double)LSM.monitor.tiering_valid_entry_cnt[i]/LSM.monitor.tiering_total_entry_cnt[i],
+				LSM.monitor.tiering_valid_entry_cnt[i],
+				LSM.monitor.tiering_total_entry_cnt[i]);
+	}
 
+	printf("\n");
 	printf("level print\n");
 	lsmtree_level_summary(&LSM);
 	printf("\n");
@@ -1127,7 +1130,7 @@ read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
 }
 
 uint32_t lsmtree_seg_debug(lsmtree *lsm){
-#ifdef LSM_DEBUG
+//#ifdef LSM_DEBUG
 	page_manager *pm=lsm->pm;
 	blockmanager *bm=pm->bm;
 	for(uint32_t i=0; i<_NOS; i++){
@@ -1174,7 +1177,7 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 		}
 	}
 
-#endif
+//#endif
 	return 1;
 }
 

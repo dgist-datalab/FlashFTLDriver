@@ -223,6 +223,7 @@ struct blockmanager{
 	uint32_t (*destroy) (struct blockmanager*);
 	__block* (*get_block) (struct blockmanager*,__segment*);
 	__block *(*pick_block)(struct blockmanager*, uint32_t page_num);
+	uint32_t (*free_seg_num)(struct blockmanager *);
 	__segment* (*get_segment) (struct blockmanager*, bool isreserve);
 	int (*get_page_num)(struct blockmanager*, __segment*);
 	int (*pick_page_num)(struct blockmanager*, __segment*);

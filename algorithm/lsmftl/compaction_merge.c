@@ -991,7 +991,6 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 		isfirst=false;
 	}
 
-
 	sst_file *last_file;
 	if(hot_cold_mode){
 		if((last_file=bis_to_sst_file(bis[DEMOTE_RUN]))){
@@ -1010,6 +1009,11 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 			sst_free(last_file, LSM.pm);
 		}
 	}
+
+	for(uint32_t i=0; i<stream_num; i++){
+		LSM.monitor.tiering_total_entry_cnt[des->idx]+=pos_set[i]->total_poped_num;
+	}
+	LSM.monitor.tiering_valid_entry_cnt[des->idx]+=new_run[DEMOTE_RUN]->now_contents_num;
 
 	for(uint32_t i=0; i<stream_num; i++){
 		sst_pos_free(pos_set[i]);

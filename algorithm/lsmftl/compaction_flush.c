@@ -324,7 +324,12 @@ static inline uint32_t now_buffered_entry_num(){
 #endif
 }
 
-static inline level *fa_make_pinned_level(level *pinned_level, run **r, std::map<uint32_t, uint32_t> *kp_set, uint32_t limit_sst_file_num){
+
+
+
+static inline level *fa_make_pinned_level(level *pinned_level, 
+		run **r, std::map<uint32_t, uint32_t> *kp_set, 
+		uint32_t limit_sst_file_num){
 
 	if(r && LSM.unaligned_sst_file_set){
 		*r=NULL;
@@ -493,6 +498,14 @@ out:
 	if(r){
 		*r=res_r;
 	}
+	return res;
+}
+
+level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
+	lsmtree_init_ordering_param();
+	LSM.pinned_level=fa_make_pinned_level(LSM.pinned_level, NULL, kp_set, UINT32_MAX);
+	level *res=LSM.pinned_level;
+	lsmtree_init_ordering_param();
 	return res;
 }
 

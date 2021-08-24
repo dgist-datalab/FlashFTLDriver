@@ -162,14 +162,20 @@ uint32_t issue_write_kv_for_bis(sst_bf_in_stream **bis, sst_bf_out_stream *bos,
 	fdriver_lock(&LSM.flush_lock);
 	uint32_t level_idx=version_to_level_idx(LSM.last_run_version, target_version, LSM.param.LEVELN);
 
-	uint32_t kv_pair_num=sst_bos_size(bos, final);
-	uint32_t need_page_num=(kv_pair_num/L2PGAP+(kv_pair_num%L2PGAP?1:0))+
-		(kv_pair_num/KP_IN_PAGE+(kv_pair_num%KP_IN_PAGE?1:0)); //map_num
-	uint32_t need_seg_num=need_page_num/_PPS+(need_page_num%_PPS?1:0);
 
-	if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
-		__do_gc(LSM.pm, false, need_seg_num*_PPS);
-		*gced=true;
+	uint32_t kv_pair_num=sst_bos_size(bos, final);
+	if(_PPS-(*bis)->seg->used_page_num < kv_pair_num/L2PGAP+1){
+		uint32_t need_page_num=(kv_pair_num/L2PGAP+(kv_pair_num%L2PGAP?1:0))+
+			(kv_pair_num/KP_IN_PAGE+(kv_pair_num%KP_IN_PAGE?1:0)); //map_num
+		uint32_t need_seg_num=need_page_num/_PPS+(need_page_num%_PPS?1:0);
+
+		if(page_manager_get_total_remain_page(LSM.pm, false, false) < need_seg_num*_PPS){
+			__do_gc(LSM.pm, false, need_seg_num*_PPS);
+			*gced=true;
+		}
+		else{
+			*gced=false;
+		}
 	}
 	else{
 		*gced=false;

@@ -169,6 +169,7 @@ void compaction_adjust_by_gc(struct read_issue_arg *arg, sst_pf_out_stream *pos,
 		run *rptr, map_range **mr, uint32_t sst_file_type, bool force);
 void *comp_alreq_end_req(algo_req *req);
 level* flush_memtable(write_buffer *wb, bool is_gc_data);
+level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set);
 
 static inline compaction_req * alloc_comp_req(int8_t start, int8_t end, write_buffer *wb,
 		void (*end_req)(compaction_req *), void *param, bool is_gc_data){

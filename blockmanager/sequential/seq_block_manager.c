@@ -10,6 +10,7 @@ struct blockmanager seq_bm={
 	.destroy=seq_destroy,
 	.get_block=seq_get_block,
 	.pick_block=seq_pick_block,
+	.free_seg_num=seq_free_seg_num,
 	.get_segment=seq_get_segment,
 	.get_page_num=seq_get_page_num,
 	.pick_page_num=seq_pick_page_num,
@@ -206,6 +207,10 @@ bool seq_is_gc_needed (struct blockmanager* bm){
 	return false;
 }
 
+uint32_t seq_free_seg_num(struct blockmanager* bm){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	return p->free_logical_segment_q->size;
+}
 void temp_print(void *a){
 	if(a){
 		static int cnt=0;
@@ -293,7 +298,7 @@ void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_inf
 		b->validate_number=0;
 		b->now=0;
 		memset(b->bitset,0,_PPB*L2PGAP/8);
-		memset(b->oob_list,0,sizeof(b->oob_list));
+		memset(b->oob_list,-1,sizeof(b->oob_list));
 	}
 
 	uint32_t segment_idx=segment_startblock_number/BPS;

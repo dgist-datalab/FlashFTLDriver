@@ -890,7 +890,6 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 	//		}
 			picked_kv_num=issue_read_kv_for_bos_stream(bos, pos, round2_tier_compaction_tags, 
 					src->idx, demote, true);
-			LSM.monitor.tiering_valid_entry_cnt+=picked_kv_num;
 			round2_tier_compaction_tags=MIN(round2_tier_compaction_tags, picked_kv_num);
 			total_moved_num+=picked_kv_num;
 			if(index_array){
@@ -930,6 +929,9 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
 	}
+
+	LSM.monitor.tiering_total_entry_cnt[src->idx==UINT32_MAX?0:src->idx]+=pos->total_poped_num;
+	LSM.monitor.tiering_valid_entry_cnt[src->idx==UINT32_MAX?0:src->idx]+=new_run->now_contents_num;
 
 	if(!total_moved_num){
 		EPRINT("no data moved", true);
