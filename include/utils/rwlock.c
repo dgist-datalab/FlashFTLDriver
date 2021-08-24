@@ -16,6 +16,28 @@ void rwlock_read_lock(rwlock* rw){
 	fdriver_unlock(&rw->cnt_lock);
 }
 
+uint32_t rwlock_try_write_lock(rwlock *rw){
+	 if(fdriver_try_lock(&rw->lock)){
+		 //not get
+		 fdriver_lock(&rw->cnt_lock);
+		 uint32_t read_cnt=rw->readcnt;
+		 fdriver_unlock(&rw->cnt_lock);
+		 if(read_cnt){
+			 printf("read wait\n");
+			 //wait
+			fdriver_lock(&rw->lock);
+			return 0;
+		 }
+		 else{
+			return UINT32_MAX;
+		 }
+	 }
+	 else{
+		 //get
+		return 0;
+	 }
+}
+
 void rwlock_read_unlock(rwlock *rw){
 	fdriver_lock(&rw->cnt_lock);
 	rw->readcnt--;

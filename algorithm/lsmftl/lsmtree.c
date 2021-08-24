@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <math.h>
+#include "oob_manager.h"
 #include "function_test.h"
 #include "segment_level_manager.h"
 #include <fcntl.h>
@@ -181,6 +182,10 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 #ifdef LSM_DEBUG
 	LSM.LBA_cnt=(uint32_t*)calloc(RANGE+1, sizeof(uint32_t));
 #endif
+
+	LSM.now_gc_seg_idx=UINT32_MAX;
+	fdriver_mutex_init(&LSM.gc_end_lock);
+	fdriver_mutex_init(&LSM.now_gc_seg_lock);
 	return 1;
 }
 
@@ -405,6 +410,7 @@ retry:
 				LSM.param.LEVELN);
 	}
 	if(r_param->prev_level>=LSM.param.LEVELN){
+		EPRINT("return false here", false);
 		return false;
 	}
 
@@ -415,9 +421,11 @@ retry:
 				r_param->prev_run=version_to_ridx(LSM.last_run_version, 
 						 r_param->prev_level, r_param->version);
 			}
+			/*
 			else{
+				EPRINT("return false here", false);
 				return false;
-			}
+			}*/
 			*lptr=LSM.disk[r_param->prev_level];
 			*rptr=&(*lptr)->array[r_param->prev_run];
 		}
@@ -427,6 +435,7 @@ retry:
 			}
 			else{
 				if(r_param->prev_run==0){
+					EPRINT("return false here", false);
 					return false;
 				}
 				r_param->prev_run--;
@@ -508,6 +517,42 @@ static void notfound_processing(request *const req){
 	else{
 		abort();
 	}
+
+	if((uint32_t)r_param->prev_run<=LSM.last_run_version->max_valid_version_num){
+		printf("print rp\n");
+		printf("level:%u run:%u read_helper_idx:%u sst_file:%p piece_ppa:%u version:%u\n", 
+				r_param->prev_level, r_param->prev_run, r_param->read_helper_idx, 
+				r_param->prev_sf, r_param->piece_ppa, r_param->version);
+		uint32_t level=version_to_belong_level(LSM.last_run_version, r_param->prev_run);
+		uint32_t ridx=version_to_ridx(LSM.last_run_version,level, r_param->prev_run);
+		printf("level:%u run:%u\n",level, ridx);
+		printf("update by gc:%u\n",LSM.disk[level]->array[ridx].update_by_gc);
+		run_content_print(&LSM.disk[level]->array[ridx], true);
+
+		sst_file *sptr=run_retrieve_sst(&LSM.disk[level]->array[ridx], req->key);
+		uint32_t ppa=sst_find_map_addr(sptr, req->key);
+		char temp_data[PAGESIZE];
+		io_manager_test_read(ppa, temp_data, TEST_IO);
+		uint32_t retrieve_piece_ppa=kp_find_piece_ppa(req->key, temp_data);
+		if(retrieve_piece_ppa==UINT32_MAX){
+			printf("real notfound!\n");
+		}
+		else{
+			printf("find in mapping piece_ppa:%u\n", retrieve_piece_ppa);
+			uint32_t helper_retrieve_ppa;
+			uint32_t idx=read_helper_idx_init(sptr->_read_helper, req->key);
+			printf("retrieve sptr:%p retrieve_idx:%u\n", sptr, idx);
+			read_helper_check(sptr->_read_helper, req->key, &helper_retrieve_ppa, sptr, &idx);
+			printf("readhelper ppa:%u\n", helper_retrieve_ppa);	
+			oob_manager *oob=get_oob_manager(PIECETOPPA(helper_retrieve_ppa));
+
+			for(uint32_t i=0; i<L2PGAP; i++){
+				printf("oob %u:%u-%u\n", i, oob->lba[i], oob->version[i]);
+			}
+			print_stacktrace();
+		}
+	}
+
 	free(r_param);
 	/*
 	printf("prev_level:%u prev_run:%u read_helper_idx:%u version:%u\n", 
@@ -520,7 +565,7 @@ static void notfound_processing(request *const req){
 }
 
 enum{
-	BUFFER_HIT, BUFFER_MISS, BUFFER_PENDING
+	BUFFER_HIT, BUFFER_MISS, BUFFER_PENDING, GC_TARGET_RETRY,
 };
 
 static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_req *req, bool sync){
@@ -547,11 +592,22 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 			return BUFFER_PENDING;
 		}
 	}
-	
+	fdriver_lock(&LSM.now_gc_seg_lock);
+	if(ppa/_PPS==LSM.now_gc_seg_idx){
+		fdriver_unlock(&LSM.now_gc_seg_lock);
+		EPRINT("read trimed target...retry", false);
+		return GC_TARGET_RETRY;
+	}
 	io_manager_issue_read(ppa, value, req, sync);
+	fdriver_unlock(&LSM.now_gc_seg_lock);
+
 	return BUFFER_MISS;
 }
 
+static inline void lsmtree_read_param_reinit(lsmtree_read_param* param){
+	param->use_read_helper=false;
+	param->prev_run=UINT32_MAX;
+}
 
 uint32_t lsmtree_read(request *const req){
 	if(!LSM.cm->tm->tagQ->size()){
@@ -565,6 +621,7 @@ uint32_t lsmtree_read(request *const req){
 		printf("req->key:%u\n", req->key);
 	}
 #endif
+restart:
 	if(!req->param){
 		r_param=(lsmtree_read_param*)calloc(1, sizeof(lsmtree_read_param));
 		req->param=(void*)r_param;
@@ -616,7 +673,13 @@ uint32_t lsmtree_read(request *const req){
 				r_param->target_level_rw_lock=NULL;
 				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
-				read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+				if(read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false)==GC_TARGET_RETRY){
+					free(alreq);
+					lsmtree_read_param_reinit(r_param);
+					free(r_param);
+					req->param=NULL;
+					goto restart;
+				}
 				return 1;
 			}		
 		}
@@ -632,7 +695,12 @@ uint32_t lsmtree_read(request *const req){
 				r_param->target_level_rw_lock=NULL;
 				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
-				read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false);
+				if(read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false)==GC_TARGET_RETRY){
+					free(alreq);
+					lsmtree_read_param_reinit(r_param);
+					free(r_param);
+					req->param=NULL;
+				}
 				return 1;
 			}
 		}
@@ -647,6 +715,14 @@ uint32_t lsmtree_read(request *const req){
 	}
 	else{
 		r_param=(lsmtree_read_param*)req->param;
+
+		/*gced sstfile check*/
+		sst_file *sptr=run_retrieve_sst(&LSM.disk[r_param->prev_level]->array[r_param->prev_run], req->key);
+		if(sptr!=r_param->prev_sf){
+			printf("gced target...retry\n");
+			r_param->use_read_helper=false;
+			r_param->prev_run=UINT32_MAX;
+		}
 	}
 
 	if(r_param->version==UINT8_MAX){
@@ -669,7 +745,10 @@ uint32_t lsmtree_read(request *const req){
 			}
 			else{//FOUND
 				al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
-				read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false);
+				if(read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false)==GC_TARGET_RETRY){
+					lsmtree_read_param_reinit(r_param);
+					goto restart;
+				}
 				goto normal_end;
 			}
 			break;
@@ -694,9 +773,15 @@ retry:
 			sptr=r_param->prev_sf;
 			goto read_helper_check_again;
 		}
+		else{
+			printf("helper_idx:%u", r_param->read_helper_idx);
+			EPRINT("notfound_here", false);
+			goto notfound;
+		}
 	}
 	
 	if(lsmtree_select_target_place(r_param, &target, &rptr, &sptr, req->key)==false){
+		EPRINT("notfound here", false);
 		goto notfound;
 	}
 		
@@ -714,13 +799,19 @@ read_helper_check_again:
 			if(req->key==debug_lba){
 				printf("read %u->%u\n",req->key, read_target_ppa);
 			}
-			read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false);
+			if(read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false)==GC_TARGET_RETRY){
+				free(al_req);
+				lsmtree_read_param_reinit(r_param);
+				goto restart;
+			}
 			goto normal_end;
 		}else{
 			if(r_param->read_helper_idx==UINT32_MAX){
+				EPRINT("notfound here", false);
 				goto notfound;
 			}
 			if(lsmtree_select_target_place(r_param, &target, &rptr, &sptr, req->key)==false){
+				EPRINT("notfound here", false);
 				goto notfound;
 			}
 			goto retry;
@@ -735,7 +826,11 @@ read_helper_check_again:
 		}
 		r_param->check_type=K2VMAP;
 		al_req=get_read_alreq(req, MAPPINGR, read_target_ppa, r_param);
-		read_buffer_checker(read_target_ppa, req->value, al_req, false);
+		if(read_buffer_checker(read_target_ppa, req->value, al_req, false)==GC_TARGET_RETRY){
+			free(al_req);
+			lsmtree_read_param_reinit(r_param);
+			goto restart;
+		}
 		goto normal_end;
 	}
 

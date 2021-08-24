@@ -184,6 +184,11 @@ typedef struct lsmtree{
 	uint32_t* blocked_invalidation_seg;
 	uint32_t gc_locked_seg_num;
 
+	uint32_t now_gc_seg_idx;
+	uint32_t now_read_issue_seg_idx;
+	fdriver_lock_t gc_end_lock;
+	fdriver_lock_t now_gc_seg_lock;
+
 	lower_info *li;
 #ifdef LSM_DEBUG
 	uint32_t *LBA_cnt;

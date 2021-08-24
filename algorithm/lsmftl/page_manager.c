@@ -1013,14 +1013,18 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	lsmtree_block_already_gc_seg(&LSM, victim->seg_idx);
 	check_victim_is_active(pm, victim);
 	if(victim->invalidate_number==victim->validate_number){
+		fdriver_lock(&LSM.now_gc_seg_lock);
+		LSM.now_gc_seg_idx=UINT32_MAX;
+		fdriver_unlock(&LSM.now_gc_seg_lock);
 		bm->trim_segment(bm, victim, bm->li);
 		page_manager_change_reserve(pm, false);
+
 		return true;
 	}
 	else if(victim->invalidate_number>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
-
+	
 	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
 	/*
 	if(LSM.monitor.gc_data==531){
@@ -1120,8 +1124,8 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 									read_helper_get_cnt(gsn->sptr->_read_helper));
 							version_decrease_invalidation_number(LSM.last_run_version, 
 									gsn->version, gsn->early_invalidation_cnt);
+							
 							level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], ridx, gsn->sidx);
-
 							gc_sptr_node_free(gsn);
 						}
 					}
@@ -1251,6 +1255,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					ridx, read_helper_get_cnt(gsn->sptr->_read_helper));
 			version_decrease_invalidation_number(LSM.last_run_version, 
 					gsn->version, gsn->early_invalidation_cnt);
+			
 			level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], 
 					version_to_ridx(LSM.last_run_version, gsn->lev_idx, gsn->version), 
 					gsn->sidx);
@@ -1260,7 +1265,12 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 	gc_helper_for_direct_mapping(gc_kv_map, wisckey_node_wb, victim->seg_idx); 
 
+	fdriver_lock(&LSM.now_gc_seg_lock);
+	LSM.now_gc_seg_idx=victim->seg_idx;
+	fdriver_unlock(&LSM.now_gc_seg_lock);
+
 	bm->trim_segment(bm, victim, bm->li);
+
 	page_manager_change_reserve(pm, false);
 
 	for(uint32_t i=0; i<q_idx; i++){

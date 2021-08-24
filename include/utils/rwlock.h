@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "../sem_lock.h"
 
 typedef struct{
@@ -20,4 +21,5 @@ void rwlock_read_unlock(rwlock*);
 void rwlock_write_lock(rwlock*);
 void rwlock_write_unlock(rwlock*);
 void rwlock_destroy(rwlock*);
+uint32_t rwlock_try_write_lock(rwlock *);
 #endif
