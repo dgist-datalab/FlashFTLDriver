@@ -511,6 +511,8 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t n
 	for_each_lru_backword(tcm.lru, ln){
 		target_tn=(tp_node*)ln->data;
 		if(get_tn_flag(target_tn)==DIRTY_FLAG) continue;
+		else 
+			break;
 		/*
 		lru_node *ln_tc;
 		uint32_t dirty_cnt=0;
@@ -534,7 +536,7 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t n
 		}*/
 	}
 
-	printf("eviction target tn:%u size:%u flag:%u\n", target_tn->idx, target_tn->tp_lru->size, get_tn_flag(target_tn)==DIRTY_FLAG);
+	//printf("eviction target tn:%u size:%u flag:%u\n", target_tn->idx, target_tn->tp_lru->size, get_tn_flag(target_tn)==DIRTY_FLAG);
 
 	if(prev_etr_idx==target_tn->idx){
 		lru_node *ln, *lp;
@@ -646,7 +648,7 @@ mapping_entry *tp_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t n
 	}
 
 	if(target_tn->tp_lru->size==evicting_flag_num){
-		printf("set dirty %u, size:%u\n", target_tn->idx, target_tn->tp_lru->size);
+		//printf("set dirty %u, size:%u\n", target_tn->idx, target_tn->tp_lru->size);
 		set_tn_flag(target_tn, DIRTY_FLAG);
 	}
 
@@ -764,7 +766,7 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba,
 		/*entry is deleted while it read mapping*/
 	}
 
-	printf("set clean %u, size:%u\n", tn->idx, tn->tp_lru->size);
+	//printf("set clean %u, size:%u\n", tn->idx, tn->tp_lru->size);
 	set_tn_flag(tn, CLEAN_FLAG);
 /*
 	printf("tn:%u -> isclean\n", tn->idx);

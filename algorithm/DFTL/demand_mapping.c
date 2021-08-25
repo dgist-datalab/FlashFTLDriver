@@ -1073,7 +1073,7 @@ eviction_path:
 							if(all_entry_evicting){
 								dmm.eviction_hint=dmm.cache->update_hit_eviction_hint(dmm.cache, now_pair->lba, prefetching_info,
 										dmm.eviction_hint, &dp->now_eviction_hint, false);
-								//print_all_processed_req();
+								print_all_processed_req();
 								return NO_EVICTIONING_ENTRY;
 							}
 							DMI.clean_eviction++;
