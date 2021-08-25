@@ -604,9 +604,13 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 	return BUFFER_MISS;
 }
 
-static inline void lsmtree_read_param_reinit(lsmtree_read_param* param){
+static inline void lsmtree_read_param_reinit(lsmtree_read_param* param, request *req;){
 	param->use_read_helper=false;
 	param->prev_run=UINT32_MAX;
+	param->prev_lelv=-1;
+	param->target_level_rw_lock=NULL;
+	free(param);
+	req->param=NULL;
 }
 
 uint32_t lsmtree_read(request *const req){
@@ -675,9 +679,7 @@ restart:
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false)==GC_TARGET_RETRY){
 					free(alreq);
-					lsmtree_read_param_reinit(r_param);
-					free(r_param);
-					req->param=NULL;
+					lsmtree_read_param_reinit(r_param, req);
 					goto restart;
 				}
 				return 1;
@@ -697,9 +699,8 @@ restart:
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false)==GC_TARGET_RETRY){
 					free(alreq);
-					lsmtree_read_param_reinit(r_param);
-					free(r_param);
-					req->param=NULL;
+					lsmtree_read_param_reinit(r_param, req);
+					goto restart;
 				}
 				return 1;
 			}
@@ -719,9 +720,9 @@ restart:
 		/*gced sstfile check*/
 		sst_file *sptr=run_retrieve_sst(&LSM.disk[r_param->prev_level]->array[r_param->prev_run], req->key);
 		if(sptr!=r_param->prev_sf){
-			printf("gced target...retry\n");
-			r_param->use_read_helper=false;
-			r_param->prev_run=UINT32_MAX;
+			printf("gced target...retry level:%u, run:%u\n", r_param->prev_level, r_param->prev_run);
+			lsmtree_read_param_reinit(r_param, req);
+			goto restart;
 		}
 	}
 
