@@ -38,6 +38,15 @@ typedef struct tp_cache_monitor{
 	int8_t tp_node_change_cnt;
 
 	int32_t evicting_cache_size;
+	
+	uint64_t total_evicting_cache_size;
+	uint64_t total_dirty_eviction_cnt;
+
+	uint64_t total_now_caching_byte;
+	uint64_t cache_search_cnt;
+
+	uint64_t total_prefetching_num;
+	uint64_t check_prefetching_cnt;
 	//bool prefetching_mode;
 	LRU *lru;
 }tp_cache_monitor;

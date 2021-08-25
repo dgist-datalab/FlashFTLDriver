@@ -173,6 +173,7 @@ static inline void dp_prev_init(demand_param *dp){
 static inline void dp_status_update(demand_param *dp, MAP_ASSIGN_STATUS status){
 	if(status==NONE){
 		dp->log=0;
+		memset(dp->prev_status, 0, sizeof(dp->prev_status));
 	}
 
 	if(dp->status==status && status!=NONE){
@@ -287,19 +288,27 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 void demand_map_free(){
 	printf("===========cache results========\n");
 	printf("Cache miss num: %u\n",DMI.miss_num);
-	printf("\tCache cold miss num: %u\n",DMI.cold_miss_num);
-	printf("\tCache capacity miss num: %u\n",DMI.miss_num - DMI.cold_miss_num);
+	printf("\tCache cold miss num: %u\n",DMI.write_cold_miss_num+DMI.read_cold_miss_num);
+	printf("\tCache capacity miss num: %u\n",DMI.miss_num - (DMI.write_cold_miss_num+DMI.read_cold_miss_num));
+
 	printf("\tread miss num: %u\n", DMI.read_miss_num);
+	printf("\t\tread_cold_miss_num:%u\n", DMI.read_cold_miss_num);
+	printf("\t\tread_capacity_miss_num:%u\n", DMI.read_cold_miss_num-DMI.read_cold_miss_num);
+
 	printf("\twrite miss num: %u\n", DMI.write_miss_num);
+	printf("\t\twrite_cold_miss_num:%u\n", DMI.write_cold_miss_num);
+	printf("\t\twrite_capacity_miss_num:%u\n", DMI.write_cold_miss_num-DMI.write_cold_miss_num);
 
 	printf("Cache hit num: %u\n",DMI.hit_num);
 	printf("\tread hit num: %u\n", DMI.read_hit_num);
+	printf("\t\tread shadow hit num: %u\n", DMI.read_shadow_hit_num);
 	printf("\twrite hit num: %u\n", DMI.write_hit_num);
-	printf("\tshadow hit num: %u\n", DMI.shadow_hit_num);
+	printf("\t\twrite shadow hit num: %u\n", DMI.write_shadow_hit_num);
 	printf("Cache hit ratio: %.2lf%%\n", (double) DMI.hit_num / (DMI.miss_num+DMI.hit_num) * 100);
 
 	printf("\nCache eviction cnt: %u\n", DMI.eviction_cnt);
 	printf("\tHit eviction: %u\n", DMI.hit_eviction);
+	printf("\tadditional_eviction:%u", DMI.additional_eviction_cnt);
 	printf("\tEviction clean cnt: %u\n", DMI.clean_eviction);
 	printf("\tEviction dirty cnt: %u\n", DMI.dirty_eviction);
 	printf("===============================\n");
@@ -368,8 +377,12 @@ static inline void dp_initialize(demand_param *dp){
 	dp->is_fresh_miss=false;
 }
 
+enum{
+	EVICTION_READ, COLD_MISS_READ, /*CAP_MISS_READ,*/ AFTER_EVICTION
+};
+
 uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_param *param, 
-		uint32_t target_data_lba){
+		uint32_t target_data_lba, uint32_t type){
 	req->type_ftl++;
 	param->flying_map_read_key=target_data_lba;
 	if(req->type==FS_GET_T){
@@ -383,8 +396,25 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 	}
 
 	if(etr->status==FLYING){
-		DMI.hit_num++;
-		DMI.shadow_hit_num++;
+		switch(type){
+			case EVICTION_READ:
+				DMI.eviction_shadow_hit_num++;
+				break;
+			case COLD_MISS_READ:
+				DMI.hit_num++;
+				DMI.miss_num--;
+				req->type==FS_SET_T?DMI.write_cold_miss_num--:DMI.read_cold_miss_num--;
+				req->type==FS_SET_T?DMI.write_shadow_hit_num++:DMI.read_shadow_hit_num++;
+				break;
+				/*
+			case CAP_MISS_READ:
+				DMI.hit_num++;
+				DMI.misst_num--;
+				req->type==FS_SET_T?DMI.write_shadow_hit_num++:DMI.read_shadow_hit_num++;
+				break;
+				*/
+		}
+
 		req->type_ftl--;
 		//assign_param_ex *ap=(assign_param_ex*)param->param_ex;
 		//printf("overlap %u gtd idx:%u, input_lba:%u target_lba:%u\n",req->seq, etr->idx, target_data_lba, ap->lba[ap->idx]);
@@ -689,7 +719,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 				update_cache_entry_wrapper(etr, lba[i], physical[i], true);
 
 				i++;
-				demand_req_data_collect(dp, req->type==FS_SET_T, i==ap->max_idx);
+				demand_req_data_collect(dp, treq->type==FS_SET_T, i==ap->max_idx);
 				if(i==ap->max_idx){
 					dmm.all_now_req->erase(treq->global_seq);
 					//debug_size();
@@ -921,12 +951,13 @@ retry:
 					dp_status_update(dp, NONE);
 					dp_prev_init(dp);
 					double_eviction=true;
+					DMI.additional_eviction_cnt++;
 					goto eviction_path;
 				}		
 			}
 
 			dp_status_update(dp, MISSR); 
-			res=map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba);
+			res=map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba, AFTER_EVICTION);
 			if(res==FLYING_HIT_END){
 				if(dmm.cache->type==COARSE){
 					dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
@@ -980,7 +1011,7 @@ retry:
 				
 				DMI.miss_num++;
 				iswrite_path ? DMI.write_miss_num++ : DMI.read_miss_num++;
-				
+
 				if((temp_res_value=dmm.cache->is_needed_eviction(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint))){
 					if(temp_res_value==EMPTY_EVICTION){
 						//print_all_processed_req();
@@ -1025,8 +1056,8 @@ eviction_path:
 
 					if(dmm.cache->type==COARSE){
 						if(!(dp->et.gtd=dmm.cache->get_eviction_GTD_entry(dmm.cache, now_pair->lba))){
-							dp_status_update(dp, EVICTIONW); 
 							DMI.clean_eviction++;
+							dp_status_update(dp, EVICTIONW); 
 							goto retry;
 						}
 						else{
@@ -1046,7 +1077,8 @@ eviction_path:
 								return NO_EVICTIONING_ENTRY;
 							}
 							DMI.clean_eviction++;
-							dp_status_update(dp, EVICTIONW); goto retry;	
+							dp_status_update(dp, EVICTIONW); 
+							goto retry;	
 						}
 						/*fine grained dirty eviction*/
 						DMI.dirty_eviction++;
@@ -1059,13 +1091,13 @@ eviction_path:
 							return MAP_WRITE_END;
 						}
 						else{
-							return map_read_wrapper(eviction_etr, req, dmm.li, dp, dp->et.mapping->lba);
+							return map_read_wrapper(eviction_etr, req, dmm.li, dp, dp->et.mapping->lba, EVICTION_READ);
 						}
 					}
 				}//needed eviction end
 				else{
-					DMI.cold_miss_num++;
-
+					req->type==FS_SET_T?DMI.write_cold_miss_num++:DMI.read_cold_miss_num++;
+					
 					if(dynamic_flying_hit){//has enough space for this entry
 						if(iswrite_path){
 							/*already update dmm.eviction_hint*/
@@ -1089,7 +1121,7 @@ eviction_path:
 					if(iswrite_path){
 						if(now_etr->physical_address!=UINT32_MAX){
 							dp_status_update(dp, MISSR);
-							return map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba);
+							return map_read_wrapper(now_etr, req, dmm.li, dp, now_pair->lba, COLD_MISS_READ);
 						}
 						else{
 							/*
@@ -1112,11 +1144,16 @@ eviction_path:
 					else{
 						//read-req should read mapping data
 						dp_status_update(dp, MISSR);
-						return map_read_wrapper(now_etr, req, dmm.li,dp, req->key);
+						return map_read_wrapper(now_etr, req, dmm.li,dp, req->key, COLD_MISS_READ);
 					}
 				}
 			}//miss end
 			else{
+				
+				DMI.hit_num++;
+				iswrite_path ? DMI.write_hit_num++ : DMI.read_hit_num++;
+				dp_status_update(dp, HIT); 
+				goto retry;
 hit_eviction:
 				if(dmm.cache->entry_type==DYNAMIC &&
 						dmm.cache->is_hit_eviction(dmm.cache, now_etr, now_pair->lba, now_pair->ppa, dmm.eviction_hint)){

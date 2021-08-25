@@ -137,13 +137,18 @@ typedef struct demand_map_monitoer{
 	uint32_t hit_num;
 	uint32_t write_hit_num;
 	uint32_t read_hit_num;
-	uint32_t shadow_hit_num;
+	uint32_t write_shadow_hit_num;
+	uint32_t read_shadow_hit_num;
+	uint32_t eviction_shadow_hit_num;
 
 	uint32_t miss_num;
-	uint32_t cold_miss_num;	
+	uint32_t total_cold_miss_num;
+	uint32_t write_cold_miss_num;	
+	uint32_t read_cold_miss_num;	
 	uint32_t write_miss_num;
 	uint32_t read_miss_num;
 
+	uint32_t additional_eviction_cnt;
 	uint32_t eviction_cnt;
 	uint32_t hit_eviction;
 	uint32_t dirty_eviction;
