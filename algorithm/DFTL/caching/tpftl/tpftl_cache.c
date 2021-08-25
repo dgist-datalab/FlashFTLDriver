@@ -129,7 +129,7 @@ static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
 	if(GETOFFSET(lba)+cnt > MAXOFFSET){
 		cnt=MAXOFFSET-GETOFFSET(lba);
 	}
-
+	printf("prefetching length:%u\n", cnt);
 	return cnt;
 }
 
@@ -177,9 +177,11 @@ static inline void tp_check_cache_size(){
 uint32_t tp_is_needed_eviction(struct my_cache *a, uint32_t lba, uint32_t *prefetching_num, uint32_t eviction_hint){
 	GTD_entry *etr=GETETR(dmm, lba);
 	etr_sanity_check(etr);
-
 	uint32_t prefetching_hint=((*prefetching_num)!=UINT32_MAX?(*prefetching_num):0);
 	uint32_t target_byte=get_target_byte(etr, lba, prefetching_hint, true);
+	if(prefetching_hint){
+		printf("prefetching hint:%u\n", prefetching_hint);
+	}
 	if(tcm.max_caching_byte > tcm.now_caching_byte + target_byte + (eviction_hint)- 
 			tcm.evicting_cache_size){
 		return HAVE_SPACE;

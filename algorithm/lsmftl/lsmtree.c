@@ -604,10 +604,10 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 	return BUFFER_MISS;
 }
 
-static inline void lsmtree_read_param_reinit(lsmtree_read_param* param, request *req;){
+static inline void lsmtree_read_param_reinit(lsmtree_read_param* param, request *req){
 	param->use_read_helper=false;
 	param->prev_run=UINT32_MAX;
-	param->prev_lelv=-1;
+	param->prev_level=-1;
 	param->target_level_rw_lock=NULL;
 	free(param);
 	req->param=NULL;
@@ -747,7 +747,7 @@ restart:
 			else{//FOUND
 				al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false)==GC_TARGET_RETRY){
-					lsmtree_read_param_reinit(r_param);
+					lsmtree_read_param_reinit(r_param, req);
 					goto restart;
 				}
 				goto normal_end;
@@ -802,7 +802,7 @@ read_helper_check_again:
 			}
 			if(read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false)==GC_TARGET_RETRY){
 				free(al_req);
-				lsmtree_read_param_reinit(r_param);
+				lsmtree_read_param_reinit(r_param, req);
 				goto restart;
 			}
 			goto normal_end;
@@ -829,7 +829,7 @@ read_helper_check_again:
 		al_req=get_read_alreq(req, MAPPINGR, read_target_ppa, r_param);
 		if(read_buffer_checker(read_target_ppa, req->value, al_req, false)==GC_TARGET_RETRY){
 			free(al_req);
-			lsmtree_read_param_reinit(r_param);
+			lsmtree_read_param_reinit(r_param, req);
 			goto restart;
 		}
 		goto normal_end;
