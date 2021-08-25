@@ -48,7 +48,8 @@ static inline void fine_mapping_sanity_checker(char *value){
 	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
 		if(map[i]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm, map[i])){
 			uint32_t lba=((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, map[i]/4))[map[i]%4];
-			if(fcm.cl_mapping->fc_array[lba]){
+			
+			if(fine_exist(NULL,lba)){
 				continue;
 			}
 			printf("%u %u mapping sanity error\n", lba, map[i]);
@@ -359,9 +360,10 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 			ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
 		}
 #else
-		lru_node *target;
-		for_each_lru_list(fcm.lru, target){
-			fc=(fine_cache*)target->data;
+		//for_each_lru_list(fcm.lru, target){
+		for(uint32_t i=0; i<PAGESIZE/sizeof(DMF);i++){
+			fc=(fine_cache*)lru_find(fcm.lru, gtd_idx*PAGESIZE/sizeof(DMF)+i);
+			if(!fc) continue;
 			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
 				printf("update invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 				abort();

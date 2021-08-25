@@ -611,6 +611,7 @@ static inline void lsmtree_read_param_reinit(lsmtree_read_param* param, request 
 	param->target_level_rw_lock=NULL;
 	free(param);
 	req->param=NULL;
+	req->magic=true;
 }
 
 uint32_t lsmtree_read(request *const req){
@@ -926,6 +927,10 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	lsmtree_read_param *r_param=(lsmtree_read_param*)req->param;
 	uint32_t offset;
 	uint32_t piece_ppa=req->ppa;
+
+	if(parents->magic){
+		printf("magic end\n");
+	}
 
 #ifdef RWLOCK_PRINT
 	uint32_t rw_lock_lev=0;
