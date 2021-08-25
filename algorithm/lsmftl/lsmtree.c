@@ -569,11 +569,19 @@ enum{
 };
 
 static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_req *req, bool sync){
+	fdriver_lock(&LSM.now_gc_seg_lock);
+	if(ppa/_PPS==LSM.now_gc_seg_idx && req->parents->magic==false){
+		fdriver_unlock(&LSM.now_gc_seg_lock);
+		EPRINT("read trimed target...retry", false);
+		return GC_TARGET_RETRY;
+	}
+
 	if(req->type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
 			processing_data_read_req(req, rb.buffer_value, false);
 			fdriver_unlock(&rb.read_buffer_lock);
+			fdriver_unlock(&LSM.now_gc_seg_lock);
 			return BUFFER_HIT;
 		}
 		else{
@@ -589,15 +597,11 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 		else{
 			rb.pending_req->insert(std::pair<uint32_t, algo_req*>(ppa, req));
 			fdriver_unlock(&rb.pending_lock);
+			fdriver_unlock(&LSM.now_gc_seg_lock);
 			return BUFFER_PENDING;
 		}
 	}
-	fdriver_lock(&LSM.now_gc_seg_lock);
-	if(ppa/_PPS==LSM.now_gc_seg_idx){
-		fdriver_unlock(&LSM.now_gc_seg_lock);
-		EPRINT("read trimed target...retry", false);
-		return GC_TARGET_RETRY;
-	}
+	
 	io_manager_issue_read(ppa, value, req, sync);
 	fdriver_unlock(&LSM.now_gc_seg_lock);
 
@@ -605,6 +609,9 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 }
 
 static inline void lsmtree_read_param_reinit(lsmtree_read_param* param, request *req){
+
+	printf("L:%u R:%u sptr:%p\n", param->prev_level, param->prev_run, param->prev_sf);
+
 	param->use_read_helper=false;
 	param->prev_run=UINT32_MAX;
 	param->prev_level=-1;
@@ -621,12 +628,16 @@ uint32_t lsmtree_read(request *const req){
 	}
 	//printf("read key:%u\n", req->key);
 	lsmtree_read_param *r_param;
+	uint32_t temp_req_global_seq=UINT32_MAX;
 #ifdef LSM_DEBUG
 	if(req->key==debug_lba){
 		printf("req->key:%u\n", req->key);
 	}
 #endif
 restart:
+	if(req->global_seq==temp_req_global_seq){
+		printf("restart here\n");
+	}
 	if(!req->param){
 		r_param=(lsmtree_read_param*)calloc(1, sizeof(lsmtree_read_param));
 		req->param=(void*)r_param;
@@ -649,6 +660,9 @@ restart:
 				rwlock_read_unlock(r_param->target_level_rw_lock);
 				free(r_param);
 				req->end_req(req);
+				if(req->global_seq==temp_req_global_seq){
+					EPRINT("end here\n", false);
+				}
 				return 1;
 			}
 		}
@@ -662,6 +676,10 @@ restart:
 
 			req->end_req(req);
 			rwlock_read_unlock(&LSM.flush_wait_wb_lock);
+			if(req->global_seq==temp_req_global_seq){
+				EPRINT("end here\n", false);
+			}
+
 			return 1;
 		}
 		rwlock_read_unlock(&LSM.flush_wait_wb_lock);
@@ -679,10 +697,16 @@ restart:
 				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false)==GC_TARGET_RETRY){
+					printf("req->seq:%u ", req->global_seq);
+					EPRINT("here",false);
 					free(alreq);
 					lsmtree_read_param_reinit(r_param, req);
+					temp_req_global_seq=req->global_seq;
 					goto restart;
 				}
+			if(req->global_seq==temp_req_global_seq){
+				EPRINT("end here\n", false);
+			}
 				return 1;
 			}		
 		}
@@ -699,10 +723,16 @@ restart:
 				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false)==GC_TARGET_RETRY){
+					printf("req->seq:%u ", req->global_seq);
+					temp_req_global_seq=req->global_seq;
+					EPRINT("here",false);
 					free(alreq);
 					lsmtree_read_param_reinit(r_param, req);
 					goto restart;
 				}
+			if(req->global_seq==temp_req_global_seq){
+				EPRINT("end here\n", false);
+			}
 				return 1;
 			}
 		}
@@ -723,6 +753,7 @@ restart:
 		if(sptr!=r_param->prev_sf){
 			printf("gced target...retry level:%u, run:%u\n", r_param->prev_level, r_param->prev_run);
 			lsmtree_read_param_reinit(r_param, req);
+			temp_req_global_seq=req->global_seq;
 			goto restart;
 		}
 	}
@@ -748,6 +779,9 @@ restart:
 			else{//FOUND
 				al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false)==GC_TARGET_RETRY){
+					printf("req->seq:%u ", req->global_seq);
+					temp_req_global_seq=req->global_seq;
+					EPRINT("here",false);
 					lsmtree_read_param_reinit(r_param, req);
 					goto restart;
 				}
@@ -792,6 +826,9 @@ retry:
 	}
 	
 read_helper_check_again:
+	if(req->global_seq==temp_req_global_seq){
+		EPRINT("reach at here\n", false);
+	}
 
 	if(sptr->_read_helper){
 		/*issue data read!*/
@@ -803,8 +840,14 @@ read_helper_check_again:
 			}
 			if(read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false)==GC_TARGET_RETRY){
 				free(al_req);
+				temp_req_global_seq=req->global_seq;
+				printf("req->seq:%u ", req->global_seq);
+				EPRINT("here",false);
 				lsmtree_read_param_reinit(r_param, req);
 				goto restart;
+			}
+			if(req->global_seq==temp_req_global_seq){
+				EPRINT("end here\n", false);
 			}
 			goto normal_end;
 		}else{
@@ -815,6 +858,9 @@ read_helper_check_again:
 			if(lsmtree_select_target_place(r_param, &target, &rptr, &sptr, req->key)==false){
 				EPRINT("notfound here", false);
 				goto notfound;
+			}
+			if(req->global_seq==temp_req_global_seq){
+				EPRINT("end here\n", false);
 			}
 			goto retry;
 		}
@@ -830,6 +876,9 @@ read_helper_check_again:
 		al_req=get_read_alreq(req, MAPPINGR, read_target_ppa, r_param);
 		if(read_buffer_checker(read_target_ppa, req->value, al_req, false)==GC_TARGET_RETRY){
 			free(al_req);
+			printf("req->seq:%u ", req->global_seq);
+			temp_req_global_seq=req->global_seq;
+			EPRINT("here",false);
 			lsmtree_read_param_reinit(r_param, req);
 			goto restart;
 		}

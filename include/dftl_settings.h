@@ -1,7 +1,7 @@
 #ifndef __H_SETDFTL__
 #define __H_SETDFTL__
 #define FINECACHE
-#define SEARCHSPEEDUP
+//#define SEARCHSPEEDUP
 
 
 #ifdef COARSECACHE
