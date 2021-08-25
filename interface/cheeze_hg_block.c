@@ -274,7 +274,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	}
 
 	res->req_array[(res->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
-	res->req_array[(res->size-1)-consecutive_cnt].consecutive_length=consecutive_cnt;
+	res->req_array[(res->size-1)-consecutive_cnt].consecutive_length=0;//consecutive_cnt;
 	return res;
 }
 
