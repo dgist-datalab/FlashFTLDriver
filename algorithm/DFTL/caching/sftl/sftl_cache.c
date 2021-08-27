@@ -85,8 +85,9 @@ uint32_t sftl_is_needed_eviction(struct my_cache *mc, uint32_t lba, uint32_t *, 
 	}*/
 
 	if(scm.max_caching_byte <= scm.now_caching_byte){
+		/*
 		printf("now caching byte bigger!!!! %s:%d\n", __FILE__, __LINE__);
-		abort();
+		abort();*/
 	}
 	return HAVE_SPACE;
 }

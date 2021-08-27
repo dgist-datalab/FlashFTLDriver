@@ -34,7 +34,8 @@ tp_cache_monitor tcm;
 bool tp_evict_target_with_tn(struct my_cache *mc, GTD_entry *etr, tp_node *target_tn,
 	tp_cache_node *tc);
 static uint32_t TP_ENTRY_SZ;
-#define TP_NODE_SZ (sizeof(tp_node)-TP_ENTRY_SZ)
+//#define TP_NODE_SZ (sizeof(tp_node)-TP_ENTRY_SZ)
+#define TP_NODE_SZ 0
 
 inline static void tn_print_contents(tp_node *tn){
 	uint32_t idx=0;
@@ -94,12 +95,16 @@ uint32_t tp_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 }
 
 uint32_t tp_free(struct my_cache *mc){
+	uint32_t tn_cnt=0;
+	uint32_t total_tc_cnt=0;
 	while(1){
 		tp_node *tn=(tp_node*)lru_pop(tcm.lru);
 		if(!tn) break;
+		tn_cnt++;
 		while(1){
 			tp_cache_node *tc=(tp_cache_node*)lru_pop(tn->tp_lru);
 			if(!tc) break;
+			total_tc_cnt++;
 			free(tc);
 		}
 		lru_free(tn->tp_lru);
@@ -111,6 +116,8 @@ uint32_t tp_free(struct my_cache *mc){
 	printf("evicting_average:%lf\n", (double)tcm.total_evicting_cache_size/tcm.total_dirty_eviction_cnt);
 	printf("avg now caching byte:%lf\n", (double)tcm.total_now_caching_byte/tcm.cache_search_cnt);
 	printf("avg prefetching length:%lf %u\n", (double)tcm.total_prefetching_num/tcm.check_prefetching_cnt, tcm.check_prefetching_cnt);
+	printf("total tn_num:%u total tc_num:%u avg tc per tn:%.2lf\n", tn_cnt, total_tc_cnt, (float)total_tc_cnt/tn_cnt);
+	printf("effective cache rate:%.2lf\n", (float)total_tc_cnt/RANGE);
 	printf("========================\n");
 
 	return 1;
@@ -141,6 +148,16 @@ static inline uint32_t __get_prefetching_length(tp_node *tn, uint32_t lba){
 
 static inline uint32_t get_target_byte(GTD_entry *etr, uint32_t lba, uint32_t prefetching_hint, bool isquery){
 	uint32_t target_byte=0;
+#ifdef DISABLE_PREFETCHING
+	if(!etr->private_data){
+		target_byte=TP_ENTRY_SZ+TP_NODE_SZ;
+	}
+	else{
+		target_byte=TP_ENTRY_SZ;
+	}
+	return target_byte;
+#else
+
 	if(prefetching_hint){
 		if(!etr->private_data){
 			target_byte=TP_ENTRY_SZ+TP_NODE_SZ;
@@ -172,6 +189,7 @@ static inline uint32_t get_target_byte(GTD_entry *etr, uint32_t lba, uint32_t pr
 	}
 
 	return target_byte;
+#endif
 }
 
 static inline void tp_check_cache_size(){

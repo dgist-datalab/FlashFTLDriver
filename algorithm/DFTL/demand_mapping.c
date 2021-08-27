@@ -293,11 +293,11 @@ void demand_map_free(){
 
 	printf("\tread miss num: %u\n", DMI.read_miss_num);
 	printf("\t\tread_cold_miss_num:%u\n", DMI.read_cold_miss_num);
-	printf("\t\tread_capacity_miss_num:%u\n", DMI.read_cold_miss_num-DMI.read_cold_miss_num);
+	printf("\t\tread_capacity_miss_num:%u\n", DMI.read_miss_num-DMI.read_cold_miss_num);
 
 	printf("\twrite miss num: %u\n", DMI.write_miss_num);
 	printf("\t\twrite_cold_miss_num:%u\n", DMI.write_cold_miss_num);
-	printf("\t\twrite_capacity_miss_num:%u\n", DMI.write_cold_miss_num-DMI.write_cold_miss_num);
+	printf("\t\twrite_capacity_miss_num:%u\n", DMI.write_miss_num-DMI.write_cold_miss_num);
 
 	printf("Cache hit num: %u\n",DMI.hit_num);
 	printf("\tread hit num: %u\n", DMI.read_hit_num);
@@ -933,6 +933,7 @@ retry:
 					printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
 					abort();
 				}
+				
 				if(dmm.cache->entry_type==DYNAMIC){
 					goto hit_eviction;
 				}
@@ -1149,11 +1150,6 @@ eviction_path:
 				}
 			}//miss end
 			else{
-				
-				DMI.hit_num++;
-				iswrite_path ? DMI.write_hit_num++ : DMI.read_hit_num++;
-				dp_status_update(dp, HIT); 
-				goto retry;
 hit_eviction:
 				if(dmm.cache->entry_type==DYNAMIC &&
 						dmm.cache->is_hit_eviction(dmm.cache, now_etr, now_pair->lba, now_pair->ppa, dmm.eviction_hint)){
