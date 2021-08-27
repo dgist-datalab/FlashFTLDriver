@@ -338,6 +338,7 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 
 void demand_map_free(){
 	demand_cache_log();
+
 	printf("write collected data\n");
 	printf("W_NUM\tR_NUM\tD_NUM\tCNT\t\tRATIO\tA_TIME\n");
 	for(uint32_t i=0; i<10; i++){
@@ -958,6 +959,7 @@ retry:
 					printf("%s:%d eviction_hint error!\n", __FILE__,__LINE__);
 					abort();
 				}
+				
 				if(dmm.cache->entry_type==DYNAMIC){
 					goto hit_eviction;
 				}
@@ -1174,11 +1176,6 @@ eviction_path:
 				}
 			}//miss end
 			else{
-				
-				DMI.hit_num++;
-				iswrite_path ? DMI.write_hit_num++ : DMI.read_hit_num++;
-				dp_status_update(dp, HIT); 
-				goto retry;
 hit_eviction:
 				if(dmm.cache->entry_type==DYNAMIC &&
 						dmm.cache->is_hit_eviction(dmm.cache, now_etr, now_pair->lba, now_pair->ppa, dmm.eviction_hint)){

@@ -35,7 +35,8 @@ tp_cache_monitor tcm;
 bool tp_evict_target_with_tn(struct my_cache *mc, GTD_entry *etr, tp_node *target_tn,
 	tp_cache_node *tc);
 static uint32_t TP_ENTRY_SZ;
-#define TP_NODE_SZ (sizeof(tp_node)-TP_ENTRY_SZ)
+//#define TP_NODE_SZ (sizeof(tp_node)-TP_ENTRY_SZ)
+#define TP_NODE_SZ 0
 
 inline static void tn_print_contents(tp_node *tn){
 	uint32_t idx=0;
@@ -96,6 +97,7 @@ uint32_t tp_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 
 uint32_t tp_free(struct my_cache *mc){
 	tp_print_log(NULL);
+
 	while(1){
 		tp_node *tn=(tp_node*)lru_pop(tcm.lru);
 		if(!tn) break;

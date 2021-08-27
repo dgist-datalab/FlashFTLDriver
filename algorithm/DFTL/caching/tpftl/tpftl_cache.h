@@ -17,6 +17,8 @@
 #define set_tn_flag(a,b) set_tc_flag(a,b)
 #define DISABLE_PREFETCHING
 
+#define DISABLE_PREFETCHING
+
 typedef struct tp_entry{
 	uint16_t offset;
 	uint32_t ppa;
