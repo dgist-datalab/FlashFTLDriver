@@ -31,6 +31,7 @@ my_cache sftl_cache_func{
 	.evict_target=NULL,
 	.update_dynamic_size=sftl_update_dynamic_size,
 	.exist=sftl_exist,
+	.print_log=NULL,
 };
 
 sftl_cache_monitor scm;

@@ -30,8 +30,10 @@ bool inf_make_mreq_apps(char type, char **keys, uint8_t *key_len, char **values,
 bool inf_iter_req_apps(char type, char *prefix, uint8_t key_len,char **value, int seq,void *req, void (*end_req)(uint32_t,uint32_t, void *));
 
 bool inf_wait_background();
+
 #endif
 
+void inf_print_log();
 uint32_t inf_algorithm_caller(request *const);
 bool inf_end_req(request*const);
 bool inf_assign_try(request *req);

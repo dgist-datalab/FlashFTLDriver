@@ -28,6 +28,7 @@ my_cache coarse_cache_func{
 	.evict_target=NULL,
 	.update_dynamic_size=NULL,
 	.exist=coarse_exist,
+	.print_log=NULL,
 };
 
 coarse_cache_monitor ccm;

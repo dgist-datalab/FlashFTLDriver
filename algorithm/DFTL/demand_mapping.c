@@ -8,7 +8,7 @@
 extern uint32_t test_key;
 extern uint32_t test_ppa;
 extern uint32_t debug_lba;
-
+extern algorithm demand_ftl;
 extern my_cache coarse_cache_func;
 extern my_cache fine_cache_func;
 extern my_cache sftl_cache_func;
@@ -25,6 +25,35 @@ uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_para
 inline static void cpy_keys(uint32_t **des, uint32_t *src){
 	(*des)=(uint32_t*)malloc(sizeof(KEYT)*L2PGAP);
 	memcpy((*des), src, sizeof(KEYT)*L2PGAP);
+}
+
+static void demand_cache_log(){
+	printf("===========cache results========\n");
+	printf("Cache miss num: %u\n",DMI.miss_num);
+	printf("\tCache cold miss num: %u\n",DMI.write_cold_miss_num+DMI.read_cold_miss_num);
+	printf("\tCache capacity miss num: %u\n",DMI.miss_num - (DMI.write_cold_miss_num+DMI.read_cold_miss_num));
+
+	printf("\tread miss num: %u\n", DMI.read_miss_num);
+	printf("\t\tread_cold_miss_num:%u\n", DMI.read_cold_miss_num);
+	printf("\t\tread_capacity_miss_num:%u\n", DMI.read_cold_miss_num-DMI.read_cold_miss_num);
+
+	printf("\twrite miss num: %u\n", DMI.write_miss_num);
+	printf("\t\twrite_cold_miss_num:%u\n", DMI.write_cold_miss_num);
+	printf("\t\twrite_capacity_miss_num:%u\n", DMI.write_cold_miss_num-DMI.write_cold_miss_num);
+
+	printf("Cache hit num: %u\n",DMI.hit_num);
+	printf("\tread hit num: %u\n", DMI.read_hit_num);
+	printf("\t\tread shadow hit num: %u\n", DMI.read_shadow_hit_num);
+	printf("\twrite hit num: %u\n", DMI.write_hit_num);
+	printf("\t\twrite shadow hit num: %u\n", DMI.write_shadow_hit_num);
+	printf("Cache hit ratio: %.2lf%%\n", (double) DMI.hit_num / (DMI.miss_num+DMI.hit_num) * 100);
+
+	printf("\nCache eviction cnt: %u\n", DMI.eviction_cnt);
+	printf("\tHit eviction: %u\n", DMI.hit_eviction);
+	printf("\tadditional_eviction:%u", DMI.additional_eviction_cnt);
+	printf("\tEviction clean cnt: %u\n", DMI.clean_eviction);
+	printf("\tEviction dirty cnt: %u\n", DMI.dirty_eviction);
+	printf("===============================\n");
 }
 
 static inline char *cache_traverse_type(MAP_ASSIGN_STATUS a){
@@ -52,6 +81,28 @@ static inline void reinsert_stopped_request(){
 enum{
 	M_WRITE, M_READ, M_DELAY
 };
+
+
+uint32_t demand_print_log(){
+	printf("FTL-LOG\n");
+	if(dmm.cache->print_log){
+		dmm.cache->print_log(dmm.cache);
+	}
+	demand_cache_log();
+	lower_info *li=demand_ftl.li;
+	printf("WAF: %lf\n\n",
+			(double)(li->req_type_cnt[MAPPINGW] +
+				li->req_type_cnt[DATAW]+
+				li->req_type_cnt[GCDW]+
+				li->req_type_cnt[GCMW_DGC]+
+				li->req_type_cnt[GCMW]+
+				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
+	if(demand_ftl.li->print_traffic){
+		demand_ftl.li->print_traffic(demand_ftl.li);
+	}
+	printf("FTL-LOG-END\n");
+	return 1;
+}
 
 static inline void dp_monitor_update(demand_param *dp, bool iswrite, uint32_t type){
 	switch(type){
@@ -286,33 +337,7 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 }
 
 void demand_map_free(){
-	printf("===========cache results========\n");
-	printf("Cache miss num: %u\n",DMI.miss_num);
-	printf("\tCache cold miss num: %u\n",DMI.write_cold_miss_num+DMI.read_cold_miss_num);
-	printf("\tCache capacity miss num: %u\n",DMI.miss_num - (DMI.write_cold_miss_num+DMI.read_cold_miss_num));
-
-	printf("\tread miss num: %u\n", DMI.read_miss_num);
-	printf("\t\tread_cold_miss_num:%u\n", DMI.read_cold_miss_num);
-	printf("\t\tread_capacity_miss_num:%u\n", DMI.read_cold_miss_num-DMI.read_cold_miss_num);
-
-	printf("\twrite miss num: %u\n", DMI.write_miss_num);
-	printf("\t\twrite_cold_miss_num:%u\n", DMI.write_cold_miss_num);
-	printf("\t\twrite_capacity_miss_num:%u\n", DMI.write_cold_miss_num-DMI.write_cold_miss_num);
-
-	printf("Cache hit num: %u\n",DMI.hit_num);
-	printf("\tread hit num: %u\n", DMI.read_hit_num);
-	printf("\t\tread shadow hit num: %u\n", DMI.read_shadow_hit_num);
-	printf("\twrite hit num: %u\n", DMI.write_hit_num);
-	printf("\t\twrite shadow hit num: %u\n", DMI.write_shadow_hit_num);
-	printf("Cache hit ratio: %.2lf%%\n", (double) DMI.hit_num / (DMI.miss_num+DMI.hit_num) * 100);
-
-	printf("\nCache eviction cnt: %u\n", DMI.eviction_cnt);
-	printf("\tHit eviction: %u\n", DMI.hit_eviction);
-	printf("\tadditional_eviction:%u", DMI.additional_eviction_cnt);
-	printf("\tEviction clean cnt: %u\n", DMI.clean_eviction);
-	printf("\tEviction dirty cnt: %u\n", DMI.dirty_eviction);
-	printf("===============================\n");
-
+	demand_cache_log();
 	printf("write collected data\n");
 	printf("W_NUM\tR_NUM\tD_NUM\tCNT\t\tRATIO\tA_TIME\n");
 	for(uint32_t i=0; i<10; i++){

@@ -19,6 +19,8 @@ struct algorithm demand_ftl={
 	.write=page_write,
 	.flush=page_flush,
 	.remove=page_remove,
+	.test=NULL,
+	.print_log=demand_print_log
 };
 
 page_read_buffer rb;

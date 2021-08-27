@@ -32,6 +32,8 @@ typedef struct amf_wrapper{
 amf_wrapper *wrapper_array;
 std::queue<amf_wrapper*>* wrap_q;
 
+void amf_traffic_print(lower_info *);
+
 lower_info amf_info={
 	.create=amf_info_create,
 	.destroy=amf_info_destroy,
@@ -48,11 +50,20 @@ lower_info amf_info={
 	.lower_show_info=amf_info_show_info,
 
 	.lower_tag_num=amf_info_lower_tag_num,
+	.print_traffic=amf_traffic_print,
 };
 
 static uint8_t test_type(uint8_t type){
 	uint8_t t_type=0xff>>1;
 	return type&t_type;
+}
+
+void amf_traffic_print(lower_info *){
+	static int cnt=0;
+	printf("traffic print: %u\n", cnt++);
+	for(int i=0; i<LREQ_TYPE_NUM;i++){
+		fprintf(stderr,"%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
+	}
 }
 
 pthread_cond_t wrapper_cond=PTHREAD_COND_INITIALIZER;

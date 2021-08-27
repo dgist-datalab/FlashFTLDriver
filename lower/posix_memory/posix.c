@@ -29,6 +29,8 @@ cl_lock *lower_flying;
 char *invalidate_ppa_ptr;
 char *result_addr;
 
+void posix_traffic_print(lower_info *li);
+
 lower_info my_posix={
 	.create=posix_create,
 	.destroy=posix_destroy,
@@ -60,7 +62,17 @@ lower_info my_posix={
 	.hw_get_kt=posix_hw_get_kt,
 	.hw_get_inv=posix_hw_get_inv
 #endif
+	.print_traffic=posix_traffic_print,
 };
+
+void posix_traffic_print(lower_info *li){
+	static int cnt=0;
+	printf("info print %u\n",cnt);
+	for(int i=0; i<LREQ_TYPE_NUM;i++){
+		printf("%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
+	}
+	printf("end\n",cnt);
+}
 
 uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;
 //uint32_t lower_test_ppa=655468/2;

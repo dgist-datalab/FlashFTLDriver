@@ -306,6 +306,13 @@ bool bench_is_finish(){
 	}
 	return true;
 }
+
+
+void bench_print_cdf(){
+	bench_data *bdata=&_master->datas[0];
+	bench_type_cdf_print(bdata);
+}
+
 void bench_print(){
 	bench_data *bdata=NULL;
 	monitor *_m=NULL;

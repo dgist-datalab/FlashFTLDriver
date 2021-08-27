@@ -42,6 +42,10 @@ void log_lower_print(int sig){
 }
 
 //int MS_TIME_SL;
+void print_temp_log(int sig){
+	inf_print_log();
+}
+
 pthread_t thr; 
 int main(int argc,char* argv[]){
 	struct sigaction sa;
@@ -49,14 +53,15 @@ int main(int argc,char* argv[]){
 	setbuf(stderr, NULL);
 	sa.sa_handler = log_print;
 	sigaction(SIGINT, &sa, NULL);
+
+	struct sigaction sa2;
+	sa2.sa_handler = print_temp_log;
+	sigaction(SIGUSR1, &sa2, NULL);
+
 	printf("signal add!\n");
 
 //	MS_TIME_SL = atoi(getenv("MS_TIME_SL"));
 //	printf("Using MS_TIME_SL of %d\n", MS_TIME_SL);
-
-    struct sigaction sa2;
-    sa2.sa_handler = log_lower_print;
-    sigaction(SIGUSR1, &sa2, NULL);
 
 
 	inf_init(1,0, argc, argv, false);

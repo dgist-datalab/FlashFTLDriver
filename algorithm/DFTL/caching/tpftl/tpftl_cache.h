@@ -15,6 +15,7 @@
 
 #define get_tn_flag(a) get_tc_flag(a)
 #define set_tn_flag(a,b) set_tc_flag(a,b)
+#define DISABLE_PREFETCHING
 
 typedef struct tp_entry{
 	uint16_t offset;
@@ -75,3 +76,4 @@ bool tp_is_hit_eviction(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_
 void tp_update_dynamic_size(struct my_cache*, uint32_t lba, char*data);
 bool tp_is_eviction_hint_full(struct my_cache*, uint32_t eviction_hint);
 int32_t tp_get_remain_space(struct my_cache *,uint32_t total_eviction_hint);
+void tp_print_log(struct my_cache *);
