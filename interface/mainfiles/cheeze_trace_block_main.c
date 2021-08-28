@@ -35,6 +35,7 @@ void * thread_test(void *){
 }
 
 void print_temp_log(int sig){
+	printf("signal\n");
 	inf_print_log();
 }
 

@@ -234,7 +234,9 @@ retry:
 			//EPRINT("before get ppa, try to gc!!\n", true);
 			if(__do_gc(pm,is_map, is_map?1:(1+1))){ //just trim
 				free(seg);
-				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+				if(!pm->current_segment[is_map?MAP_S:DATA_S]){
+					pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+				}
 				goto retry;
 			}
 			else{ //copy trim
@@ -292,7 +294,9 @@ retry:
 			else{ //copy trim
 				
 			}
-			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			if(!pm->current_segment[is_map?MAP_S:DATA_S]){
+				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			}
 		}
 		else{
 			if(seg){
@@ -358,7 +362,9 @@ retry:
 			else{ //copy trim
 				
 			}
-			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			if(!pm->current_segment[is_map?MAP_S:DATA_S]){
+				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			}
 		}
 		else{
 			if(seg){
@@ -394,13 +400,13 @@ bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page,
 
 uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 	if(ismap){
-		return _PPS-pm->current_segment[MAP_S]->used_page_num;
+		return pm->current_segment[MAP_S]?_PPS-pm->current_segment[DATA_S]->used_page_num:0;
 	}
 	else{
 		if(pm->remain_data_segment_q->size()){
 			return _PPS-pm->remain_data_segment_q->front()->used_page_num;
 		}
-		return _PPS-pm->current_segment[DATA_S]->used_page_num;
+		return pm->current_segment[DATA_S]?_PPS-pm->current_segment[DATA_S]->used_page_num:0;
 	}
 }
 
@@ -1026,6 +1032,9 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	}
 	
 	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
+	if(LSM.monitor.gc_data==495){
+		printf("break!\n");
+	}
 	/*
 	if(LSM.monitor.gc_data==531){
 		//LSM.global_debug_flag=true;

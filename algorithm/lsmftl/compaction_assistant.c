@@ -460,6 +460,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		printf("break!\n");
 	}
 	if(temp_level){
+		LSM.monitor.flushed_kp_num+=LSM.flushed_kp_set->size();
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
 				iter!=LSM.flushed_kp_seg->end(); iter++){

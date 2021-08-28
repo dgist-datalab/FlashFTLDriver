@@ -29,6 +29,7 @@ struct algorithm lsm_ftl={
 	.flush=lsmtree_flush,
 	.remove=lsmtree_remove,
 	.test=lsmtree_testing,
+	.print_log=lsmtree_print_log,
 };
 
 static void tiered_level_fd_open(){
@@ -978,7 +979,8 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	uint32_t piece_ppa=req->ppa;
 
 	if(parents->magic){
-		printf("magic end\n");
+		static int magic_end_cnt=0;
+		printf("[%u]magic end req->seq:%u\n", magic_end_cnt++, parents->global_seq);
 	}
 
 #ifdef RWLOCK_PRINT
@@ -1417,5 +1419,12 @@ void lsmtree_init_ordering_param(){
 	if(LSM.unaligned_sst_file_set){
 		run_free(LSM.unaligned_sst_file_set);
 		LSM.unaligned_sst_file_set=NULL;
+	}
+}
+
+uint32_t lsmtree_print_log(){
+	lsmtree_monitor_print();
+	if(LSM.li->print_traffic){
+		LSM.li->print_traffic(LSM.li);
 	}
 }

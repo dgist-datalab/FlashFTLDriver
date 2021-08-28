@@ -50,6 +50,7 @@ typedef struct lsmtree_monitor{
 	uint64_t merge_total_entry_cnt;
 	uint64_t merge_valid_entry_cnt;
 	uint64_t max_memory_usage_bit;
+	uint64_t flushed_kp_num;
 	uint64_t tiering_valid_entry_cnt[10];
 	uint64_t tiering_total_entry_cnt[10];
 
@@ -233,6 +234,7 @@ void lsmtree_block_already_gc_seg(lsmtree *lsm, uint32_t seg);
 void lsmtree_unblock_already_gc_seg(lsmtree *lsm);
 void lsmtree_control_gc_lock_on_read(lsmtree *lsm, uint32_t piece_ppa, bool _final);
 void lsmtree_after_compaction_processing(lsmtree *lsm);
+uint32_t lsmtree_print_log();
 uint32_t lsmtree_total_invalidate_num(lsmtree *lsm);
 
 uint32_t lsmtree_testing();

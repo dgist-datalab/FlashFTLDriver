@@ -334,6 +334,7 @@ static void* thread_do(void *param){//struct thread* thread_p){
 	thpool_* thpool_p = thread_p->thpool_p;
 
 	/* Register signal handler */
+	/*
 	struct sigaction act;
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
@@ -341,7 +342,7 @@ static void* thread_do(void *param){//struct thread* thread_p){
 	if (sigaction(SIGUSR1, &act, NULL) == -1) {
 		err("thread_do(): cannot handle SIGUSR1");
 	}
-
+*/
 	/* Mark thread as alive (initialized) */
 	pthread_mutex_lock(&thpool_p->thcount_lock);
 	thpool_p->num_threads_alive += 1;
