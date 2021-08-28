@@ -304,7 +304,7 @@ void *posix_pull_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 		my_posix.req_type_cnt[test_type]++;
 	}
 	if(!seg_table[PPA].storage){
-		printf("%u not populated!\n",PPA);
+		printf("%u not populated! end_req:%p\n",PPA, req->end_req);
 		abort();
 	} else {
 		memcpy(value->value,seg_table[PPA].storage,size);
