@@ -311,6 +311,12 @@ bool bench_is_finish(){
 void bench_print_cdf(){
 	bench_data *bdata=&_master->datas[0];
 	bench_type_cdf_print(bdata);
+	
+	monitor *_m=NULL;
+	_m=&_master->m[0];
+	bench_cdf_print(_m->m_num,_m->type,bdata);
+
+	memset(bdata,0, sizeof(bench_data));
 }
 
 void bench_print(){

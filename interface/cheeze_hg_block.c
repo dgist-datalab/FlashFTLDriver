@@ -26,6 +26,21 @@ extern uint32_t test_key;
 //static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
 //static uint32_t trace_crc_buf[CRC_BUFSIZE];
 
+_request_monitor request_monitor;
+void request_print_log(){
+	printf("requst log\n");
+	printf("write seq(avg_seq,cnt): %.2lf %u\n",
+			(float)request_monitor.write_sequential_length/request_monitor.write_sequential_cnt, request_monitor.write_sequential_cnt);
+	printf("read seq(avg_seq,cnt): %.2lf %u\n",
+			(float)request_monitor.read_sequential_length/request_monitor.read_sequential_cnt, request_monitor.read_sequential_cnt);
+	printf("write read random: %u %u\n", request_monitor.write_random_cnt,
+			request_monitor.read_random_cnt);
+}
+
+void request_memset_print_log(){
+	memset(&request_monitor, 0, sizeof(request_monitor));
+}
+
 extern pthread_mutex_t req_cnt_lock;
 
 static inline char *get_buf_addr(char **pdata_addr, int id) {
@@ -186,6 +201,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	uint32_t consecutive_cnt=0;
 	static uint32_t global_seq=0;
 
+
 	for(uint32_t i=0; i<res->size; i++){
 		request *temp=&res->req_array[i];
 		temp->parents=res;
@@ -198,6 +214,30 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		temp->is_sequential_start=false;
 		temp->flush_all=0;
 		temp->global_seq=global_seq++;
+
+		
+		if(i==0){
+			if(res->size>1){
+				if(type==FS_GET_T){
+					request_monitor.read_sequential_cnt++;
+					request_monitor.read_sequential_length+=res->size;
+				}	
+				else if(type==FS_SET_T){
+					request_monitor.write_sequential_cnt++;
+					request_monitor.write_sequential_length+=res->size;
+				}
+			}
+			else{
+				if(type==FS_GET_T){
+					request_monitor.read_random_cnt++;
+				}	
+				else if(type==FS_SET_T){
+					request_monitor.write_random_cnt++;
+				}		
+			}
+		}
+
+
 		switch(type){
 			case FS_GET_T:
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);

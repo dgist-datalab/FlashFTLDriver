@@ -265,7 +265,7 @@ uint32_t inf_algorithm_caller(request *const inf_req){
 }
 
 void inf_print_log(){
-	bench_print_cdf;
+	bench_print_cdf();
 	if(mp.algo->print_log){
 		mp.algo->print_log();
 	}

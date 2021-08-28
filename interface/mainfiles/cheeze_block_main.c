@@ -13,6 +13,8 @@
 #include "../cheeze_hg_block.h"
 
 void log_print(int sig){
+	request_print_log();
+	request_memset_print_log();
 	free_cheeze();
 	printf("f cheeze\n");
 	inf_free();
@@ -43,6 +45,8 @@ void log_lower_print(int sig){
 
 //int MS_TIME_SL;
 void print_temp_log(int sig){
+	request_print_log();
+	request_memset_print_log();
 	inf_print_log();
 }
 

@@ -35,7 +35,7 @@ my_cache fine_cache_func{
 	.evict_target=fine_evict_target, 
 	.update_dynamic_size=NULL,
 	.exist=fine_exist,
-	.print_log=NULL,
+	.print_log=fine_print_log,
 };
 
 uint32_t entry_to_lba(void *_entry){
@@ -80,6 +80,7 @@ uint32_t fine_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 }
 
 uint32_t fine_free(struct my_cache *mc){
+	fine_print_log(mc);
 	while(1){
 		fine_cache *fc=(fine_cache*)lru_pop(fcm.lru);
 		if(!fc) break;
@@ -147,6 +148,25 @@ static inline fine_cache * __find_lru_map(uint32_t lba){
 	}*/
 #endif
 	return NULL;
+}
+
+
+void fine_print_log(struct my_cache*){
+	bool mapcheck[RANGE/(PAGESIZE/sizeof(uint32_t))]={0,};
+	lru_node *target;
+	for_each_lru_list(fcm.lru, target){
+		fine_cache *fc=(fine_cache*)target->data;
+		mapcheck[fc->lba/(PAGESIZE/sizeof(uint32_t))]=true;
+	}
+
+	uint32_t cnt=0;
+	for(uint32_t i=0; i<RANGE/(PAGESIZE/sizeof(uint32_t)); i++){
+		if(mapcheck[i]){
+			cnt++;
+		}
+	}
+
+	printf("finecache_log trans_page num, ratio, entry_cnt: %u (%.2lf), %u\n", cnt, (float)cnt/(RANGE/(PAGESIZE/sizeof(uint32_t))), fcm.lru->size);
 }
 
 static inline uint32_t __update_entry(GTD_entry *etr,uint32_t lba, uint32_t ppa, bool isgc, uint32_t *eviction_hint){

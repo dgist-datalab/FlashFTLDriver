@@ -31,6 +31,16 @@ struct cheeze_trace_req_user {
     unsigned int len;
 } __attribute__((aligned(8), packed));
 
+typedef struct request_monitor{
+	uint32_t write_sequential_length;
+	uint32_t write_sequential_cnt;
+	uint32_t write_random_cnt;
+
+	uint32_t read_sequential_length;
+	uint32_t read_sequential_cnt;
+	uint32_t read_random_cnt;
+}_request_monitor;
+
 
 #define CHEEZE_QUEUE_SIZE 1024
 #define CHEEZE_BUF_SIZE (2ULL * 1024 * 1024)
@@ -96,5 +106,7 @@ void free_trace_cheeze();
 vec_request **get_vectored_request_arr();
 //vec_request *get_vectored_request();
 vec_request *get_trace_vectored_request();
+void request_print_log();
+void request_memset_print_log(); 
 
 #endif

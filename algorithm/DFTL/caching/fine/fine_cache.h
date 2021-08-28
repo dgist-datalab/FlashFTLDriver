@@ -55,3 +55,4 @@ bool fine_exist(struct my_cache *, uint32_t lba);
 void fine_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *, uint32_t lba);
 bool fine_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint);
 int32_t fine_get_remain_space(struct my_cache *, uint32_t total_eviction_hint);
+void fine_print_log(struct my_cache*);
