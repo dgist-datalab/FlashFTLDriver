@@ -34,6 +34,10 @@ void * thread_test(void *){
 	return NULL;
 }
 
+void print_temp_log(int sig){
+	inf_print_log();
+}
+
 pthread_t thr; 
 int main(int argc,char* argv[]){
 	struct sigaction sa;
@@ -42,6 +46,10 @@ int main(int argc,char* argv[]){
 	sa.sa_handler = log_print;
 	sigaction(SIGINT, &sa, NULL);
 	printf("signal add!\n");
+
+	struct sigaction sa2;
+	sa2.sa_handler = print_temp_log;
+	sigaction(SIGUSR1, &sa2, NULL);
 
 	inf_init(1,0,argc,argv, false);
 

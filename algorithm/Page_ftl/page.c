@@ -22,6 +22,8 @@ align_buffer a_buffer;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 
 extern MeasureTime mt;
+uint32_t print_traffic();
+
 struct algorithm page_ftl={
 	.argument_set=page_argument,
 	.create=page_create,
@@ -30,7 +32,16 @@ struct algorithm page_ftl={
 	.write=page_write,
 	.flush=page_flush,
 	.remove=page_remove,
+	.test=NULL,
+	.print_log=print_traffic,
 };
+
+uint32_t print_traffic(){
+	printf("FTL-LOG\n");
+	page_ftl.li->print_traffic(page_ftl.li);
+	printf("FTL-LOG-END\n");
+	return 1;
+}
 
 page_read_buffer rb;
 

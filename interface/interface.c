@@ -175,6 +175,8 @@ void assign_req(request* req){
         MA(&infTime);
 #endif
 }
+
+
 extern int32_t flying_cnt;
 bool inf_assign_try(request *req){
 	bool flag=false;
@@ -260,6 +262,13 @@ uint32_t inf_algorithm_caller(request *const inf_req){
 			break;
 	}
 	return 1;
+}
+
+void inf_print_log(){
+	bench_print_cdf;
+	if(mp.algo->print_log){
+		mp.algo->print_log();
+	}
 }
 
 void *p_main(void *__input){

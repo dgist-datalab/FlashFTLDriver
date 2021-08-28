@@ -146,6 +146,8 @@ void bench_custom_print(MeasureTime *mt, int idx);
 int bench_set_params(int argc, char **argv,char **targv);
 bench_value* get_bench_ondemand();
 
+void bench_print_cdf();
+
 char *get_vectored_bench(uint32_t *mark);
 char *get_vectored_one_command(uint8_t type, uint32_t tid, uint32_t key);
 

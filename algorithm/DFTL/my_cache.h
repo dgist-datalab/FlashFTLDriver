@@ -39,6 +39,7 @@ typedef struct my_cache{
 	bool (*evict_target)(struct my_cache *,GTD_entry *, mapping_entry *);
 	void (*update_dynamic_size)(struct my_cache *, uint32_t lba, char *data);
 	bool (*exist)(struct my_cache *, uint32_t lba);
+	void (*print_log)(struct my_cache*);
 	CACHE_TYPE type;
 	ENTRY_SIZE_TYPE entry_type;
 	void *private_data;

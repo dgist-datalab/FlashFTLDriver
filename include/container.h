@@ -141,6 +141,7 @@ struct lower_info {
 	char *(*hw_get_kt)();
 	char *(*hw_get_inv)();
 #endif
+	void (*print_traffic)(struct lower_info *);
 	struct blockmanager *bm;
 
 	lower_status (*statusOfblock)(BLOCKT);
@@ -174,6 +175,7 @@ struct algorithm{
 	uint32_t (*flush)(request *const);
 	uint32_t (*remove)(request *const);
 	uint32_t (*test)();
+	uint32_t (*print_log)();
 	lower_info* li;
 	struct blockmanager *bm;
 	void *algo_body;

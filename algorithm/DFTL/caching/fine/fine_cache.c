@@ -35,6 +35,7 @@ my_cache fine_cache_func{
 	.evict_target=fine_evict_target, 
 	.update_dynamic_size=NULL,
 	.exist=fine_exist,
+	.print_log=NULL,
 };
 
 uint32_t entry_to_lba(void *_entry){

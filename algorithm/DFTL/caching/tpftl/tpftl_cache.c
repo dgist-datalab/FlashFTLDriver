@@ -24,6 +24,7 @@ my_cache tp_cache_func{
 	.evict_target=tp_evict_target, 
 	.update_dynamic_size=tp_update_dynamic_size,
 	.exist=tp_exist,
+	.print_log=tp_print_log,
 };
 
 extern demand_map_manager dmm;
@@ -95,31 +96,20 @@ uint32_t tp_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 }
 
 uint32_t tp_free(struct my_cache *mc){
-	uint32_t tn_cnt=0;
-	uint32_t total_tc_cnt=0;
+	tp_print_log(NULL);
+
 	while(1){
 		tp_node *tn=(tp_node*)lru_pop(tcm.lru);
 		if(!tn) break;
-		tn_cnt++;
 		while(1){
 			tp_cache_node *tc=(tp_cache_node*)lru_pop(tn->tp_lru);
 			if(!tc) break;
-			total_tc_cnt++;
 			free(tc);
 		}
 		lru_free(tn->tp_lru);
 		free(tn);
 	}
 	lru_free(tcm.lru);
-	printf("=======cache_log========\n");
-	printf("now_caching_byte: %u max_caching_byte: %u\n", tcm.now_caching_byte, tcm.max_caching_byte);
-	printf("evicting_average:%lf\n", (double)tcm.total_evicting_cache_size/tcm.total_dirty_eviction_cnt);
-	printf("avg now caching byte:%lf\n", (double)tcm.total_now_caching_byte/tcm.cache_search_cnt);
-	printf("avg prefetching length:%lf %u\n", (double)tcm.total_prefetching_num/tcm.check_prefetching_cnt, tcm.check_prefetching_cnt);
-	printf("total tn_num:%u total tc_num:%u avg tc per tn:%.2lf\n", tn_cnt, total_tc_cnt, (float)total_tc_cnt/tn_cnt);
-	printf("effective cache rate:%.2lf\n", (float)total_tc_cnt/RANGE);
-	printf("========================\n");
-
 	return 1;
 }
 
@@ -155,9 +145,7 @@ static inline uint32_t get_target_byte(GTD_entry *etr, uint32_t lba, uint32_t pr
 	else{
 		target_byte=TP_ENTRY_SZ;
 	}
-	return target_byte;
 #else
-
 	if(prefetching_hint){
 		if(!etr->private_data){
 			target_byte=TP_ENTRY_SZ+TP_NODE_SZ;
@@ -187,9 +175,8 @@ static inline uint32_t get_target_byte(GTD_entry *etr, uint32_t lba, uint32_t pr
 			}
 		}
 	}
-
-	return target_byte;
 #endif
+	return target_byte;
 }
 
 static inline void tp_check_cache_size(){
@@ -869,4 +856,26 @@ bool tp_is_eviction_hint_full(struct my_cache*, uint32_t eviction_hint){
 }
 int32_t tp_get_remain_space(struct my_cache *,uint32_t total_eviction_hint){
 	return tcm.max_caching_byte-tcm.now_caching_byte-total_eviction_hint;
+}
+
+void tp_print_log(struct my_cache *){
+	uint32_t tn_cnt=0;
+	uint32_t total_tc_cnt=0;
+	lru_node *ln;
+	tp_node *target_tn;
+	tp_cache_node *tc;
+	tn_cnt=tcm.lru->size;
+	for_each_lru_list(tcm.lru, ln){
+		target_tn=(tp_node*)ln->data;
+		total_tc_cnt+=target_tn->tp_lru->size;
+	}
+
+	printf("=======cache_log========\n");
+	printf("now_caching_byte: %u max_caching_byte: %u\n", tcm.now_caching_byte, tcm.max_caching_byte);
+	printf("evicting_average:%lf\n", (double)tcm.total_evicting_cache_size/tcm.total_dirty_eviction_cnt);
+	printf("avg now caching byte:%lf\n", (double)tcm.total_now_caching_byte/tcm.cache_search_cnt);
+	printf("avg prefetching length:%lf %u\n", (double)tcm.total_prefetching_num/tcm.check_prefetching_cnt, tcm.check_prefetching_cnt);
+	printf("total tn_num:%u (%.2lf) total tc_num:%u avg tc per tn:%.2lf\n", tn_cnt, (float)tn_cnt/(RANGE/(PAGESIZE/sizeof(uint32_t))), total_tc_cnt, (float)total_tc_cnt/tn_cnt);
+	printf("effective cache rate:%.2lf\n", (float)total_tc_cnt/RANGE);
+	printf("========================\n");
 }
