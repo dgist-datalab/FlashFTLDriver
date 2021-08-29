@@ -208,10 +208,11 @@ static void lsmtree_monitor_print(){
 			LSM.monitor.merge_total_entry_cnt);
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
 		if(!LSM.monitor.tiering_total_entry_cnt[i]) continue;
-		printf("[%u] tiering efficienty:%.2f (%lu/%lu - valid/total)\n", i,
+		printf("[%u] tiering efficienty:%.2f (%lu/%lu - valid/total), WAF:%.2f\n", i,
 				(double)LSM.monitor.tiering_valid_entry_cnt[i]/LSM.monitor.tiering_total_entry_cnt[i],
 				LSM.monitor.tiering_valid_entry_cnt[i],
-				LSM.monitor.tiering_total_entry_cnt[i]);
+				LSM.monitor.tiering_total_entry_cnt[i],
+				(double)LSM.monitor.tierinng_valid_entry_cnt[i]/LSM.flushed_kp_num);
 	}
 
 	printf("\n");
