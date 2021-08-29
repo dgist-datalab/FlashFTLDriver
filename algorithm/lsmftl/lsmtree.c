@@ -212,7 +212,7 @@ static void lsmtree_monitor_print(){
 				(double)LSM.monitor.tiering_valid_entry_cnt[i]/LSM.monitor.tiering_total_entry_cnt[i],
 				LSM.monitor.tiering_valid_entry_cnt[i],
 				LSM.monitor.tiering_total_entry_cnt[i],
-				(double)LSM.monitor.tierinng_valid_entry_cnt[i]/LSM.flushed_kp_num);
+				(double)LSM.monitor.tiering_valid_entry_cnt[i]/LSM.monitor.flushed_kp_num);
 	}
 
 	printf("\n");
