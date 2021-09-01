@@ -46,15 +46,19 @@ typedef struct gc_mapping_check_node{
 	value_set *mapping_data;
 	char *data_ptr;
 	fdriver_lock_t done_lock;
+	struct sst_file *sptr;
 	uint32_t type;
 	uint32_t level;
+	uint32_t version;
 	uint32_t map_ppa;
 	uint32_t piece_ppa; 
 	uint32_t new_piece_ppa;
 	uint32_t lba;
 	uint64_t validate_piece_cnt;
 	uint64_t invalidate_piece_cnt;
-	struct sst_file *target_sst_file;
+	bool is_issued_node;
+	bool is_invalidate_node;
+	bool is_page_file_map;
 }gc_mapping_check_node;
 
 bool __do_gc(page_manager *pm, bool is_map, uint32_t target_page_num);
@@ -85,6 +89,11 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*>*,
 		struct write_buffer *wb, uint32_t seg_idx);
 void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*, 
 		struct write_buffer *wb, uint32_t seg_idx);
+void gc_helper_for_page_file(std::map<uint32_t, gc_mapping_check_node*>* kp_data, 
+		std::map<uint32_t, gc_mapping_check_node*>* map_data,
+		std::multimap<uint32_t, gc_mapping_check_node*> *invalid_kp_data,
+		struct write_buffer *wb, uint32_t seg_idx);
+bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_t lba, uint32_t new_piece_ppa);
 void page_manager_insert_remain_seg(page_manager *pm, __segment *);
 
 static inline  char *get_seg_type_name(page_manager *pm, uint32_t seg_idx){

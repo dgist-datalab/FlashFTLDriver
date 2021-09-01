@@ -9,6 +9,7 @@ run *run_init(uint32_t sst_file_num, uint32_t start_lba, uint32_t end_lba){
 	res->start_lba=start_lba;
 	res->end_lba=end_lba;
 	res->now_contents_num=0;
+	res->now_contents_memory=0;
 	res->sst_num_zero_by_gc=false;
 	res->update_by_gc=false;
 	if(sst_file_num>100000){
@@ -39,6 +40,7 @@ void run_reinit(run *res){
 	res->end_lba=0;
 	res->sst_num_zero_by_gc=false;
 	res->now_contents_num=0;
+	res->now_contents_memory=0;
 	res->now_sst_num=0;
 }
 
@@ -216,6 +218,7 @@ static inline void __do_run_append_sstfile(run *_run, sst_file *sstfile, bool mo
 	update_range(_run, sstfile->start_lba, sstfile->end_lba);
 	if(sstfile->_read_helper){
 		_run->now_contents_num+=read_helper_get_cnt(sstfile->_read_helper);
+		_run->now_contents_memory+=read_helper_memory_usage(sstfile->_read_helper, 48);
 	}
 	_run->now_sst_num++;
 }
@@ -237,7 +240,10 @@ void run_deep_append_sstfile(run *_run, sst_file *sstfile){
 	}
 	sst_deep_copy(&_run->sst_set[_run->now_sst_num], sstfile);
 	update_range(_run, sstfile->start_lba, sstfile->end_lba);
-	_run->now_contents_num+=read_helper_get_cnt(sstfile->_read_helper);
+	if(sstfile->_read_helper){
+		_run->now_contents_num+=read_helper_get_cnt(sstfile->_read_helper);
+		_run->now_contents_memory+=read_helper_memory_usage(sstfile->_read_helper, 48);
+	}
 	_run->now_sst_num++;
 }
 

@@ -38,7 +38,7 @@ typedef struct read_issue_arg{
 	bool page_file;
 	uint32_t version_for_gc;
 	map_range *map_target_for_gc;
-	sst_file *sst_target_for_gc;
+	sst_file **sst_target_for_gc;
 
 	inter_read_alreq_param *param[COMPACTION_TAGS];
 }read_issue_arg;

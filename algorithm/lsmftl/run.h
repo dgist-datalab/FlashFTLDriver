@@ -16,6 +16,8 @@ typedef struct run{
 	uint32_t end_lba;
 	uint32_t start_data_physical_address;
 	uint32_t now_contents_num;
+	uint64_t now_contents_memory;
+	bool wisckey_run;
 	bool moved_originality;
 	bool sst_num_zero_by_gc;
 	bool update_by_gc;

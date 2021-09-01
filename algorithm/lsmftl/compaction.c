@@ -195,10 +195,17 @@ void issue_map_read_sst_job(compaction_master *cm, read_arg_container *thread_ar
 
 static void read_param_init(read_issue_arg *read_arg){
 	inter_read_alreq_param *param;
+	if(read_arg->sst_target_for_gc){
+		free(read_arg->sst_target_for_gc);
+	}
+	
+	read_arg->sst_target_for_gc=(sst_file**)malloc(sizeof(sst_file*)*(read_arg->to-read_arg->from+1));
 	for(int i=0; i<read_arg->to-read_arg->from+1; i++){
 		param=compaction_get_read_param(_cm);
 		param->target=LEVELING_SST_AT_PTR(read_arg->des, read_arg->from+i);
+		read_arg->sst_target_for_gc[i]=param->target;
 		param->target->read_done=false;
+		param->target->isgced=false;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&param->done_lock, 0);
 		read_arg->param[i]=param;
@@ -207,10 +214,17 @@ static void read_param_init(read_issue_arg *read_arg){
 
 static void read_param_init_with_array(read_issue_arg *read_arg, uint32_t *target_array){
 	inter_read_alreq_param *param;
+	if(read_arg->sst_target_for_gc){
+		free(read_arg->sst_target_for_gc);
+	}
+	
+	read_arg->sst_target_for_gc=(sst_file**)malloc(sizeof(sst_file*)*(read_arg->to-read_arg->from+1));
 	for(int i=0; i<read_arg->to-read_arg->from+1; i++){
 		param=compaction_get_read_param(_cm);
 		param->target=LEVELING_SST_AT_PTR(read_arg->des, target_array[read_arg->from+i]);
+		read_arg->sst_target_for_gc[i]=param->target;
 		param->target->read_done=false;
+		param->target->isgced=false;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&param->done_lock, 0);
 		read_arg->param[i]=param;
@@ -229,9 +243,13 @@ bool read_done_check(inter_read_alreq_param *param, bool check_page_sst){
 
 bool file_done(inter_read_alreq_param *param, bool inv_flag){
 	param->target->data=NULL;
+	param->target->compaction_used=false;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);
-	invalidate_map_ppa(LSM.pm->bm, param->target->file_addr.map_ppa, inv_flag);
+	if(!param->target->isgced){
+		invalidate_map_ppa(LSM.pm->bm, param->target->file_addr.map_ppa, inv_flag);
+	}
+	param->target->isgced=false;
 	compaction_free_read_param(_cm, param);
 	return true;
 }
@@ -764,7 +782,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 
 	_cm=cm;
 	run *new_run=previous_run?previous_run:run_init(src->now_sst_num, UINT32_MAX, 0);
-	read_issue_arg read_arg;
+	read_issue_arg read_arg={0,};
 	read_arg.des=src;
 	read_arg_container thread_arg;
 	thread_arg.end_req=comp_alreq_end_req;
@@ -865,6 +883,7 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 						read_arg.to-read_arg.from+1, now_version,
 						read_done_check, file_done);
 			}
+			LSM.compactioning_pos_set=&pos;
 		}
 		else{
 			if(index_array){
@@ -946,6 +965,10 @@ run *compaction_wisckey_to_normal(compaction_master *cm, level *src,
 	}
 
 	lsmtree_after_compaction_processing(&LSM);
+
+	if(read_arg.sst_target_for_gc){
+		free(read_arg.sst_target_for_gc);
+	}
 
 	release_locked_seg_q(locked_seg_q);
 	sst_pos_free(pos);
@@ -1445,6 +1468,7 @@ level* compaction_LE2LE(compaction_master *cm, level *src, level *des, uint32_t 
 level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated){
 	leveling_update_meta_for_trivial_move(src, des, target_version);
 	run *new_run=level_LE_to_run(src, true);
+	new_run->wisckey_run=true;
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 	//level_run_reinit(des, idx_set[1]);
 	run *rptr;
@@ -1471,11 +1495,10 @@ level *compaction_LE2TI(compaction_master *cm, level *src, level *des, uint32_t 
 
 level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t target_version, bool *populated){
 	static int cnt=0;
-	if(cnt==528){
-		printf("LW2TW cnt:\n");
-	}
 	cnt++;
-	leveling_update_meta_for_trivial_move(src, des, target_version);
+	if(src->idx!=UINT32_MAX){
+		leveling_update_meta_for_trivial_move(src, des, target_version);
+	}
 	run *new_run=level_LE_to_run(src, true);
 	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
 	//level_run_reinit(des, idx_set[1]);
@@ -1486,7 +1509,6 @@ level* compaction_LW2TW(compaction_master *cm, level *src, level *des, uint32_t 
 			level_append_run_copy_move_originality(res, rptr, ridx);
 		}
 	}
-
 
 /*
 	uint32_t start_lba=src->array[0].start_lba;
@@ -1527,6 +1549,7 @@ void *comp_alreq_end_req(algo_req *req){
 		case MAPPINGR:
 			r_param=(inter_read_alreq_param*)req->param;
 			if(r_param->target){
+				r_param->target->compaction_used=true;
 				r_param->target->data=r_param->data->value;
 				r_param->target->read_done=true;
 			}

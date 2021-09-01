@@ -9,6 +9,7 @@
 typedef struct oob_manager{
 	uint32_t lba[L2PGAP];
 	uint32_t version[L2PGAP];
+	bool ismap;
 }oob_manager;
 
 oob_manager *get_oob_manager(uint32_t ppa);

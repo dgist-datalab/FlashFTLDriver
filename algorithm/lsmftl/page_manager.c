@@ -9,7 +9,7 @@
 
 extern lsmtree LSM;
 //uint32_t debug_piece_ppa=1105510*L2PGAP;
-//uint32_t debug_piece_ppa=1422588;
+//uint32_t debug_piece_ppa=386798*L2PGAP;
 uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
@@ -36,6 +36,7 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 		oob_manager *oob=get_oob_manager(PIECETOPPA(piece_ppa[i]));
 		oob->lba[piece_ppa[i]%L2PGAP]=lba[i];
 		oob->version[piece_ppa[i]%L2PGAP]=version[i];
+		oob->ismap=false;
 	//	memcpy(&oob[(piece_ppa[i]%L2PGAP)*sizeof(uint32_t)], &lba[i], sizeof(uint32_t));
 #ifdef LSM_DEBUG
 		if(piece_ppa[i]==debug_piece_ppa){
@@ -92,6 +93,10 @@ bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abor
 		EPRINT("invalidate piece here!\n",false);
 	}
 #endif
+	if(piece_ppa==UINT32_MAX){
+		/*already gced piece*/
+		return true;
+	}
 
 	if(!bm->unpopulate_bit(bm, piece_ppa)){
 		if(should_abort){
@@ -162,6 +167,7 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 	oob_manager *oob=get_oob_manager(map_ppa);
 	oob->lba[0]=start_lba;
 	oob->lba[1]=end_lba;
+	oob->ismap=true;
 
 //	char *oob=bm->get_oob(bm, map_ppa);
 //	((uint32_t*)oob)[0]=start_lba;
@@ -171,6 +177,8 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 		static int cnt=0;
 		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("validate map here!\n", false);
+		printf("[info] map_ppa:%u, s~e %u ~ %u\n", map_ppa, start_lba, end_lba);
+		
 	}
 #endif
 
@@ -194,7 +202,7 @@ void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 		static int cnt=0;
 		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("invalidate map here!\n", false);
-		LSM.global_debug_flag=true;
+		lsmtree_compactioning_set_print(map_ppa/_PPS);
 	}
 #endif
 
@@ -858,10 +866,9 @@ bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_
 					kp_set=(key_ptr_pair*)temp->map_target_for_gc[j].data;
 				}
 				else{
-					EPRINT("not implemented", true);
-					if(temp->map_target_for_gc[j].start_lba > lba ||
-							temp->map_target_for_gc[j].end_lba < lba) continue;
-					kp_set=(key_ptr_pair*)temp->sst_target_for_gc[j].data;
+					if(temp->sst_target_for_gc[j]->start_lba > lba ||
+							temp->sst_target_for_gc[j]->end_lba < lba) continue;
+					kp_set=(key_ptr_pair*)temp->sst_target_for_gc[j]->data;
 				}
 
 
@@ -880,6 +887,10 @@ bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_
 				kp_set[kp_idx].piece_ppa=new_piece_ppa;
 			}
 		}
+	}
+
+	if(new_piece_ppa==UINT32_MAX){ //invalidation
+		return res;
 	}
 
 	/*updating bos data*/
@@ -1014,6 +1025,24 @@ static void move_sptr(gc_sptr_node *gsn, uint32_t seg_idx, uint32_t lev_idx,
 	gc_sptr_node_free(gsn);
 }
 
+gc_mapping_check_node* gmc_init(gc_read_node *gn, sst_file *sptr, uint32_t version){
+	gc_mapping_check_node *gmc=(gc_mapping_check_node*)malloc(sizeof(gc_mapping_check_node));
+	gmc->data_ptr=&gn->data->value[LPAGESIZE*(gn->piece_ppa%L2PGAP)];
+	gmc->piece_ppa=gn->piece_ppa;
+	gmc->new_piece_ppa=UINT32_MAX;
+	gmc->lba=gn->lba;
+	gmc->map_ppa=UINT32_MAX;
+	gmc->type=MAP_CHECK_FLUSHED_KP;
+	gmc->level=LSM.param.LEVELN-(1+1);
+	gmc->mapping_data=NULL;
+	gmc->sptr=sptr;
+	gmc->version=version;
+	gmc->is_issued_node=false;
+	gmc->is_page_file_map=false;
+	gmc->is_invalidate_node=false;
+	return gmc;
+}
+
 bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_data++;
 	lsmtree_block_already_gc_seg(&LSM, victim->seg_idx);
@@ -1032,8 +1061,8 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	}
 	
 	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
-	if(LSM.monitor.gc_data==495){
-		printf("break!\n");
+	if(LSM.monitor.gc_data==412){
+	//	printf("break!\n");
 	}
 	/*
 	if(LSM.monitor.gc_data==531){
@@ -1086,12 +1115,16 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	uint32_t recent_version, target_version;
 	uint32_t sptr_idx=0, level_idx=UINT32_MAX;
 
-	write_buffer *wisckey_node_wb=NULL;
+	write_buffer *wisckey_node_wb=NULL, *page_file_wb=NULL;
 	std::map<uint32_t, gc_mapping_check_node *> *gc_kv_map=new std::map<uint32_t, gc_mapping_check_node*>();
+	std::map<uint32_t, gc_mapping_check_node*> *gc_page_file_kv_map=new std::map<uint32_t, gc_mapping_check_node*>();
+	std::map<uint32_t, gc_mapping_check_node*> *gc_page_file_map=new std::map<uint32_t, gc_mapping_check_node*>();
+	std::multimap<uint32_t, gc_mapping_check_node*> *gc_page_file_invalid_kv_map=new std::multimap<uint32_t, gc_mapping_check_node*>();
 
 	gc_mapping_check_node *gmc=NULL;
 
 	gc_sptr_node *gsn=NULL;
+	std::set<uint32_t> filtering_page_map_ppa;
 	while(!gc_target_queue->empty()){
 		gn=gc_target_queue->front();
 		fdriver_lock(&gn->done_lock);
@@ -1099,19 +1132,25 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		oob_manager *oob=get_oob_manager(ppa);
 		oob_lba=oob->lba;
 		oob_version=oob->version;
-
+	//	if(filtering_page_map_ppa.count(ppa)) continue;
 		for(uint32_t i=0; i<L2PGAP; i++){
+			if(filtering_page_map_ppa.count(ppa)) continue;
 			if(bm->is_invalid_page(bm, ppa*L2PGAP+i)){
 				continue;
 			}
 			else{
 				if(oob_lba[i]==UINT32_MAX) continue;
-
+				if(ppa==debug_piece_ppa/L2PGAP){
+					static int debug_point=0;
+					printf("debug_point %u break!\n", debug_point++);
+				}
 				piece_ppa=ppa*L2PGAP+i;
 				gn->piece_ppa=piece_ppa;
 				gn->lba=oob_lba[i];
 				gn->version=oob_version[i];
 				if(gn->lba==debug_lba){
+					static int debug_point=0;
+					printf("debug_point:%u\n", debug_point++);
 					printf("target is moved!\n");
 				}
 				
@@ -1133,12 +1172,46 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 									read_helper_get_cnt(gsn->sptr->_read_helper));
 							version_decrease_invalidation_number(LSM.last_run_version, 
 									gsn->version, gsn->early_invalidation_cnt);
-							
+							/*
+							for(uint32_t i=0; i<sptr->map_num; i++){
+								map_range *mr=&sptr->block_file_map[i];
+								printf("%u~%u ppa:%u\n", mr->start_lba, mr->end_lba, mr->ppa);
+							}
+							printf("now compactioning print\n");
+							*/
 							level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], ridx, gsn->sidx);
+							lsmtree_compactioning_set_print(victim->seg_idx);
 							gc_sptr_node_free(gsn);
 						}
 					}
 					sptr=lsmtree_find_target_normal_sst_datagc(gn->lba, gn->piece_ppa, &level_idx, &target_version, &sptr_idx);
+					if(sptr && sptr->type==PAGE_FILE){
+						uint32_t now_sptr_map_ppa=sptr->file_addr.map_ppa;
+						filtering_page_map_ppa.insert(now_sptr_map_ppa);
+						if(sptr->file_addr.map_ppa==gn->piece_ppa/L2PGAP){
+							gmc=gmc_init(gn, sptr, target_version);
+							gmc->is_page_file_map=true;
+							gc_page_file_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
+						}
+						else{
+							recent_version=version_map_lba(LSM.last_run_version, oob_lba[i]);
+							gmc=gmc_init(gn, sptr, target_version);
+							if(recent_version!=target_version){
+								gmc->new_piece_ppa=UINT32_MAX;
+								gmc->is_invalidate_node=true;
+								gc_page_file_invalid_kv_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
+							}
+							else{
+								if(!page_file_wb){
+									page_file_wb=write_buffer_init(_PPS*L2PGAP, pm, GC_WB);	
+								}
+								write_buffer_insert_for_gc(page_file_wb, gmc->lba, gmc->data_ptr);
+								gc_page_file_kv_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
+							}
+						}
+						sptr=NULL;
+						continue;
+					}
 					if(sptr){
 						for(uint32_t temp_idx=0; temp_idx<sptr->map_num; temp_idx++){
 							if(sptr->block_file_map[temp_idx].ppa/_PPS!=victim->seg_idx){
@@ -1204,18 +1277,10 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 				//	EPRINT("should I implement?", true);
 				
 					/*checking other level*/
-					gmc=(gc_mapping_check_node*)malloc(sizeof(gc_mapping_check_node));
-					gmc->data_ptr=&gn->data->value[LPAGESIZE*i];
-					gmc->piece_ppa=piece_ppa;
-					gmc->new_piece_ppa=UINT32_MAX;
-					gmc->lba=oob_lba[i];
-					gmc->map_ppa=UINT32_MAX;
-					gmc->type=MAP_CHECK_FLUSHED_KP;
-					gmc->level=LSM.param.LEVELN-(1+1);
+					gmc=gmc_init(gn, NULL, UINT32_MAX);
 					if(!wisckey_node_wb){
 						wisckey_node_wb=write_buffer_init(_PPS*L2PGAP, pm, GC_WB);	
 					}
-					gmc->mapping_data=NULL;
 					write_buffer_insert_for_gc(wisckey_node_wb, gmc->lba, gmc->data_ptr);
 					gc_kv_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
 
@@ -1244,12 +1309,14 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					}
 					else{
 						gsn->early_invalidation_cnt++;
+						updating_now_compactioning_data(target_version, victim->seg_idx, gn->lba, UINT32_MAX);
 						invalidate_kp_entry(gn->lba, gn->piece_ppa, UINT32_MAX, true);
 						continue; //already invalidate
 					}
 				}
 			}
 		}
+
 		free_target[q_idx++]=gn->data;
 		gc_read_node_free(gn);
 		gc_target_queue->pop();
@@ -1272,13 +1339,19 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		}
 	}
 
-	gc_helper_for_direct_mapping(gc_kv_map, wisckey_node_wb, victim->seg_idx); 
+	gc_helper_for_direct_mapping(gc_kv_map, wisckey_node_wb, victim->seg_idx);
+	gc_helper_for_page_file(gc_page_file_kv_map, gc_page_file_map, 
+			gc_page_file_invalid_kv_map, page_file_wb, victim->seg_idx);
+	
 
 	fdriver_lock(&LSM.now_gc_seg_lock);
 	LSM.now_gc_seg_idx=victim->seg_idx;
 	fdriver_unlock(&LSM.now_gc_seg_lock);
 
+	uint32_t victim_seg_idx=victim->seg_idx;
 	bm->trim_segment(bm, victim, bm->li);
+
+	lsmtree_compactioning_set_gced_flag(victim_seg_idx);
 
 	page_manager_change_reserve(pm, false);
 
@@ -1289,8 +1362,15 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 
 	delete gc_target_queue;
 	delete gc_kv_map;
+	delete gc_page_file_kv_map;
+	delete gc_page_file_map;
+	delete gc_page_file_invalid_kv_map;
+
 	if(wisckey_node_wb){
 		write_buffer_free(wisckey_node_wb);
+	}
+	if(page_file_wb){
+		write_buffer_free(page_file_wb);
 	}
 	return false;
 }

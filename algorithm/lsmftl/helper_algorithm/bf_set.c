@@ -197,3 +197,7 @@ void bf_set_free(bf_set* bfs){
 	}
 	free(bfs);
 }
+
+void bf_update_piece_ppa(bf_set* bfs, uint32_t offset, uint32_t piece_ppa){
+	((bp_pair*)bfs->array)[offset].piece_ppa=piece_ppa;
+}

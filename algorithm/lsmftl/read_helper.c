@@ -483,3 +483,10 @@ uint32_t read_helper_get_cnt(read_helper *rh){
 	}
 	return res;
 }
+
+void read_helper_update_ppa(read_helper *rh, uint32_t index, uint32_t new_piece_ppa){
+	if(rh->type!=HELPER_BF_PTR_GUARD){
+		EPRINT("invalid type", true);
+	}
+	gbf_update_piece_ppa((guard_bf_set*)rh->body, index, new_piece_ppa);
+}

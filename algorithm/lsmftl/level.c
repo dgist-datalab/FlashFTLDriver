@@ -23,6 +23,7 @@ level *level_init(uint32_t max_sst_num, uint32_t max_run_num, uint32_t level_typ
 	res->max_contents_num=max_contents_num;
 	res->now_contents_num=0;
 	res->check_full_by_size=check_full_by_size;
+	res->compacting_wisckey_flag=false;
 	return res;
 }
 
@@ -216,11 +217,32 @@ sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa
 	for_each_run_max(lev, run_ptr, ridx){
 		if(run_ptr->now_sst_num==0) continue;
 		sptr=run_retrieve_sst(run_ptr, lba);
-		if(sptr && sptr->file_addr.piece_ppa<=piece_ppa &&
+		if(sptr && sptr->type==BLOCK_FILE && 
+				sptr->file_addr.piece_ppa<=piece_ppa &&
 				sptr->end_ppa*L2PGAP>=piece_ppa){
 			*target_ridx=ridx;
 			*sptr_idx=(sptr-run_ptr->sst_set);
 			return sptr;
+		}
+		if(sptr){
+			if(sptr->type==PAGE_FILE){	
+				if(sptr->file_addr.map_ppa==piece_ppa/L2PGAP){
+					*target_ridx=ridx;
+					*sptr_idx=(sptr-run_ptr->sst_set);
+					return sptr;
+				}
+
+				uint32_t helper_idx=read_helper_idx_init(sptr->_read_helper, lba);
+				uint32_t retrieve_piece_ppa=UINT32_MAX;
+				while(!read_helper_last(sptr->_read_helper, helper_idx)){
+					read_helper_check(sptr->_read_helper, lba, &retrieve_piece_ppa, sptr, &helper_idx);
+					if(retrieve_piece_ppa==piece_ppa){
+						*target_ridx=ridx;
+						*sptr_idx=(sptr-run_ptr->sst_set);
+						return sptr;
+					}
+				}
+			}
 		}
 	}
 	return NULL;
@@ -350,6 +372,11 @@ void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	}
 	
 	sst_file *org_sptr=&lev->array[ridx].sst_set[sptr_idx];
+	uint32_t org_contents_num=read_helper_get_cnt(org_sptr->_read_helper);
+	uint64_t org_contents_memory=read_helper_memory_usage(org_sptr->_read_helper, 48);
+
+	uint32_t new_contents_num=read_helper_get_cnt(sptr->_read_helper);
+	uint64_t new_contents_memory=read_helper_memory_usage(sptr->_read_helper, 48);
 	/*free(org_sptr->block_file_map);
 	read_helper_free(org_sptr->_read_helper);*/
 	sst_reinit(org_sptr);
@@ -383,6 +410,12 @@ void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 			EPRINT("range error", true);
 		}
 	}
+
+	lev->array[ridx].now_contents_num-=org_contents_num;
+	lev->array[ridx].now_contents_num+=new_contents_num;
+
+	lev->array[ridx].now_contents_memory-=org_contents_memory;
+	lev->array[ridx].now_contents_memory+=new_contents_memory;
 }
 
 void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr){
@@ -448,6 +481,9 @@ void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_f
 	//free(org_sptr->block_file_map);
 	lev->array[ridx].sst_set[sptr_idx]=(*sptr);
 	lev->array[ridx].now_sst_num++;
+
+	lev->array[ridx].now_contents_num+=read_helper_get_cnt(sptr->_read_helper);
+	lev->array[ridx].now_contents_memory+=read_helper_memory_usage(sptr->_read_helper, 48);
 }
 
 void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
@@ -461,6 +497,10 @@ void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx){
 	}
 
 	uint32_t target_num_sst_file=r->now_sst_num-sptr_idx-1;
+
+	lev->array[ridx].now_contents_num-=read_helper_get_cnt(r->sst_set[sptr_idx]._read_helper);
+	lev->array[ridx].now_contents_memory-=read_helper_memory_usage(r->sst_set[sptr_idx]._read_helper, 48);
+
 	memmove(&r->sst_set[sptr_idx], &r->sst_set[sptr_idx+1], sizeof(sst_file) * target_num_sst_file);
 	memset(&r->sst_set[r->now_sst_num-1], 0, sizeof(sst_file));
 	r->now_sst_num--;

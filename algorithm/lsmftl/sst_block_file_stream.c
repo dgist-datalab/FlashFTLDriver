@@ -48,10 +48,6 @@ static key_value_wrapper *kv_wrapper_setting(sst_bf_out_stream *bos, key_value_w
 			printf("wrapping! %u -> piece_ppa:%u offset:%u\n", debug_lba, kv_wrap_buf[i]->piece_ppa, kv_wrap_buf[i]->piece_ppa%L2PGAP);	
 		}
 
-		if(LSM.global_debug_flag && kv_wrap_buf[i]->kv_ptr.lba==debug_lba){
-			printf("break!\n");
-		}
-
 		invalidate_kp_entry(kv_wrap_buf[i]->kv_ptr.lba, kv_wrap_buf[i]->piece_ppa, UINT32_MAX, true);
 
 		kv_wrap_buf[i]->kv_ptr.data=&value[LPAGESIZE*(kv_wrap_buf[i]->piece_ppa%L2PGAP)];

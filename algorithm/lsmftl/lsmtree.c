@@ -6,6 +6,7 @@
 #include "oob_manager.h"
 #include "function_test.h"
 #include "segment_level_manager.h"
+#include "./design_knob/design_knob.h"
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -53,6 +54,7 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	io_manager_init(li);
 	LSM.pm=page_manager_init(bm);
 	LSM.cm=compaction_init(COMPACTION_REQ_MAX_NUM);
+	LSM.next_level_wisckey_compaction=true;
 	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * WRITEBUFFER_NUM);
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
@@ -214,6 +216,12 @@ static void lsmtree_monitor_print(){
 				LSM.monitor.tiering_total_entry_cnt[i],
 				(double)LSM.monitor.tiering_valid_entry_cnt[i]/LSM.monitor.flushed_kp_num);
 	}
+
+	uint64_t total_flushing_file=LSM.monitor.flushing_sequential_file+LSM.monitor.flushing_random_file;
+	printf("flushing seq ratio:%.2lf (s:%lu r:%lu)\n", 
+			(double)LSM.monitor.flushing_sequential_file/total_flushing_file,
+			LSM.monitor.flushing_sequential_file, 
+			LSM.monitor.flushing_random_file);
 
 	printf("\n");
 	printf("level print\n");
@@ -624,6 +632,7 @@ static inline void lsmtree_read_param_reinit(lsmtree_read_param* param, request 
 }
 
 uint32_t lsmtree_read(request *const req){
+	uint32_t global_seq=req->global_seq;
 	if(!LSM.cm->tm->tagQ->size()){
 	//	printf("now compactioning\n");
 	//	abort();
@@ -637,7 +646,7 @@ uint32_t lsmtree_read(request *const req){
 	}
 #endif
 restart:
-	if(req->global_seq==temp_req_global_seq){
+	if(global_seq==temp_req_global_seq){
 		printf("restart here\n");
 	}
 	if(!req->param){
@@ -662,7 +671,7 @@ restart:
 				rwlock_read_unlock(r_param->target_level_rw_lock);
 				free(r_param);
 				req->end_req(req);
-				if(req->global_seq==temp_req_global_seq){
+				if(global_seq==temp_req_global_seq){
 					EPRINT("end here\n", false);
 				}
 				return 1;
@@ -678,7 +687,7 @@ restart:
 
 			req->end_req(req);
 			rwlock_read_unlock(&LSM.flush_wait_wb_lock);
-			if(req->global_seq==temp_req_global_seq){
+			if(global_seq==temp_req_global_seq){
 				EPRINT("end here\n", false);
 			}
 
@@ -699,14 +708,14 @@ restart:
 				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false)==GC_TARGET_RETRY){
-					printf("req->seq:%u ", req->global_seq);
+					printf("req->seq:%u ", global_seq);
 					EPRINT("here",false);
 					free(alreq);
 					lsmtree_read_param_reinit(r_param, req);
-					temp_req_global_seq=req->global_seq;
+					temp_req_global_seq=global_seq;
 					goto restart;
 				}
-			if(req->global_seq==temp_req_global_seq){
+			if(global_seq==temp_req_global_seq){
 				EPRINT("end here\n", false);
 			}
 				return 1;
@@ -725,14 +734,14 @@ restart:
 				rwlock_read_unlock(&LSM.flushed_kp_set_lock);
 				algo_req *alreq=get_read_alreq(req, DATAR, target_piece_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(target_piece_ppa), req->value, alreq, false)==GC_TARGET_RETRY){
-					printf("req->seq:%u ", req->global_seq);
-					temp_req_global_seq=req->global_seq;
+					printf("req->seq:%u ", global_seq);
+					temp_req_global_seq=global_seq;
 					EPRINT("here",false);
 					free(alreq);
 					lsmtree_read_param_reinit(r_param, req);
 					goto restart;
 				}
-			if(req->global_seq==temp_req_global_seq){
+			if(global_seq==temp_req_global_seq){
 				EPRINT("end here\n", false);
 			}
 				return 1;
@@ -755,7 +764,7 @@ restart:
 		if(sptr!=r_param->prev_sf){
 			printf("gced target...retry level:%u, run:%u\n", r_param->prev_level, r_param->prev_run);
 			lsmtree_read_param_reinit(r_param, req);
-			temp_req_global_seq=req->global_seq;
+			temp_req_global_seq=global_seq;
 			goto restart;
 		}
 	}
@@ -781,8 +790,8 @@ restart:
 			else{//FOUND
 				al_req=get_read_alreq(req, DATAR, read_target_ppa, r_param);
 				if(read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false)==GC_TARGET_RETRY){
-					printf("req->seq:%u ", req->global_seq);
-					temp_req_global_seq=req->global_seq;
+					printf("req->seq:%u ", global_seq);
+					temp_req_global_seq=global_seq;
 					EPRINT("here",false);
 					lsmtree_read_param_reinit(r_param, req);
 					goto restart;
@@ -828,7 +837,7 @@ retry:
 	}
 	
 read_helper_check_again:
-	if(req->global_seq==temp_req_global_seq){
+	if(global_seq==temp_req_global_seq){
 		EPRINT("reach at here\n", false);
 	}
 
@@ -842,18 +851,19 @@ read_helper_check_again:
 			}
 			if(read_buffer_checker(PIECETOPPA(read_target_ppa), req->value, al_req, false)==GC_TARGET_RETRY){
 				free(al_req);
-				temp_req_global_seq=req->global_seq;
-				printf("req->seq:%u ", req->global_seq);
+				temp_req_global_seq=global_seq;
+				printf("req->seq:%u ", global_seq);
 				EPRINT("here",false);
 				lsmtree_read_param_reinit(r_param, req);
 				goto restart;
 			}
-			if(req->global_seq==temp_req_global_seq){
+			if(global_seq==temp_req_global_seq){
 				EPRINT("end here\n", false);
 			}
 			goto normal_end;
 		}else{
 			if(r_param->read_helper_idx==UINT32_MAX){
+				printf("req-key:%u\n", req->key);
 				EPRINT("notfound here", false);
 				goto notfound;
 			}
@@ -861,7 +871,7 @@ read_helper_check_again:
 				EPRINT("notfound here", false);
 				goto notfound;
 			}
-			if(req->global_seq==temp_req_global_seq){
+			if(global_seq==temp_req_global_seq){
 				EPRINT("end here\n", false);
 			}
 			goto retry;
@@ -878,8 +888,8 @@ read_helper_check_again:
 		al_req=get_read_alreq(req, MAPPINGR, read_target_ppa, r_param);
 		if(read_buffer_checker(read_target_ppa, req->value, al_req, false)==GC_TARGET_RETRY){
 			free(al_req);
-			printf("req->seq:%u ", req->global_seq);
-			temp_req_global_seq=req->global_seq;
+			printf("req->seq:%u ", global_seq);
+			temp_req_global_seq=global_seq;
 			EPRINT("here",false);
 			lsmtree_read_param_reinit(r_param, req);
 			goto restart;
@@ -1120,6 +1130,12 @@ sst_file *lsmtree_find_target_normal_sst_datagc(uint32_t lba, uint32_t piece_ppa
 		uint32_t *lev_idx, uint32_t *target_version, uint32_t *target_sidx){
 	sst_file *res=NULL;
 	uint32_t ridx;
+	/*/
+	static int cnt=0;
+	printf("find_target cnt:%u\n",cnt++);
+	if(cnt==21){
+		printf("break!\n");
+	}*/
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
 		level *lev=LSM.disk[i];
 		if(lev->level_type==TIERING_WISCKEY 
@@ -1347,6 +1363,7 @@ uint32_t lsmtree_total_invalidate_num(lsmtree *lsm){
 }
 
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting){
+	if(piece_ppa==UINT32_MAX) return true; //gced entry 
 	bool flag=aborting;
 #if defined(DEMAND_SEG_LOCK) || defined(UPDATING_COMPACTION_DATA)
 	if(LSM.blocked_invalidation_seg[piece_ppa/L2PGAP/_PPS]){
@@ -1404,7 +1421,10 @@ void lsmtree_after_compaction_processing(lsmtree *lsm){
 	lsm->now_compaction_stream_num=0;
 	while(lsm->gc_moved_map_ppa.size()){
 		uint32_t target_map_ppa=lsm->gc_moved_map_ppa.front();
-		invalidate_map_ppa(lsm->pm->bm, target_map_ppa, false);
+		oob_manager *oob=get_oob_manager(target_map_ppa);
+		if(oob->ismap){
+			invalidate_map_ppa(lsm->pm->bm, target_map_ppa, false);
+		}
 		lsm->gc_moved_map_ppa.pop();
 	}
 	lsm->compactioning_pos_set=NULL;
@@ -1423,9 +1443,134 @@ void lsmtree_init_ordering_param(){
 	}
 }
 
+
+bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper){
+	uint64_t using_memory=0;
+	for(uint32_t i=LSM.param.LEVELN-1; i<LSM.param.LEVELN; i++){
+		run *rptr;
+		sst_file *sptr;
+		for(uint32_t ridx=0; ridx<LSM.disk[i]->max_run_num; ridx++){
+			rptr=&LSM.disk[i]->array[ridx];
+			if(!rptr->now_sst_num) continue;
+			for(uint32_t sidx=0; sidx<rptr->now_sst_num; sidx++){
+				sptr=&rptr->sst_set[sidx];
+				using_memory+=read_helper_memory_usage(sptr->_read_helper, 48);
+			}
+		}
+	}
+
+	uint64_t remain_memory=LSM.param.tr.PLR_memory<using_memory?0:LSM.param.tr.PLR_memory-using_memory;
+	double run_coverage=(double)run_contents_num/RANGE;
+	uint64_t needed_memory=ceil(bf_memory_per_ent(run_coverage)*run_contents_num)+run_contents_num*48;
+	//printf("max_bf:%lu max_plr:%lu, using_memory:%lu\n", LSM.param.tr.BF_memory, LSM.param.tr.PLR_memory, using_memory);
+	//printf("remain_memory:%lu, needed_memory:%lu result:%s\n", remain_memory, needed_memory, needed_memory<=remain_memory?"wisckey":"none");
+	return needed_memory<=remain_memory;
+}
+
 uint32_t lsmtree_print_log(){
 	lsmtree_monitor_print();
 	if(LSM.li->print_traffic){
 		LSM.li->print_traffic(LSM.li);
+	}
+	return 1;
+}
+
+void lsmtree_compactioning_set_print(uint32_t seg_idx){
+	if(LSM.compactioning_pos_set){
+		sst_file *file;
+		map_range *mr;
+		for(uint32_t i=0; i<LSM.now_compaction_stream_num; i++){
+			sst_pf_out_stream *pos=LSM.compactioning_pos_set[i];
+			if(!pos) continue;
+			if(pos->type==SST_PAGE_FILE_STREAM){			
+				std::multimap<uint32_t, sst_file*>::iterator f_iter=pos->sst_map_for_gc->begin();
+				for(;f_iter!=pos->sst_map_for_gc->end(); f_iter++){
+					file=f_iter->second;
+					if(file->file_addr.map_ppa/_PPS==seg_idx){
+						printf("[file] map_ppa:%u s~e:%u~%u read done:%u\n",file->file_addr.map_ppa, file->start_lba, file->end_lba, file->read_done);
+					}
+				}
+			}
+			else{
+				std::multimap<uint32_t, map_range*>::iterator m_iter=pos->mr_map_for_gc->begin();
+				for(; m_iter!=pos->mr_map_for_gc->end(); m_iter++){
+					mr=m_iter->second;
+					if(mr->ppa/_PPS==seg_idx){
+						printf("[map] map_ppa:%u s~e:%u~%u read done:%u\n",mr->ppa, mr->start_lba, mr->end_lba, mr->read_done);
+					}
+				}
+			}
+		}
+	}
+
+	if(LSM.read_arg_set){
+		for(uint32_t i=0; i<LSM.now_compaction_stream_num; i++){
+			read_issue_arg *temp=LSM.read_arg_set[i];
+			for(uint32_t j=temp->from; j<=temp->to; j++){
+				if(temp->page_file==false){
+					map_range *mr=&temp->map_target_for_gc[j];
+					if(!mr) continue; //mr can be null, when it used all data.
+					if(mr->ppa/_PPS==seg_idx){
+						printf("[map] map_ppa:%u s~e:%u~%u read_done:%u\n",mr->ppa, mr->start_lba, mr->end_lba, mr->read_done);
+					}
+				}
+				else{
+					sst_file *sptr=temp->sst_target_for_gc[j];
+					if(sptr->file_addr.map_ppa/_PPS==seg_idx){
+						printf("[file] map_ppa:%u s~e:%u~%u read_done:%u\n",sptr->file_addr.map_ppa, sptr->start_lba, sptr->end_lba, sptr->read_done);
+					}
+				}
+			}
+		}
+	}
+}
+
+void lsmtree_compactioning_set_gced_flag(uint32_t seg_idx){
+	if(LSM.compactioning_pos_set){
+		sst_file *file;
+		map_range *mr;
+		for(uint32_t i=0; i<LSM.now_compaction_stream_num; i++){
+			sst_pf_out_stream *pos=LSM.compactioning_pos_set[i];
+			if(!pos) continue;
+			if(pos->type==SST_PAGE_FILE_STREAM){			
+				std::multimap<uint32_t, sst_file*>::iterator f_iter=pos->sst_map_for_gc->begin();
+				for(;f_iter!=pos->sst_map_for_gc->end(); f_iter++){
+					file=f_iter->second;
+					if(file->file_addr.map_ppa/_PPS==seg_idx){
+						file->isgced=true;
+					}
+				}
+			}
+			else{
+				std::multimap<uint32_t, map_range*>::iterator m_iter=pos->mr_map_for_gc->begin();
+				for(; m_iter!=pos->mr_map_for_gc->end(); m_iter++){
+					mr=m_iter->second;
+					if(mr->ppa/_PPS==seg_idx){
+						mr->isgced=true;
+					}
+				}
+			}
+		}
+	}
+
+	if(LSM.read_arg_set){
+		for(uint32_t i=0; i<LSM.now_compaction_stream_num; i++){
+			read_issue_arg *temp=LSM.read_arg_set[i];
+			for(uint32_t j=temp->from; j<=temp->to; j++){
+				if(temp->page_file==false){
+					map_range *mr=&temp->map_target_for_gc[j];
+					if(!mr) continue; //mr can be null, when it used all data.
+					if(mr->ppa/_PPS==seg_idx){
+						mr->isgced=true;
+					}
+				}
+				else{
+					sst_file *sptr=temp->sst_target_for_gc[j];
+					if(sptr->file_addr.map_ppa/_PPS==seg_idx){
+						sptr->isgced=true;
+					}
+				}
+			}
+		}
 	}
 }

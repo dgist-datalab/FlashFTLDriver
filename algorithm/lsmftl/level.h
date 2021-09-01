@@ -17,6 +17,7 @@ typedef struct level{
 	uint32_t level_type;
 	uint32_t max_contents_num;
 	uint32_t now_contents_num;
+	bool compacting_wisckey_flag;
 	bool check_full_by_size;
 	run *array;
 }level;

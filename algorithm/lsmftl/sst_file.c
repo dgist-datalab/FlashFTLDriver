@@ -252,7 +252,9 @@ void sst_print(sst_file *sptr){
 		printf("file-ppa:%u~%u map-num:%u ", sptr->file_addr.piece_ppa, 
 				sptr->end_ppa*L2PGAP, sptr->map_num);
 	}
-	printf("contents_num:%u\n", read_helper_get_cnt(sptr->_read_helper));
+	if(sptr->_read_helper){
+		printf("contents_num:%u type:%u\n", read_helper_get_cnt(sptr->_read_helper), sptr->_read_helper->type);
+	}
 }
 
 void map_print(map_range *mr){

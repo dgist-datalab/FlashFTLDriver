@@ -33,6 +33,7 @@
 
 #define DEMAND_SEG_LOCK
 #define UPDATING_COMPACTION_DATA
+#define DYNAMIC_WISCKEY
 
 enum{
 	DEMOTE_RUN, KEEP_RUN,
@@ -51,6 +52,8 @@ typedef struct lsmtree_monitor{
 	uint64_t merge_valid_entry_cnt;
 	uint64_t max_memory_usage_bit;
 	uint64_t flushed_kp_num;
+	uint64_t flushing_sequential_file;
+	uint64_t flushing_random_file;
 	uint64_t tiering_valid_entry_cnt[10];
 	uint64_t tiering_total_entry_cnt[10];
 
@@ -83,6 +86,11 @@ typedef struct tree_param{
 	double run_range_size[21];
 	double level_size_ratio[21];
 	double WAF;
+#ifdef DYNAMIC_WISCKEY
+	uint64_t BF_memory;
+	uint64_t PLR_memory;
+	uint64_t memory_limit_for_helper;
+#endif
 }tree_param;
 
 typedef struct lsmtree_parameter{
@@ -190,6 +198,10 @@ typedef struct lsmtree{
 	fdriver_lock_t gc_end_lock;
 	fdriver_lock_t now_gc_seg_lock;
 
+#ifdef DYNAMIC_WISCKEY
+	bool next_level_wisckey_compaction;
+#endif
+
 	lower_info *li;
 #ifdef LSM_DEBUG
 	uint32_t *LBA_cnt;
@@ -239,6 +251,8 @@ uint32_t lsmtree_total_invalidate_num(lsmtree *lsm);
 
 uint32_t lsmtree_testing();
 uint32_t lsmtree_seg_debug(lsmtree *lsm);
+bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper);
+
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting);
 static inline bool lsmtree_is_gc_available(lsmtree *lsm, uint32_t seg_idx){
 	bool res;
@@ -259,6 +273,8 @@ static void lsmtree_print_WAF(lower_info *li){
 //sst_file *lsmtree_find_target_sst(uint32_t lba, uint32_t *idx);
 read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);
 void lsmtree_init_ordering_param();
+void lsmtree_compactioning_set_print(uint32_t seg_idx);
+void lsmtree_compactioning_set_gced_flag(uint32_t seg_idx);
 #define MAKE_L0COMP_REQ(wb, param, is_gc_data)\
 	alloc_comp_req(-1,0,(wb),lsmtree_compaction_end_req, (void*)(param), (is_gc_data))
 

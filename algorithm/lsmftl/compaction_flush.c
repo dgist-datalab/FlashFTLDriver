@@ -113,6 +113,7 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set,
 	free(temp_kp_set);
 }
 
+extern char all_set_page[PAGESIZE];
 static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		uint32_t* processed_entry_num,
 		std::map<uint32_t, uint32_t>::iterator *temp_iter, 
@@ -130,7 +131,7 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		return NULL;
 	}
 
-	value_set *vs=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+	value_set *vs=inf_get_valueset(all_set_page, FS_MALLOC_W, PAGESIZE);
 	key_ptr_pair *kp_set=(key_ptr_pair*)vs->value;
 
 	std::map<uint32_t, uint32_t>::iterator iter=temp_iter?*temp_iter:flushed_kp_set->begin();
@@ -146,6 +147,8 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	uint32_t new_seq_cnt=0;
 	uint32_t seq_start_idx=0;
 	std::map<uint32_t, uint32_t>::iterator seq_start_iter;
+
+	static bool function_debug_flag=false;
 
 	if(SEGNUM(page_manager_pick_new_ppa(LSM.pm, false, DATASEG)*L2PGAP) != SEGNUM(iter->second)){
 		/*this is an inevitable situation*/
@@ -250,13 +253,27 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 			rh=read_helper_init(lsmtree_get_target_rhp(LSM.param.LEVELN-1));
 		}
 		else{
+		#ifdef DYNAMIC_WISCKEY
+			if(LSM.next_level_wisckey_compaction){
+				rh=read_helper_init(LSM.param.bf_ptr_guard_rhp);
+			}
+			else{
+				rh=read_helper_init(lsmtree_get_target_rhp(0));
+			}
+		#else
 			rh=read_helper_init(lsmtree_get_target_rhp(0));
+		#endif
+
 		}
 #else
 		rh=read_helper_init(lsmtree_get_target_rhp(0));
+
 #endif
 		//read_helper
 		for(uint32_t j=0; j<i; j++){
+			if(kp_set[j].lba==debug_lba){
+				printf("break!\n");
+			}
 			read_helper_stream_insert(rh, kp_set[j].lba, kp_set[j].piece_ppa);
 		}	
 		read_helper_insert_done(rh);
@@ -295,6 +312,7 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		res->end_ppa=UINT32_MAX;
 	}
 
+
 	res->start_lba=kp_set[0].lba;
 	res->end_lba=kp_set[last_idx].lba;
 	res->_read_helper=rh;
@@ -311,6 +329,12 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	write_req->param=(void*)vs;
 	write_req->end_req=comp_alreq_end_req;
 	io_manager_issue_internal_write(map_ppa, vs, write_req, false);
+
+	if(function_debug_flag){
+		printf("debug print\n");
+		sst_print(res);
+		function_debug_flag=false;
+	}
 	return res;
 }
 
@@ -424,6 +448,7 @@ static inline level *fa_make_pinned_level(level *pinned_level,
 					run_append_sstfile_move_originality(res_r, res_file);
 				}
 				else{
+					res_file->sequential_file?LSM.monitor.flushing_sequential_file++:LSM.monitor.flushing_random_file++;
 					level_append_sstfile(res, res_file, true);
 					sequential_flag_update(1);
 				}
@@ -477,6 +502,7 @@ out:
 				run_append_sstfile_move_originality(res_r, sptr);
 			}
 			else{
+				sptr->sequential_file?LSM.monitor.flushing_sequential_file++:LSM.monitor.flushing_random_file++;
 				level_append_sstfile(res, sptr, true);
 			}
 			m_iter=kp_set->upper_bound(sptr->end_lba);

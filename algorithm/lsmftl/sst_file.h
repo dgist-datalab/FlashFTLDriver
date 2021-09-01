@@ -10,16 +10,17 @@ enum{
 };
 
 typedef union physcial_addr{
-	uint32_t piece_ppa; // for block_file
-	uint32_t map_ppa; //for page_file
+	volatile uint32_t piece_ppa; // for block_file
+	volatile uint32_t map_ppa; //for page_file
 }p_addr;
 
 
 typedef struct map_range{
 	uint32_t start_lba;
 	uint32_t end_lba;
-	uint32_t ppa;
+	volatile uint32_t ppa;
 	volatile bool read_done;
+	bool isgced;
 	char *data;
 }map_range;
 
@@ -37,10 +38,12 @@ typedef struct sst_file{
 
 	uint32_t start_lba;
 	uint32_t end_lba;
+	bool compaction_used;
 	struct read_helper *_read_helper;
 	
 	map_range *block_file_map;
 	bool is_issue_for_gc;
+	bool isgced;
 	volatile bool read_done;
 	char *data;
 }sst_file;

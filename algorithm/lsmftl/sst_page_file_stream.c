@@ -323,6 +323,7 @@ check_again:
 				goto check_again;
 			}
 			else{
+				printf("prev:%u now:%u\n", os->prev_lba, res.lba);
 				EPRINT("data error!", true);
 			}
 		}

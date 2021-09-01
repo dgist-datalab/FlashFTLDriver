@@ -208,4 +208,7 @@ void gbf_set_free(guard_bf_set* gbf){
 	free(gbf);
 }
 
-
+void gbf_update_piece_ppa(guard_bf_set *gbf, uint32_t idx, uint32_t piece_ppa){
+	uint32_t _idx=idx/BP_sub_member_num;
+	bf_update_piece_ppa((bf_set*)gbf->body[_idx].array, idx%BP_sub_member_num, piece_ppa);
+}

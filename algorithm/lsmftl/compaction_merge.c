@@ -24,6 +24,7 @@ void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 		param->map_target=&mr[i];
 		mr[i].data=NULL;
 		mr[i].read_done=false;
+		mr[i].isgced=false;
 		param->data=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 		fdriver_lock_init(&param->done_lock, 0);
 		read_arg->param[param_idx++]=param;
@@ -48,7 +49,10 @@ static bool invalid_map_done(inter_read_alreq_param *param, bool inv_flag){
 	param->map_target->data=NULL;
 	inf_free_valueset(param->data, FS_MALLOC_R);
 	fdriver_destroy(&param->done_lock);
-	invalidate_map_ppa(LSM.pm->bm, param->map_target->ppa, inv_flag);
+	if(!param->map_target->isgced){
+		invalidate_map_ppa(LSM.pm->bm, param->map_target->ppa, inv_flag);
+	}
+	param->map_target->isgced=false;
 	free(param);
 	//compaction_free_read_param(_cm, param);
 	return true;
@@ -98,11 +102,17 @@ static map_range * make_mr_set(sst_file *set, uint32_t start_idx, uint32_t end_i
 	uint32_t idx=0;
 	uint32_t mr_idx=0;
 	for(uint32_t i=start_idx; i<=end_idx; i++){
-		for_each_map_range(&set[i], mptr, idx){
-			if(LSM.global_debug_flag && mptr->ppa==debug_piece_ppa/L2PGAP){
-				printf("break!\n");
+		if(set[i].type==BLOCK_FILE){
+			for_each_map_range(&set[i], mptr, idx){
+				mr[mr_idx]=*mptr;
+				mr[mr_idx].data=NULL;
+				mr_idx++;
 			}
-			mr[mr_idx]=*mptr;
+		}
+		else{
+			mr[mr_idx].start_lba=set[i].start_lba;
+			mr[mr_idx].end_lba=set[i].end_lba;
+			mr[mr_idx].ppa=set[i].file_addr.map_ppa;
 			mr[mr_idx].data=NULL;
 			mr_idx++;
 		}
@@ -114,45 +124,59 @@ static map_range * make_mr_set_for_gc(sst_file *set, uint32_t start_idx, uint32_
 		uint32_t border_lba, uint32_t* map_num){
 	uint32_t target_map_num=0;
 	sst_file *sptr=&set[start_idx];
-	uint32_t first_map_idx=sst_upper_bound_map_idx(sptr, border_lba);
-
-	if(sptr->block_file_map[first_map_idx].end_lba==border_lba){
-		first_map_idx++;
+	uint32_t first_map_idx=0;
+	if(sptr->type==BLOCK_FILE){
+		first_map_idx=sst_upper_bound_map_idx(sptr, border_lba);
+		if(sptr->block_file_map[first_map_idx].end_lba==border_lba){
+			first_map_idx++;
+		}
+		target_map_num=sptr->map_num-first_map_idx;
+	}
+	else{
+		target_map_num=1;
 	}
 
-	target_map_num=sptr->map_num-first_map_idx;
 	map_range *res=NULL;
 	for(uint32_t i=start_idx+1; i<=end_idx; i++){
 		sptr=&set[i];
-		target_map_num+=sptr->map_num;
+		if(set[i].type==BLOCK_FILE){
+			target_map_num+=sptr->map_num;
+		}
+		else{
+			target_map_num++;
+		}
 	}
-
-	
 
 	if(!target_map_num) {
 		*map_num=0;
 		return NULL;
 	}
 	res=(map_range*)calloc(target_map_num, sizeof(map_range));
-	
+
 	uint32_t mr_idx=0;
 	for(uint32_t i=start_idx; i<=end_idx; i++){
 		sptr=&set[i];
-		if(first_map_idx && i==start_idx){
-			for(uint32_t j=first_map_idx; j<sptr->map_num; j++){
-				res[mr_idx]=sptr->block_file_map[j];
-				res[mr_idx].data=NULL;	
-				if(LSM.global_debug_flag && res[mr_idx].ppa==debug_piece_ppa/L2PGAP){
-					printf("break!\n");
+		if(sptr->type==BLOCK_FILE){
+			if(first_map_idx && i==start_idx){
+				for(uint32_t j=first_map_idx; j<sptr->map_num; j++){
+					res[mr_idx]=sptr->block_file_map[j];
+					res[mr_idx].data=NULL;	
+					mr_idx++;
 				}
+				continue;
+			}
+			map_range *mptr;
+			uint32_t idx;
+			for_each_map_range(sptr, mptr, idx){
+				res[mr_idx]=*mptr;
+				res[mr_idx].data=NULL;
 				mr_idx++;
 			}
-			continue;
 		}
-		map_range *mptr;
-		uint32_t idx;
-		for_each_map_range(sptr, mptr, idx){
-			res[mr_idx]=*mptr;
+		else{
+			res[mr_idx].start_lba=sptr->start_lba;
+			res[mr_idx].end_lba=sptr->end_lba;
+			res[mr_idx].ppa=sptr->file_addr.map_ppa;
 			res[mr_idx].data=NULL;
 			mr_idx++;
 		}
@@ -167,10 +191,6 @@ void compaction_adjust_by_gc(read_issue_arg *read_arg_set, sst_pf_out_stream *po
 #ifdef UPDATING_COMPACTION_DATA
 	if(!force){
 		if(!rptr->update_by_gc) return;
-	}
-
-	if(LSM.global_debug_flag){
-		printf("break!\n");
 	}
 
 	if(sst_file_type==PAGE_FILE){
@@ -331,7 +351,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 #ifdef LSM_DEBUG
 	printf("merge cnt:%u\n", cnt++);
 	if(cnt==7){
-		//LSM.global_debug_flag=true;
 //		printf("break!\n");
 	}
 #endif
@@ -583,9 +602,6 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	}
 
 	version_clear_merge_target(LSM.last_run_version, idx_set, des->idx);
-	if(new_run->now_sst_num==0){
-		printf("break!\n");
-	}
 	printf("prev - merge :%u run_num:%u new_run sst_size:%u\n", cnt, res->run_num, new_run->now_sst_num);
 	if(new_run->now_sst_num){
 		level_update_run_at_move_originality(res, target_ridx, new_run, true);
@@ -814,6 +830,11 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	//version_print_order(LSM.last_run_version, src->idx);
 #endif
 
+	static uint32_t cnt=0;
+	printf("TI2RUN %u\n", cnt++);
+	if(cnt==14){
+		//LSM.global_debug_flag=true;
+	}
 	map_range **mr_set=(map_range **)calloc(stream_num, sizeof(map_range*));
 	/*make it reverse order for stream sorting*/
 	//printf("target ridx print\n"); 
@@ -821,10 +842,17 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 		uint32_t ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
 		uint32_t sst_file_num=src->array[ridx].now_sst_num;
 		uint32_t map_num=0;
-
 		//printf("\tridx:%u\n", ridx);
 		for(uint32_t j=0; j<sst_file_num; j++){
-			map_num+=src->array[ridx].sst_set[j].map_num;
+			if(src->array[ridx].sst_set[j].type==PAGE_FILE){
+				map_num++;
+				if(src->array[ridx].sst_set[j].map_num){
+					EPRINT("why??", true);
+				}
+			}
+			else{
+				map_num+=src->array[ridx].sst_set[j].map_num;
+			}
 		}
 		/*
 		if(!map_num){
@@ -874,9 +902,6 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	while(!(sorting_done==((1<<stream_num)-1) && read_done==((1<<stream_num)-1))){
 
 		if(gced){
-			if(gced && LSM.global_debug_flag){
-				printf("target_break!\n");
-			}
 			for(int32_t i=stream_num-1, j=0; i>=0; i--, j++){
 				if(read_done & (1<<j)) continue;
 				if(LSM.global_debug_flag && j==12){

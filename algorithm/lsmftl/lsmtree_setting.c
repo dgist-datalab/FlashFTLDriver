@@ -610,6 +610,9 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			if(settings[i].isinvalid) continue;
 
 			settings[i].memory_usage_bit+=RANGE*ceil(log2(settings[i].size_factor * i));
+			/*
+			settings[i].memory_limit_for_helper=memory_limit_bit-
+				(RANGE*ceil(log2(settings[i].size_factor*i)))-write_buffer_memory_bit;*/
 			settings[i].run_num=settings[i].size_factor*i;
 			settings[i].WAF=i+1;
 			for(uint32_t j=i; j>=1; j--){
@@ -636,9 +639,11 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 				settings[i].lp[j].is_wisckey=false;
 				if(bf_memory_per_ent(run_coverage_ratio) < plr_memory_per_ent(run_coverage_ratio)){
 					settings[i].lp[j].is_bf=true;
+					settings[i].BF_memory+=bf_memory_per_ent(run_coverage_ratio)*level_size;
 				}
 				else{
 					settings[i].lp[j].is_bf=false;
+					settings[i].PLR_memory+=plr_memory_per_ent(run_coverage_ratio)*level_size;
 				}
 				uint64_t run_memory_usage_bit= level_size *
 					MIN(bf_memory_per_ent(run_coverage_ratio), plr_memory_per_ent(run_coverage_ratio));
@@ -684,6 +689,7 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	/*setting up lsmtree_parameter*/
 	target_level_param.size_factor=round(target_level_param.size_factor);
 	res.tr=target_level_param;
+	//res.tr.memory_limit_for_helper-=res.tr.BF_memory;
 
 	res.bf_ptr_guard_rhp.type=HELPER_BF_PTR_GUARD;
 	res.bf_ptr_guard_rhp.target_prob=TARGETFPR;
@@ -722,7 +728,6 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 			break;
 		}
 	}
-
 #endif
 
 	//free(settings);

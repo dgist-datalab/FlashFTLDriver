@@ -26,6 +26,7 @@ uint32_t gbf_get_start_idx(guard_bf_set *, uint32_t lba);
 guard_bf_set* gbf_set_copy(guard_bf_set *src);
 void gbf_set_move(guard_bf_set *des, guard_bf_set *src);
 void gbf_set_free(guard_bf_set*);
+void gbf_update_piece_ppa(guard_bf_set *, uint32_t idx, uint32_t piece_ppa);
 
 static inline uint32_t gbf_get_memory_usage_bit(guard_bf_set *gbf_set, uint32_t lba_unit){
 	uint32_t res=0;

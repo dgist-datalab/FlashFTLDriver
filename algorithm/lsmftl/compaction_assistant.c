@@ -186,10 +186,21 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 			rh=read_helper_init(lsmtree_get_target_rhp(LSM.param.LEVELN-1));
 		}
 		else{
+		#ifdef DYNAMIC_WISCKEY
+			if(LSM.next_level_wisckey_compaction){
+				rh=read_helper_init(LSM.param.bf_ptr_guard_rhp);
+			}
+			else{
+				rh=read_helper_init(lsmtree_get_target_rhp(0));
+			}
+		#else
 			rh=read_helper_init(lsmtree_get_target_rhp(0));
+		#endif
+
 		}
 #else
 		rh=read_helper_init(lsmtree_get_target_rhp(0));
+
 #endif
 		//read_helper
 		for(uint32_t j=0; j<i; j++){
@@ -455,11 +466,8 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	level *lev=NULL;
 	static uint32_t demote_cnt=0;
 	printf("demote_cnt: %u\n", demote_cnt++);
-
-	if(demote_cnt==699){
-		printf("break!\n");
-	}
 	if(temp_level){
+		temp_level->compacting_wisckey_flag=LSM.next_level_wisckey_compaction;
 		LSM.monitor.flushed_kp_num+=LSM.flushed_kp_set->size();
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
@@ -517,7 +525,17 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 					lev=compaction_LW2TW(cm, src_lev, des_lev, target_version, &populated);
 					break;
 				case TIERING:
-					lev=compaction_LW2TI(cm, src_lev, des_lev, target_version, &populated);
+#ifdef DYNAMIC_WISCKEY
+					if(src_lev->compacting_wisckey_flag){
+						lev=compaction_LW2TW(cm, src_lev, des_lev, target_version, &populated);
+					}
+					else{
+#endif
+						lev=compaction_LW2TI(cm, src_lev, des_lev, target_version, &populated);
+					
+#ifdef DYNAMIC_WISCKEY
+					}
+#endif
 					break;
 			}
 			break;
@@ -617,13 +635,10 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		LSM.flushed_kp_seg->clear();
 	
 		/*coupling version*/
-		if(LSM.global_debug_flag){
-			printf("break!\n");
-		}
 		std::map<uint32_t, uint32_t>::iterator map_iter;
 		for(map_iter=LSM.flushed_kp_set->begin(); map_iter!=LSM.flushed_kp_set->end(); map_iter++){
 			if(LSM.global_debug_flag && map_iter->first==debug_lba){
-				printf("break!\n");
+//				printf("break!\n");
 			}
 			version_coupling_lba_version(LSM.last_run_version, map_iter->first, target_version);
 		}
@@ -667,6 +682,8 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		level_free(temp_level, LSM.pm);
 		LSM.pinned_level=NULL;
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
+
+		LSM.next_level_wisckey_compaction=lsmtree_target_run_wisckeyable(LSM.param.write_buffer_ent, true);
 	}
 	else{
 		version_level_invalidate_number_init(LSM.last_run_version, start_idx);
