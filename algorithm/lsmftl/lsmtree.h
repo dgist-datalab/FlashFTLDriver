@@ -251,6 +251,7 @@ uint32_t lsmtree_total_invalidate_num(lsmtree *lsm);
 
 uint32_t lsmtree_testing();
 uint32_t lsmtree_seg_debug(lsmtree *lsm);
+uint32_t lsmtree_get_seg_invalidate_number();
 bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper);
 
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting);

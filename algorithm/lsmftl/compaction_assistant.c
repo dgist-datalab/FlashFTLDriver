@@ -881,6 +881,16 @@ void check_and_make_available_data(){
 	}
 }
 
+bool force_merging_test(){
+	uint32_t total_remain_page=page_manager_get_total_remain_page(LSM.pm, true, false);
+	if(total_remain_page>_PPS) return false;
+	uint32_t total_invalidate_number=lsmtree_get_seg_invalidate_number();
+	if(total_invalidate_number<_PPS){
+		printf("force_merging!\n");
+	}
+	return total_invalidate_number < _PPS;
+}
+
 void* compaction_main(void *_cm){
 	compaction_master *cm=(compaction_master*)_cm;
 	queue *req_q=(queue*)cm->req_q;
@@ -954,13 +964,13 @@ again:
 		lsmtree_level_summary(&LSM);
 
 		if(level_is_full(LSM.disk[req->end_level], LSM.param.last_size_factor)){
-			if(req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)){
+			if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)) || force_merging_test()){
 				last_level_reclaim(cm, LSM.param.LEVELN-1);
 			}
 			else if(req->end_level==LSM.param.LEVELN-1){
 				goto end;
 			}
-
+			
 			req->start_level=req->end_level;
 			req->end_level++;
 			goto again;
@@ -984,23 +994,28 @@ again:
 				goto again;
 			}
 		}
-
+		/*
+		if(force_merging_test()){
+			last_level_reclaim(cm, LSM.param.LEVELN-1);
+		}*/
 end:
-/*
+
 		if(page_manager_get_total_remain_page(LSM.pm, false, true) <_PPS){
 			uint32_t res=lsmtree_total_invalidate_num(&LSM);
-			//printf("remain total invalidate_num:%u %u\n", res, _PPS);
 			if(res<_PPS*L2PGAP){
-
+				printf("force compaction!\n");
 				lsmtree_level_summary(&LSM);
-
+				if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor))){
+					last_level_reclaim(cm, LSM.param.LEVELN-1);
+					goto end;
+				}	
 				req->start_level=req->end_level;
 				req->end_level++;
 				force=true;
 				goto again;
 			}
 		}
-*/
+
 		force=false;
 		tag_manager_free_tag(cm->tm,req->tag);
 		req->end_req(req);

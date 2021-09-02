@@ -1298,6 +1298,13 @@ read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
 	return LSM.param.plr_rhp;
 }
 
+uint32_t lsmtree_get_seg_invalidate_number(){
+	uint32_t res=0;
+	for(uint32_t i=0; i<_NOS; i++){
+		res+=LSM.pm->bm->get_invalidate_number(LSM.pm->bm, i);
+	}
+	return res;
+}
 uint32_t lsmtree_seg_debug(lsmtree *lsm){
 //#ifdef LSM_DEBUG
 	page_manager *pm=lsm->pm;
