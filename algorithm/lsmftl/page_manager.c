@@ -10,7 +10,7 @@
 extern lsmtree LSM;
 //uint32_t debug_piece_ppa=1105510*L2PGAP;
 //uint32_t debug_piece_ppa=386798*L2PGAP;
-uint32_t debug_piece_ppa=UINT32_MAX;
+uint32_t debug_piece_ppa=868351*L2PGAP;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
 
@@ -178,7 +178,7 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("validate map here!\n", false);
 		printf("[info] map_ppa:%u, s~e %u ~ %u\n", map_ppa, start_lba, end_lba);
-		
+		LSM.global_debug_flag=true;
 	}
 #endif
 
@@ -1118,13 +1118,12 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	write_buffer *wisckey_node_wb=NULL, *page_file_wb=NULL;
 	std::map<uint32_t, gc_mapping_check_node *> *gc_kv_map=new std::map<uint32_t, gc_mapping_check_node*>();
 	std::map<uint32_t, gc_mapping_check_node*> *gc_page_file_kv_map=new std::map<uint32_t, gc_mapping_check_node*>();
-	std::map<uint32_t, gc_mapping_check_node*> *gc_page_file_map=new std::map<uint32_t, gc_mapping_check_node*>();
+	std::multimap<uint32_t, gc_mapping_check_node*> *gc_page_file_map=new std::multimap<uint32_t, gc_mapping_check_node*>();
 	std::multimap<uint32_t, gc_mapping_check_node*> *gc_page_file_invalid_kv_map=new std::multimap<uint32_t, gc_mapping_check_node*>();
 
 	gc_mapping_check_node *gmc=NULL;
 
 	gc_sptr_node *gsn=NULL;
-	std::set<uint32_t> filtering_page_map_ppa;
 	while(!gc_target_queue->empty()){
 		gn=gc_target_queue->front();
 		fdriver_lock(&gn->done_lock);
@@ -1132,9 +1131,10 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		oob_manager *oob=get_oob_manager(ppa);
 		oob_lba=oob->lba;
 		oob_version=oob->version;
-	//	if(filtering_page_map_ppa.count(ppa)) continue;
+		if(LSM.global_debug_flag && gn->piece_ppa==debug_piece_ppa){
+			printf("break!\n");
+		}
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(filtering_page_map_ppa.count(ppa)) continue;
 			if(bm->is_invalid_page(bm, ppa*L2PGAP+i)){
 				continue;
 			}
@@ -1186,12 +1186,15 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 					}
 					sptr=lsmtree_find_target_normal_sst_datagc(gn->lba, gn->piece_ppa, &level_idx, &target_version, &sptr_idx);
 					if(sptr && sptr->type==PAGE_FILE){
-						uint32_t now_sptr_map_ppa=sptr->file_addr.map_ppa;
-						filtering_page_map_ppa.insert(now_sptr_map_ppa);
 						if(sptr->file_addr.map_ppa==gn->piece_ppa/L2PGAP){
-							gmc=gmc_init(gn, sptr, target_version);
-							gmc->is_page_file_map=true;
-							gc_page_file_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
+							if(gn->piece_ppa%L2PGAP==0){
+								gmc=gmc_init(gn, sptr, target_version);
+								gmc->is_page_file_map=true;
+								gc_page_file_map->insert(std::pair<uint32_t, gc_mapping_check_node*>(gmc->lba, gmc));
+								if(sptr->file_addr.map_ppa==debug_piece_ppa/L2PGAP){
+									printf("target_sptr:%u~%u %u, lba:%u\n", sptr->start_lba, sptr->end_lba, sptr->file_addr.map_ppa, gn->lba);
+								}
+							}
 						}
 						else{
 							recent_version=version_map_lba(LSM.last_run_version, oob_lba[i]);

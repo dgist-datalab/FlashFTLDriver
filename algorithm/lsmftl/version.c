@@ -196,6 +196,48 @@ void version_clear_merge_target(version *v, uint32_t *version_set, uint32_t leve
 	version_update_mapping_merge(v, version_set, level_idx);
 }
 
+static void version_order_update(version *v, uint32_t target_version, uint32_t level_idx){
+	uint32_t target_order=v->V2O_map[level_idx][target_version];
+	for(uint32_t i=0; i<v->level_run_num[level_idx]; i++){
+		uint32_t decrease_num=0;
+		if(i==target_version) continue;
+		if(i > target_version) decrease_num++;
+
+		if(decrease_num==0) continue;
+		uint32_t target_vidx=v->O2V_map[level_idx][i];
+		v->V2O_map[level_idx][target_vidx]=i-decrease_num;
+		v->O2V_map[level_idx][i-decrease_num]=target_vidx;
+
+		uint32_t target_ridx=v->O2R_map[level_idx][i];
+		v->R2O_map[level_idx][target_ridx]=i-decrease_num;
+		v->O2R_map[level_idx][i-decrease_num]=target_ridx;
+	}
+	v->level_order_token[level_idx]-=1;
+}
+
+void version_clear_target(version *v, uint32_t target_version, uint32_t level_idx){
+	v->version_invalidate_number[target_version]=0;
+
+	std::list<uint32_t>::iterator v_iter=v->version_populate_queue[level_idx][VERSION]->begin();
+	std::list<uint32_t>::iterator r_iter=v->version_populate_queue[level_idx][RUNIDX]->begin();
+
+	for(; v_iter!=v->version_empty_queue[level_idx][VERSION]->end(); ){
+		if(*v_iter==target_version){		
+			v->version_empty_queue[level_idx][VERSION]->push_back(*v_iter);
+			v->version_empty_queue[level_idx][RUNIDX]->push_back(*r_iter);
+
+			v->version_populate_queue[level_idx][VERSION]->erase(v_iter);
+			v->version_populate_queue[level_idx][RUNIDX]->erase(r_iter);			
+			break;
+		}
+		else{
+			v_iter++;
+			r_iter++;
+		}
+	}
+	version_order_update(v, target_version, level_idx);
+}
+
 void version_repopulate_merge_target(version *v, uint32_t target_version, uint32_t ridx, uint32_t level_idx){
 	uint32_t get_version=v->version_empty_queue[level_idx][VERSION]->front();
 	uint32_t get_ridx=v->version_empty_queue[level_idx][RUNIDX]->front();

@@ -317,9 +317,48 @@ static inline void map_range_postprocessing(std::list<mr_free_set>* mr_list,  ui
 	}
 }
 
+level *compaction_merge_empty_run(level *des, run *older, run *newer, uint32_t *idx_set){
+	level *res=level_init(des->max_sst_num, des->max_run_num, des->level_type, des->idx, des->max_contents_num, des->check_full_by_size);
+	uint32_t big_order=MAX(
+			version_to_order(LSM.last_run_version, des->idx, idx_set[0]),
+			version_to_order(LSM.last_run_version, des->idx, idx_set[1]));
+	uint32_t small_order=MIN(
+			version_to_order(LSM.last_run_version, des->idx, idx_set[0]),
+			version_to_order(LSM.last_run_version, des->idx, idx_set[1]));
+
+	run *rptr; uint32_t ridx;
+	for_each_run_max(des, rptr, ridx){
+		if(ridx!=idx_set[0] && ridx!=idx_set[1]){
+			if(rptr->now_sst_num || rptr->sst_num_zero_by_gc){
+				level_append_run_copy_move_originality(res, rptr, ridx);
+			}
+		}
+	}
+
+	if(older->now_sst_num==0 &&  newer->now_sst_num==0){
+		printf("double empty merging\n");
+		version_clear_target(LSM.last_run_version, 
+				version_order_to_version(LSM.last_run_version, des->idx, small_order), 
+				des->idx);
+		version_clear_target(LSM.last_run_version, 
+				version_order_to_version(LSM.last_run_version, des->idx, big_order), 
+				des->idx);
+	}
+	else if(older->now_sst_num==0){
+		printf("big order merging\n");
+		version_clear_target(LSM.last_run_version, version_order_to_version(LSM.last_run_version, des->idx, small_order), des->idx);
+		level_update_run_at_move_originality(res, version_order_to_ridx(LSM.last_run_version, des->idx, big_order), newer, true);
+	}
+	else{
+		printf("small order merging\n");
+		version_clear_target(LSM.last_run_version, version_order_to_version(LSM.last_run_version, des->idx, big_order), des->idx);
+		level_update_run_at_move_originality(res, version_order_to_ridx(LSM.last_run_version, des->idx, small_order), older, true);
+	}
+	return res;
+}
+
 level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	_cm=cm;
-	run *new_run=run_init(des->max_sst_num/des->max_run_num, UINT32_MAX, 0);
 
 	LSM.now_merging_run[0]=idx_set[0];
 	LSM.now_merging_run[1]=idx_set[1];
@@ -334,6 +373,11 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	run *older=&des->array[version_order_to_ridx(LSM.last_run_version, des->idx, small_order)];
 	run *newer=&des->array[version_order_to_ridx(LSM.last_run_version, des->idx, big_order)];
 
+	if(older->now_sst_num==0 || newer->now_sst_num==0){	
+		return compaction_merge_empty_run(des, older, newer, idx_set);
+	}
+
+	run *new_run=run_init(des->max_sst_num/des->max_run_num, UINT32_MAX, 0);
 	read_issue_arg read_arg1={0,}, read_arg2={0,};
 	read_issue_arg read_arg1_prev={0,}, read_arg2_prev={0,};
 	read_arg_container thread_arg;
@@ -350,8 +394,8 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 	static int cnt=0;
 #ifdef LSM_DEBUG
 	printf("merge cnt:%u\n", cnt++);
-	if(cnt==7){
-//		printf("break!\n");
+	if(cnt==35){
+		printf("break!\n");
 	}
 #endif
 
@@ -614,7 +658,7 @@ level* compaction_merge(compaction_master *cm, level *des, uint32_t *idx_set){
 
 	run_free(new_run);
 
-	version_poped_update(LSM.last_run_version, des->idx, MERGED_RUN_NUM);
+	//version_poped_update(LSM.last_run_version, des->idx, MERGED_RUN_NUM);
 
 	printf("merge %u,%u to %u\n", idx_set[0], idx_set[1], target_ridx);
 	delete new_range_set;

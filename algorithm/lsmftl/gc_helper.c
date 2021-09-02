@@ -370,10 +370,9 @@ out:
 }
 
 void gc_helper_for_page_file(std::map<uint32_t, gc_mapping_check_node*>* gkv,
-		std::map<uint32_t, gc_mapping_check_node*>* gm,
+		std::multimap<uint32_t, gc_mapping_check_node*>* gm,
 		std::multimap<uint32_t, gc_mapping_check_node*> *invalid_kp_data,
 		struct write_buffer *wb, uint32_t seg_idx){
-	if(!wb) return;
 	key_ptr_pair *kp_set;
 	gc_mapping_check_node *gcn;
 	std::set<void *>sptr_set;
@@ -381,28 +380,34 @@ void gc_helper_for_page_file(std::map<uint32_t, gc_mapping_check_node*>* gkv,
 	uint32_t level_idx;
 	uint32_t target_version;
 	uint32_t sptr_idx;
-	while((kp_set=write_buffer_flush_for_gc(wb, false, seg_idx, NULL, UINT32_MAX, gkv))){
-		for(uint32_t i=0; i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++, gkv_iter++){
-			if(gkv_iter->first!=kp_set[i].lba){
-				EPRINT("different kv!", true);
+	if(wb){
+		gkv_iter=gkv->begin();
+		while((kp_set=write_buffer_flush_for_gc(wb, false, seg_idx, NULL, UINT32_MAX, gkv))){
+			for(uint32_t i=0; i<KP_IN_PAGE && kp_set[i].lba!=UINT32_MAX; i++, gkv_iter++){
+				if(gkv_iter->first!=kp_set[i].lba){
+					EPRINT("different kv!", true);
+				}
+				gcn=gkv_iter->second;
+				if(gcn->lba==debug_lba){
+					printf("break!\n");
+				}
+				gcn->sptr=lsmtree_find_target_normal_sst_datagc(gcn->lba, gcn->piece_ppa, &level_idx, &target_version, &sptr_idx);
+				if(!gcn->sptr->data){
+					gc_helper_issue_read_node(gcn->sptr, gcn, LSM.li);
+				}
+				sptr_set.insert((void*)gcn->sptr);
+				updating_now_compactioning_data(gcn->version, seg_idx, gcn->lba, gcn->new_piece_ppa);
 			}
-			gcn=gkv_iter->second;
-			if(gcn->lba==1427683 || gkv_iter->first==1427683){
-				printf("break!\n");
-			}
-			gcn->sptr=lsmtree_find_target_normal_sst_datagc(gcn->lba, gcn->piece_ppa, &level_idx, &target_version, &sptr_idx);
-			if(!gcn->sptr->data){
-				gc_helper_issue_read_node(gcn->sptr, gcn, LSM.li);
-			}
-			sptr_set.insert((void*)gcn->sptr);
-			updating_now_compactioning_data(gcn->version, seg_idx, gcn->lba, gcn->new_piece_ppa);
+			free(kp_set);
 		}
-		free(kp_set);
 	}
 
 	gkv_iter=gm->begin();
 	for(;gkv_iter!=gm->end(); gkv_iter++){
 		gcn=gkv_iter->second;
+		if(gcn->lba==36608){
+			printf("break!\n");
+		}
 		gcn->sptr=lsmtree_find_target_normal_sst_datagc(gcn->lba, gcn->piece_ppa, &level_idx, &target_version, &sptr_idx);
 		if(!gcn->sptr->data){
 			gc_helper_issue_read_node(gcn->sptr, gcn, LSM.li);
@@ -428,7 +433,7 @@ void gc_helper_for_page_file(std::map<uint32_t, gc_mapping_check_node*>* gkv,
 			fdriver_lock(&gcn->done_lock);
 		}
 
-		if(gcn->lba==debug_lba && gcn->piece_ppa==debug_piece_ppa){
+		if(gcn->sptr->file_addr.map_ppa==debug_piece_ppa/L2PGAP){
 			printf("break!\n");
 		}
 		sst_file *sptr=gcn->sptr;
@@ -458,6 +463,9 @@ void gc_helper_for_page_file(std::map<uint32_t, gc_mapping_check_node*>* gkv,
 	std::set<void*>::iterator sptr_iter=sptr_set.begin();
 	for(; sptr_iter!=sptr_set.end(); sptr_iter++){
 		sst_file *sptr=(sst_file*)(*sptr_iter);
+		if(sptr->file_addr.map_ppa==debug_piece_ppa/L2PGAP){
+			printf("break!\n");
+		}
 		uint32_t old_map_ppa=sptr->file_addr.map_ppa;
 		invalidate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, true);
 		uint32_t map_ppa=page_manager_get_reserve_new_ppa(LSM.pm, false, seg_idx);

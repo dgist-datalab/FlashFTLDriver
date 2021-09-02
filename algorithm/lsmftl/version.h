@@ -78,6 +78,7 @@ uint32_t version_decrease_invalidation_number(version *v, uint32_t _version,
 		int32_t decrease_num);
 
 void version_reunpopulate(version *v, uint32_t version, uint32_t level_idx);
+void version_clear_target(version *v, uint32_t version, uint32_t level_idx);
 
 static inline uint32_t version_order_to_ridx(version *v, uint32_t lev_idx, uint32_t order){
 	return v->O2R_map[lev_idx][order];

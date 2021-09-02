@@ -90,7 +90,7 @@ void gc_helper_for_normal(std::map<uint32_t, gc_mapping_check_node*>*,
 void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*, 
 		struct write_buffer *wb, uint32_t seg_idx);
 void gc_helper_for_page_file(std::map<uint32_t, gc_mapping_check_node*>* kp_data, 
-		std::map<uint32_t, gc_mapping_check_node*>* map_data,
+		std::multimap<uint32_t, gc_mapping_check_node*>* map_data,
 		std::multimap<uint32_t, gc_mapping_check_node*> *invalid_kp_data,
 		struct write_buffer *wb, uint32_t seg_idx);
 bool updating_now_compactioning_data(uint32_t version, uint32_t seg_idx, uint32_t lba, uint32_t new_piece_ppa);
