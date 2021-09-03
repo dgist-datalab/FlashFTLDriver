@@ -282,11 +282,31 @@ void version_reunpopulate(version *v, uint32_t version, uint32_t level_idx){
 }
 void version_clear_level(version *v, uint32_t level_idx){
 	uint32_t max_run_num=v->version_populate_queue[level_idx][VERSION]->size();
+	if(max_run_num==v->level_run_num[level_idx]){
+		for(uint32_t i=0; i<max_run_num; i++){
+			version_unpopulate(v,
+					version_pop_oldest_version(LSM.last_run_version, level_idx),
+					level_idx);
+		}
+	}
+	else{
+		v->version_empty_queue[level_idx][VERSION]->clear();
+		v->version_empty_queue[level_idx][RUNIDX]->clear();
 
-	for(uint32_t i=0; i<max_run_num; i++){
-		version_unpopulate(v,
-				version_pop_oldest_version(LSM.last_run_version, level_idx),
-				level_idx);
+		v->version_populate_queue[level_idx][VERSION]->clear();
+		v->version_populate_queue[level_idx][RUNIDX]->clear();
+
+		uint32_t limit=LSM.disk[level_idx]->max_run_num;
+		uint32_t version=v->start_vidx_of_level[level_idx];
+		for(uint32_t j=0; j<limit; j++){
+			v->V2O_map[level_idx][version-v->start_vidx_of_level[level_idx]]=j;
+			v->O2V_map[level_idx][j]=version;
+			v->R2O_map[level_idx][j]=j;
+			v->O2R_map[level_idx][j]=j;
+
+			v->version_empty_queue[level_idx][VERSION]->push_back(version++);
+			v->version_empty_queue[level_idx][RUNIDX]->push_back(j);
+		}
 	}
 	v->level_order_token[level_idx]=0;
 }

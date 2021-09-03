@@ -178,7 +178,6 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("validate map here!\n", false);
 		printf("[info] map_ppa:%u, s~e %u ~ %u\n", map_ppa, start_lba, end_lba);
-		LSM.global_debug_flag=true;
 	}
 #endif
 
