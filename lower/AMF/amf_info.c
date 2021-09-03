@@ -58,7 +58,7 @@ static uint8_t test_type(uint8_t type){
 	return type&t_type;
 }
 
-void amf_traffic_print(lower_info *){
+void amf_traffic_print(lower_info *li){
 	static int cnt=0;
 	printf("traffic print: %u\n", cnt++);
 	for(int i=0; i<LREQ_TYPE_NUM;i++){
