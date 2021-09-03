@@ -584,21 +584,10 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 				/*do nothing*/
 			}
 			else{
-				if(src_lev->run_num < src_lev->max_run_num){
-					version_get_resort_version(LSM.last_run_version, src_lev->idx);
-				}
-				else{
-					version_clear_level(LSM.last_run_version, src_lev->idx);
-				}
+				version_clear_level(LSM.last_run_version, src_lev->idx);
 			}
 #else
-			if(src_lev->run_num < src_lev->max_run_num){
-				version_get_resort_version(LSM.last_run_version, src_lev->idx);
-			}
-			else{
-				version_clear_level(LSM.last_run_version, src_lev->idx);
-
-			}
+			version_clear_level(LSM.last_run_version, src_lev->idx);
 #endif
 		}
 	}
@@ -1002,8 +991,12 @@ end:
 
 		if(page_manager_get_total_remain_page(LSM.pm, false, true) <_PPS){
 			uint32_t res=lsmtree_total_invalidate_num(&LSM);
-			if(res<_PPS*L2PGAP){
-				printf("force compaction!\n");
+			if(res<_PPS*L2PGAP*4){
+				static int cnt=0;
+				printf("force compaction! %u\n", cnt++);
+				if(cnt==4){
+					printf("break!\n");
+				}
 				lsmtree_level_summary(&LSM);
 				if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor))){
 					last_level_reclaim(cm, LSM.param.LEVELN-1);

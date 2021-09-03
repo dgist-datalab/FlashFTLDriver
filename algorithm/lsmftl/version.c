@@ -281,7 +281,8 @@ void version_reunpopulate(version *v, uint32_t version, uint32_t level_idx){
 	v->level_order_token[level_idx]--;
 }
 void version_clear_level(version *v, uint32_t level_idx){
-	uint32_t max_run_num=v->level_run_num[level_idx];
+	uint32_t max_run_num=v->version_populate_queue[level_idx][VERSION]->size();
+
 	for(uint32_t i=0; i<max_run_num; i++){
 		version_unpopulate(v,
 				version_pop_oldest_version(LSM.last_run_version, level_idx),
