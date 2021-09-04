@@ -305,6 +305,13 @@ static void thread_hold(int sig_id) {
 	}
 }
 
+void mask_sig(){
+	sigset_t mask;
+	sigemptyset(&mask); 
+	sigaddset(&mask, SIGUSR1); 
+
+	pthread_sigmask(SIG_BLOCK, &mask, NULL);
+}
 
 /* What each thread is doing
 *
@@ -341,8 +348,9 @@ static void* thread_do(void *param){//struct thread* thread_p){
 	act.sa_handler = thread_hold;
 	if (sigaction(SIGUSR1, &act, NULL) == -1) {
 		err("thread_do(): cannot handle SIGUSR1");
-	}
+		}
 */
+	mask_sig();
 	/* Mark thread as alive (initialized) */
 	pthread_mutex_lock(&thpool_p->thcount_lock);
 	thpool_p->num_threads_alive += 1;
