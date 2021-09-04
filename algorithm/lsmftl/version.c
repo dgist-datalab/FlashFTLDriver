@@ -258,6 +258,7 @@ void version_repopulate_merge_target(version *v, uint32_t target_version, uint32
 	}
 
 	uint32_t order=v->level_order_token[level_idx];
+	
 	if(order!=v->level_run_num[level_idx]-2){
 		EPRINT("order error", true);
 	}

@@ -988,10 +988,10 @@ again:
 			last_level_reclaim(cm, LSM.param.LEVELN-1);
 		}*/
 end:
-
-		if(page_manager_get_total_remain_page(LSM.pm, false, true) <_PPS){
+		if(force==false && page_manager_get_total_remain_page(LSM.pm, false, true) <_PPS){
 			uint32_t res=lsmtree_total_invalidate_num(&LSM);
 			if(res<_PPS*L2PGAP*4){
+				
 				static int cnt=0;
 				printf("force compaction! %u\n", cnt++);
 				if(cnt==33){
@@ -1000,12 +1000,22 @@ end:
 				lsmtree_level_summary(&LSM);
 				if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor))){
 					last_level_reclaim(cm, LSM.param.LEVELN-1);
-					goto end;
-				}	
-				req->start_level=req->end_level;
-				req->end_level++;
-				force=true;
-				goto again;
+	//				goto end;
+				}
+				else{
+					req->start_level=req->end_level;
+					req->end_level++;
+					force=true;
+					goto again;
+				}
+				/*
+				static int cnt=0;
+				printf("force compaction! %u\n", cnt++);
+				if(cnt==33){
+					printf("break!\n");
+				}
+				last_level_reclaim(cm, LSM.param.LEVELN-1);
+				goto end;*/
 			}
 		}
 
