@@ -118,15 +118,26 @@ void version_get_merge_target(version *v, uint32_t *version_set, uint32_t level_
 
 	int32_t most_version=-1;
 	int32_t most_invalid_num=0;
+	float most_invalid_ratio=0;
 	int32_t sec_most_version=-1;
+
 
 #ifdef INVALIDATION_COUNT_MERGE
 	for(uint32_t i=start_ver; i<=end_ver; i++){
+		float now_invalid_ratio=(float)v->version_invalidate_number[i]/LSM.disk[level_idx]->array[i].now_contents_num;
+
+		if(most_invalid_ratio < now_invalid_ratio){
+			most_invalid_ratio=now_invalid_ratio;
+			sec_most_version=most_version;
+			most_version=i;
+		}
+/*
 		if(most_invalid_num < v->version_invalidate_number[i]){
 			most_invalid_num=v->version_invalidate_number[i];
 			sec_most_version=most_version;
 			most_version=i;
 		}
+*/
 	}
 #endif
 
