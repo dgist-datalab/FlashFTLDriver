@@ -996,7 +996,6 @@ end:
 				printf("force compaction! %u\n", cnt++);
 				if(cnt==33){
 					printf("break!\n");
-					LSM.global_debug_flag=true;
 				}
 				lsmtree_level_summary(&LSM);
 				if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor))){

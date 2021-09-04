@@ -1130,12 +1130,6 @@ sst_file *lsmtree_find_target_normal_sst_datagc(uint32_t lba, uint32_t piece_ppa
 		uint32_t *lev_idx, uint32_t *target_version, uint32_t *target_sidx){
 	sst_file *res=NULL;
 	uint32_t ridx;
-	/*/
-	static int cnt=0;
-	printf("find_target cnt:%u\n",cnt++);
-	if(cnt==21){
-		printf("break!\n");
-	}*/
 	for(uint32_t i=0; i<LSM.param.LEVELN; i++){
 		level *lev=LSM.disk[i];
 		if(lev->level_type==TIERING_WISCKEY 
