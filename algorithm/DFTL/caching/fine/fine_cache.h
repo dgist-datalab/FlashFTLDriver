@@ -10,7 +10,7 @@
 #define set_flag(a, b) ((fine_cache_node*)((a)->private_data))->dirty_bit=(b)
 #define init_fcn(a) ((a)->private_data)=malloc(sizeof(fine_cache_node))
 
-#define FINECACHEENT_SZ (sizeof(uint32_t)+sizeof(uint32_t))
+#define FINECACHEENT_SZ (sizeof(uint32_t)+sizeof(uint32_t)+16) //lba+ppa+lru_ptr+hash_ptr
 
 typedef mapping_entry fine_cache;
 

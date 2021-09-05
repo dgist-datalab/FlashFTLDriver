@@ -79,7 +79,7 @@ inline static void tc_lru_traverse(LRU *lru, tp_node *tn){
 
 uint32_t tp_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&tcm.lru, NULL, NULL);
-	uint32_t target_bits=(32+get_bits_from_int(PAGESIZE/sizeof(uint32_t))+1); // ppa, offset, dirty
+	uint32_t target_bits=(32+get_bits_from_int(PAGESIZE/sizeof(uint32_t))+1)+32+32; // ppa, offset, dirty, lru_ptr, hash_ptr;
 	TP_ENTRY_SZ=target_bits/8+(target_bits%8?1:0);
 
 	tcm.max_caching_byte=total_caching_physical_pages*PAGESIZE;
@@ -729,7 +729,7 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba,
 				ppa_list[tc->offset]=tc->ppa;
 				set_tc_flag(tc, CLEAN_FLAG);
 				if(!demand_ftl.bm->query_bit(demand_ftl.bm, tc->ppa)){
-					printf("wtf1! %u:%u\n", GETLBA(tn, tc), tc->ppa);
+					printf("wtf1! %lu:%u\n", GETLBA(tn, tc), tc->ppa);
 					abort();
 				}
 #ifdef DFTL_DEBUG
@@ -874,7 +874,7 @@ void tp_print_log(struct my_cache *){
 	printf("now_caching_byte: %u max_caching_byte: %u\n", tcm.now_caching_byte, tcm.max_caching_byte);
 	printf("evicting_average:%lf\n", (double)tcm.total_evicting_cache_size/tcm.total_dirty_eviction_cnt);
 	printf("avg now caching byte:%lf\n", (double)tcm.total_now_caching_byte/tcm.cache_search_cnt);
-	printf("avg prefetching length:%lf %u\n", (double)tcm.total_prefetching_num/tcm.check_prefetching_cnt, tcm.check_prefetching_cnt);
+	printf("avg prefetching length:%lf %lu\n", (double)tcm.total_prefetching_num/tcm.check_prefetching_cnt, tcm.check_prefetching_cnt);
 	printf("total tn_num:%u (%.2lf) total tc_num:%u avg tc per tn:%.2lf\n", tn_cnt, (float)tn_cnt/(RANGE/(PAGESIZE/sizeof(uint32_t))), total_tc_cnt, (float)total_tc_cnt/tn_cnt);
 	printf("effective cache rate:%.2lf\n", (float)total_tc_cnt/RANGE);
 	printf("========================\n");

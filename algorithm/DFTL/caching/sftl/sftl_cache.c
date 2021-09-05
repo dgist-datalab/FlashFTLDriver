@@ -39,7 +39,9 @@ extern demand_map_manager dmm;
 
 uint32_t sftl_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&scm.lru, NULL, NULL);
-	scm.max_caching_byte=total_caching_physical_pages * PAGESIZE;
+	uint32_t half_translate_page_num=RANGE/(PAGESIZE/(sizeof(uint32_t)))/2;
+	scm.max_caching_byte=total_caching_physical_pages * PAGESIZE - half_translate_page_num * (4+4);
+	scm.max_caching_byte-=half_translate_page_num*2/8; //for dirty bit
 	scm.now_caching_byte=0;
 	mc->type=COARSE;
 	mc->entry_type=DYNAMIC;

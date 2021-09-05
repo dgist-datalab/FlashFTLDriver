@@ -36,7 +36,9 @@ extern demand_map_manager dmm;
 
 uint32_t coarse_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&ccm.lru, NULL, NULL);
-	ccm.max_caching_page=total_caching_physical_pages;
+	uint32_t max_translate_page_num=RANGE/(PAGESIZE/sizeof(uint32_t));
+	uint64_t total_memory=total_caching_physical_pages*PAGESIZE - max_translate_page_num/8;
+	ccm.max_caching_page=total_memory/(PAGESIZE+16);
 	ccm.now_caching_page=0;
 	mc->type=COARSE;
 	mc->private_data=NULL;
