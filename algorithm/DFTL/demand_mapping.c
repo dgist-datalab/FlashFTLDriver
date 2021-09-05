@@ -54,6 +54,7 @@ static void demand_cache_log(){
 	printf("\tEviction clean cnt: %u\n", DMI.clean_eviction);
 	printf("\tEviction dirty cnt: %u\n", DMI.dirty_eviction);
 	printf("===============================\n");
+	memset(DMI, 0, sizeof(DMI));
 }
 
 static inline char *cache_traverse_type(MAP_ASSIGN_STATUS a){
