@@ -629,7 +629,8 @@ retry_logic:
 	goto retry;
 
 out:
-	if(lsmtree_is_gc_available(&LSM, seg_idx) && victim_target->invalidate_number!=victim_target->validate_number){
+	//if(lsmtree_is_gc_available(&LSM, seg_idx) && victim_target->invalidate_number!=victim_target->validate_number){
+	if(lsmtree_is_gc_unavailable(&LSM, seg_idx)){
 //		if(LSM.global_debug_flag) printf("[%lu] %u is locked\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
@@ -637,6 +638,7 @@ out:
 //		if(LSM.global_debug_flag) printf("[%lu] %u is not enough invalid\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
+
 
 	if(LSM.flushed_kp_seg->find(seg_idx)!=LSM.flushed_kp_seg->end()){
 		res=true;
@@ -1061,7 +1063,6 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	
 	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
 	if(LSM.monitor.gc_data==655){
-		LSM.global_debug_flag=true;
 	//	printf("break!\n");
 	}
 	/*

@@ -466,6 +466,8 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	level *lev=NULL;
 	static uint32_t demote_cnt=0;
 	printf("demote_cnt: %u\n", demote_cnt++);
+	if(demote_cnt==930){
+	}
 	if(temp_level){
 		temp_level->compacting_wisckey_flag=LSM.next_level_wisckey_compaction;
 		LSM.monitor.flushed_kp_num+=LSM.flushed_kp_set->size();

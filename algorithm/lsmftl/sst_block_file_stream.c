@@ -249,7 +249,6 @@ sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read
 		res->rhp=rhp;
 	}
 	res->using_shared_value=false;
-
 	return res;
 }
 

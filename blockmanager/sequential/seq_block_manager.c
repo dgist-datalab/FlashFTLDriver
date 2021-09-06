@@ -468,6 +468,10 @@ int seq_get_page_num(struct blockmanager* bm,__segment *s){
 		total_num+=s->blocks[i]->now;
 	}
 	if(total_num!=s->used_page_num){
+		for(uint32_t i=0; i<BPS; i++){
+			//total_num+=s->blocks[i]->now;
+			printf("ttt: %u:%u\n", i, s->blocks[i]->now);
+		}
 		abort();
 	}
 #endif

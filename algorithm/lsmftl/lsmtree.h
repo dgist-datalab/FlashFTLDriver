@@ -255,7 +255,7 @@ uint32_t lsmtree_get_seg_invalidate_number();
 bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper);
 
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting);
-static inline bool lsmtree_is_gc_available(lsmtree *lsm, uint32_t seg_idx){
+static inline bool lsmtree_is_gc_unavailable(lsmtree *lsm, uint32_t seg_idx){
 	bool res;
 	fdriver_lock(&lsm->gc_unavailable_seg_lock);
 	res=lsm->gc_unavailable_seg[seg_idx]!=0?true:false;
