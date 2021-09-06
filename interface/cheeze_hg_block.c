@@ -241,6 +241,8 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		switch(type){
 			case FS_GET_T:
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+				measure_init(&temp->latency_checker);
+				measure_start(&temp->latency_checker);
 				break;
 			case FS_SET_T:
 #ifdef TRACE_REPLAY
@@ -248,6 +250,8 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 #else
 				temp->value=inf_get_valueset(&res->buf[LPAGESIZE*i],FS_MALLOC_W,PAGESIZE);
 #endif
+				measure_init(&temp->latency_checker);
+				measure_start(&temp->latency_checker);
 				break;	
 			case FS_FLUSH_T:
 				break;

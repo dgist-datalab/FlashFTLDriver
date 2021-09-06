@@ -199,8 +199,11 @@ void *vectored_main(void *__input){
 				switch(req->type){
 					case FS_GET_T:
 					case FS_SET_T:
+#ifdef REAL_BENCH_MODE
+#else
 						measure_init(&req->latency_checker);
 						measure_start(&req->latency_checker);
+#endif
 					break;
 				}
 				req->tag_num=tag_manager_get_tag(tm);
