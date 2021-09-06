@@ -92,6 +92,7 @@ void init_trace_cheeze(){
 }
 
 void init_cheeze(uint64_t phy_addr){
+	printf("QSIZE:%u\n", QSIZE);
 	int chrfd = open("/dev/mem", O_RDWR);
 	if (chrfd < 0) {
 		perror("Failed to open /dev/mem");
