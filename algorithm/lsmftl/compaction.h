@@ -18,7 +18,7 @@
 #include "sst_page_file_stream.h"
 #include <queue>
 
-#define COMPACTION_TAGS ((QDEPTH)*4)
+#define COMPACTION_TAGS ((512)*4)
 #define TARGETREADNUM(read_arg) (read_arg.to-read_arg.from+1)
 #define COMPACTION_LEVEL_NUM (2)
 
