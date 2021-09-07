@@ -622,6 +622,9 @@ static inline void lsmtree_read_param_reinit(lsmtree_read_param* param, request 
 
 	printf("L:%u R:%u sptr:%p\n", param->prev_level, param->prev_run, param->prev_sf);
 
+	if(param->target_level_rw_lock){
+		rwlock_read_unlock(param->target_level_rw_lock);
+	}
 	param->use_read_helper=false;
 	param->prev_run=UINT32_MAX;
 	param->prev_level=-1;
@@ -636,6 +639,10 @@ uint32_t lsmtree_read(request *const req){
 	if(!LSM.cm->tm->tagQ->size()){
 	//	printf("now compactioning\n");
 	//	abort();
+	}
+
+	if(req->global_seq==4228469){
+		printf("break!\n");
 	}
 	//printf("read key:%u\n", req->key);
 	lsmtree_read_param *r_param;
@@ -759,6 +766,10 @@ restart:
 	else{
 		r_param=(lsmtree_read_param*)req->param;
 
+		if(r_param->target_level_rw_lock==NULL){
+			r_param->target_level_rw_lock=&LSM.level_rwlock[r_param->prev_level];
+			rwlock_read_lock(r_param->target_level_rw_lock);
+		}
 		/*gced sstfile check*/
 		sst_file *sptr=run_retrieve_sst(&LSM.disk[r_param->prev_level]->array[r_param->prev_run], req->key);
 		if(sptr!=r_param->prev_sf){
@@ -989,6 +1000,9 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	uint32_t offset;
 	uint32_t piece_ppa=req->ppa;
 
+	if(parents->global_seq==4228469){
+		printf("break!\n");
+	}
 	if(parents->magic){
 		static int magic_end_cnt=0;
 		printf("[%u]magic end req->seq:%u\n", magic_end_cnt++, parents->global_seq);
@@ -1051,6 +1065,7 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 			printf("%u read_unlock - %u\n", rw_lock_lev, r_param->prev_level);
 #endif
 			rwlock_read_unlock(r_param->target_level_rw_lock);
+			r_param->target_level_rw_lock=NULL;
 		}
 		free(req);
 		if(!inf_assign_try(parents)){

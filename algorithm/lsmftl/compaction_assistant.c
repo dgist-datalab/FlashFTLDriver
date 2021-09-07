@@ -459,14 +459,16 @@ static inline level *TW_compaction(compaction_master *cm, level *src, level *des
 	level_free(temp, LSM.pm);
 	return res;
 }
-
+char rw_debug_flag=0;
 static inline void do_compaction_demote(compaction_master *cm, compaction_req *req, 
 		level *temp_level, uint32_t start_idx, uint32_t end_idx){
 
 	level *lev=NULL;
 	static uint32_t demote_cnt=0;
 	printf("demote_cnt: %u\n", demote_cnt++);
-	if(demote_cnt==930){
+	if(demote_cnt>= 999){
+		rw_debug_flag=1;
+		printf("break!\n");
 	}
 	if(temp_level){
 		temp_level->compacting_wisckey_flag=LSM.next_level_wisckey_compaction;

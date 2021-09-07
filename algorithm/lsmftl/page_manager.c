@@ -10,7 +10,8 @@
 extern lsmtree LSM;
 //uint32_t debug_piece_ppa=1105510*L2PGAP;
 //uint32_t debug_piece_ppa=386798*L2PGAP;
-uint32_t debug_piece_ppa=868351*L2PGAP;
+//uint32_t debug_piece_ppa=868351*L2PGAP;
+uint32_t debug_piece_ppa=UINT32_MAX;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
 
@@ -201,7 +202,7 @@ void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 		static int cnt=0;
 		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
 		EPRINT("invalidate map here!\n", false);
-		lsmtree_compactioning_set_print(map_ppa/_PPS);
+		//lsmtree_compactioning_set_print(map_ppa/_PPS);
 	}
 #endif
 
@@ -1181,7 +1182,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 							printf("now compactioning print\n");
 							*/
 							level_sptr_remove_at_in_gc(LSM.disk[gsn->lev_idx], ridx, gsn->sidx);
-							lsmtree_compactioning_set_print(victim->seg_idx);
+							//lsmtree_compactioning_set_print(victim->seg_idx);
 							gc_sptr_node_free(gsn);
 						}
 					}
