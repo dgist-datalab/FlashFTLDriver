@@ -1572,7 +1572,7 @@ void lsmtree_compactioning_set_gced_flag(uint32_t seg_idx){
 	if(LSM.read_arg_set){
 		for(uint32_t i=0; i<LSM.now_compaction_stream_num; i++){
 			read_issue_arg *temp=LSM.read_arg_set[i];
-			for(uint32_t j=temp->from; j<=temp->to; j++){
+			for(uint32_t j=0; j<temp->to-temp->from+1; j++){
 				if(temp->page_file==false){
 					map_range *mr=&temp->map_target_for_gc[j];
 					if(!mr) continue; //mr can be null, when it used all data.

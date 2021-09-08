@@ -466,8 +466,7 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	level *lev=NULL;
 	static uint32_t demote_cnt=0;
 	printf("demote_cnt: %u\n", demote_cnt++);
-	if(demote_cnt>= 999){
-		rw_debug_flag=1;
+	if(demote_cnt== 355){
 		printf("break!\n");
 	}
 	if(temp_level){
