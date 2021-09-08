@@ -589,6 +589,7 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 	if(req->type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
+			req->parents->type_lower++;
 			processing_data_read_req(req, rb.buffer_value, false);
 			fdriver_unlock(&rb.read_buffer_lock);
 			fdriver_unlock(&LSM.now_gc_seg_lock);
@@ -605,6 +606,7 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 			fdriver_unlock(&rb.pending_lock);
 		}
 		else{
+			req->parents->type_lower++;
 			rb.pending_req->insert(std::pair<uint32_t, algo_req*>(ppa, req));
 			fdriver_unlock(&rb.pending_lock);
 			fdriver_unlock(&LSM.now_gc_seg_lock);
