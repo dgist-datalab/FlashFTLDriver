@@ -1493,7 +1493,9 @@ uint32_t lsmtree_print_log(){
 	if(LSM.li->print_traffic){
 		LSM.li->print_traffic(LSM.li);
 	}
+	free(LSM.monitor.compaction_cnt);
 	memset(&LSM.monitor, 0, sizeof(LSM.monitor));
+	LSM.monitor.compaction_cnt=(uint32_t*)calloc(LSM.param.LEVELN+1, sizeof(uint32_t));
 	return 1;
 }
 
