@@ -1063,7 +1063,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	}
 	
 	printf("gc_data:%u (seg_idx:%u)\n", LSM.monitor.gc_data, victim->seg_idx);
-	if(LSM.monitor.gc_data==270){
+	if(LSM.monitor.gc_data==505){
 		printf("break!\n");
 	}
 	/*

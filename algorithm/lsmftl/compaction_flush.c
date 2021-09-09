@@ -306,6 +306,9 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		res->block_file_map[0].ppa=map_ppa;
 		res->seq_data_end_piece_ppa=kp_set[last_idx].piece_ppa;
 		res->end_ppa=map_ppa;
+		if(res->end_ppa==793137){
+			printf("break!\n");
+		}
 	}	
 	else{
 		res->file_addr.map_ppa=map_ppa;

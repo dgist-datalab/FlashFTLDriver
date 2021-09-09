@@ -217,12 +217,28 @@ sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t piece_ppa
 	for_each_run_max(lev, run_ptr, ridx){
 		if(run_ptr->now_sst_num==0) continue;
 		sptr=run_retrieve_sst(run_ptr, lba);
-		if(sptr && sptr->type==BLOCK_FILE && 
-				sptr->file_addr.piece_ppa<=piece_ppa &&
-				sptr->end_ppa*L2PGAP>=piece_ppa){
-			*target_ridx=ridx;
-			*sptr_idx=(sptr-run_ptr->sst_set);
-			return sptr;
+		if(sptr && sptr->type==BLOCK_FILE){
+			for(uint32_t i=0; i<sptr->map_num; i++){
+				if(piece_ppa/L2PGAP==sptr->block_file_map[i].ppa){
+					*target_ridx=ridx;
+					*sptr_idx=(sptr-run_ptr->sst_set);
+					return sptr;
+				}
+			}
+			if(sptr->sequential_file){
+				if(sptr->file_addr.piece_ppa<=piece_ppa && sptr->seq_data_end_piece_ppa>=piece_ppa){
+					*target_ridx=ridx;
+					*sptr_idx=(sptr-run_ptr->sst_set);
+					return sptr;
+				}
+			}
+			else{
+				if(sptr->file_addr.piece_ppa<=piece_ppa && sptr->end_ppa*L2PGAP>=piece_ppa){
+					*target_ridx=ridx;
+					*sptr_idx=(sptr-run_ptr->sst_set);
+					return sptr;
+				}
+			}
 		}
 		if(sptr){
 			if(sptr->type==PAGE_FILE){	
