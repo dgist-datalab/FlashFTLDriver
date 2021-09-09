@@ -590,7 +590,7 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
 			req->parents->type_lower++;
-			processing_data_read_req(req, rb.buffer_value, false);
+			processing_data_read_req(req, rb.buffer_value, true);
 			fdriver_unlock(&rb.read_buffer_lock);
 			fdriver_unlock(&LSM.now_gc_seg_lock);
 			return BUFFER_HIT;
@@ -1099,7 +1099,7 @@ void *lsmtree_read_end_req(algo_req *req){
 			for(;target_r_iter->first==PIECETOPPA(req->ppa) && 
 					target_r_iter!=rb.pending_req->end();){
 				pending_req=target_r_iter->second;
-				processing_data_read_req(pending_req, parents->value->value, false);
+				processing_data_read_req(pending_req, parents->value->value, true);
 				rb.pending_req->erase(target_r_iter++);
 			}
 			rb.issue_req->erase(req->ppa/L2PGAP);
