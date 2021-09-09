@@ -162,6 +162,8 @@ typedef struct lsmtree{
 	struct run * unaligned_sst_file_set;
 #endif
 	
+	uint32_t same_segment_flag;
+	uint32_t same_target_segment;
 	rwlock *level_rwlock;
 
 	fdriver_lock_t flush_lock;

@@ -725,11 +725,12 @@ uint32_t update_read_arg_tiering(uint32_t read_done_flag, bool isfirst,sst_pf_ou
 
 run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num, 
 		uint32_t target_version, bool hot_cold_mode, bool inplace){
-	run *src_rptr; uint32_t src_idx;
+	run *src_rptr; uint32_t src_ridx;
 	uint32_t max_lba=0, min_lba=UINT32_MAX;
+	/*check run sequential*/
 	for(uint32_t i=0; i<max_run_num; i++){
-		src_idx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
-		src_rptr=LEVEL_RUN_AT_PTR(src, src_idx);
+		src_ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
+		src_rptr=LEVEL_RUN_AT_PTR(src, src_ridx);
 		if(src_rptr->end_lba > max_lba){
 			max_lba=src_rptr->end_lba;
 		}
@@ -737,7 +738,7 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 			min_lba=src_rptr->start_lba;
 		}
 
-		run *comp_rptr; uint32_t comp_idx=src_idx+1;
+		run *comp_rptr; uint32_t comp_idx=src_ridx+1;
 		for_each_run_at(src, comp_rptr, comp_idx){
 			if((src_rptr->start_lba > comp_rptr->end_lba) ||
 				(src_rptr->end_lba<comp_rptr->start_lba)){
@@ -751,13 +752,19 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 
 	LSM.monitor.trivial_move_cnt++;
 	std::map<uint32_t, run*> temp_run;
+	/*filtering page_file*/
+	/*run *page_file_run=run_init(src->now_sst_num, 0, UINT32_MAX);*/
 	for(uint32_t i=0; i<max_run_num; i++){
-		src_idx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
-		src_rptr=LEVEL_RUN_AT_PTR(src, src_idx);
+		src_ridx=version_order_to_ridx(LSM.last_run_version, src->idx, i);
+		src_rptr=LEVEL_RUN_AT_PTR(src, src_ridx);
 		uint32_t sidx; sst_file *sptr;
+//retry:
 		for_each_sst(src_rptr, sptr, sidx){
 			if(sptr->type==PAGE_FILE){
 				return NULL;
+	//			run_append_sstfile_move_originality(page_file_run, sptr);
+	//			run_remove_sst_file_at(src_rptr, sidx);
+//				goto retry;
 			}
 		}
 		temp_run.insert(std::pair<uint32_t, run*>(src_rptr->start_lba, src_rptr));
@@ -766,6 +773,7 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 	run *res=run_init(src->max_sst_num, UINT32_MAX, 0);
 	std::map<uint32_t, run*>::iterator iter;
 
+	//compaction_convert_sst_page_to_block(page_file_run);
 	read_helper_param rhp=lsmtree_get_target_rhp(des_idx);
 	for(iter=temp_run.begin(); iter!=temp_run.end(); iter++){
 		run *rptr=iter->second;
@@ -806,6 +814,7 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 			free(moved_sidx);
 			
 		}
+		
 		sst_file *sptr; uint32_t sidx;
 		for_each_sst(rptr, sptr, sidx){
 			if(des_idx==1 && sptr->type==PAGE_FILE){
@@ -814,6 +823,8 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 			run_append_sstfile_move_originality(res, sptr);
 		}
 	}
+
+
 	return res;
 }
 

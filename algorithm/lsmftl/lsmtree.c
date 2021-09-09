@@ -189,6 +189,8 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.now_gc_seg_idx=UINT32_MAX;
 	fdriver_mutex_init(&LSM.gc_end_lock);
 	fdriver_mutex_init(&LSM.now_gc_seg_lock);
+	LSM.same_segment_flag=UINT32_MAX;
+	LSM.unaligned_sst_file_set=NULL;
 	return 1;
 }
 
@@ -1455,6 +1457,7 @@ void lsmtree_init_ordering_param(){
 	LSM.now_pinned_sst_file_num=0;
 	LSM.processed_entry_num=0;
 	LSM.processing_lba=UINT32_MAX;
+	LSM.same_segment_flag=UINT32_MAX;
 	if(LSM.unaligned_sst_file_set){
 		run_free(LSM.unaligned_sst_file_set);
 		LSM.unaligned_sst_file_set=NULL;
@@ -1490,6 +1493,7 @@ uint32_t lsmtree_print_log(){
 	if(LSM.li->print_traffic){
 		LSM.li->print_traffic(LSM.li);
 	}
+	memset(&LSM.monitor, 0, sizeof(LSM.monitor));
 	return 1;
 }
 

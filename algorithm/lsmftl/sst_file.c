@@ -260,3 +260,17 @@ void sst_print(sst_file *sptr){
 void map_print(map_range *mr){
 	printf("range:%u~%u ppa:%u\n", mr->start_lba, mr->end_lba, mr->ppa);
 }
+
+void invalidate_sst_file_map(sst_file *sptr){
+	switch(sptr->type){
+		case PAGE_FILE:
+			invalidate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, true);
+			break;
+		case BLOCK_FILE:
+			if(sptr->map_num!=1){
+				EPRINT("can't be", true);
+			}
+			invalidate_map_ppa(LSM.pm->bm, sptr->block_file_map[0].ppa, true);
+			break;
+	}
+}

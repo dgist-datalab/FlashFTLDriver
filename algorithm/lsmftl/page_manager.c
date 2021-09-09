@@ -11,7 +11,7 @@ extern lsmtree LSM;
 //uint32_t debug_piece_ppa=1105510*L2PGAP;
 //uint32_t debug_piece_ppa=386798*L2PGAP;
 //uint32_t debug_piece_ppa=868351*L2PGAP;
-uint32_t debug_piece_ppa=UINT32_MAX;
+uint32_t debug_piece_ppa=4587480;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
 
@@ -177,6 +177,10 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 	if(map_ppa==debug_piece_ppa/L2PGAP){
 		static int cnt=0;
 		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
+		if(start_lba==debug_lba && cnt>=8){
+			printf("break!");
+			LSM.global_debug_flag=true;
+		}
 		EPRINT("validate map here!\n", false);
 		printf("[info] map_ppa:%u, s~e %u ~ %u\n", map_ppa, start_lba, end_lba);
 	}
@@ -424,7 +428,7 @@ uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_num){
 	uint32_t q_size=pm->remain_data_segment_q->size();
 	for(uint32_t i=0; i<q_size; i++){
 		seg=pm->remain_data_segment_q->front();
-		if(_PPS-seg->used_page_num < target_page_num){
+		if(_PPS-seg->used_page_num <= target_page_num){
 			free(seg);
 			pm->remain_data_segment_q->pop_front();
 		}
@@ -434,7 +438,7 @@ uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_num){
 	}
 
 	if(!pm->current_segment[DATA_S] ||
-			_PPS-pm->current_segment[DATA_S]->used_page_num < target_page_num){
+			_PPS-pm->current_segment[DATA_S]->used_page_num <= target_page_num){
 		free(pm->current_segment[DATA_S]);
 		page_manager_move_next_seg(LSM.pm, false, false, DATASEG);
 	}
@@ -1271,6 +1275,29 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 						}
 					}
 					else{
+						if(LSM.unaligned_sst_file_set && LSM.unaligned_sst_file_set->now_sst_num){
+							uint32_t idx=run_retrieve_sst_idx(LSM.unaligned_sst_file_set, oob_lba[i]);
+							if(idx!=UINT32_MAX){
+								sst_file *unaligned_sptr=&LSM.unaligned_sst_file_set->sst_set[idx];
+								if(unaligned_sptr->type==PAGE_FILE){
+									if(unaligned_sptr->file_addr.map_ppa!=piece_ppa/L2PGAP){
+										EPRINT("can't be", true);
+									}
+								}
+								else{
+									if(unaligned_sptr->block_file_map[0].ppa!=piece_ppa/L2PGAP){
+										EPRINT("can't be", true);
+									}
+								}
+								invalidate_sst_file_map(unaligned_sptr);
+								run_remove_sst_file_at(LSM.unaligned_sst_file_set, idx);
+								if(LSM.unaligned_sst_file_set->now_sst_num==0){
+									run_free(LSM.unaligned_sst_file_set);
+									LSM.unaligned_sst_file_set=NULL;
+								}
+								continue;
+							}
+						}
 						printf("lba:%u piece_ppa:%u ", oob_lba[i], piece_ppa);
 						EPRINT("???\n", true);
 					}
