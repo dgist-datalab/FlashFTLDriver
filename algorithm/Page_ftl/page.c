@@ -86,7 +86,8 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 				printf("%u page hit(piece_ppa:%u)\n", req->key,value->ppa);
 			}
 			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-			req->type_ftl=req->type_lower=0;
+			//req->type_ftl=req->type_lower=0;
+			req->type_lower++;
 			req->end_req(req);
 			fdriver_unlock(&rb.read_buffer_lock);
 			return;
@@ -112,6 +113,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 			fdriver_unlock(&rb.pending_lock);
 		}
 		else{
+			req->type_lower++;
 			rb.pending_req->insert(std::pair<uint32_t, algo_req*>(ppa, my_req));
 			fdriver_unlock(&rb.pending_lock);
 			return;
