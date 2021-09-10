@@ -591,7 +591,7 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 	if(req->type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
-			req->parents->type_lower++;
+			req->parents->buffer_hit++;
 			processing_data_read_req(req, rb.buffer_value, true);
 			fdriver_unlock(&rb.read_buffer_lock);
 			fdriver_unlock(&LSM.now_gc_seg_lock);
@@ -608,7 +608,7 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 			fdriver_unlock(&rb.pending_lock);
 		}
 		else{
-			req->parents->type_lower++;
+			req->parents->buffer_hit++;
 			rb.pending_req->insert(std::pair<uint32_t, algo_req*>(ppa, req));
 			fdriver_unlock(&rb.pending_lock);
 			fdriver_unlock(&LSM.now_gc_seg_lock);
@@ -1004,13 +1004,12 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	uint32_t offset;
 	uint32_t piece_ppa=req->ppa;
 
-	if(parents->global_seq==4228469){
-		printf("break!\n");
+	if(parents){
+		if(parents->type_lower<10){
+			parents->type_lower+=req->type_lower;
+		}
 	}
-	if(parents->magic){
-		static int magic_end_cnt=0;
-		printf("[%u]magic end req->seq:%u\n", magic_end_cnt++, parents->global_seq);
-	}
+
 
 #ifdef RWLOCK_PRINT
 	uint32_t rw_lock_lev=0;

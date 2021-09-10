@@ -7,7 +7,8 @@
 
 #define PRINTPER 1
 #define ALGOTYPE 300
-#define LOWERTYPE 300
+#define LOWERTYPE 30
+#define BUFFER_HIT 10
 #define BENCHNUM 16
 
 #ifdef CDF
@@ -58,7 +59,7 @@ typedef struct{
 	uint64_t read_cdf[1000000/TIMESLOT+1];
 #endif
 	uint64_t read_cnt,write_cnt;
-	bench_ftl_time ftl_poll[ALGOTYPE][LOWERTYPE];
+	bench_ftl_time ftl_poll[ALGOTYPE][LOWERTYPE][BUFFER_HIT];
 	MeasureTime bench;
 }bench_data;
 

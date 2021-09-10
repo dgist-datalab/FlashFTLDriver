@@ -96,6 +96,8 @@ e:for application req*/
 
 	uint8_t type_ftl;
 	uint8_t type_lower;
+	uint8_t buffer_hit;
+
 	uint8_t before_type_lower;
 	bool isstart;
 	MeasureTime latency_checker;

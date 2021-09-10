@@ -493,12 +493,16 @@ static inline void write_updated_map(request *req, GTD_entry *target_etr,
 		invalidate_map_ppa(temp);
 	}
 	bool is_map_gc_triggered=false;
-	req->type_lower++;
+	if(req->type_ftl<90){
+		req->type_ftl+=10;
+	}
 	target_etr->physical_address=get_map_ppa(target_etr->idx, &is_map_gc_triggered)*L2PGAP;
 
 
 	if(is_map_gc_triggered){
-		req->type_lower++;
+		if(req->type_ftl<200){
+			req->type_ftl+=100;
+		}
 	}
 	mapping_sanity_checker_with_cache(req->value->value, target_etr->idx);
 #ifdef DFTL_DEBUG

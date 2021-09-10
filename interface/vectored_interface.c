@@ -196,6 +196,7 @@ void *vectored_main(void *__input){
 				}
 	
 				request *req=&vec_req->req_array[i];
+				req->type_ftl=req->type_lower=req->buffer_hit=0;
 				switch(req->type){
 					case FS_GET_T:
 					case FS_SET_T:
