@@ -624,6 +624,9 @@ level* flush_memtable(write_buffer *wb, bool is_gc_data){
 
 	/*make temp level*/
 	if(making_level){
+		if(needed_map_num > now_remain_page_num){
+			__do_gc(LSM.pm, false, needed_map_num-now_remain_page_num);
+		}
 		LSM.pinned_level=fa_make_pinned_level(LSM.pinned_level, NULL,LSM.flushed_kp_set, UINT32_MAX);
 		res=LSM.pinned_level;
 	}

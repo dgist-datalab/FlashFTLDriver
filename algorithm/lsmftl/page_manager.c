@@ -11,7 +11,7 @@ extern lsmtree LSM;
 //uint32_t debug_piece_ppa=1105510*L2PGAP;
 //uint32_t debug_piece_ppa=386798*L2PGAP;
 //uint32_t debug_piece_ppa=868351*L2PGAP;
-uint32_t debug_piece_ppa=1179649*L2PGAP;
+uint32_t debug_piece_ppa=715125*L2PGAP;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
 
@@ -43,6 +43,9 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 		if(piece_ppa[i]==debug_piece_ppa){
 			printf("%u lba:%u ppa:%u", should_abort?++cnt:cnt, oob->lba[piece_ppa[i]%L2PGAP], debug_piece_ppa);
 			EPRINT("validate piece here!\n", false );
+			if(cnt==13){
+				printf("break!\n");
+			}
 		}
 #endif
 
@@ -92,6 +95,9 @@ bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abor
 		static uint32_t cnt=0;
 		printf("%u %u", should_abort?++cnt:++cnt, debug_piece_ppa);
 		EPRINT("invalidate piece here!\n",false);
+		if(cnt==13){
+			printf("break!\n");
+		}
 	}
 #endif
 	if(piece_ppa==UINT32_MAX){
