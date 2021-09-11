@@ -105,7 +105,6 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value, gc_value *gv){
 			res->isdone=false;
 			res->ppa=ppa;
 			my_req->param=(void *)res;
-			my_req->type_lower=0;
 			/*when read a value, you can assign free value by this function*/
 			res->value=inf_get_valueset(NULL,FS_MALLOC_R,PAGESIZE);
 			demand_ftl.li->read(ppa,PAGESIZE,res->value,ASYNC,my_req);

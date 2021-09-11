@@ -818,7 +818,7 @@ run* tiering_trivial_move(level *src, uint32_t des_idx, uint32_t max_run_num,
 		sst_file *sptr; uint32_t sidx;
 		for_each_sst(rptr, sptr, sidx){
 			if(des_idx==1 && sptr->type==PAGE_FILE){
-				printf("break???!\n");
+				printf("break?\n");
 			}
 			run_append_sstfile_move_originality(res, sptr);
 		}
