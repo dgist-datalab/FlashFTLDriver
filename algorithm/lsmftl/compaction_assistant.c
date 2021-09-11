@@ -629,9 +629,6 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		/*coupling version*/
 		std::map<uint32_t, uint32_t>::iterator map_iter;
 		for(map_iter=LSM.flushed_kp_set->begin(); map_iter!=LSM.flushed_kp_set->end(); map_iter++){
-			if(LSM.global_debug_flag && map_iter->first==debug_lba){
-//				printf("break!\n");
-			}
 			version_coupling_lba_version(LSM.last_run_version, map_iter->first, target_version);
 		}
 		delete LSM.flushed_kp_set;
@@ -953,10 +950,10 @@ again:
 
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
 
-		lsmtree_level_summary(&LSM);
+		lsmtree_level_summary(&LSM, false);
 
 		if(level_is_full(LSM.disk[req->end_level], LSM.param.last_size_factor)){
-			if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)) || force_merging_test()){
+			if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor))){
 				last_level_reclaim(cm, LSM.param.LEVELN-1);
 			}
 			else if(req->end_level==LSM.param.LEVELN-1){
@@ -997,19 +994,53 @@ end:
 				
 				static int cnt=0;
 				printf("force compaction! %u\n", cnt++);
-				if(cnt==33){
+				if(cnt==18){
 					printf("break!\n");
+					LSM.global_debug_flag=true;
 				}
-				lsmtree_level_summary(&LSM);
+				lsmtree_level_summary(&LSM, false);
 				if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor))){
 					last_level_reclaim(cm, LSM.param.LEVELN-1);
 	//				goto end;
 				}
 				else{
-					req->start_level=req->end_level;
-					req->end_level++;
-					force=true;
-					goto again;
+					float min_validate_ratio=1.0f;
+					float target_validate_ratio;
+					uint32_t target_version=0;
+					run *target_run=NULL;
+					uint32_t target_ridx;
+					uint32_t ridx;
+					run *rptr;
+					for_each_run_max(LSM.disk[LSM.param.LEVELN-1], rptr, ridx){
+						if(!rptr->now_sst_num) continue;
+						uint32_t version_number=version_ridx_to_version(LSM.last_run_version, LSM.param.LEVELN-1, ridx);
+						if(LSM.last_run_version->version_invalidate_number[version_number]==0) continue;
+						target_validate_ratio=(float)(rptr->now_contents_num - LSM.last_run_version->version_invalidate_number[version_number])/rptr->now_contents_num;
+						if(min_validate_ratio > target_validate_ratio){
+							min_validate_ratio=target_validate_ratio;
+							target_run=rptr;
+							target_version=version_number;
+							target_ridx=ridx;
+						}
+					}
+					if(target_run){
+						run *new_run=compaction_reclaim_run(cm, target_run, target_version);
+						version_invalidate_number_init(LSM.last_run_version, target_version);
+						if(new_run->now_sst_num==0){
+							version_clear_target(LSM.last_run_version, target_version, LSM.param.LEVELN-1);
+							level_empty_run(LSM.disk[LSM.param.LEVELN-1], target_ridx);
+						}
+						else{
+							level_update_run_at_move_originality(LSM.disk[LSM.param.LEVELN-1], target_ridx, new_run, false);
+						}
+						run_free(new_run);
+					}
+					else{
+						req->start_level=req->end_level;
+						req->end_level++;
+						force=true;
+						goto again;
+					}
 				}
 				/*
 				static int cnt=0;

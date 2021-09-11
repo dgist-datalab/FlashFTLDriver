@@ -227,7 +227,7 @@ static void lsmtree_monitor_print(){
 
 	printf("\n");
 	printf("level print\n");
-	lsmtree_level_summary(&LSM);
+	lsmtree_level_summary(&LSM, true);
 	printf("\n");
 
 	uint64_t *level_memory_breakdown=(uint64_t*)calloc(LSM.param.LEVELN, sizeof(uint64_t));
@@ -1116,10 +1116,10 @@ void *lsmtree_read_end_req(algo_req *req){
 }
 
 
-void lsmtree_level_summary(lsmtree *lsm){
+void lsmtree_level_summary(lsmtree *lsm, bool force){
 #ifdef LSM_DEBUG
 	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
-		printf("ptr:%p ", lsm->disk[i]); level_print(lsm->disk[i]);
+		printf("ptr:%p ", lsm->disk[i]); level_print(lsm->disk[i], force);
 	}
 	lsmtree_print_WAF(lsm->li);
 #endif

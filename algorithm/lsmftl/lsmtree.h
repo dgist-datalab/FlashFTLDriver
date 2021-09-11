@@ -229,7 +229,7 @@ uint32_t lsmtree_write(request *const req);
 uint32_t lsmtree_flush(request *const req);
 uint32_t lsmtree_remove(request *const req);
 void lsmtree_compaction_end_req(struct compaction_req*);
-void lsmtree_level_summary(lsmtree *lsm);
+void lsmtree_level_summary(lsmtree *lsm, bool force);
 void lsmtree_content_print(lsmtree *lsm, bool print_sst);
 void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param);
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);

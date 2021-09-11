@@ -11,7 +11,7 @@ extern lsmtree LSM;
 //uint32_t debug_piece_ppa=1105510*L2PGAP;
 //uint32_t debug_piece_ppa=386798*L2PGAP;
 //uint32_t debug_piece_ppa=868351*L2PGAP;
-uint32_t debug_piece_ppa=4587480;
+uint32_t debug_piece_ppa=1179649*L2PGAP;
 bool temp_debug_flag;
 extern uint32_t debug_lba;
 
@@ -177,10 +177,6 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 	if(map_ppa==debug_piece_ppa/L2PGAP){
 		static int cnt=0;
 		printf("%u %u", should_abort?++cnt:cnt, debug_piece_ppa);
-		if(start_lba==debug_lba && cnt>=8){
-			printf("break!");
-			LSM.global_debug_flag=true;
-		}
 		EPRINT("validate map here!\n", false);
 		printf("[info] map_ppa:%u, s~e %u ~ %u\n", map_ppa, start_lba, end_lba);
 	}

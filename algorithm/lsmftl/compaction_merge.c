@@ -896,7 +896,6 @@ run **compaction_TI2RUN(compaction_master *cm, level *src, level *des, uint32_t 
 	static uint32_t cnt=0;
 	printf("TI2RUN %u\n", cnt++);
 	if(cnt==14){
-		//LSM.global_debug_flag=true;
 	}
 	map_range **mr_set=(map_range **)calloc(stream_num, sizeof(map_range*));
 	/*make it reverse order for stream sorting*/
@@ -1164,7 +1163,7 @@ level* compaction_TI2TI(compaction_master *cm, level *src, level *des, uint32_t 
 	run_free(new_run[DEMOTE_RUN]);
 	free(new_run);
 
-	level_print(res);
+	level_print(res, false);
 	return res;
 }
 
@@ -1237,7 +1236,7 @@ level *compaction_TI2TI_separation(compaction_master *cm, level *src, level *des
 	run_free(new_run[KEEP_RUN]);
 	run_free(new_run[DEMOTE_RUN]);
 	free(new_run);
-	level_print(src);
+	level_print(src,false);
 //	level_print(res);
 	return res;
 }
@@ -1402,23 +1401,42 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 	sst_bf_in_stream *bis=NULL;
 	uint32_t border_lba=0;
 
-	read_arg_set.max_num=map_num;
+	LSM.read_arg_set=thread_arg.arg_set;
+	LSM.now_compaction_stream_num=1;
+	LSM.compactioning_pos_set=&pos;
 
-	gc_lock_run(target_rptr);
+	read_arg_set.max_num=map_num;
+	read_arg_set.version_for_gc=version;
+	read_arg_set.page_file=false;
+
 
 	run *new_run=run_init(target_rptr->now_sst_num, UINT32_MAX, 0);
 
 	uint32_t unlocked_sst_idx=0;
 	bool gced=false;
+
+	if(LSM.global_debug_flag){
+		printf("break!\n");
+	}
+
+	uint32_t stream_border_lba=0;
 	while(read_done!=(1<<stream_num)-1){
 		if(gced){
-			compaction_adjust_by_gc(&read_arg_set, pos, border_lba,
+			compaction_adjust_by_gc(&read_arg_set, pos, stream_border_lba,
 					target_rptr, &mr_set, BLOCK_FILE, false);
 		}
 		gced=false;
 		read_done=update_read_arg_tiering(read_done, isfirst, &pos, &mr_set, 
 				&read_arg_set, true, stream_num, NULL, version);
+
 		last_round=(read_done==(1<<stream_num)-1);
+
+		if(!last_round){
+			stream_border_lba=mr_set[read_arg_set.to].end_lba;
+		}
+		else{
+			stream_border_lba=UINT32_MAX;
+		}
 
 		if(!last_round){
 			issue_map_read_sst_job(cm, &thread_arg);
@@ -1428,6 +1446,7 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 
 		if(bos==NULL){
 			bos=sst_bos_init(read_map_done_check, true);
+			LSM.now_compaction_bos=bos;
 		}
 		if(bis==NULL){
 			bis=tiering_new_bis(locked_seg_q, LSM.param.LEVELN-1);	
@@ -1438,22 +1457,15 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 		border_lba=issue_write_kv_for_bis(&bis, bos, locked_seg_q, new_run, 
 				read_num, version, last_round, &gced);
 		
-		gc_unlock_run(target_rptr, &unlocked_sst_idx, border_lba);
-
 		isfirst=false;
 	}
 	thpool_wait(cm->issue_worker);
 	/*finishing*/
-	gc_unlock_run(target_rptr, &unlocked_sst_idx, UINT32_MAX);
 
 	sst_file *last_file;
 	if((last_file=bis_to_sst_file(bis))){
 		run_append_sstfile_move_originality(new_run, last_file);
 		sst_free(last_file, LSM.pm);
-	}
-
-	if(new_run->now_sst_num==0){
-		EPRINT("should delete version", true);
 	}
 
 	sst_bis_free(bis);
@@ -1465,6 +1477,7 @@ run *compaction_reclaim_run(compaction_master *cm, run *target_rptr, uint32_t ve
 	free(mr_set);
 	free(thread_arg.arg_set);
 	lsmtree_gc_unavailable_sanity_check(&LSM);
+	lsmtree_after_compaction_processing(&LSM);
 	return new_run;
 }
 

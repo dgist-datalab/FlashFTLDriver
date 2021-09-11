@@ -329,34 +329,63 @@ uint32_t get_level_content_num(level *lev){
 	return content_num;
 }
 
-void level_print(level *lev){
-#ifdef LSM_DEBUG
-	uint32_t content_num=get_level_content_num(lev);
-	if(lev->now_sst_num){
-		if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
-			printf("level idx:%d run %u/%u content_num: %u (%.2lf %%)\n",
-					lev->idx,
-					lev->run_num, lev->max_run_num,
-					content_num, (double)content_num/RANGE*100
-				  );	
+void level_print(level *lev, bool force){
+	if(force){
+		uint32_t content_num=get_level_content_num(lev);
+		if(lev->now_sst_num){
+			if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
+				printf("level idx:%d run %u/%u content_num: %u (%.2lf %%)\n",
+						lev->idx,
+						lev->run_num, lev->max_run_num,
+						content_num, (double)content_num/RANGE*100
+					  );	
+			}
+			else{
+				printf("level idx:%d sst:%u/%u start lba:%u~end lba:%u content_num:%u (%.2lf %%)\n", 
+						lev->idx,
+						lev->now_sst_num, lev->max_sst_num,
+						FIRST_RUN_PTR(lev)->start_lba,
+						LAST_RUN_PTR(lev)->end_lba,
+						content_num, (double)content_num/RANGE*100
+					  );
+			}
 		}
 		else{
-			printf("level idx:%d sst:%u/%u start lba:%u~end lba:%u content_num:%u (%.2lf %%)\n", 
+			printf("level idx:%d run:%u/%u sst:%u/%u\n", 
 					lev->idx,
-					lev->now_sst_num, lev->max_sst_num,
-					FIRST_RUN_PTR(lev)->start_lba,
-					LAST_RUN_PTR(lev)->end_lba,
-					content_num, (double)content_num/RANGE*100
-				  );
+					lev->run_num, lev->max_run_num,
+					lev->now_sst_num, lev->max_sst_num);
 		}
 	}
 	else{
-		printf("level idx:%d run:%u/%u sst:%u/%u\n", 
-			lev->idx,
-			lev->run_num, lev->max_run_num,
-			lev->now_sst_num, lev->max_sst_num);
-	}
+#ifdef LSM_DEBUG
+		uint32_t content_num=get_level_content_num(lev);
+		if(lev->now_sst_num){
+			if(lev->level_type==TIERING || lev->level_type==TIERING_WISCKEY){
+				printf("level idx:%d run %u/%u content_num: %u (%.2lf %%)\n",
+						lev->idx,
+						lev->run_num, lev->max_run_num,
+						content_num, (double)content_num/RANGE*100
+					  );	
+			}
+			else{
+				printf("level idx:%d sst:%u/%u start lba:%u~end lba:%u content_num:%u (%.2lf %%)\n", 
+						lev->idx,
+						lev->now_sst_num, lev->max_sst_num,
+						FIRST_RUN_PTR(lev)->start_lba,
+						LAST_RUN_PTR(lev)->end_lba,
+						content_num, (double)content_num/RANGE*100
+					  );
+			}
+		}
+		else{
+			printf("level idx:%d run:%u/%u sst:%u/%u\n", 
+					lev->idx,
+					lev->run_num, lev->max_run_num,
+					lev->now_sst_num, lev->max_sst_num);
+		}
 #endif
+	}
 }
 
 void level_content_print(level *lev, bool print_sst){
@@ -364,7 +393,7 @@ void level_content_print(level *lev, bool print_sst){
 	uint32_t ridx;
 	sst_file *sptr;
 	uint32_t sidx;
-	level_print(lev);
+	level_print(lev, false);
 	for_each_run(lev, rptr, ridx){
 		printf("\t[%u] ",ridx);
 		run_print(rptr);
@@ -662,6 +691,11 @@ uint32_t level_run_populate_analysis(run *r){
 	}
 	if(cnt_sum==0) return 0;
 	return cnt_sum/contents_num;
+}
+
+void level_empty_run(level *lev, uint32_t ridx){
+	lev->now_contents_num-=lev->array[ridx].now_contents_num;
+	lev->run_num--;
 }
 
 
