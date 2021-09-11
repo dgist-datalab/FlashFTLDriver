@@ -426,16 +426,17 @@ void bench_update_typetime(bench_data *_d, uint8_t a_type,uint8_t l_type,uint8_t
 }
 
 void bench_type_cdf_print(bench_data *_d){
-	fprintf(stderr,"a_type\tl_type\tmax\tmin\tavg\tcnt\tpercentage\n");
+	fprintf(stderr,"a_type\tBH\tl_type\tmax\tmin\tavg\tcnt\tpercentage\n");
 	for(int i = 0; i < ALGOTYPE; i++){
-		for(int j = 0; j < LOWERTYPE; j++){
-			for(int k=0; k<BUFFER_HIT; k++){
-				if(!_d->ftl_poll[i][j][k].cnt){
+		for(int j = 0; j < BUFFER_HIT; j++){
+			for(int k=0; k<LOWERTYPE; k++){
+				if(!_d->ftl_poll[i][k][j].cnt){
 					continue;
 				}
-				fprintf(stderr,"%d\t%d\t%lu\t%lu\t%.3f\t%lu\t%.5f%%\n",i,j,_d->ftl_poll[i][j][k].max,_d->ftl_poll[i][j][k].min,
-						(float)_d->ftl_poll[i][j][k].total_micro/_d->ftl_poll[i][j][k].cnt,_d->ftl_poll[i][j][k].cnt,
-						(float)_d->ftl_poll[i][j][k].cnt/_d->read_cnt*100);
+				fprintf(stderr,"%d\t%d\t%d\t%lu\t%lu\t%.3f\t%lu\t%.5f%%\n",i, j, k, 
+						_d->ftl_poll[i][k][j].max,_d->ftl_poll[i][k][j].min,
+						(float)_d->ftl_poll[i][k][j].total_micro/_d->ftl_poll[i][k][j].cnt,_d->ftl_poll[i][k][j].cnt,
+						(float)_d->ftl_poll[i][k][j].cnt/_d->read_cnt*100);
 			}
 		}
 	}
