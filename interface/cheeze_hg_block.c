@@ -363,10 +363,12 @@ vec_request **get_vectored_request_arr()
 	int req_idx = 0;
 	static int cnt=0;
 	static int previous_queue=0;
+	uint32_t now_start_idx=previous_queue;
 	bool check_continue=false;
 	res = (vec_request **) malloc(sizeof(vec_request *) * (check_idx + 1));
-	for (int i = previous_queue%CHEEZE_QUEUE_SIZE; i < CHEEZE_QUEUE_SIZE; i++) {
+	for (int i = now_start_idx, j=0; j < CHEEZE_QUEUE_SIZE; j++, i=(now_start_idx+j)%CHEEZE_QUEUE_SIZE) {
 		if (!check[i]){
+			
 			if(check_continue==false){
 				previous_queue=i;
 				check_continue=true;
