@@ -360,23 +360,20 @@ vec_request **get_vectored_request_arr()
 	if (!check_idx)
 		goto retry;
 
-#if 0
-	uint32_t tmp = total_size / SLICE * MS_TIME_SL;
-	if (!tmp)
-		tmp = 1;
-	static int debug_cnt = 0;
-	if (++debug_cnt % 100000 == 0) {
-		printf("tmp:%u\n", tmp);
-	}
-	usleep(tmp);
-#endif
-
 	int req_idx = 0;
 	static int cnt=0;
+	static int previous_queue=0;
+	bool check_continue=false;
 	res = (vec_request **) malloc(sizeof(vec_request *) * (check_idx + 1));
-	for (int i = 0; i < CHEEZE_QUEUE_SIZE; i++) {
-		if (!check[i])
+	for (int i = previous_queue%CHEEZE_QUEUE_SIZE; i < CHEEZE_QUEUE_SIZE; i++) {
+		if (!check[i]){
+			if(check_continue==false){
+				previous_queue=i;
+				check_continue=true;
+			}
+//			printf("%u\n", i);
 			continue;
+		}
 		send = &send_event_addr[i];
 		recv = &recv_event_addr[i];
 		id = i;
@@ -394,6 +391,9 @@ vec_request **get_vectored_request_arr()
 		if (ureq->op!=REQ_OP_READ) {
 			barrier();
 			*recv = 1;
+		}
+		if(i==CHEEZE_QUEUE_SIZE-1){
+			previous_queue=0;
 		}
 	}
 	res[req_idx] = NULL;

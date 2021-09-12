@@ -269,6 +269,7 @@ void inf_print_log(){
 	if(mp.algo->print_log){
 		mp.algo->print_log();
 	}
+	memset(mp.li->req_type_cnt, 0, sizeof(mp.li->req_type_cnt));
 }
 
 void *p_main(void *__input){
