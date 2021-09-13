@@ -278,6 +278,7 @@ void *page_end_req(algo_req* input){
 			for(;target_r_iter->first==param->value->ppa/L2PGAP && 
 					target_r_iter!=rb.pending_req->end();){
 				pending_req=target_r_iter->second;
+				pending_req->type_lower=input->type_lower;
 				processing_pending_req(pending_req, param->value);
 				rb.pending_req->erase(target_r_iter++);
 			}
