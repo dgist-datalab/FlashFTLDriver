@@ -54,7 +54,9 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	io_manager_init(li);
 	LSM.pm=page_manager_init(bm);
 	LSM.cm=compaction_init(COMPACTION_REQ_MAX_NUM);
+#ifdef DYNAMIC_WISCKEY
 	LSM.next_level_wisckey_compaction=true;
+#endif
 	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * WRITEBUFFER_NUM);
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
@@ -190,7 +192,9 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	fdriver_mutex_init(&LSM.gc_end_lock);
 	fdriver_mutex_init(&LSM.now_gc_seg_lock);
 	LSM.same_segment_flag=UINT32_MAX;
+#ifdef MIN_ENTRY_PER_SST
 	LSM.unaligned_sst_file_set=NULL;
+#endif
 	return 1;
 }
 
@@ -1451,8 +1455,15 @@ void lsmtree_after_compaction_processing(lsmtree *lsm){
 }
 
 void lsmtree_init_ordering_param(){
+
+#ifdef MIN_ENTRY_PER_SST
+	#ifdef MIN_ENTRY_OFF
+	LSM.sst_sequential_available_flag=false;
+	LSM.randomness_check=RANGE;
+	#else
 	LSM.sst_sequential_available_flag=true;
 	LSM.randomness_check=0;
+	#endif
 	LSM.now_pinned_sst_file_num=0;
 	LSM.processed_entry_num=0;
 	LSM.processing_lba=UINT32_MAX;
@@ -1461,10 +1472,12 @@ void lsmtree_init_ordering_param(){
 		run_free(LSM.unaligned_sst_file_set);
 		LSM.unaligned_sst_file_set=NULL;
 	}
+#endif
 }
 
 
 bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper){
+#ifdef DYNAMIC_WISCKEY
 	uint64_t using_memory=0;
 	for(uint32_t i=LSM.param.LEVELN-1; i<LSM.param.LEVELN; i++){
 		run *rptr;
@@ -1485,6 +1498,9 @@ bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper){
 	//printf("max_bf:%lu max_plr:%lu, using_memory:%lu\n", LSM.param.tr.BF_memory, LSM.param.tr.PLR_memory, using_memory);
 	//printf("remain_memory:%lu, needed_memory:%lu result:%s\n", remain_memory, needed_memory, needed_memory<=remain_memory?"wisckey":"none");
 	return needed_memory<=remain_memory;
+#else
+	return false;
+#endif
 }
 
 uint32_t lsmtree_print_log(){

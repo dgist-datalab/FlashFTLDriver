@@ -711,7 +711,9 @@ lsmtree_parameter lsmtree_memory_limit_to_setting(uint64_t memory_limit_bit){
 	res.version_enable=true;
 	res.write_buffer_bit=target_WB;
 	res.write_buffer_ent=target_buffered_ent-(target_buffered_ent/KP_IN_PAGE*L2PGAP);
-#ifdef MIN_ENTRY_PER_SST
+#if MIN_ENTRY_PER_SST==0
+	res.max_sst_in_pinned_level=14;
+#else
 	res.max_sst_in_pinned_level=CEILING_TARGET(res.write_buffer_ent, MIN_ENTRY_PER_SST);
 #endif
 	res.read_amplification=TARGETFPR;

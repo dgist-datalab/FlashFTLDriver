@@ -1,5 +1,4 @@
 SRCS +=\
-	   compaction_flush.c\
 	   version.c\
 	   io.c\
 	   level.c\
@@ -24,6 +23,7 @@ SRCS +=\
 	   lsmtree_testing.c\
 	   lsmtree_setting.c\
 	   oob_manager.c\
+	   compaction_flush.c\
 #	   gc.c\
 #	   helper_algorithm/bf_set.c\
 #	   helper_algorithm/compressed_bloomfilter.c

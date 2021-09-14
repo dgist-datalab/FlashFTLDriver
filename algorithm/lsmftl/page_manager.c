@@ -1277,6 +1277,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 						}
 					}
 					else{
+#ifdef MIN_ENTRY_PER_SST
 						if(LSM.unaligned_sst_file_set && LSM.unaligned_sst_file_set->now_sst_num){
 							uint32_t idx=run_retrieve_sst_idx(LSM.unaligned_sst_file_set, oob_lba[i]);
 							if(idx!=UINT32_MAX){
@@ -1300,6 +1301,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 								continue;
 							}
 						}
+#endif
 						printf("lba:%u piece_ppa:%u ", oob_lba[i], piece_ppa);
 						EPRINT("???\n", true);
 					}

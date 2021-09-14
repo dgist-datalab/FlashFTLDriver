@@ -118,8 +118,8 @@ static inline bool check_sequential(std::map<uint32_t, uint32_t> *kp_set, write_
 		return false;
 	}
 }
-
-#ifndef MIN_ENTRY_PER_SST
+#if 0
+//#ifdef MIN_ENTRY_OFF
 extern char all_set_page[PAGESIZE];
 static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set, 
 		std::map<uint32_t, uint32_t>::iterator *temp_iter, bool make_rh){
@@ -206,6 +206,9 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		for(uint32_t j=0; j<i; j++){
 			read_helper_stream_insert(rh, kp_set[j].lba, kp_set[j].piece_ppa);
 		}	
+	}
+	else{
+		rh=NULL;
 	}
 	
 	if(!sequential_file){
@@ -466,11 +469,10 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	level *lev=NULL;
 	static uint32_t demote_cnt=0;
 	printf("demote_cnt: %u\n", demote_cnt++);
-	if(demote_cnt== 355){
-		printf("break!\n");
-	}
 	if(temp_level){
+#ifdef DYNAMIC_WISCKEY
 		temp_level->compacting_wisckey_flag=LSM.next_level_wisckey_compaction;
+#endif
 		LSM.monitor.flushed_kp_num+=LSM.flushed_kp_set->size();
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
@@ -671,8 +673,9 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		level_free(temp_level, LSM.pm);
 		LSM.pinned_level=NULL;
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
-
+#ifdef DYNAMIC_WISCKEY
 		LSM.next_level_wisckey_compaction=lsmtree_target_run_wisckeyable(LSM.param.write_buffer_ent, true);
+#endif
 	}
 	else{
 		version_level_invalidate_number_init(LSM.last_run_version, start_idx);

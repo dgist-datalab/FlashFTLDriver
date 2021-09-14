@@ -185,6 +185,7 @@ void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv
 		find_iter=LSM.flushed_kp_set->find(iter->first);
 		if(find_iter!=LSM.flushed_kp_set->end()){
 
+#ifdef MIN_ENTRY_PER_SST
 			if(LSM.unaligned_sst_file_set && LSM.unaligned_sst_file_set->now_sst_num){
 				uint32_t idx=run_retrieve_sst_idx(LSM.unaligned_sst_file_set, find_iter->first);
 				if(idx!=UINT32_MAX){
@@ -196,6 +197,7 @@ void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv
 					}
 				}
 			}
+#endif
 
 			find_iter->second=iter->second->new_piece_ppa;
 			LSM.flushed_kp_seg->insert(
