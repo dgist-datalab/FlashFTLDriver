@@ -40,11 +40,11 @@ double get_target_each_fpr(float block_fpr, uint32_t member_num){
 	return newton(0.5, member_num, block_fpr);
 }
 
-uint32_t get_number_of_bits(float target_fpr){
-	float t=1/target_fpr;
-	uint32_t tt=ceil(log2(t));
+double get_number_of_bits(double target_fpr){
+	double t=1/target_fpr;
+	uint64_t tt=ceil(log2(t));
 	//printf("tt:%u\n",tt);
-	return pow(2,tt) < t ? tt+1: tt;
+	return ceil(log2(t));//tt;//pow(2,log2(t)) < t ? tt+1: tt;
 }
 
 void bf_set_prepare(float target_fpr, uint32_t member_num, uint32_t type){

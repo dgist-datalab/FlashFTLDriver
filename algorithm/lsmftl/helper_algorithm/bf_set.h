@@ -30,7 +30,7 @@ uint32_t bf_set_get_piece_ppa(bf_set *, uint32_t* last_idx, uint32_t lba);
 bf_set* bf_set_copy(bf_set *src);
 void bf_set_move(bf_set *des, bf_set *src);
 void bf_set_free(bf_set*);
-uint32_t get_number_of_bits(float target_fpr);
+double get_number_of_bits(double target_fpr);
 double get_target_each_fpr(float block_fpr, uint32_t member_num);
 void bf_update_piece_ppa(bf_set*, uint32_t offset, uint32_t piece_ppa);
 #endif
