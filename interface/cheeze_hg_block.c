@@ -302,7 +302,10 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	//char *write="W";
 	//char *read="R";
 	//printf("type: %s\n", tmp);
-	if (id_req%1000==0) printf("\rpercent: %f%%", (float)id_req*(float)100/(float)zip_32);
+	float perct = (float)id_req*(float)100/(float)zip_32;
+	if (id_req%1000==0) printf("\rpercent: %f%%", perct);
+	//if (perct > 40) exit(0);
+	if (id_req%10000000==0) printf("\n");
 	if (strchr(tmp, 'W')) type=FS_SET_T;
 	else if (strchr(tmp, 'R')) type=FS_GET_T;
 	else {
@@ -319,6 +322,9 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	res->mark=0;
 
 	res->buf=NULL;
+
+	uint32_t prev_lba=UINT32_MAX;
+	uint32_t consecutive_cnt=0;
 	static uint32_t global_seq=0;
 	for (uint32_t i=0; i<res->size; i++) {
 		request *temp=&res->req_array[i];
@@ -338,7 +344,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 				break;
 			case FS_SET_T:
-				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+		temp->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 				break;
 			default:
 				printf("error type!\n");
@@ -346,10 +352,27 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 				break;
 		}
 		temp->key=lba_r/8+i;
+
+		if (prev_lba = UINT32_MAX) {
+			prev_lba = temp->key;
+		} else {
+			if (prev_lba+1==temp->key) {
+				consecutive_cnt++;
+			} else {
+				res->req_array[i-consecutive_cnt-1].is_sequential_start=(consecutive_cnt!=0);
+				res->req_array[i-consecutive_cnt-1].consecutive_length=consecutive_cnt;
+			}
+			prev_lba = temp->key;
+			temp->consecutive_length=0;
+		}
+
 	}
+	res->req_array[(res->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
+	res->req_array[(res->size-1)-consecutive_cnt].consecutive_length=consecutive_cnt;
 	return res;
 
 }
+extern volatile vectored_request *now_processing;
 
 bool jeeyun_end_req(request *const req) {
 	vectored_request *preq=req->parents;
@@ -362,11 +385,14 @@ bool jeeyun_end_req(request *const req) {
 		case FS_GET_T:
 			bench_reap_data(req, mp.li);
 			if(req->value) {
+				inf_free_valueset(req->value, FS_MALLOC_R);
 			}
 			break;
 		case FS_SET_T:
 			bench_reap_data(req, mp.li);
-			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);
+			if(req->value) {
+				inf_free_valueset(req->value, FS_MALLOC_W);  
+			}
 			break;
 		case FS_FLUSH_T:
 		case FS_DELETE_T:
@@ -374,7 +400,15 @@ bool jeeyun_end_req(request *const req) {
 		default:
 			abort();
 	}
+	pthread_mutex_lock(&req_cnt_lock);
+	preq->done_cnt++;
 	release_each_req(req);
+	if (preq->size == preq->done_cnt) {
+		free(preq->req_array);
+		now_processing=NULL;
+		free(preq);
+	}
+	pthread_mutex_unlock(&req_cnt_lock);
 	return true;
 }
 //extern int MS_TIME_SL;
@@ -489,7 +523,6 @@ vec_request *get_trace_vectored_request(){
 	return res;
 }
 
-extern volatile vectored_request *now_processing;
 
 bool cheeze_end_req(request *const req){
 	vectored_request *preq=req->parents;

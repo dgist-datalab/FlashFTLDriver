@@ -133,10 +133,10 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
-		-ljemalloc\
+#		-ljemalloc\
 #	-laio\
 
-all: jriver
+all: jriver_08
 
 DEBUG: debug_driver
 
@@ -154,7 +154,13 @@ cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/c
 driver: ./interface/vectored_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
-jriver: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+jriver_08: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
+jriver_11: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
+jriver_ran: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a

@@ -62,7 +62,7 @@
 
 //#ifdef AMF
 	#define NOC 2
-	#define BPS (64*NOC)
+	#define BPS (1)
 	#define _PPS (_PPB*BPS)
 //#else
 //	#define BPS (64)
