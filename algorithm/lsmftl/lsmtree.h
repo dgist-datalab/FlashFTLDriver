@@ -24,7 +24,7 @@
 
 /*OPTIMIZING SET*/
 //#define HOT_COLD
-
+#define FAST
 #define MIN_ENTRY_PER_SST 128
 #define MIN_SEQ_ENTRY_NUM 4
 #define WB_SEPARATE
