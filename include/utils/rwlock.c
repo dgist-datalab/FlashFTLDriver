@@ -1,4 +1,6 @@
 #include "rwlock.h"
+static int32_t cnt;
+extern char rw_debug_flag;
 void rwlock_init(rwlock *rw){
 	//pthread_mutex_init(&rw->lock,NULL);
 	//pthread_mutex_init(&rw->cnt_lock,NULL);
@@ -10,6 +12,10 @@ void rwlock_init(rwlock *rw){
 void rwlock_read_lock(rwlock* rw){
 	fdriver_lock(&rw->cnt_lock);
 	rw->readcnt++;
+	/*
+	if(rw_debug_flag){
+			printf("rw->read_cnt:%u\n", rw->readcnt);
+	}*/
 	if(rw->readcnt==1){
 		fdriver_lock(&rw->lock);
 	}
@@ -41,6 +47,14 @@ uint32_t rwlock_try_write_lock(rwlock *rw){
 void rwlock_read_unlock(rwlock *rw){
 	fdriver_lock(&rw->cnt_lock);
 	rw->readcnt--;
+	/*
+	if(rw_debug_flag){
+			printf("rw->read_cnt:%u\n", rw->readcnt);
+	}*/
+	if(rw->readcnt<0){
+		printf("????\n");
+		abort();
+	}
 	if(rw->readcnt==0){
 		fdriver_unlock(&rw->lock);
 	}

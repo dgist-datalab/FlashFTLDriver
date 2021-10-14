@@ -71,7 +71,7 @@ void posix_traffic_print(lower_info *li){
 	for(int i=0; i<LREQ_TYPE_NUM;i++){
 		printf("%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
 	}
-	printf("end\n",cnt);
+	printf("end\n");
 }
 
 uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;

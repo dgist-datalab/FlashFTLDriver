@@ -26,13 +26,18 @@ typedef struct dummy_req{
 
 typedef struct amf_wrapper{
 	uint32_t cnt;
+	uint32_t ppa;
 	algo_req *req;
 }amf_wrapper;
 
 amf_wrapper *wrapper_array;
 std::queue<amf_wrapper*>* wrap_q;
 
+#define extract_bus_num(a) ((a>>1)&0x7)
+
 void amf_traffic_print(lower_info *);
+pthread_mutex_t channel_lock=PTHREAD_MUTEX_INITIALIZER;
+uint32_t channel_overlap[8];
 
 lower_info amf_info={
 	.create=amf_info_create,
@@ -69,7 +74,7 @@ void amf_traffic_print(lower_info *li){
 pthread_cond_t wrapper_cond=PTHREAD_COND_INITIALIZER;
 pthread_mutex_t wrapper_lock=PTHREAD_MUTEX_INITIALIZER;
 
-static inline amf_wrapper* get_amf_wrapper(){
+static inline amf_wrapper* get_amf_wrapper(uint32_t ppa){
 	amf_wrapper *res;
 	pthread_mutex_lock(&wrapper_lock);
 	while(wrap_q->empty()){
@@ -77,6 +82,7 @@ static inline amf_wrapper* get_amf_wrapper(){
 	}
 	res=wrap_q->front();
 	res->cnt=0;
+	res->ppa=ppa;
 	wrap_q->pop();
 	pthread_mutex_unlock(&wrapper_lock);
 	return res;
@@ -156,8 +162,15 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,bool async,al
 
 	req->test_ppa=ppa;
 	req->type_lower=0;
+
+	pthread_mutex_lock(&channel_lock);
+	if(channel_overlap[extract_bus_num(ppa)]++){
+		req->type_lower++;
+	}
+	pthread_mutex_unlock(&channel_lock);
+
 #ifdef LOWER_MEM_DEV
-	amf_wrapper *temp_req=get_amf_wrapper();
+	amf_wrapper *temp_req=get_amf_wrapper(ppa);
 	temp_req->req=req;
 	memcpy(mem_pool[ppa], value->value, PAGESIZE);
 	for(uint32_t i=0; i<R2PGAP; i++){
@@ -177,10 +190,16 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,bool async,alg
 	}
 
 	req->test_ppa=ppa;
-
 	req->type_lower=0;
+
+	pthread_mutex_lock(&channel_lock);
+	if(channel_overlap[extract_bus_num(ppa)]++){
+		req->type_lower++;
+	}
+	pthread_mutex_unlock(&channel_lock);
+
 #ifdef LOWER_MEM_DEV
-	amf_wrapper *temp_req=get_amf_wrapper();
+	amf_wrapper *temp_req=get_amf_wrapper(ppa);
 	temp_req->req=req;
 	memcpy(value->value, mem_pool[ppa], PAGESIZE);
 	for(uint32_t i=0; i<R2PGAP; i++){
@@ -232,6 +251,10 @@ void amf_call_back_r(void *_req){
 
 	wrapper->cnt++;
 	if(wrapper->cnt==R2PGAP){
+		pthread_mutex_lock(&channel_lock);
+		channel_overlap[extract_bus_num(wrapper->ppa)]--;
+		pthread_mutex_unlock(&channel_lock); 
+
 		algo_req *req=(algo_req*)wrapper->req;
 		req->end_req(req);
 		release_amf_wrapper(wrapper);
@@ -242,6 +265,10 @@ void amf_call_back_w(void *_req){
 	amf_wrapper *wrapper=(amf_wrapper*)_req;
 	wrapper->cnt++;
 	if(wrapper->cnt==R2PGAP){
+		pthread_mutex_lock(&channel_lock);
+		channel_overlap[extract_bus_num(wrapper->ppa)]--;
+		pthread_mutex_unlock(&channel_lock);
+
 		algo_req *req=(algo_req*)wrapper->req;
 		req->end_req(req);
 		release_amf_wrapper(wrapper);

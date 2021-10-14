@@ -1,0 +1,4534 @@
+signal add!
+bench range:0 ~ 4294967295
+!!! (SYNC) posix memory NOP:1205862!!!
+BF target bit:6 fpr:0.016415 member_set:71428 target_member:14 min_bit:12.857142
+target settings memory usage!
+LEVEL	WAF	SF	run_num	memory
+0	3.00	13.89	27	0.210
+------------------------------------------
+[param] # of level: 2
+[param] normal size factor: 14.000000
+[param] read amplification: 1.100000
+[param] version number :27
+[param] write_buffer ent: 21720
+[param] write_buffer byte: 261120
+[param] reclaim ppa target: 76308 (305232)
+[PERF] WAF:3.00+GC
+[PERF] RAF:1.100
+------------------------------------------
+OP:85
+WB_SEPARATE ENABLE
+INVALIDATION_COUNT_MERGE ENABLE
+TI[0] - run_num:14 data:0.01(%) H:BF_GUARD
+TI[1] - run_num:14 data:0.10(%) H:PLR
+max_version idx:28
+NOS:73
+now waiting req!!
+make pinned level cnt:2 (nil) 
+sequntial file ratio:11/11
+demote_cnt: 0
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:4 (nil) 
+sequntial file ratio:13/13
+demote_cnt: 1
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:6 0x7fe132bfc650 
+make pinned level cnt:8 (nil) 
+sequntial file ratio:42/44
+demote_cnt: 2
+version info: v-16 vidx-2 ridx-2 order-2
+10000
+make pinned level cnt:10 (nil) 
+sequntial file ratio:88/88
+demote_cnt: 3
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:12 (nil) 
+sequntial file ratio:101/101
+demote_cnt: 4
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:14 0x7fe132bfc650 
+make pinned level cnt:16 (nil) 
+sequntial file ratio:81/83
+demote_cnt: 5
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:18 (nil) 
+sequntial file ratio:111/111
+demote_cnt: 6
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:20 (nil) 
+sequntial file ratio:75/75
+demote_cnt: 7
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:22 0x7fe132bfc650 
+make pinned level cnt:24 (nil) 
+sequntial file ratio:76/78
+demote_cnt: 8
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:26 (nil) 
+sequntial file ratio:104/104
+demote_cnt: 9
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:28 (nil) 
+sequntial file ratio:67/67
+demote_cnt: 10
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:30 0x7fe132bfc650 
+make pinned level cnt:32 (nil) 
+sequntial file ratio:79/82
+demote_cnt: 11
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:34 (nil) 
+sequntial file ratio:89/89
+demote_cnt: 12
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:36 (nil) 
+sequntial file ratio:70/70
+demote_cnt: 13
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 14
+version info: v-0 vidx-0 ridx-0 order-0
+level idx:1 run 1/14 content_num: 163683 (3.90 %)
+make pinned level cnt:38 (nil) 
+sequntial file ratio:80/80
+demote_cnt: 15
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:40 0x7fe132bfc650 
+make pinned level cnt:42 (nil) 
+sequntial file ratio:51/54
+demote_cnt: 16
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:44 (nil) 
+sequntial file ratio:89/89
+demote_cnt: 17
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:46 (nil) 
+sequntial file ratio:14/14
+demote_cnt: 18
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:48 0x7fe132bfc650 
+make pinned level cnt:50 (nil) 
+sequntial file ratio:73/74
+demote_cnt: 19
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:52 (nil) 
+sequntial file ratio:53/53
+demote_cnt: 20
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:54 (nil) 
+sequntial file ratio:71/71
+demote_cnt: 21
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:56 0x7fe132bfc650 
+make pinned level cnt:58 (nil) 
+sequntial file ratio:37/39
+demote_cnt: 22
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:60 (nil) 
+sequntial file ratio:90/90
+demote_cnt: 23
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:62 (nil) 
+sequntial file ratio:55/55
+demote_cnt: 24
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:64 0x7fe132bfc650 
+make pinned level cnt:66 (nil) 
+sequntial file ratio:65/67
+demote_cnt: 25
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:68 (nil) 
+sequntial file ratio:48/48
+demote_cnt: 26
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:70 (nil) 
+sequntial file ratio:79/79
+demote_cnt: 27
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:72 0x7fe132bfc650 
+20000
+make pinned level cnt:74 (nil) 
+sequntial file ratio:57/58
+demote_cnt: 28
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 29
+version info: v-1 vidx-1 ridx-1 order-1
+level idx:1 run 2/14 content_num: 333362 (7.95 %)
+make pinned level cnt:76 0x7fe132bfc650 
+make pinned level cnt:78 (nil) 
+sequntial file ratio:63/65
+demote_cnt: 30
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:80 (nil) 
+sequntial file ratio:86/86
+demote_cnt: 31
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:82 0x7fe132bfc650 
+make pinned level cnt:84 (nil) 
+sequntial file ratio:20/24
+demote_cnt: 32
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:86 (nil) 
+sequntial file ratio:73/73
+demote_cnt: 33
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:88 (nil) 
+sequntial file ratio:68/68
+demote_cnt: 34
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:90 0x7fe132bfc650 
+make pinned level cnt:92 (nil) 
+sequntial file ratio:66/71
+demote_cnt: 35
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:94 (nil) 
+sequntial file ratio:77/77
+demote_cnt: 36
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:96 (nil) 
+sequntial file ratio:81/81
+demote_cnt: 37
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:98 0x7fe132bfc650 
+make pinned level cnt:100 (nil) 
+sequntial file ratio:84/87
+demote_cnt: 38
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:102 (nil) 
+sequntial file ratio:85/85
+demote_cnt: 39
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:104 0x7fe132bfc650 
+make pinned level cnt:106 (nil) 
+sequntial file ratio:48/53
+demote_cnt: 40
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:108 (nil) 
+sequntial file ratio:42/42
+demote_cnt: 41
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:110 (nil) 
+sequntial file ratio:51/51
+demote_cnt: 42
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:112 0x7fe132bfc650 
+make pinned level cnt:114 (nil) 
+sequntial file ratio:35/40
+demote_cnt: 43
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 44
+version info: v-2 vidx-2 ridx-2 order-2
+level idx:1 run 3/14 content_num: 500554 (11.93 %)
+make pinned level cnt:116 0x7fe132bfc650 
+make pinned level cnt:118 (nil) 
+sequntial file ratio:35/42
+demote_cnt: 45
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:120 (nil) 
+sequntial file ratio:70/70
+demote_cnt: 46
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:122 0x7fe132bfc650 
+make pinned level cnt:124 (nil) 
+sequntial file ratio:24/34
+demote_cnt: 47
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:126 (nil) 
+sequntial file ratio:72/72
+demote_cnt: 48
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:128 0x7fe132bfc650 
+make pinned level cnt:130 (nil) 
+sequntial file ratio:11/22
+demote_cnt: 49
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:132 (nil) 
+sequntial file ratio:100/100
+demote_cnt: 50
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:134 0x7fe132bfc650 
+make pinned level cnt:136 (nil) 
+sequntial file ratio:14/24
+demote_cnt: 51
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:138 (nil) 
+sequntial file ratio:125/125
+demote_cnt: 52
+version info: v-21 vidx-7 ridx-7 order-7
+30000
+make pinned level cnt:140 0x7fe132bfc650 
+make pinned level cnt:142 (nil) 
+sequntial file ratio:37/48
+demote_cnt: 53
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:144 (nil) 
+sequntial file ratio:165/165
+demote_cnt: 54
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:146 0x7fe132bfc650 
+make pinned level cnt:148 (nil) 
+sequntial file ratio:29/38
+demote_cnt: 55
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:150 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 56
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:152 0x7fe132bfc650 
+make pinned level cnt:154 (nil) 
+sequntial file ratio:59/67
+demote_cnt: 57
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:156 (nil) 
+sequntial file ratio:165/170
+demote_cnt: 58
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 59
+version info: v-3 vidx-3 ridx-3 order-3
+level idx:1 run 4/14 content_num: 665499 (15.87 %)
+make pinned level cnt:158 (nil) 
+sequntial file ratio:169/170
+demote_cnt: 60
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:160 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 61
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:162 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 62
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:164 0x7fe132bfc650 
+make pinned level cnt:166 (nil) 
+sequntial file ratio:100/111
+demote_cnt: 63
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:168 (nil) 
+sequntial file ratio:166/170
+demote_cnt: 64
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:170 (nil) 
+sequntial file ratio:169/170
+demote_cnt: 65
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:172 0x7fe132bfc650 
+make pinned level cnt:174 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 66
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:176 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 67
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:178 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 68
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:180 0x7fe132bfc650 
+make pinned level cnt:182 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 69
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:184 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 70
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:186 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 71
+version info: v-25 vidx-11 ridx-11 order-11
+40000
+make pinned level cnt:188 0x7fe132bfc650 
+make pinned level cnt:190 (nil) 
+sequntial file ratio:148/161
+demote_cnt: 72
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:192 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 73
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 74
+version info: v-4 vidx-4 ridx-4 order-4
+level idx:1 run 5/14 content_num: 829459 (19.78 %)
+make pinned level cnt:194 (nil) 
+sequntial file ratio:63/63
+demote_cnt: 75
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:196 0x7fe132bfc650 
+make pinned level cnt:198 (nil) 
+sequntial file ratio:109/118
+demote_cnt: 76
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:200 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 77
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:202 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 78
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:204 0x7fe132bfc650 
+make pinned level cnt:206 (nil) 
+sequntial file ratio:90/101
+demote_cnt: 79
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:208 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 80
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:210 0x7fe132bfc650 
+make pinned level cnt:212 (nil) 
+sequntial file ratio:148/152
+demote_cnt: 81
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:214 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 82
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:216 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 83
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:218 0x7fe132bfc650 
+make pinned level cnt:220 (nil) 
+sequntial file ratio:109/119
+demote_cnt: 84
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:222 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 85
+version info: v-24 vidx-10 ridx-10 order-10
+50000
+make pinned level cnt:224 0x7fe132bfc650 
+make pinned level cnt:226 (nil) 
+sequntial file ratio:153/158
+demote_cnt: 86
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:228 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 87
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:230 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 88
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 89
+version info: v-5 vidx-5 ridx-5 order-5
+level idx:1 run 6/14 content_num: 977233 (23.30 %)
+make pinned level cnt:232 0x7fe132bfc650 
+make pinned level cnt:234 (nil) 
+sequntial file ratio:33/37
+demote_cnt: 90
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:236 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 91
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:238 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 92
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:240 0x7fe132bfc650 
+make pinned level cnt:242 (nil) 
+sequntial file ratio:79/91
+demote_cnt: 93
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:244 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 94
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:246 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 95
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:248 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 96
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:250 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 97
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:252 0x7fe132bfc650 
+60000
+make pinned level cnt:254 (nil) 
+sequntial file ratio:34/37
+demote_cnt: 98
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:256 (nil) 
+sequntial file ratio:28/28
+demote_cnt: 99
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:258 0x7fe132bfc650 
+make pinned level cnt:260 (nil) 
+sequntial file ratio:5/16
+demote_cnt: 100
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:262 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 101
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:264 0x7fe132bfc650 
+make pinned level cnt:266 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 102
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:268 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 103
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 104
+version info: v-6 vidx-6 ridx-6 order-6
+level idx:1 run 7/14 content_num: 1130547 (26.95 %)
+make pinned level cnt:270 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 105
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:272 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 106
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:274 0x7fe132bfc650 
+make pinned level cnt:276 (nil) 
+sequntial file ratio:102/109
+demote_cnt: 107
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:278 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 108
+version info: v-17 vidx-3 ridx-3 order-3
+70000
+make pinned level cnt:280 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 109
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:282 0x7fe132bfc650 
+make pinned level cnt:284 (nil) 
+sequntial file ratio:51/60
+demote_cnt: 110
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:286 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 111
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:288 0x7fe132bfc650 
+make pinned level cnt:290 (nil) 
+sequntial file ratio:152/169
+demote_cnt: 112
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:292 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 113
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:294 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 114
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:296 0x7fe132bfc650 
+make pinned level cnt:298 (nil) 
+sequntial file ratio:39/44
+demote_cnt: 115
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:300 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 116
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:302 0x7fe132bfc650 
+make pinned level cnt:304 (nil) 
+sequntial file ratio:103/109
+demote_cnt: 117
+version info: v-26 vidx-12 ridx-12 order-12
+80000
+make pinned level cnt:306 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 118
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 119
+version info: v-7 vidx-7 ridx-7 order-7
+level idx:1 run 8/14 content_num: 1284188 (30.62 %)
+make pinned level cnt:308 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 120
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:310 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 121
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:312 0x7fe132bfc650 
+make pinned level cnt:314 (nil) 
+sequntial file ratio:20/30
+demote_cnt: 122
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:316 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 123
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:318 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 124
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:320 0x7fe132bfc650 
+make pinned level cnt:322 (nil) 
+sequntial file ratio:95/105
+demote_cnt: 125
+version info: v-19 vidx-5 ridx-5 order-5
+90000
+make pinned level cnt:324 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 126
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:326 0x7fe132bfc650 
+make pinned level cnt:328 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 127
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:330 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 128
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:332 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 129
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:334 0x7fe132bfc650 
+make pinned level cnt:336 (nil) 
+sequntial file ratio:158/170
+demote_cnt: 130
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:338 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 131
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:340 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 132
+version info: v-26 vidx-12 ridx-12 order-12
+100000
+make pinned level cnt:342 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 133
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 134
+version info: v-8 vidx-8 ridx-8 order-8
+level idx:1 run 9/14 content_num: 1432265 (34.15 %)
+make pinned level cnt:344 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 135
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:346 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 136
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:348 0x7fe132bfc650 
+make pinned level cnt:350 (nil) 
+sequntial file ratio:130/141
+demote_cnt: 137
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:352 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 138
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:354 0x7fe132bfc650 
+make pinned level cnt:356 (nil) 
+sequntial file ratio:62/64
+demote_cnt: 139
+version info: v-18 vidx-4 ridx-4 order-4
+110000
+make pinned level cnt:358 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 140
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:360 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 141
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:362 0x7fe132bfc650 
+make pinned level cnt:364 (nil) 
+sequntial file ratio:133/146
+demote_cnt: 142
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:366 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 143
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:368 0x7fe132bfc650 
+make pinned level cnt:370 (nil) 
+sequntial file ratio:152/170
+demote_cnt: 144
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:372 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 145
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:374 (nil) 
+120000
+sequntial file ratio:159/170
+demote_cnt: 146
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:376 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 147
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:378 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 148
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 149
+version info: v-9 vidx-9 ridx-9 order-9
+level idx:1 run 10/14 content_num: 1580914 (37.69 %)
+make pinned level cnt:380 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 150
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:382 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 151
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:384 0x7fe132bfc650 
+make pinned level cnt:386 (nil) 
+sequntial file ratio:45/53
+demote_cnt: 152
+version info: v-16 vidx-2 ridx-2 order-2
+130000
+make pinned level cnt:388 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 153
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:390 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 154
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:392 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 155
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:394 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 156
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:396 0x7fe132bfc650 
+make pinned level cnt:398 (nil) 
+sequntial file ratio:80/83
+demote_cnt: 157
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:400 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 158
+version info: v-22 vidx-8 ridx-8 order-8
+140000
+make pinned level cnt:402 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 159
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:404 (nil) 
+sequntial file ratio:85/94
+demote_cnt: 160
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:406 (nil) 
+sequntial file ratio:15/15
+demote_cnt: 161
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:408 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 162
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:410 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 163
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 164
+version info: v-10 vidx-10 ridx-10 order-10
+level idx:1 run 11/14 content_num: 1724600 (41.12 %)
+150000
+make pinned level cnt:412 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 165
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:414 0x7fe132bfc650 
+make pinned level cnt:416 (nil) 
+sequntial file ratio:75/80
+demote_cnt: 166
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:418 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 167
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:420 0x7fe132bfc650 
+make pinned level cnt:422 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 168
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:424 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 169
+version info: v-18 vidx-4 ridx-4 order-4
+160000
+make pinned level cnt:426 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 170
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:428 0x7fe132bfc650 
+make pinned level cnt:430 (nil) 
+sequntial file ratio:149/157
+demote_cnt: 171
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:432 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 172
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:434 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 173
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:436 0x7fe132bfc650 
+make pinned level cnt:438 (nil) 
+sequntial file ratio:99/110
+demote_cnt: 174
+version info: v-23 vidx-9 ridx-9 order-9
+170000
+make pinned level cnt:440 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 175
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:442 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 176
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:444 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 177
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:446 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 178
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 179
+version info: v-11 vidx-11 ridx-11 order-11
+level idx:1 run 12/14 content_num: 1869850 (44.58 %)
+make pinned level cnt:448 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 180
+version info: v-14 vidx-0 ridx-0 order-0
+180000
+make pinned level cnt:450 0x7fe132bfc650 
+make pinned level cnt:452 (nil) 
+sequntial file ratio:136/153
+demote_cnt: 181
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:454 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 182
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:456 0x7fe132bfc650 
+make pinned level cnt:458 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 183
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:460 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 184
+version info: v-18 vidx-4 ridx-4 order-4
+190000
+make pinned level cnt:462 (nil) 
+sequntial file ratio:38/39
+demote_cnt: 185
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:464 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 186
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:466 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 187
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:468 0x7fe132bfc650 
+make pinned level cnt:470 (nil) 
+sequntial file ratio:60/63
+demote_cnt: 188
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:472 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 189
+version info: v-23 vidx-9 ridx-9 order-9
+200000
+make pinned level cnt:474 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 190
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:476 0x7fe132bfc650 
+make pinned level cnt:478 (nil) 
+sequntial file ratio:7/17
+demote_cnt: 191
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:480 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 192
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:482 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 193
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 194
+version info: v-12 vidx-12 ridx-12 order-12
+level idx:1 run 13/14 content_num: 2014745 (48.04 %)
+make pinned level cnt:484 0x7fe132bfc650 
+make pinned level cnt:486 (nil) 
+sequntial file ratio:121/129
+demote_cnt: 195
+version info: v-14 vidx-0 ridx-0 order-0
+210000
+make pinned level cnt:488 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 196
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:490 0x7fe132bfc650 
+make pinned level cnt:492 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 197
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:494 0x7fe132bfc650 
+make pinned level cnt:496 (nil) 
+sequntial file ratio:142/153
+demote_cnt: 198
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:498 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 199
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:500 0x7fe132bfc650 
+220000
+make pinned level cnt:502 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 200
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:504 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 201
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:506 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 202
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:508 0x7fe132bfc650 
+make pinned level cnt:510 (nil) 
+sequntial file ratio:158/170
+demote_cnt: 203
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:512 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 204
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:514 0x7fe132bfc650 
+230000
+make pinned level cnt:516 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 205
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:518 (nil) 
+sequntial file ratio:154/164
+demote_cnt: 206
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:520 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 207
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:522 0x7fe132bfc650 
+make pinned level cnt:524 (nil) 
+sequntial file ratio:156/164
+demote_cnt: 208
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 209
+version info: v-13 vidx-13 ridx-13 order-13
+level idx:1 run 14/14 content_num: 2159602 (51.49 %)
+240000
+make pinned level cnt:526 (nil) 
+sequntial file ratio:20/31
+demote_cnt: 210
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:528 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 211
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:530 0x7fe132bfc650 
+make pinned level cnt:532 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 212
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:534 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 213
+version info: v-17 vidx-3 ridx-3 order-3
+250000
+make pinned level cnt:536 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 214
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:538 0x7fe132bfc650 
+make pinned level cnt:540 (nil) 
+sequntial file ratio:123/131
+demote_cnt: 215
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:542 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 216
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:544 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 217
+version info: v-21 vidx-7 ridx-7 order-7
+260000
+make pinned level cnt:546 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 218
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:548 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 219
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:550 0x7fe132bfc650 
+make pinned level cnt:552 (nil) 
+sequntial file ratio:95/100
+demote_cnt: 220
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:554 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 221
+version info: v-25 vidx-11 ridx-11 order-11
+270000
+make pinned level cnt:556 (nil) 
+sequntial file ratio:164/170
+demote_cnt: 222
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:558 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 223
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:0
+merge 13,12 to 13
+target:76308 now_remain:303715
+demote_cnt: 224
+version info: v-12 vidx-12 ridx-12 order-13
+level idx:1 run 14/14 content_num: 2218586 (52.90 %)
+make pinned level cnt:560 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 225
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:562 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 226
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:564 0x7fe132bfc650 
+make pinned level cnt:566 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 227
+version info: v-16 vidx-2 ridx-2 order-2
+280000
+make pinned level cnt:568 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 228
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:570 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 229
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:572 0x7fe132bfc650 
+make pinned level cnt:574 (nil) 
+sequntial file ratio:135/145
+demote_cnt: 230
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:576 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 231
+version info: v-20 vidx-6 ridx-6 order-6
+290000
+make pinned level cnt:578 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 232
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:580 0x7fe132bfc650 
+make pinned level cnt:582 (nil) 
+sequntial file ratio:65/77
+demote_cnt: 233
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:584 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 234
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:586 0x7fe132bfc650 
+300000
+make pinned level cnt:588 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 235
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:590 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 236
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:592 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 237
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:594 0x7fe132bfc650 
+make pinned level cnt:596 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 238
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:1
+merge 12,11 to 12
+target:76308 now_remain:302180
+demote_cnt: 239
+version info: v-11 vidx-11 ridx-11 order-13
+level idx:1 run 14/14 content_num: 2279561 (54.35 %)
+make pinned level cnt:598 0x7fe132bfc650 
+make pinned level cnt:600 (nil) 
+310000
+sequntial file ratio:89/99
+demote_cnt: 240
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:602 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 241
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:604 0x7fe132bfc650 
+make pinned level cnt:606 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 242
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:608 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 243
+version info: v-17 vidx-3 ridx-3 order-3
+320000
+make pinned level cnt:610 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 244
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:612 0x7fe132bfc650 
+make pinned level cnt:614 (nil) 
+sequntial file ratio:155/170
+demote_cnt: 245
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:616 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 246
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:618 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 247
+version info: v-21 vidx-7 ridx-7 order-7
+330000
+make pinned level cnt:620 (nil) 
+sequntial file ratio:103/114
+demote_cnt: 248
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:622 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 249
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:624 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 250
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:626 0x7fe132bfc650 
+340000
+make pinned level cnt:628 (nil) 
+sequntial file ratio:87/98
+demote_cnt: 251
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:630 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 252
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:632 0x7fe132bfc650 
+make pinned level cnt:634 (nil) 
+sequntial file ratio:155/170
+demote_cnt: 253
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:2
+merge 11,10 to 11
+target:76308 now_remain:300194
+demote_cnt: 254
+version info: v-10 vidx-10 ridx-10 order-13
+level idx:1 run 14/14 content_num: 2340068 (55.79 %)
+make pinned level cnt:636 0x7fe132bfc650 
+make pinned level cnt:638 (nil) 
+sequntial file ratio:133/144
+demote_cnt: 255
+version info: v-14 vidx-0 ridx-0 order-0
+350000
+make pinned level cnt:640 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 256
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:642 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 257
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:644 0x7fe132bfc650 
+make pinned level cnt:646 (nil) 
+sequntial file ratio:127/140
+demote_cnt: 258
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:648 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 259
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:650 0x7fe132bfc650 
+360000
+make pinned level cnt:652 (nil) 
+sequntial file ratio:152/170
+demote_cnt: 260
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:654 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 261
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:656 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 262
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:658 0x7fe132bfc650 
+make pinned level cnt:660 (nil) 
+370000
+sequntial file ratio:80/83
+demote_cnt: 263
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:662 (nil) 
+sequntial file ratio:164/170
+demote_cnt: 264
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:664 0x7fe132bfc650 
+make pinned level cnt:666 (nil) 
+sequntial file ratio:11/12
+demote_cnt: 265
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:668 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 266
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:670 0x7fe132bfc650 
+380000
+make pinned level cnt:672 (nil) 
+sequntial file ratio:156/170
+demote_cnt: 267
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:674 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 268
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:3
+merge 10,9 to 10
+target:76308 now_remain:289654
+demote_cnt: 269
+version info: v-9 vidx-9 ridx-9 order-13
+level idx:1 run 14/14 content_num: 2399581 (57.21 %)
+make pinned level cnt:676 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 270
+version info: v-14 vidx-0 ridx-0 order-0
+390000
+make pinned level cnt:678 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 271
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:680 0x7fe132bfc650 
+make pinned level cnt:682 (nil) 
+sequntial file ratio:95/106
+demote_cnt: 272
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:684 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 273
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:686 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 274
+version info: v-18 vidx-4 ridx-4 order-4
+400000
+make pinned level cnt:688 0x7fe132bfc650 
+make pinned level cnt:690 (nil) 
+sequntial file ratio:90/101
+demote_cnt: 275
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:692 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 276
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:694 0x7fe132bfc650 
+make pinned level cnt:696 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 277
+version info: v-21 vidx-7 ridx-7 order-7
+410000
+make pinned level cnt:698 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 278
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:700 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 279
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:702 0x7fe132bfc650 
+make pinned level cnt:704 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 280
+version info: v-24 vidx-10 ridx-10 order-10
+420000
+430000
+440000
+450000
+make pinned level cnt:706 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 281
+version info: v-25 vidx-11 ridx-11 order-11
+460000
+470000
+480000
+490000
+make pinned level cnt:708 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 282
+version info: v-26 vidx-12 ridx-12 order-12
+500000
+make pinned level cnt:710 0x7fe132bfc650 
+510000
+make pinned level cnt:712 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 283
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:4
+merge 9,8 to 9
+target:76308 now_remain:267227
+demote_cnt: 284
+version info: v-8 vidx-8 ridx-8 order-13
+level idx:1 run 14/14 content_num: 2461896 (58.70 %)
+make pinned level cnt:714 0x7fe132bfc650 
+520000
+make pinned level cnt:716 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 285
+version info: v-14 vidx-0 ridx-0 order-0
+530000
+540000
+make pinned level cnt:718 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 286
+version info: v-15 vidx-1 ridx-1 order-1
+550000
+make pinned level cnt:720 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 287
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:722 0x7fe132bfc650 
+560000
+570000
+make pinned level cnt:724 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 288
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:726 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 289
+version info: v-18 vidx-4 ridx-4 order-4
+580000
+make pinned level cnt:728 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 290
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:730 0x7fe132bfc650 
+590000
+make pinned level cnt:732 (nil) 
+sequntial file ratio:86/90
+demote_cnt: 291
+version info: v-20 vidx-6 ridx-6 order-6
+600000
+make pinned level cnt:734 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 292
+version info: v-21 vidx-7 ridx-7 order-7
+610000
+620000
+make pinned level cnt:736 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 293
+version info: v-22 vidx-8 ridx-8 order-8
+630000
+make pinned level cnt:738 0x7fe132bfc650 
+make pinned level cnt:740 (nil) 
+sequntial file ratio:79/81
+demote_cnt: 294
+version info: v-23 vidx-9 ridx-9 order-9
+640000
+make pinned level cnt:742 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 295
+version info: v-24 vidx-10 ridx-10 order-10
+650000
+make pinned level cnt:744 0x7fe132bfc650 
+make pinned level cnt:746 (nil) 
+sequntial file ratio:32/40
+demote_cnt: 296
+version info: v-25 vidx-11 ridx-11 order-11
+660000
+670000
+make pinned level cnt:748 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 297
+version info: v-26 vidx-12 ridx-12 order-12
+680000
+make pinned level cnt:750 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 298
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:5
+merge 7,6 to 7
+target:76308 now_remain:276209
+demote_cnt: 299
+version info: v-6 vidx-6 ridx-6 order-13
+level idx:1 run 14/14 content_num: 2571637 (61.31 %)
+690000
+make pinned level cnt:752 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 300
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:754 0x7fe132bfc650 
+700000
+make pinned level cnt:756 (nil) 
+sequntial file ratio:74/82
+demote_cnt: 301
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:758 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 302
+version info: v-16 vidx-2 ridx-2 order-2
+710000
+720000
+make pinned level cnt:760 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 303
+version info: v-17 vidx-3 ridx-3 order-3
+730000
+make pinned level cnt:762 0x7fe132bfc650 
+make pinned level cnt:764 (nil) 
+sequntial file ratio:112/123
+demote_cnt: 304
+version info: v-18 vidx-4 ridx-4 order-4
+740000
+750000
+make pinned level cnt:766 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 305
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:768 (nil) 
+sequntial file ratio:162/162
+demote_cnt: 306
+version info: v-20 vidx-6 ridx-6 order-6
+760000
+make pinned level cnt:770 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 307
+version info: v-21 vidx-7 ridx-7 order-7
+770000
+780000
+make pinned level cnt:772 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 308
+version info: v-22 vidx-8 ridx-8 order-8
+790000
+make pinned level cnt:774 0x7fe132bfc650 
+make pinned level cnt:776 (nil) 
+sequntial file ratio:125/137
+demote_cnt: 309
+version info: v-23 vidx-9 ridx-9 order-9
+800000
+make pinned level cnt:778 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 310
+version info: v-24 vidx-10 ridx-10 order-10
+810000
+make pinned level cnt:780 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 311
+version info: v-25 vidx-11 ridx-11 order-11
+820000
+make pinned level cnt:782 0x7fe132bfc650 
+make pinned level cnt:784 (nil) 
+sequntial file ratio:75/86
+demote_cnt: 312
+version info: v-26 vidx-12 ridx-12 order-12
+830000
+840000
+make pinned level cnt:786 (nil) 
+sequntial file ratio:118/118
+demote_cnt: 313
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:6
+merge 6,4 to 6
+target:76308 now_remain:247814
+demote_cnt: 314
+version info: v-4 vidx-4 ridx-4 order-13
+level idx:1 run 14/14 content_num: 2684952 (64.01 %)
+850000
+make pinned level cnt:788 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 315
+version info: v-14 vidx-0 ridx-0 order-0
+860000
+make pinned level cnt:790 0x7fe132bfc650 
+make pinned level cnt:792 (nil) 
+sequntial file ratio:156/169
+demote_cnt: 316
+version info: v-15 vidx-1 ridx-1 order-1
+870000
+880000
+make pinned level cnt:794 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 317
+version info: v-16 vidx-2 ridx-2 order-2
+890000
+make pinned level cnt:796 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 318
+version info: v-17 vidx-3 ridx-3 order-3
+900000
+make pinned level cnt:798 0x7fe132bfc650 
+make pinned level cnt:800 (nil) 
+sequntial file ratio:49/60
+demote_cnt: 319
+version info: v-18 vidx-4 ridx-4 order-4
+910000
+make pinned level cnt:802 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 320
+version info: v-19 vidx-5 ridx-5 order-5
+920000
+930000
+make pinned level cnt:804 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 321
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:806 0x7fe132bfc650 
+make pinned level cnt:808 (nil) 
+sequntial file ratio:99/112
+demote_cnt: 322
+version info: v-21 vidx-7 ridx-7 order-7
+940000
+950000
+make pinned level cnt:810 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 323
+version info: v-22 vidx-8 ridx-8 order-8
+960000
+make pinned level cnt:812 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 324
+version info: v-23 vidx-9 ridx-9 order-9
+970000
+make pinned level cnt:814 0x7fe132bfc650 
+980000
+make pinned level cnt:816 (nil) 
+sequntial file ratio:98/110
+demote_cnt: 325
+version info: v-24 vidx-10 ridx-10 order-10
+990000
+make pinned level cnt:818 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 326
+version info: v-25 vidx-11 ridx-11 order-11
+1000000
+make pinned level cnt:820 (nil) 
+1010000
+sequntial file ratio:159/170
+demote_cnt: 327
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:822 0x7fe132bfc650 
+make pinned level cnt:824 (nil) 
+sequntial file ratio:86/95
+demote_cnt: 328
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:7
+merge 1,0 to 1
+target:76308 now_remain:230745
+demote_cnt: 329
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 2778960 (66.26 %)
+1020000
+make pinned level cnt:826 0x7fe132bfc650 
+make pinned level cnt:828 (nil) 
+sequntial file ratio:157/170
+demote_cnt: 330
+version info: v-14 vidx-0 ridx-0 order-0
+1030000
+make pinned level cnt:830 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 331
+version info: v-15 vidx-1 ridx-1 order-1
+1040000
+make pinned level cnt:832 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 332
+version info: v-16 vidx-2 ridx-2 order-2
+1050000
+make pinned level cnt:834 0x7fe132bfc650 
+1060000
+make pinned level cnt:836 (nil) 
+sequntial file ratio:133/144
+demote_cnt: 333
+version info: v-17 vidx-3 ridx-3 order-3
+1070000
+make pinned level cnt:838 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 334
+version info: v-18 vidx-4 ridx-4 order-4
+1080000
+1090000
+make pinned level cnt:840 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 335
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:842 0x7fe132bfc650 
+1100000
+make pinned level cnt:844 (nil) 
+sequntial file ratio:90/103
+demote_cnt: 336
+version info: v-20 vidx-6 ridx-6 order-6
+1110000
+make pinned level cnt:846 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 337
+version info: v-21 vidx-7 ridx-7 order-7
+1120000
+make pinned level cnt:848 (nil) 
+sequntial file ratio:164/170
+demote_cnt: 338
+version info: v-22 vidx-8 ridx-8 order-8
+1130000
+make pinned level cnt:850 0x7fe132bfc650 
+make pinned level cnt:852 (nil) 
+sequntial file ratio:6/16
+demote_cnt: 339
+version info: v-23 vidx-9 ridx-9 order-9
+1140000
+make pinned level cnt:854 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 340
+version info: v-24 vidx-10 ridx-10 order-10
+1150000
+1160000
+make pinned level cnt:856 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 341
+version info: v-25 vidx-11 ridx-11 order-11
+1170000
+make pinned level cnt:858 0x7fe132bfc650 
+make pinned level cnt:860 (nil) 
+sequntial file ratio:96/109
+demote_cnt: 342
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:862 (nil) 
+sequntial file ratio:169/170
+demote_cnt: 343
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:8
+merge 4,2 to 4
+target:76308 now_remain:215903
+demote_cnt: 344
+version info: v-2 vidx-2 ridx-2 order-13
+level idx:1 run 14/14 content_num: 2875544 (68.56 %)
+1180000
+1190000
+make pinned level cnt:864 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 345
+version info: v-14 vidx-0 ridx-0 order-0
+1200000
+make pinned level cnt:866 0x7fe132bfc650 
+make pinned level cnt:868 (nil) 
+sequntial file ratio:79/92
+demote_cnt: 346
+version info: v-15 vidx-1 ridx-1 order-1
+1210000
+make pinned level cnt:870 (nil) 
+sequntial file ratio:169/170
+demote_cnt: 347
+version info: v-16 vidx-2 ridx-2 order-2
+1220000
+make pinned level cnt:872 0x7fe132bfc650 
+make pinned level cnt:874 (nil) 
+sequntial file ratio:93/103
+demote_cnt: 348
+version info: v-17 vidx-3 ridx-3 order-3
+1230000
+1240000
+make pinned level cnt:876 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 349
+version info: v-18 vidx-4 ridx-4 order-4
+1250000
+make pinned level cnt:878 (nil) 
+sequntial file ratio:108/108
+demote_cnt: 350
+version info: v-19 vidx-5 ridx-5 order-5
+1260000
+1270000
+make pinned level cnt:880 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 351
+version info: v-20 vidx-6 ridx-6 order-6
+1280000
+make pinned level cnt:882 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 352
+version info: v-21 vidx-7 ridx-7 order-7
+1290000
+make pinned level cnt:884 0x7fe132bfc650 
+1300000
+make pinned level cnt:886 (nil) 
+sequntial file ratio:53/66
+demote_cnt: 353
+version info: v-22 vidx-8 ridx-8 order-8
+1310000
+make pinned level cnt:888 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 354
+version info: v-23 vidx-9 ridx-9 order-9
+1320000
+make pinned level cnt:890 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 355
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:892 0x7fe132bfc650 
+make pinned level cnt:894 (nil) 
+sequntial file ratio:133/137
+demote_cnt: 356
+version info: v-25 vidx-11 ridx-11 order-11
+1330000
+make pinned level cnt:896 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 357
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:898 0x7fe132bfc650 
+1340000
+make pinned level cnt:900 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 358
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:9
+merge 3,5 to 3
+target:76308 now_remain:220410
+demote_cnt: 359
+version info: v-5 vidx-5 ridx-5 order-13
+level idx:1 run 14/14 content_num: 2963506 (70.66 %)
+1350000
+1360000
+1370000
+make pinned level cnt:902 0x7fe132bfc650 
+make pinned level cnt:904 (nil) 
+sequntial file ratio:31/42
+demote_cnt: 360
+version info: v-14 vidx-0 ridx-0 order-0
+1380000
+make pinned level cnt:906 (nil) 
+sequntial file ratio:38/38
+demote_cnt: 361
+version info: v-15 vidx-1 ridx-1 order-1
+1390000
+make pinned level cnt:908 0x7fe132bfc650 
+make pinned level cnt:910 (nil) 
+sequntial file ratio:102/114
+demote_cnt: 362
+version info: v-16 vidx-2 ridx-2 order-2
+1400000
+1410000
+make pinned level cnt:912 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 363
+version info: v-17 vidx-3 ridx-3 order-3
+1420000
+make pinned level cnt:914 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 364
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:916 0x7fe132bfc650 
+make pinned level cnt:918 (nil) 
+sequntial file ratio:90/98
+demote_cnt: 365
+version info: v-19 vidx-5 ridx-5 order-5
+1430000
+make pinned level cnt:920 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 366
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:922 0x7fe132bfc650 
+1440000
+1450000
+make pinned level cnt:924 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 367
+version info: v-21 vidx-7 ridx-7 order-7
+1460000
+make pinned level cnt:926 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 368
+version info: v-22 vidx-8 ridx-8 order-8
+1470000
+make pinned level cnt:928 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 369
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:930 0x7fe132bfc650 
+1480000
+make pinned level cnt:932 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 370
+version info: v-24 vidx-10 ridx-10 order-10
+1490000
+1500000
+make pinned level cnt:934 0x7fe132bfc650 
+make pinned level cnt:936 (nil) 
+sequntial file ratio:80/91
+demote_cnt: 371
+version info: v-25 vidx-11 ridx-11 order-11
+1510000
+make pinned level cnt:938 (nil) 
+sequntial file ratio:168/170
+demote_cnt: 372
+version info: v-26 vidx-12 ridx-12 order-12
+1520000
+make pinned level cnt:940 0x7fe132bfc650 
+1530000
+make pinned level cnt:942 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 373
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:10
+merge 13,12 to 13
+target:76308 now_remain:192787
+demote_cnt: 374
+version info: v-12 vidx-12 ridx-12 order-13
+level idx:1 run 14/14 content_num: 3068273 (73.15 %)
+1540000
+make pinned level cnt:944 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 375
+version info: v-14 vidx-0 ridx-0 order-0
+1550000
+make pinned level cnt:946 0x7fe132bfc650 
+1560000
+make pinned level cnt:948 (nil) 
+sequntial file ratio:150/170
+demote_cnt: 376
+version info: v-15 vidx-1 ridx-1 order-1
+1570000
+make pinned level cnt:950 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 377
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:952 (nil) 
+sequntial file ratio:167/170
+demote_cnt: 378
+version info: v-17 vidx-3 ridx-3 order-3
+1580000
+1590000
+make pinned level cnt:954 0x7fe132bfc650 
+make pinned level cnt:956 (nil) 
+sequntial file ratio:91/103
+demote_cnt: 379
+version info: v-18 vidx-4 ridx-4 order-4
+1600000
+make pinned level cnt:958 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 380
+version info: v-19 vidx-5 ridx-5 order-5
+1610000
+make pinned level cnt:960 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 381
+version info: v-20 vidx-6 ridx-6 order-6
+1620000
+make pinned level cnt:962 0x7fe132bfc650 
+make pinned level cnt:964 (nil) 
+sequntial file ratio:41/52
+demote_cnt: 382
+version info: v-21 vidx-7 ridx-7 order-7
+1630000
+make pinned level cnt:966 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 383
+version info: v-22 vidx-8 ridx-8 order-8
+1640000
+1650000
+make pinned level cnt:968 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 384
+version info: v-23 vidx-9 ridx-9 order-9
+1660000
+make pinned level cnt:970 0x7fe132bfc650 
+1670000
+make pinned level cnt:972 (nil) 
+sequntial file ratio:91/96
+demote_cnt: 385
+version info: v-24 vidx-10 ridx-10 order-10
+1680000
+make pinned level cnt:974 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 386
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:976 0x7fe132bfc650 
+1690000
+1700000
+make pinned level cnt:978 (nil) 
+sequntial file ratio:43/51
+demote_cnt: 387
+version info: v-26 vidx-12 ridx-12 order-12
+1710000
+make pinned level cnt:980 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 388
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:11
+merge 11,10 to 11
+target:76308 now_remain:182263
+demote_cnt: 389
+version info: v-10 vidx-10 ridx-10 order-13
+level idx:1 run 14/14 content_num: 3164292 (75.44 %)
+make pinned level cnt:982 0x7fe132bfc650 
+1720000
+make pinned level cnt:984 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 390
+version info: v-14 vidx-0 ridx-0 order-0
+1730000
+make pinned level cnt:986 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 391
+version info: v-15 vidx-1 ridx-1 order-1
+1740000
+make pinned level cnt:988 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 392
+version info: v-16 vidx-2 ridx-2 order-2
+1750000
+make pinned level cnt:990 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 393
+version info: v-17 vidx-3 ridx-3 order-3
+1760000
+1770000
+make pinned level cnt:992 0x7fe132bfc650 
+make pinned level cnt:994 (nil) 
+sequntial file ratio:59/63
+demote_cnt: 394
+version info: v-18 vidx-4 ridx-4 order-4
+1780000
+make pinned level cnt:996 (nil) 
+1790000
+sequntial file ratio:159/170
+demote_cnt: 395
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:998 0x7fe132bfc650 
+1800000
+make pinned level cnt:1000 (nil) 
+sequntial file ratio:131/140
+demote_cnt: 396
+version info: v-20 vidx-6 ridx-6 order-6
+1810000
+make pinned level cnt:1002 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 397
+version info: v-21 vidx-7 ridx-7 order-7
+1820000
+make pinned level cnt:1004 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 398
+version info: v-22 vidx-8 ridx-8 order-8
+1830000
+make pinned level cnt:1006 0x7fe132bfc650 
+1840000
+make pinned level cnt:1008 (nil) 
+sequntial file ratio:99/109
+demote_cnt: 399
+version info: v-23 vidx-9 ridx-9 order-9
+1850000
+make pinned level cnt:1010 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 400
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:1012 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 401
+version info: v-25 vidx-11 ridx-11 order-11
+1860000
+make pinned level cnt:1014 0x7fe132bfc650 
+make pinned level cnt:1016 (nil) 
+sequntial file ratio:117/127
+demote_cnt: 402
+version info: v-26 vidx-12 ridx-12 order-12
+1870000
+1880000
+make pinned level cnt:1018 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 403
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:12
+merge 9,8 to 9
+target:76308 now_remain:153848
+demote_cnt: 404
+version info: v-8 vidx-8 ridx-8 order-13
+level idx:1 run 14/14 content_num: 3253087 (77.56 %)
+1890000
+make pinned level cnt:1020 0x7fe132bfc650 
+1900000
+make pinned level cnt:1022 (nil) 
+sequntial file ratio:137/143
+demote_cnt: 405
+version info: v-14 vidx-0 ridx-0 order-0
+1910000
+make pinned level cnt:1024 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 406
+version info: v-15 vidx-1 ridx-1 order-1
+1920000
+1930000
+make pinned level cnt:1026 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 407
+version info: v-16 vidx-2 ridx-2 order-2
+1940000
+make pinned level cnt:1028 0x7fe132bfc650 
+make pinned level cnt:1030 (nil) 
+sequntial file ratio:94/105
+demote_cnt: 408
+version info: v-17 vidx-3 ridx-3 order-3
+1950000
+make pinned level cnt:1032 (nil) 
+1960000
+sequntial file ratio:159/170
+demote_cnt: 409
+version info: v-18 vidx-4 ridx-4 order-4
+1970000
+make pinned level cnt:1034 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 410
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:1036 0x7fe132bfc650 
+make pinned level cnt:1038 (nil) 
+sequntial file ratio:67/77
+demote_cnt: 411
+version info: v-20 vidx-6 ridx-6 order-6
+1980000
+make pinned level cnt:1040 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 412
+version info: v-21 vidx-7 ridx-7 order-7
+1990000
+make pinned level cnt:1042 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 413
+version info: v-22 vidx-8 ridx-8 order-8
+2000000
+make pinned level cnt:1044 0x7fe132bfc650 
+make pinned level cnt:1046 (nil) 
+sequntial file ratio:92/104
+demote_cnt: 414
+version info: v-23 vidx-9 ridx-9 order-9
+2010000
+2020000
+make pinned level cnt:1048 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 415
+version info: v-24 vidx-10 ridx-10 order-10
+2030000
+make pinned level cnt:1050 (nil) 
+sequntial file ratio:17/17
+demote_cnt: 416
+version info: v-25 vidx-11 ridx-11 order-11
+2040000
+2050000
+make pinned level cnt:1052 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 417
+version info: v-26 vidx-12 ridx-12 order-12
+2060000
+make pinned level cnt:1054 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 418
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:13
+merge 7,6 to 7
+target:76308 now_remain:176090
+demote_cnt: 419
+version info: v-6 vidx-6 ridx-6 order-13
+level idx:1 run 14/14 content_num: 3329536 (79.38 %)
+2070000
+2080000
+make pinned level cnt:1056 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 420
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:1058 0x7fe132bfc650 
+2090000
+2100000
+make pinned level cnt:1060 (nil) 
+sequntial file ratio:74/83
+demote_cnt: 421
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:1062 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 422
+version info: v-16 vidx-2 ridx-2 order-2
+2110000
+make pinned level cnt:1064 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 423
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:1066 0x7fe132bfc650 
+2120000
+make pinned level cnt:1068 (nil) 
+sequntial file ratio:157/170
+demote_cnt: 424
+version info: v-18 vidx-4 ridx-4 order-4
+2130000
+make pinned level cnt:1070 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 425
+version info: v-19 vidx-5 ridx-5 order-5
+2140000
+make pinned level cnt:1072 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 426
+version info: v-20 vidx-6 ridx-6 order-6
+2150000
+make pinned level cnt:1074 0x7fe132bfc650 
+2160000
+make pinned level cnt:1076 (nil) 
+sequntial file ratio:16/24
+demote_cnt: 427
+version info: v-21 vidx-7 ridx-7 order-7
+2170000
+make pinned level cnt:1078 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 428
+version info: v-22 vidx-8 ridx-8 order-8
+2180000
+2190000
+make pinned level cnt:1080 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 429
+version info: v-23 vidx-9 ridx-9 order-9
+2200000
+make pinned level cnt:1082 0x7fe132bfc650 
+make pinned level cnt:1084 (nil) 
+2210000
+sequntial file ratio:24/34
+demote_cnt: 430
+version info: v-24 vidx-10 ridx-10 order-10
+2220000
+make pinned level cnt:1086 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 431
+version info: v-25 vidx-11 ridx-11 order-11
+2230000
+make pinned level cnt:1088 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 432
+version info: v-26 vidx-12 ridx-12 order-12
+2240000
+make pinned level cnt:1090 0x7fe132bfc650 
+make pinned level cnt:1092 (nil) 
+sequntial file ratio:104/114
+demote_cnt: 433
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:14
+merge 1,0 to 1
+target:76308 now_remain:151269
+demote_cnt: 434
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 3405951 (81.20 %)
+2250000
+make pinned level cnt:1094 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 435
+version info: v-14 vidx-0 ridx-0 order-0
+2260000
+make pinned level cnt:1096 0x7fe132bfc650 
+make pinned level cnt:1098 (nil) 
+sequntial file ratio:84/95
+demote_cnt: 436
+version info: v-15 vidx-1 ridx-1 order-1
+2270000
+2280000
+make pinned level cnt:1100 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 437
+version info: v-16 vidx-2 ridx-2 order-2
+2290000
+make pinned level cnt:1102 (nil) 
+sequntial file ratio:169/170
+demote_cnt: 438
+version info: v-17 vidx-3 ridx-3 order-3
+2300000
+2310000
+make pinned level cnt:1104 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 439
+version info: v-18 vidx-4 ridx-4 order-4
+2320000
+make pinned level cnt:1106 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 440
+version info: v-19 vidx-5 ridx-5 order-5
+2330000
+make pinned level cnt:1108 0x7fe132bfc650 
+make pinned level cnt:1110 (nil) 
+sequntial file ratio:10/21
+demote_cnt: 441
+version info: v-20 vidx-6 ridx-6 order-6
+2340000
+2350000
+make pinned level cnt:1112 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 442
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:1114 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 443
+version info: v-22 vidx-8 ridx-8 order-8
+2360000
+2370000
+make pinned level cnt:1116 0x7fe132bfc650 
+make pinned level cnt:1118 (nil) 
+sequntial file ratio:22/30
+demote_cnt: 444
+version info: v-23 vidx-9 ridx-9 order-9
+2380000
+2390000
+make pinned level cnt:1120 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 445
+version info: v-24 vidx-10 ridx-10 order-10
+2400000
+make pinned level cnt:1122 (nil) 
+sequntial file ratio:82/82
+demote_cnt: 446
+version info: v-25 vidx-11 ridx-11 order-11
+2410000
+make pinned level cnt:1124 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 447
+version info: v-26 vidx-12 ridx-12 order-12
+2420000
+2430000
+make pinned level cnt:1126 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 448
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:15
+merge 5,2 to 5
+target:76308 now_remain:135486
+demote_cnt: 449
+version info: v-2 vidx-2 ridx-2 order-13
+level idx:1 run 14/14 content_num: 3441444 (82.05 %)
+2440000
+make pinned level cnt:1128 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 450
+version info: v-14 vidx-0 ridx-0 order-0
+2450000
+make pinned level cnt:1130 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 451
+version info: v-15 vidx-1 ridx-1 order-1
+2460000
+make pinned level cnt:1132 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 452
+version info: v-16 vidx-2 ridx-2 order-2
+2470000
+make pinned level cnt:1134 0x7fe132bfc650 
+make pinned level cnt:1136 (nil) 
+sequntial file ratio:144/164
+demote_cnt: 453
+version info: v-17 vidx-3 ridx-3 order-3
+2480000
+2490000
+make pinned level cnt:1138 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 454
+version info: v-18 vidx-4 ridx-4 order-4
+2500000
+make pinned level cnt:1140 (nil) 
+sequntial file ratio:18/18
+demote_cnt: 455
+version info: v-19 vidx-5 ridx-5 order-5
+2510000
+2520000
+make pinned level cnt:1142 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 456
+version info: v-20 vidx-6 ridx-6 order-6
+2530000
+2540000
+make pinned level cnt:1144 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 457
+version info: v-21 vidx-7 ridx-7 order-7
+2550000
+make pinned level cnt:1146 0x7fe132bfc650 
+make pinned level cnt:1148 (nil) 
+sequntial file ratio:45/56
+demote_cnt: 458
+version info: v-22 vidx-8 ridx-8 order-8
+2560000
+2570000
+make pinned level cnt:1150 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 459
+version info: v-23 vidx-9 ridx-9 order-9
+2580000
+make pinned level cnt:1152 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 460
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:1154 0x7fe132bfc650 
+make pinned level cnt:1156 (nil) 
+2590000
+sequntial file ratio:145/168
+demote_cnt: 461
+version info: v-25 vidx-11 ridx-11 order-11
+2600000
+make pinned level cnt:1158 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 462
+version info: v-26 vidx-12 ridx-12 order-12
+2610000
+2620000
+make pinned level cnt:1160 (nil) 
+sequntial file ratio:167/170
+demote_cnt: 463
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:16
+merge 12,10 to 12
+target:76308 now_remain:94706
+demote_cnt: 464
+version info: v-10 vidx-10 ridx-10 order-13
+level idx:1 run 14/14 content_num: 3497948 (83.40 %)
+2630000
+2640000
+make pinned level cnt:1162 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 465
+version info: v-14 vidx-0 ridx-0 order-0
+2650000
+make pinned level cnt:1164 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 466
+version info: v-15 vidx-1 ridx-1 order-1
+2660000
+make pinned level cnt:1166 0x7fe132bfc650 
+make pinned level cnt:1168 (nil) 
+sequntial file ratio:82/92
+demote_cnt: 467
+version info: v-16 vidx-2 ridx-2 order-2
+2670000
+2680000
+make pinned level cnt:1170 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 468
+version info: v-17 vidx-3 ridx-3 order-3
+2690000
+make pinned level cnt:1172 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 469
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:1174 0x7fe132bfc650 
+2700000
+make pinned level cnt:1176 (nil) 
+sequntial file ratio:158/170
+demote_cnt: 470
+version info: v-19 vidx-5 ridx-5 order-5
+2710000
+make pinned level cnt:1178 (nil) 
+sequntial file ratio:163/170
+demote_cnt: 471
+version info: v-20 vidx-6 ridx-6 order-6
+2720000
+2730000
+make pinned level cnt:1180 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 472
+version info: v-21 vidx-7 ridx-7 order-7
+2740000
+make pinned level cnt:1182 0x7fe132bfc650 
+2750000
+make pinned level cnt:1184 (nil) 
+sequntial file ratio:50/61
+demote_cnt: 473
+version info: v-22 vidx-8 ridx-8 order-8
+2760000
+make pinned level cnt:1186 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 474
+version info: v-23 vidx-9 ridx-9 order-9
+2770000
+make pinned level cnt:1188 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 475
+version info: v-24 vidx-10 ridx-10 order-10
+2780000
+make pinned level cnt:1190 0x7fe132bfc650 
+2790000
+make pinned level cnt:1192 (nil) 
+sequntial file ratio:109/121
+demote_cnt: 476
+version info: v-25 vidx-11 ridx-11 order-11
+2800000
+make pinned level cnt:1194 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 477
+version info: v-26 vidx-12 ridx-12 order-12
+2810000
+make pinned level cnt:1196 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 478
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:17
+gc_data:342 (seg_idx:30)
+gc_data:344 (seg_idx:56)
+merge 13,6 to 13
+target:76308 now_remain:93916
+demote_cnt: 479
+version info: v-6 vidx-6 ridx-6 order-13
+level idx:1 run 14/14 content_num: 3545080 (84.52 %)
+2820000
+make pinned level cnt:1198 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 480
+version info: v-14 vidx-0 ridx-0 order-0
+2830000
+make pinned level cnt:1200 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 481
+version info: v-15 vidx-1 ridx-1 order-1
+2840000
+make pinned level cnt:1202 0x7fe132bfc650 
+make pinned level cnt:1204 (nil) 
+sequntial file ratio:115/125
+demote_cnt: 482
+version info: v-16 vidx-2 ridx-2 order-2
+2850000
+2860000
+make pinned level cnt:1206 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 483
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:1208 (nil) 
+sequntial file ratio:89/90
+demote_cnt: 484
+version info: v-18 vidx-4 ridx-4 order-4
+2870000
+2880000
+make pinned level cnt:1210 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 485
+version info: v-19 vidx-5 ridx-5 order-5
+2890000
+2900000
+make pinned level cnt:1212 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 486
+version info: v-20 vidx-6 ridx-6 order-6
+2910000
+make pinned level cnt:1214 0x7fe132bfc650 
+make pinned level cnt:1216 (nil) 
+sequntial file ratio:12/13
+demote_cnt: 487
+version info: v-21 vidx-7 ridx-7 order-7
+2920000
+2930000
+make pinned level cnt:1218 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 488
+version info: v-22 vidx-8 ridx-8 order-8
+2940000
+make pinned level cnt:1220 0x7fe132bfc650 
+2950000
+make pinned level cnt:1222 (nil) 
+sequntial file ratio:114/127
+demote_cnt: 489
+version info: v-23 vidx-9 ridx-9 order-9
+2960000
+make pinned level cnt:1224 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 490
+version info: v-24 vidx-10 ridx-10 order-10
+2970000
+make pinned level cnt:1226 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 491
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:1228 0x7fe132bfc650 
+2980000
+make pinned level cnt:1230 (nil) 
+sequntial file ratio:113/132
+demote_cnt: 492
+version info: v-26 vidx-12 ridx-12 order-12
+2990000
+make pinned level cnt:1232 (nil) 
+sequntial file ratio:165/170
+demote_cnt: 493
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:18
+merge 11,8 to 11
+demote_cnt: 494
+version info: v-8 vidx-8 ridx-8 order-13
+level idx:1 run 14/14 content_num: 3597978 (85.78 %)
+3000000
+make pinned level cnt:1234 0x7fe132bfc650 
+make pinned level cnt:1236 (nil) 
+sequntial file ratio:69/70
+demote_cnt: 495
+version info: v-14 vidx-0 ridx-0 order-0
+3010000
+3020000
+make pinned level cnt:1238 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 496
+version info: v-15 vidx-1 ridx-1 order-1
+3030000
+make pinned level cnt:1240 0x7fe132bfc650 
+make pinned level cnt:1242 (nil) 
+sequntial file ratio:52/63
+demote_cnt: 497
+version info: v-16 vidx-2 ridx-2 order-2
+3040000
+make pinned level cnt:1244 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 498
+version info: v-17 vidx-3 ridx-3 order-3
+3050000
+make pinned level cnt:1246 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 499
+version info: v-18 vidx-4 ridx-4 order-4
+3060000
+make pinned level cnt:1248 0x7fe132bfc650 
+3070000
+make pinned level cnt:1250 (nil) 
+sequntial file ratio:154/168
+demote_cnt: 500
+version info: v-19 vidx-5 ridx-5 order-5
+3080000
+make pinned level cnt:1252 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 501
+version info: v-20 vidx-6 ridx-6 order-6
+3090000
+3100000
+make pinned level cnt:1254 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 502
+version info: v-21 vidx-7 ridx-7 order-7
+3110000
+make pinned level cnt:1256 0x7fe132bfc650 
+make pinned level cnt:1258 (nil) 
+sequntial file ratio:21/25
+demote_cnt: 503
+version info: v-22 vidx-8 ridx-8 order-8
+3120000
+make pinned level cnt:1260 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 504
+version info: v-23 vidx-9 ridx-9 order-9
+3130000
+make pinned level cnt:1262 0x7fe132bfc650 
+3140000
+make pinned level cnt:1264 (nil) 
+sequntial file ratio:138/149
+demote_cnt: 505
+version info: v-24 vidx-10 ridx-10 order-10
+3150000
+make pinned level cnt:1266 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 506
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:375 (seg_idx:47)
+gc_data:376 (seg_idx:57)
+3160000
+make pinned level cnt:1268 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 507
+version info: v-26 vidx-12 ridx-12 order-12
+3170000
+make pinned level cnt:1270 0x7fe132bfc650 
+make pinned level cnt:1272 (nil) 
+sequntial file ratio:142/154
+demote_cnt: 508
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:19
+gc_data:378 (seg_idx:5)
+merge 4,3 to 4
+target:76308 now_remain:86691
+demote_cnt: 509
+version info: v-3 vidx-3 ridx-3 order-13
+level idx:1 run 14/14 content_num: 3658175 (87.22 %)
+3180000
+3190000
+make pinned level cnt:1274 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 510
+version info: v-14 vidx-0 ridx-0 order-0
+3200000
+make pinned level cnt:1276 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 511
+version info: v-15 vidx-1 ridx-1 order-1
+3210000
+make pinned level cnt:1278 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 512
+version info: v-16 vidx-2 ridx-2 order-2
+3220000
+make pinned level cnt:1280 0x7fe132bfc650 
+make pinned level cnt:1282 (nil) 
+sequntial file ratio:142/154
+demote_cnt: 513
+version info: v-17 vidx-3 ridx-3 order-3
+3230000
+make pinned level cnt:1284 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 514
+version info: v-18 vidx-4 ridx-4 order-4
+3240000
+make pinned level cnt:1286 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 515
+version info: v-19 vidx-5 ridx-5 order-5
+3250000
+make pinned level cnt:1288 0x7fe132bfc650 
+3260000
+make pinned level cnt:1290 (nil) 
+sequntial file ratio:91/102
+demote_cnt: 516
+version info: v-20 vidx-6 ridx-6 order-6
+3270000
+make pinned level cnt:1292 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 517
+version info: v-21 vidx-7 ridx-7 order-7
+3280000
+make pinned level cnt:1294 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 518
+version info: v-22 vidx-8 ridx-8 order-8
+3290000
+make pinned level cnt:1296 0x7fe132bfc650 
+3300000
+make pinned level cnt:1298 (nil) 
+sequntial file ratio:115/127
+demote_cnt: 519
+version info: v-23 vidx-9 ridx-9 order-9
+make pinned level cnt:1300 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 520
+version info: v-24 vidx-10 ridx-10 order-10
+3310000
+3320000
+make pinned level cnt:1302 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 521
+version info: v-25 vidx-11 ridx-11 order-11
+3330000
+make pinned level cnt:1304 0x7fe132bfc650 
+3340000
+make pinned level cnt:1306 (nil) 
+sequntial file ratio:95/107
+demote_cnt: 522
+version info: v-26 vidx-12 ridx-12 order-12
+3350000
+make pinned level cnt:1308 (nil) 
+sequntial file ratio:169/170
+demote_cnt: 523
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:20
+gc_data:394 (seg_idx:71)
+gc_data:396 (seg_idx:11)
+merge 9,7 to 9
+target:76308 now_remain:82908
+demote_cnt: 524
+version info: v-7 vidx-7 ridx-7 order-13
+level idx:1 run 14/14 content_num: 3731625 (88.97 %)
+3360000
+3370000
+make pinned level cnt:1310 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 525
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:1312 0x7fe132bfc650 
+3380000
+make pinned level cnt:1314 (nil) 
+sequntial file ratio:158/170
+demote_cnt: 526
+version info: v-15 vidx-1 ridx-1 order-1
+3390000
+make pinned level cnt:1316 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 527
+version info: v-16 vidx-2 ridx-2 order-2
+3400000
+make pinned level cnt:1318 (nil) 
+sequntial file ratio:125/125
+demote_cnt: 528
+version info: v-17 vidx-3 ridx-3 order-3
+3410000
+3420000
+make pinned level cnt:1320 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 529
+version info: v-18 vidx-4 ridx-4 order-4
+3430000
+make pinned level cnt:1322 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 530
+version info: v-19 vidx-5 ridx-5 order-5
+3440000
+make pinned level cnt:1324 0x7fe132bfc650 
+make pinned level cnt:1326 (nil) 
+3450000
+sequntial file ratio:122/131
+demote_cnt: 531
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:1328 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 532
+version info: v-21 vidx-7 ridx-7 order-7
+3460000
+make pinned level cnt:1330 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 533
+version info: v-22 vidx-8 ridx-8 order-8
+3470000
+3480000
+make pinned level cnt:1332 0x7fe132bfc650 
+make pinned level cnt:1334 (nil) 
+sequntial file ratio:95/100
+demote_cnt: 534
+version info: v-23 vidx-9 ridx-9 order-9
+3490000
+make pinned level cnt:1336 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 535
+version info: v-24 vidx-10 ridx-10 order-10
+3500000
+make pinned level cnt:1338 0x7fe132bfc650 
+3510000
+make pinned level cnt:1340 (nil) 
+sequntial file ratio:146/158
+demote_cnt: 536
+version info: v-25 vidx-11 ridx-11 order-11
+3520000
+make pinned level cnt:1342 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 537
+version info: v-26 vidx-12 ridx-12 order-12
+3530000
+3540000
+make pinned level cnt:1344 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 538
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:21
+gc_data:413 (seg_idx:39)
+gc_data:414 (seg_idx:62)
+gc_data:415 (seg_idx:22)
+merge 2,0 to 2
+demote_cnt: 539
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 3773908 (89.98 %)
+make pinned level cnt:1346 0x7fe132bfc650 
+make pinned level cnt:1348 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 540
+version info: v-14 vidx-0 ridx-0 order-0
+3550000
+3560000
+make pinned level cnt:1350 0x7fe132bfc650 
+make pinned level cnt:1352 (nil) 
+sequntial file ratio:39/49
+demote_cnt: 541
+version info: v-15 vidx-1 ridx-1 order-1
+3570000
+make pinned level cnt:1354 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 542
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:1356 0x7fe132bfc650 
+3580000
+3590000
+make pinned level cnt:1358 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 543
+version info: v-17 vidx-3 ridx-3 order-3
+3600000
+make pinned level cnt:1360 0x7fe132bfc650 
+make pinned level cnt:1362 (nil) 
+sequntial file ratio:25/36
+demote_cnt: 544
+version info: v-18 vidx-4 ridx-4 order-4
+3610000
+3620000
+make pinned level cnt:1364 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 545
+version info: v-19 vidx-5 ridx-5 order-5
+3630000
+make pinned level cnt:1366 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 546
+version info: v-20 vidx-6 ridx-6 order-6
+3640000
+make pinned level cnt:1368 0x7fe132bfc650 
+make pinned level cnt:1370 (nil) 
+sequntial file ratio:92/102
+demote_cnt: 547
+version info: v-21 vidx-7 ridx-7 order-7
+3650000
+make pinned level cnt:1372 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 548
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:1374 0x7fe132bfc650 
+3660000
+make pinned level cnt:1376 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 549
+version info: v-23 vidx-9 ridx-9 order-9
+3670000
+make pinned level cnt:1378 0x7fe132bfc650 
+3680000
+make pinned level cnt:1380 (nil) 
+sequntial file ratio:95/107
+demote_cnt: 550
+version info: v-24 vidx-10 ridx-10 order-10
+gc_data:427 (seg_idx:7)
+gc_data:428 (seg_idx:26)
+make pinned level cnt:1382 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 551
+version info: v-25 vidx-11 ridx-11 order-11
+3690000
+3700000
+make pinned level cnt:1384 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 552
+version info: v-26 vidx-12 ridx-12 order-12
+gc_data:429 (seg_idx:54)
+gc_data:430 (seg_idx:72)
+3710000
+make pinned level cnt:1386 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 553
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:22
+gc_data:431 (seg_idx:14)
+gc_data:432 (seg_idx:10)
+gc_data:433 (seg_idx:69)
+merge 10,6 to 10
+demote_cnt: 554
+version info: v-6 vidx-6 ridx-6 order-13
+level idx:1 run 14/14 content_num: 3820079 (91.08 %)
+3720000
+3730000
+make pinned level cnt:1388 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 555
+version info: v-14 vidx-0 ridx-0 order-0
+3740000
+make pinned level cnt:1390 (nil) 
+sequntial file ratio:80/80
+demote_cnt: 556
+version info: v-15 vidx-1 ridx-1 order-1
+3750000
+make pinned level cnt:1392 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 557
+version info: v-16 vidx-2 ridx-2 order-2
+3760000
+3770000
+make pinned level cnt:1394 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 558
+version info: v-17 vidx-3 ridx-3 order-3
+3780000
+make pinned level cnt:1396 0x7fe132bfc650 
+3790000
+make pinned level cnt:1398 (nil) 
+sequntial file ratio:130/141
+demote_cnt: 559
+version info: v-18 vidx-4 ridx-4 order-4
+3800000
+make pinned level cnt:1400 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 560
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:1402 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 561
+version info: v-20 vidx-6 ridx-6 order-6
+3810000
+make pinned level cnt:1404 0x7fe132bfc650 
+make pinned level cnt:1406 (nil) 
+sequntial file ratio:109/117
+demote_cnt: 562
+version info: v-21 vidx-7 ridx-7 order-7
+3820000
+3830000
+make pinned level cnt:1408 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 563
+version info: v-22 vidx-8 ridx-8 order-8
+3840000
+3850000
+make pinned level cnt:1410 (nil) 
+sequntial file ratio:115/115
+demote_cnt: 564
+version info: v-23 vidx-9 ridx-9 order-9
+3860000
+make pinned level cnt:1412 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 565
+version info: v-24 vidx-10 ridx-10 order-10
+3870000
+3880000
+make pinned level cnt:1414 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 566
+version info: v-25 vidx-11 ridx-11 order-11
+3890000
+make pinned level cnt:1416 0x7fe132bfc650 
+make pinned level cnt:1418 (nil) 
+sequntial file ratio:118/129
+demote_cnt: 567
+version info: v-26 vidx-12 ridx-12 order-12
+gc_data:445 (seg_idx:26)
+gc_data:446 (seg_idx:38)
+3900000
+3910000
+make pinned level cnt:1420 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 568
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:23
+gc_data:448 (seg_idx:19)
+gc_data:449 (seg_idx:39)
+merge 8,3 to 8
+demote_cnt: 569
+version info: v-3 vidx-3 ridx-3 order-13
+level idx:1 run 14/14 content_num: 3863062 (92.10 %)
+make pinned level cnt:1422 0x7fe132bfc650 
+3920000
+make pinned level cnt:1424 (nil) 
+sequntial file ratio:49/60
+demote_cnt: 570
+version info: v-14 vidx-0 ridx-0 order-0
+3930000
+make pinned level cnt:1426 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 571
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:1428 (nil) 
+sequntial file ratio:165/170
+demote_cnt: 572
+version info: v-16 vidx-2 ridx-2 order-2
+3940000
+make pinned level cnt:1430 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 573
+version info: v-17 vidx-3 ridx-3 order-3
+3950000
+3960000
+make pinned level cnt:1432 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 574
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:1434 0x7fe132bfc650 
+3970000
+make pinned level cnt:1436 (nil) 
+sequntial file ratio:168/170
+demote_cnt: 575
+version info: v-19 vidx-5 ridx-5 order-5
+3980000
+3990000
+make pinned level cnt:1438 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 576
+version info: v-20 vidx-6 ridx-6 order-6
+4000000
+make pinned level cnt:1440 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 577
+version info: v-21 vidx-7 ridx-7 order-7
+4010000
+make pinned level cnt:1442 0x7fe132bfc650 
+4020000
+make pinned level cnt:1444 (nil) 
+sequntial file ratio:158/170
+demote_cnt: 578
+version info: v-22 vidx-8 ridx-8 order-8
+4030000
+make pinned level cnt:1446 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 579
+version info: v-23 vidx-9 ridx-9 order-9
+4040000
+make pinned level cnt:1448 (nil) 
+sequntial file ratio:167/170
+demote_cnt: 580
+version info: v-24 vidx-10 ridx-10 order-10
+4050000
+make pinned level cnt:1450 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 581
+version info: v-25 vidx-11 ridx-11 order-11
+4060000
+make pinned level cnt:1452 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 582
+version info: v-26 vidx-12 ridx-12 order-12
+4070000
+make pinned level cnt:1454 0x7fe132bfc650 
+4080000
+make pinned level cnt:1456 (nil) 
+sequntial file ratio:44/55
+demote_cnt: 583
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:462 (seg_idx:13)
+gc_data:463 (seg_idx:52)
+merge cnt:24
+gc_data:464 (seg_idx:29)
+gc_data:467 (seg_idx:33)
+merge 13,1 to 13
+demote_cnt: 584
+version info: v-1 vidx-1 ridx-1 order-13
+level idx:1 run 14/14 content_num: 3907085 (93.15 %)
+4090000
+4100000
+make pinned level cnt:1458 0x7fe132bfc650 
+make pinned level cnt:1460 (nil) 
+sequntial file ratio:48/57
+demote_cnt: 585
+version info: v-14 vidx-0 ridx-0 order-0
+4110000
+make pinned level cnt:1462 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 586
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:1464 0x7fe132bfc650 
+4120000
+4130000
+make pinned level cnt:1466 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 587
+version info: v-16 vidx-2 ridx-2 order-2
+4140000
+make pinned level cnt:1468 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 588
+version info: v-17 vidx-3 ridx-3 order-3
+4150000
+make pinned level cnt:1470 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 589
+version info: v-18 vidx-4 ridx-4 order-4
+4160000
+make pinned level cnt:1472 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 590
+version info: v-19 vidx-5 ridx-5 order-5
+4170000
+make pinned level cnt:1474 0x7fe132bfc650 
+make pinned level cnt:1476 (nil) 
+sequntial file ratio:10/21
+demote_cnt: 591
+version info: v-20 vidx-6 ridx-6 order-6
+4180000
+make pinned level cnt:1478 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 592
+version info: v-21 vidx-7 ridx-7 order-7
+4190000
+4200000
+make pinned level cnt:1480 (nil) 
+sequntial file ratio:153/153
+demote_cnt: 593
+version info: v-22 vidx-8 ridx-8 order-8
+4210000
+make pinned level cnt:1482 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 594
+version info: v-23 vidx-9 ridx-9 order-9
+4220000
+4230000
+make pinned level cnt:1484 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 595
+version info: v-24 vidx-10 ridx-10 order-10
+4240000
+make pinned level cnt:1486 0x7fe132bfc650 
+make pinned level cnt:1488 (nil) 
+sequntial file ratio:72/82
+demote_cnt: 596
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:481 (seg_idx:49)
+gc_data:482 (seg_idx:24)
+4250000
+make pinned level cnt:1490 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 597
+version info: v-26 vidx-12 ridx-12 order-12
+4260000
+make pinned level cnt:1492 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 598
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:483 (seg_idx:30)
+gc_data:484 (seg_idx:43)
+merge cnt:25
+gc_data:485 (seg_idx:37)
+merge 9,7 to 9
+target:76308 now_remain:76382
+demote_cnt: 599
+version info: v-7 vidx-7 ridx-7 order-13
+level idx:1 run 14/14 content_num: 3933522 (93.78 %)
+4270000
+4280000
+make pinned level cnt:1494 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 600
+version info: v-14 vidx-0 ridx-0 order-0
+4290000
+make pinned level cnt:1496 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 601
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:1498 0x7fe132bfc650 
+4300000
+make pinned level cnt:1500 (nil) 
+sequntial file ratio:16/27
+demote_cnt: 602
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:1502 (nil) 
+sequntial file ratio:169/170
+demote_cnt: 603
+version info: v-17 vidx-3 ridx-3 order-3
+4310000
+make pinned level cnt:1504 0x7fe132bfc650 
+4320000
+make pinned level cnt:1506 (nil) 
+sequntial file ratio:157/170
+demote_cnt: 604
+version info: v-18 vidx-4 ridx-4 order-4
+4330000
+4340000
+make pinned level cnt:1508 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 605
+version info: v-19 vidx-5 ridx-5 order-5
+4350000
+make pinned level cnt:1510 (nil) 
+sequntial file ratio:164/164
+demote_cnt: 606
+version info: v-20 vidx-6 ridx-6 order-6
+4360000
+4370000
+make pinned level cnt:1512 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 607
+version info: v-21 vidx-7 ridx-7 order-7
+4380000
+make pinned level cnt:1514 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 608
+version info: v-22 vidx-8 ridx-8 order-8
+4390000
+make pinned level cnt:1516 0x7fe132bfc650 
+4400000
+make pinned level cnt:1518 (nil) 
+sequntial file ratio:127/136
+demote_cnt: 609
+version info: v-23 vidx-9 ridx-9 order-9
+4410000
+4420000
+make pinned level cnt:1520 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 610
+version info: v-24 vidx-10 ridx-10 order-10
+gc_data:501 (seg_idx:5)
+gc_data:502 (seg_idx:64)
+4430000
+make pinned level cnt:1522 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 611
+version info: v-25 vidx-11 ridx-11 order-11
+make pinned level cnt:1524 0x7fe132bfc650 
+make pinned level cnt:1526 (nil) 
+sequntial file ratio:156/159
+demote_cnt: 612
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:1528 0x7fe132bfc650 
+4440000
+make pinned level cnt:1530 (nil) 
+sequntial file ratio:152/170
+demote_cnt: 613
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:503 (seg_idx:60)
+gc_data:504 (seg_idx:61)
+merge cnt:26
+gc_data:505 (seg_idx:6)
+merge 11,0 to 11
+demote_cnt: 614
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 3972906 (94.72 %)
+4450000
+make pinned level cnt:1532 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 615
+version info: v-14 vidx-0 ridx-0 order-0
+4460000
+4470000
+make pinned level cnt:1534 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 616
+version info: v-15 vidx-1 ridx-1 order-1
+4480000
+make pinned level cnt:1536 0x7fe132bfc650 
+make pinned level cnt:1538 (nil) 
+sequntial file ratio:130/140
+demote_cnt: 617
+version info: v-16 vidx-2 ridx-2 order-2
+4490000
+4500000
+make pinned level cnt:1540 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 618
+version info: v-17 vidx-3 ridx-3 order-3
+4510000
+make pinned level cnt:1542 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 619
+version info: v-18 vidx-4 ridx-4 order-4
+4520000
+make pinned level cnt:1544 0x7fe132bfc650 
+make pinned level cnt:1546 (nil) 
+sequntial file ratio:107/117
+demote_cnt: 620
+version info: v-19 vidx-5 ridx-5 order-5
+4530000
+make pinned level cnt:1548 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 621
+version info: v-20 vidx-6 ridx-6 order-6
+gc_data:518 (seg_idx:34)
+gc_data:519 (seg_idx:48)
+4540000
+make pinned level cnt:1550 (nil) 
+4550000
+sequntial file ratio:159/170
+demote_cnt: 622
+version info: v-21 vidx-7 ridx-7 order-7
+4560000
+make pinned level cnt:1552 0x7fe132bfc650 
+make pinned level cnt:1554 (nil) 
+sequntial file ratio:77/84
+demote_cnt: 623
+version info: v-22 vidx-8 ridx-8 order-8
+4570000
+make pinned level cnt:1556 0x7fe132bfc650 
+make pinned level cnt:1558 (nil) 
+4580000
+sequntial file ratio:161/170
+demote_cnt: 624
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:520 (seg_idx:23)
+gc_data:521 (seg_idx:64)
+4590000
+make pinned level cnt:1560 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 625
+version info: v-24 vidx-10 ridx-10 order-10
+4600000
+make pinned level cnt:1562 0x7fe132bfc650 
+4610000
+make pinned level cnt:1564 (nil) 
+sequntial file ratio:4/15
+demote_cnt: 626
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:522 (seg_idx:21)
+gc_data:523 (seg_idx:30)
+4620000
+make pinned level cnt:1566 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 627
+version info: v-26 vidx-12 ridx-12 order-12
+4630000
+make pinned level cnt:1568 0x7fe132bfc650 
+make pinned level cnt:1570 (nil) 
+sequntial file ratio:108/117
+demote_cnt: 628
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:524 (seg_idx:51)
+gc_data:525 (seg_idx:48)
+merge cnt:27
+gc_data:526 (seg_idx:57)
+merge 4,3 to 4
+demote_cnt: 629
+version info: v-3 vidx-3 ridx-3 order-13
+level idx:1 run 14/14 content_num: 4004171 (95.47 %)
+4640000
+4650000
+make pinned level cnt:1572 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 630
+version info: v-14 vidx-0 ridx-0 order-0
+make pinned level cnt:1574 (nil) 
+4660000
+sequntial file ratio:159/170
+demote_cnt: 631
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:1576 0x7fe132bfc650 
+4670000
+make pinned level cnt:1578 (nil) 
+sequntial file ratio:138/154
+demote_cnt: 632
+version info: v-16 vidx-2 ridx-2 order-2
+4680000
+4690000
+make pinned level cnt:1580 (nil) 
+sequntial file ratio:72/72
+demote_cnt: 633
+version info: v-17 vidx-3 ridx-3 order-3
+make pinned level cnt:1582 0x7fe132bfc650 
+4700000
+make pinned level cnt:1584 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 634
+version info: v-18 vidx-4 ridx-4 order-4
+4710000
+4720000
+make pinned level cnt:1586 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 635
+version info: v-19 vidx-5 ridx-5 order-5
+gc_data:537 (seg_idx:49)
+gc_data:538 (seg_idx:60)
+make pinned level cnt:1588 (nil) 
+4730000
+sequntial file ratio:159/170
+demote_cnt: 636
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:1590 0x7fe132bfc650 
+4740000
+make pinned level cnt:1592 (nil) 
+sequntial file ratio:158/170
+demote_cnt: 637
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:539 (seg_idx:34)
+gc_data:540 (seg_idx:64)
+4750000
+4760000
+make pinned level cnt:1594 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 638
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:1596 0x7fe132bfc650 
+make pinned level cnt:1598 (nil) 
+sequntial file ratio:92/100
+demote_cnt: 639
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:541 (seg_idx:42)
+gc_data:542 (seg_idx:21)
+4770000
+4780000
+make pinned level cnt:1600 (nil) 
+sequntial file ratio:145/145
+demote_cnt: 640
+version info: v-24 vidx-10 ridx-10 order-10
+4790000
+make pinned level cnt:1602 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 641
+version info: v-25 vidx-11 ridx-11 order-11
+4800000
+make pinned level cnt:1604 0x7fe132bfc650 
+4810000
+make pinned level cnt:1606 (nil) 
+sequntial file ratio:154/165
+demote_cnt: 642
+version info: v-26 vidx-12 ridx-12 order-12
+gc_data:543 (seg_idx:53)
+gc_data:544 (seg_idx:60)
+4820000
+make pinned level cnt:1608 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 643
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:28
+gc_data:547 (seg_idx:29)
+gc_data:548 (seg_idx:56)
+gc_data:549 (seg_idx:59)
+merge 13,1 to 13
+demote_cnt: 644
+version info: v-1 vidx-1 ridx-1 order-13
+level idx:1 run 14/14 content_num: 4042539 (96.38 %)
+4830000
+make pinned level cnt:1610 0x7fe132bfc650 
+4840000
+make pinned level cnt:1612 (nil) 
+sequntial file ratio:150/170
+demote_cnt: 645
+version info: v-14 vidx-0 ridx-0 order-0
+4850000
+make pinned level cnt:1614 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 646
+version info: v-15 vidx-1 ridx-1 order-1
+4860000
+make pinned level cnt:1616 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 647
+version info: v-16 vidx-2 ridx-2 order-2
+make pinned level cnt:1618 0x7fe132bfc650 
+make pinned level cnt:1620 (nil) 
+sequntial file ratio:70/83
+demote_cnt: 648
+version info: v-17 vidx-3 ridx-3 order-3
+4870000
+4880000
+make pinned level cnt:1622 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 649
+version info: v-18 vidx-4 ridx-4 order-4
+4890000
+make pinned level cnt:1624 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 650
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:1626 0x7fe132bfc650 
+make pinned level cnt:1628 (nil) 
+sequntial file ratio:165/168
+demote_cnt: 651
+version info: v-20 vidx-6 ridx-6 order-6
+gc_data:561 (seg_idx:53)
+gc_data:562 (seg_idx:49)
+4900000
+4910000
+make pinned level cnt:1630 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 652
+version info: v-21 vidx-7 ridx-7 order-7
+make pinned level cnt:1632 0x7fe132bfc650 
+4920000
+4930000
+make pinned level cnt:1634 (nil) 
+sequntial file ratio:155/170
+demote_cnt: 653
+version info: v-22 vidx-8 ridx-8 order-8
+gc_data:563 (seg_idx:42)
+gc_data:564 (seg_idx:47)
+4940000
+make pinned level cnt:1636 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 654
+version info: v-23 vidx-9 ridx-9 order-9
+4950000
+make pinned level cnt:1638 0x7fe132bfc650 
+4960000
+make pinned level cnt:1640 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 655
+version info: v-24 vidx-10 ridx-10 order-10
+gc_data:565 (seg_idx:21)
+gc_data:566 (seg_idx:30)
+4970000
+make pinned level cnt:1642 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 656
+version info: v-25 vidx-11 ridx-11 order-11
+4980000
+make pinned level cnt:1644 0x7fe132bfc650 
+4990000
+make pinned level cnt:1647 (nil) 
+sequntial file ratio:123/170
+demote_cnt: 657
+version info: v-26 vidx-12 ridx-12 order-12
+gc_data:567 (seg_idx:49)
+gc_data:568 (seg_idx:64)
+make pinned level cnt:1649 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 658
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:29
+gc_data:570 (seg_idx:43)
+gc_data:571 (seg_idx:51)
+gc_data:572 (seg_idx:69)
+merge 9,6 to 9
+demote_cnt: 659
+version info: v-6 vidx-6 ridx-6 order-13
+level idx:1 run 14/14 content_num: 4103780 (97.84 %)
+5000000
+make pinned level cnt:1651 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 660
+version info: v-14 vidx-0 ridx-0 order-0
+5010000
+make pinned level cnt:1653 0x7fe132bfc650 
+5020000
+make pinned level cnt:1655 (nil) 
+sequntial file ratio:151/170
+demote_cnt: 661
+version info: v-15 vidx-1 ridx-1 order-1
+5030000
+make pinned level cnt:1657 (nil) 
+sequntial file ratio:88/88
+demote_cnt: 662
+version info: v-16 vidx-2 ridx-2 order-2
+5040000
+make pinned level cnt:1659 0x7fe132bfc650 
+5050000
+make pinned level cnt:1661 (nil) 
+sequntial file ratio:37/48
+demote_cnt: 663
+version info: v-17 vidx-3 ridx-3 order-3
+5060000
+make pinned level cnt:1663 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 664
+version info: v-18 vidx-4 ridx-4 order-4
+gc_data:584 (seg_idx:53)
+gc_data:585 (seg_idx:21)
+5070000
+5080000
+make pinned level cnt:1665 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 665
+version info: v-19 vidx-5 ridx-5 order-5
+5090000
+make pinned level cnt:1667 0x7fe132bfc650 
+make pinned level cnt:1669 (nil) 
+sequntial file ratio:149/161
+demote_cnt: 666
+version info: v-20 vidx-6 ridx-6 order-6
+5100000
+make pinned level cnt:1671 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 667
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:586 (seg_idx:18)
+gc_data:587 (seg_idx:42)
+5110000
+make pinned level cnt:1673 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 668
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:1675 0x7fe132bfc650 
+5120000
+5130000
+make pinned level cnt:1678 (nil) 
+sequntial file ratio:11/19
+demote_cnt: 669
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:588 (seg_idx:30)
+gc_data:589 (seg_idx:4)
+5140000
+make pinned level cnt:1680 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 670
+version info: v-24 vidx-10 ridx-10 order-10
+5150000
+make pinned level cnt:1682 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 671
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:590 (seg_idx:43)
+gc_data:591 (seg_idx:28)
+gc_data:592 (seg_idx:29)
+5160000
+make pinned level cnt:1684 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 672
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:1686 0x7fe132bfc650 
+5170000
+make pinned level cnt:1689 (nil) 
+sequntial file ratio:1/12
+demote_cnt: 673
+version info: v-27 vidx-13 ridx-13 order-13
+5180000
+gc_data:593 (seg_idx:42)
+gc_data:594 (seg_idx:14)
+gc_data:595 (seg_idx:21)
+merge cnt:30
+merge 7,0 to 7
+demote_cnt: 674
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 4162153 (99.23 %)
+make pinned level cnt:1691 0x7fe132bfc650 
+5190000
+make pinned level cnt:1693 (nil) 
+sequntial file ratio:97/113
+demote_cnt: 675
+version info: v-14 vidx-0 ridx-0 order-0
+5200000
+make pinned level cnt:1695 (nil) 
+sequntial file ratio:39/39
+demote_cnt: 676
+version info: v-15 vidx-1 ridx-1 order-1
+5210000
+5220000
+make pinned level cnt:1697 (nil) 
+sequntial file ratio:106/114
+demote_cnt: 677
+version info: v-16 vidx-2 ridx-2 order-2
+5230000
+5240000
+make pinned level cnt:1699 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 678
+version info: v-17 vidx-3 ridx-3 order-3
+gc_data:604 (seg_idx:27)
+gc_data:605 (seg_idx:34)
+5250000
+5260000
+make pinned level cnt:1701 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 679
+version info: v-18 vidx-4 ridx-4 order-4
+make pinned level cnt:1703 0x7fe132bfc650 
+5270000
+make pinned level cnt:1705 (nil) 
+sequntial file ratio:102/112
+demote_cnt: 680
+version info: v-19 vidx-5 ridx-5 order-5
+5280000
+5290000
+make pinned level cnt:1707 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 681
+version info: v-20 vidx-6 ridx-6 order-6
+gc_data:606 (seg_idx:18)
+gc_data:607 (seg_idx:47)
+5300000
+make pinned level cnt:1709 0x7fe132bfc650 
+make pinned level cnt:1711 (nil) 
+sequntial file ratio:112/123
+demote_cnt: 682
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:608 (seg_idx:28)
+gc_data:609 (seg_idx:30)
+gc_data:610 (seg_idx:53)
+5310000
+5320000
+make pinned level cnt:1713 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 683
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:1715 0x7fe132bfc650 
+5330000
+make pinned level cnt:1717 (nil) 
+sequntial file ratio:76/94
+demote_cnt: 684
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:611 (seg_idx:34)
+gc_data:612 (seg_idx:4)
+5340000
+5350000
+make pinned level cnt:1719 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 685
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:1721 0x7fe132bfc650 
+5360000
+make pinned level cnt:1723 (nil) 
+sequntial file ratio:162/170
+demote_cnt: 686
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:613 (seg_idx:47)
+gc_data:614 (seg_idx:49)
+gc_data:615 (seg_idx:29)
+5370000
+5380000
+make pinned level cnt:1725 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 687
+version info: v-26 vidx-12 ridx-12 order-12
+make pinned level cnt:1727 0x7fe132bfc650 
+5390000
+make pinned level cnt:1729 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 688
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:616 (seg_idx:53)
+gc_data:617 (seg_idx:42)
+gc_data:618 (seg_idx:43)
+merge cnt:31
+merge 1,0 to 1
+demote_cnt: 689
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 4249831 (101.32 %)
+5400000
+make pinned level cnt:1731 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 690
+version info: v-14 vidx-0 ridx-0 order-0
+5410000
+make pinned level cnt:1733 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 691
+version info: v-15 vidx-1 ridx-1 order-1
+5420000
+5430000
+make pinned level cnt:1735 0x7fe132bfc650 
+make pinned level cnt:1737 (nil) 
+sequntial file ratio:49/59
+demote_cnt: 692
+version info: v-16 vidx-2 ridx-2 order-2
+gc_data:627 (seg_idx:33)
+gc_data:628 (seg_idx:14)
+5440000
+make pinned level cnt:1739 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 693
+version info: v-17 vidx-3 ridx-3 order-3
+5450000
+make pinned level cnt:1741 0x7fe132bfc650 
+make pinned level cnt:1743 (nil) 
+sequntial file ratio:46/57
+demote_cnt: 694
+version info: v-18 vidx-4 ridx-4 order-4
+gc_data:629 (seg_idx:30)
+gc_data:630 (seg_idx:34)
+5460000
+5470000
+make pinned level cnt:1745 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 695
+version info: v-19 vidx-5 ridx-5 order-5
+make pinned level cnt:1747 0x7fe132bfc650 
+5480000
+make pinned level cnt:1749 (nil) 
+sequntial file ratio:144/153
+demote_cnt: 696
+version info: v-20 vidx-6 ridx-6 order-6
+gc_data:631 (seg_idx:27)
+gc_data:632 (seg_idx:49)
+5490000
+make pinned level cnt:1751 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 697
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:633 (seg_idx:14)
+gc_data:634 (seg_idx:4)
+gc_data:635 (seg_idx:42)
+make pinned level cnt:1753 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 698
+version info: v-22 vidx-8 ridx-8 order-8
+5500000
+make pinned level cnt:1755 0x7fe132bfc650 
+make pinned level cnt:1757 (nil) 
+sequntial file ratio:142/150
+demote_cnt: 699
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:636 (seg_idx:34)
+gc_data:637 (seg_idx:71)
+gc_data:638 (seg_idx:63)
+5510000
+5520000
+make pinned level cnt:1759 (nil) 
+sequntial file ratio:161/170
+demote_cnt: 700
+version info: v-24 vidx-10 ridx-10 order-10
+make pinned level cnt:1761 0x7fe132bfc650 
+5530000
+make pinned level cnt:1763 (nil) 
+sequntial file ratio:133/140
+demote_cnt: 701
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:639 (seg_idx:49)
+gc_data:640 (seg_idx:47)
+5540000
+make pinned level cnt:1765 (nil) 
+sequntial file ratio:164/170
+demote_cnt: 702
+version info: v-26 vidx-12 ridx-12 order-12
+5550000
+make pinned level cnt:1767 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 703
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:641 (seg_idx:42)
+gc_data:642 (seg_idx:39)
+gc_data:643 (seg_idx:7)
+merge cnt:32
+gc_data:644 (seg_idx:25)
+gc_data:646 (seg_idx:8)
+gc_data:647 (seg_idx:17)
+merge 3,0 to 3
+demote_cnt: 704
+version info: v-0 vidx-0 ridx-0 order-13
+gc_data:648 (seg_idx:63)
+gc_data:650 (seg_idx:31)
+level idx:1 run 14/14 content_num: 4323586 (103.08 %)
+make pinned level cnt:1769 0x7fe132bfc650 
+5560000
+make pinned level cnt:1771 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 705
+version info: v-14 vidx-0 ridx-0 order-0
+gc_data:651 (seg_idx:49)
+gc_data:652 (seg_idx:33)
+gc_data:653 (seg_idx:30)
+5570000
+make pinned level cnt:1773 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 706
+version info: v-15 vidx-1 ridx-1 order-1
+make pinned level cnt:1775 0x7fe132bfc650 
+5580000
+make pinned level cnt:1777 (nil) 
+sequntial file ratio:155/170
+demote_cnt: 707
+version info: v-16 vidx-2 ridx-2 order-2
+gc_data:654 (seg_idx:14)
+gc_data:655 (seg_idx:28)
+gc_data:656 (seg_idx:4)
+5590000
+make pinned level cnt:1779 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 708
+version info: v-17 vidx-3 ridx-3 order-3
+gc_data:657 (seg_idx:31)
+gc_data:658 (seg_idx:67)
+5600000
+make pinned level cnt:1781 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 709
+version info: v-18 vidx-4 ridx-4 order-4
+5610000
+make pinned level cnt:1783 0x7fe132bfc650 
+5620000
+make pinned level cnt:1786 (nil) 
+sequntial file ratio:52/63
+demote_cnt: 710
+version info: v-19 vidx-5 ridx-5 order-5
+gc_data:659 (seg_idx:30)
+gc_data:660 (seg_idx:71)
+gc_data:661 (seg_idx:47)
+5630000
+make pinned level cnt:1788 (nil) 
+sequntial file ratio:160/170
+demote_cnt: 711
+version info: v-20 vidx-6 ridx-6 order-6
+make pinned level cnt:1790 0x7fe132bfc650 
+5640000
+make pinned level cnt:1793 (nil) 
+sequntial file ratio:74/99
+demote_cnt: 712
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:662 (seg_idx:4)
+gc_data:663 (seg_idx:34)
+gc_data:664 (seg_idx:39)
+5650000
+make pinned level cnt:1795 (nil) 
+sequntial file ratio:159/170
+demote_cnt: 713
+version info: v-22 vidx-8 ridx-8 order-8
+make pinned level cnt:1797 0x7fe132bfc650 
+5660000
+make pinned level cnt:1799 (nil) 
+sequntial file ratio:118/126
+demote_cnt: 714
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:665 (seg_idx:67)
+gc_data:666 (seg_idx:30)
+gc_data:667 (seg_idx:18)
+read error!!: len:0
+
+
+
+(0)[cdf]read---
+0,330591,0.179202
+10,1295757,0.881588
+20,171775,0.974701
+30,35746,0.994078
+40,4349,0.996435
+50,285,0.996590
+60,27,0.996605
+70,10,0.996610
+80,10,0.996615
+90,4,0.996617
+100,9,0.996622
+110,5,0.996625
+120,4,0.996627
+130,3,0.996629
+140,4,0.996631
+150,4,0.996633
+160,5,0.996636
+170,5,0.996639
+180,4,0.996641
+190,6,0.996644
+200,3,0.996646
+210,6,0.996649
+220,6,0.996652
+230,3,0.996654
+250,7,0.996658
+260,3,0.996659
+270,3,0.996661
+280,3,0.996662
+290,5,0.996665
+300,1,0.996666
+310,3,0.996667
+320,4,0.996670
+330,4,0.996672
+340,6,0.996675
+350,3,0.996677
+360,3,0.996678
+370,6,0.996681
+380,5,0.996684
+390,3,0.996686
+400,3,0.996687
+420,2,0.996689
+430,5,0.996691
+440,4,0.996693
+450,2,0.996695
+460,8,0.996699
+470,4,0.996701
+480,6,0.996704
+490,4,0.996706
+500,5,0.996709
+510,7,0.996713
+520,4,0.996715
+530,4,0.996717
+540,7,0.996721
+550,3,0.996723
+560,9,0.996728
+570,6,0.996731
+580,5,0.996733
+600,3,0.996735
+610,3,0.996737
+620,2,0.996738
+630,3,0.996739
+640,5,0.996742
+650,4,0.996744
+660,7,0.996748
+670,6,0.996751
+680,6,0.996755
+690,7,0.996758
+700,7,0.996762
+710,6,0.996765
+720,9,0.996770
+730,2,0.996771
+740,6,0.996775
+750,3,0.996776
+760,9,0.996781
+770,3,0.996783
+780,10,0.996788
+790,2,0.996789
+800,6,0.996793
+810,8,0.996797
+820,6,0.996800
+830,2,0.996801
+840,3,0.996803
+850,6,0.996806
+860,7,0.996810
+870,10,0.996815
+880,6,0.996819
+890,13,0.996826
+900,10,0.996831
+910,3,0.996833
+920,11,0.996839
+930,8,0.996843
+940,3,0.996845
+950,3,0.996846
+960,9,0.996851
+970,7,0.996855
+980,5,0.996858
+990,6,0.996861
+1000,10,0.996866
+1010,8,0.996871
+1020,7,0.996874
+1030,4,0.996877
+1040,1,0.996877
+1050,9,0.996882
+1060,6,0.996885
+1070,6,0.996889
+1080,4,0.996891
+1090,4,0.996893
+1100,7,0.996897
+1110,6,0.996900
+1120,7,0.996904
+1130,5,0.996906
+1140,3,0.996908
+1150,2,0.996909
+1160,2,0.996910
+1170,1,0.996911
+1190,1,0.996911
+1220,4,0.996913
+1230,3,0.996915
+1240,10,0.996921
+1250,10,0.996926
+1260,6,0.996929
+1270,10,0.996935
+1280,9,0.996939
+1290,12,0.996946
+1300,9,0.996951
+1310,10,0.996956
+1320,6,0.996960
+1330,7,0.996963
+1340,6,0.996967
+1350,6,0.996970
+1360,10,0.996975
+1370,7,0.996979
+1380,6,0.996982
+1390,8,0.996987
+1400,12,0.996993
+1410,14,0.997001
+1420,7,0.997005
+1430,8,0.997009
+1440,10,0.997014
+1450,5,0.997017
+1460,18,0.997027
+1470,15,0.997035
+1480,16,0.997044
+1490,15,0.997052
+1500,20,0.997063
+1510,29,0.997078
+1520,37,0.997098
+1530,39,0.997119
+1540,37,0.997140
+1550,57,0.997170
+1560,72,0.997209
+1570,71,0.997248
+1580,90,0.997297
+1590,86,0.997343
+1600,90,0.997392
+1610,110,0.997452
+1620,127,0.997521
+1630,124,0.997588
+1640,136,0.997662
+1650,129,0.997731
+1660,127,0.997800
+1670,109,0.997859
+1680,147,0.997939
+1690,130,0.998010
+1700,92,0.998059
+1710,110,0.998119
+1720,86,0.998166
+1730,101,0.998220
+1740,110,0.998280
+1750,102,0.998335
+1760,110,0.998395
+1770,79,0.998438
+1780,101,0.998493
+1790,100,0.998547
+1800,105,0.998604
+1810,101,0.998658
+1820,102,0.998714
+1830,106,0.998771
+1840,111,0.998831
+1850,117,0.998895
+1860,101,0.998949
+1870,120,0.999014
+1880,127,0.999083
+1890,125,0.999151
+1900,128,0.999220
+1910,107,0.999278
+1920,128,0.999348
+1930,94,0.999399
+1940,123,0.999466
+1950,119,0.999530
+1960,97,0.999583
+1970,80,0.999626
+1980,54,0.999655
+1990,56,0.999686
+2000,47,0.999711
+2010,36,0.999731
+2020,26,0.999745
+2030,22,0.999757
+2040,17,0.999766
+2050,11,0.999772
+2060,7,0.999776
+2070,7,0.999779
+2080,2,0.999780
+2090,4,0.999783
+2100,3,0.999784
+2110,1,0.999785
+2120,6,0.999788
+2130,4,0.999790
+2140,4,0.999792
+2150,2,0.999793
+2160,1,0.999794
+2170,2,0.999795
+2180,2,0.999796
+2210,1,0.999797
+2240,1,0.999797
+2260,1,0.999798
+2270,2,0.999799
+2280,1,0.999799
+2310,1,0.999800
+2320,2,0.999801
+2340,1,0.999802
+2350,1,0.999802
+2360,1,0.999803
+2380,1,0.999803
+2390,2,0.999804
+2430,1,0.999805
+2440,2,0.999806
+2450,2,0.999807
+2510,1,0.999808
+2520,2,0.999809
+2610,1,0.999809
+2650,1,0.999810
+2680,1,0.999810
+2710,1,0.999811
+2750,1,0.999811
+2760,1,0.999812
+2770,1,0.999812
+2780,1,0.999813
+2790,1,0.999814
+2800,1,0.999814
+2900,2,0.999815
+2930,2,0.999816
+2960,1,0.999817
+3000,1,0.999817
+3010,1,0.999818
+3020,1,0.999818
+3110,1,0.999819
+3150,1,0.999820
+3160,1,0.999820
+3170,1,0.999821
+3200,1,0.999821
+3510,1,0.999822
+3610,1,0.999822
+3650,2,0.999823
+3720,3,0.999825
+3780,1,0.999825
+3800,1,0.999826
+3820,1,0.999827
+3880,2,0.999828
+3930,1,0.999828
+3970,1,0.999829
+4000,1,0.999829
+4070,1,0.999830
+4130,1,0.999830
+4330,1,0.999831
+4380,2,0.999832
+4390,2,0.999833
+4460,2,0.999834
+4480,1,0.999835
+4520,1,0.999835
+4530,1,0.999836
+4600,1,0.999836
+4630,1,0.999837
+4710,2,0.999838
+4730,1,0.999838
+4740,1,0.999839
+4760,1,0.999840
+4790,1,0.999840
+4830,1,0.999841
+4880,1,0.999841
+4920,1,0.999842
+4960,1,0.999842
+4980,1,0.999843
+5010,1,0.999843
+5060,1,0.999844
+5130,2,0.999845
+5150,1,0.999846
+5170,1,0.999846
+5260,1,0.999847
+5350,1,0.999847
+5370,1,0.999848
+5380,1,0.999848
+5490,1,0.999849
+5530,1,0.999849
+5640,1,0.999850
+5650,1,0.999850
+5730,1,0.999851
+5740,1,0.999851
+5900,1,0.999852
+5910,1,0.999853
+6020,1,0.999853
+6030,1,0.999854
+6040,1,0.999854
+6130,1,0.999855
+6230,1,0.999855
+6250,1,0.999856
+6270,1,0.999856
+6370,1,0.999857
+6460,1,0.999857
+6510,1,0.999858
+6630,1,0.999858
+6750,1,0.999859
+6790,1,0.999860
+6900,1,0.999860
+7050,1,0.999861
+7080,1,0.999861
+7100,1,0.999862
+7130,1,0.999862
+7150,1,0.999863
+7210,1,0.999863
+7240,1,0.999864
+7380,1,0.999864
+7410,1,0.999865
+7500,1,0.999866
+7530,1,0.999866
+7690,1,0.999867
+7710,1,0.999867
+7720,1,0.999868
+7730,1,0.999868
+7740,1,0.999869
+7750,1,0.999869
+7760,1,0.999870
+7780,1,0.999870
+7800,1,0.999871
+7820,1,0.999872
+7830,1,0.999872
+7840,1,0.999873
+7860,1,0.999873
+7870,2,0.999874
+7880,3,0.999876
+7890,2,0.999877
+7900,2,0.999878
+7910,2,0.999879
+7920,1,0.999880
+7930,1,0.999880
+7960,3,0.999882
+7970,2,0.999883
+7980,1,0.999883
+7990,4,0.999886
+8000,4,0.999888
+8010,1,0.999888
+8020,2,0.999889
+8030,3,0.999891
+8040,1,0.999892
+8050,1,0.999892
+8060,2,0.999893
+8070,5,0.999896
+8080,1,0.999896
+8090,3,0.999898
+8110,2,0.999899
+8120,4,0.999901
+8130,4,0.999904
+8150,1,0.999904
+8160,3,0.999906
+8180,1,0.999906
+8190,1,0.999907
+8200,1,0.999907
+8210,1,0.999908
+8220,1,0.999908
+8230,1,0.999909
+8240,1,0.999909
+8430,1,0.999910
+8610,1,0.999911
+8620,1,0.999911
+8750,1,0.999912
+8790,1,0.999912
+9150,1,0.999913
+9200,1,0.999913
+9240,1,0.999914
+9760,1,0.999914
+10550,1,0.999915
+10790,1,0.999915
+10940,1,0.999916
+10990,1,0.999916
+11100,1,0.999917
+11340,1,0.999918
+11540,1,0.999918
+42880,1,0.999919
+60360,1,0.999919
+67210,1,0.999920
+69190,1,0.999920
+74790,1,0.999921
+76140,1,0.999921
+76820,1,0.999922
+80690,1,0.999923
+83320,1,0.999923
+86990,1,0.999924
+87530,1,0.999924
+88800,1,0.999925
+90480,1,0.999925
+93310,1,0.999926
+93720,1,0.999926
+94130,1,0.999927
+94720,1,0.999927
+95040,1,0.999928
+95110,1,0.999928
+96840,1,0.999929
+98000,1,0.999930
+99170,1,0.999930
+99810,1,0.999931
+101200,1,0.999931
+101730,1,0.999932
+111480,1,0.999932
+111510,1,0.999933
+114970,1,0.999933
+115280,1,0.999934
+119650,1,0.999934
+119780,1,0.999935
+120680,1,0.999936
+122720,1,0.999936
+122940,1,0.999937
+125290,1,0.999937
+125400,1,0.999938
+125940,1,0.999938
+126500,1,0.999939
+127280,1,0.999939
+128300,1,0.999940
+128410,1,0.999940
+128550,1,0.999941
+128660,1,0.999941
+128770,1,0.999942
+128910,1,0.999943
+128940,1,0.999943
+129940,1,0.999944
+130730,1,0.999944
+131110,1,0.999945
+131480,1,0.999945
+131820,1,0.999946
+132250,1,0.999946
+132340,1,0.999947
+132480,1,0.999947
+133400,1,0.999948
+133760,1,0.999949
+134030,1,0.999949
+134770,1,0.999950
+134850,1,0.999950
+135380,1,0.999951
+135690,1,0.999951
+136650,1,0.999952
+136800,1,0.999952
+137000,1,0.999953
+137010,1,0.999953
+137140,1,0.999954
+137890,1,0.999954
+138060,1,0.999955
+138110,1,0.999956
+138590,1,0.999956
+138630,1,0.999957
+138680,1,0.999957
+139640,1,0.999958
+139760,1,0.999958
+140370,1,0.999959
+141910,1,0.999959
+142090,2,0.999960
+142130,1,0.999961
+142750,1,0.999961
+143110,1,0.999962
+143120,1,0.999963
+143190,1,0.999963
+143620,1,0.999964
+144060,1,0.999964
+144490,1,0.999965
+144850,1,0.999965
+145340,1,0.999966
+146390,1,0.999966
+147450,1,0.999967
+147930,1,0.999967
+148010,1,0.999968
+148920,1,0.999969
+148940,1,0.999969
+149100,1,0.999970
+149220,1,0.999970
+149300,1,0.999971
+152910,1,0.999971
+154220,1,0.999972
+154750,1,0.999972
+154880,1,0.999973
+154980,1,0.999973
+157170,1,0.999974
+159380,1,0.999975
+160480,1,0.999975
+160610,1,0.999976
+164890,1,0.999976
+166670,1,0.999977
+171590,1,0.999977
+173570,1,0.999978
+173650,1,0.999978
+173760,1,0.999979
+176270,1,0.999979
+177250,1,0.999980
+177380,1,0.999981
+177580,1,0.999981
+177700,1,0.999982
+180390,1,0.999982
+182570,1,0.999983
+188140,1,0.999983
+381080,1,0.999984
+394410,1,0.999984
+394610,1,0.999985
+753910,1,0.999985
+756510,1,0.999986
+779650,1,0.999986
+863520,1,0.999987
+863700,1,0.999988
+901140,1,0.999988
+925750,1,0.999989
+930110,1,0.999989
+951010,1,0.999990
+953950,1,0.999990
+1000000,18,1.000000
+a_type	l_type	max	min	avg	cnt	percentage
+0	0	6203393	0	59.103	1710715	92.73203%
+1	0	4727097	7	75.538	136863	7.41888%
+2	0	35	29	32.000	2	0.00011%
+--------------------------------------------
+|            bench type:                   |
+--------------------------------------------
+----algorithm----
+[0~100(usec)]: 0
+[100~200(usec)]: 0
+[200~300(usec)]: 0
+[300~400(usec)]: 0
+[400~500(usec)]: 0
+[500~600(usec)]: 0
+[600~700(usec)]: 0
+[700~800(usec)]: 0
+[800~900(usec)]: 0
+[900~1000(usec)]: 0
+[over_ms]: 0
+[over__s]: 0
+----lower----
+[0~100(usec)]: 0
+[100~200(usec)]: 0
+[200~300(usec)]: 0
+[300~400(usec)]: 0
+[400~500(usec)]: 0
+[500~600(usec)]: 0
+[600~700(usec)]: 0
+[700~800(usec)]: 0
+[800~900(usec)]: 0
+[900~1000(usec)]: 0
+[over_ms]: 0
+[over__s]: 0
+----average----
+[avg_algo]: 0.0
+[avg_low]: 0.0
+-----lower_info----
+[write_op]: 0
+[read_op]: 0
+[trim_op]:0
+[WAF, RAF]: 0.000000, 0.000000
+[if rw test]: 0.000000(WAF), 0.000000(RAF)
+
+----summary----
+[all_time]: 0.0
+[size]: 64707.332031(mb)
+[FAIL NUM] 0
+[SUCCESS RATIO] 1.000000
+[throughput] inf(kb/s)
+             inf(mb/s)
+[IOPS] inf
+[cache hit cnt,ratio] 0, 0.000000
+[cache hit cnt,ratio dftl] 0, 0.000000
+[READ WRITE CNT] 1844794 14717497
+error cnt:2786
+result of ms:
+---
+level idx:0 run 10/14 content_num: 174921 (4.17 %)
+	[0] lba:510464~3142655 sst_file num:167/170
+	[1] lba:1016112~2405406 sst_file num:171/340
+	[2] lba:510976~2621455 sst_file num:163/170
+	[3] lba:511412~4183299 sst_file num:169/340
+	[4] lba:1054~4184503 sst_file num:165/170
+	[5] lba:15656~4184579 sst_file num:59/63
+	[6] lba:517048~4185627 sst_file num:169/170
+	[7] lba:16091~4188711 sst_file num:99/99
+	[8] lba:1035~4190075 sst_file num:171/340
+	[9] lba:0~4190499 sst_file num:126/126
+level idx:1 run 14/14 content_num: 4314831 (102.87 %)
+	[0] lba:1035~4181503 sst_file num:4/296
+	[1] lba:1060~4152459 sst_file num:6/296
+	[2] lba:1037~4035418 sst_file num:6/296
+	[3] lba:1062~4168219 sst_file num:7/296
+	[4] lba:1035~4095653 sst_file num:8/296
+	[5] lba:1104~3992968 sst_file num:6/296
+	[6] lba:1~4144151 sst_file num:5/296
+	[7] lba:1067~4121443 sst_file num:7/296
+	[8] lba:1038~4066057 sst_file num:7/296
+	[9] lba:0~4090112 sst_file num:12/296
+	[10] lba:1078~4051860 sst_file num:6/296
+	[11] lba:1~4081905 sst_file num:8/296
+	[12] lba:1036~4006102 sst_file num:5/296
+	[13] lba:3~4194303 sst_file num:11/296
+----LSMtree monitor log----
+TRIVIAL MOVE cnt:0
+COMPACTION 0 cnt: 668
+COMPACTION 1 cnt: 47
+COMPACTION 2 cnt: 33
+COMPACTION_RECLAIM_RUN_NUM:0
+COMPACTION_EARLY_INVALIDATION: 0
+DATA GC cnt:667
+MAPPING GC cnt:0
+
+merge efficienty:0.71 (10151884/14278407 - valid/total)
+tiering efficienty:inf (11388925/0 - valid/total)
+
+level print
+ptr:0x7fe0b0070170 level idx:0 run 10/14 content_num: 174921 (4.17 %)
+ptr:0x7fe1163aeda0 level idx:1 run 14/14 content_num: 4314831 (102.87 %)
+WAF: 3.285831
+
+
+[32-BIT] memory usage: 0.24 for PFTL
+	32609564(bit)
+	4076195.50(byte)
+	3.89(MB)
+  memory breakdown
+	leveling:0 (0.00)
+	tiering:10247964 (0.31)
+	version_bit:20971520 (0.64)
+	write_pinned_end: 1390080 (0.04)
+  Memory usage in level
+	 0 : 1236672 (0.038)
+	 1 : 9011292 (0.276)
+
+
+[48-BIT] memory usage: 0.17 for PFTL
+	33914748(bit)
+	4239343.50(byte)
+	4.04(MB)
+  memory breakdown
+	leveling:0 (0.00 , 0.000)
+	tiering:10858108 (0.32 , 0.054)
+	version_bit:20971520 (0.62)
+	write_pinned_ent: 2085120 (0.06)
+  Memory usage in level
+	 0 : 1513360 (0.045)
+	 1 : 9344748 (0.276)
+
+----- Time result ------
+should time is a adding type
+Tiering RH [make] time :avg:1.30 total:47486861 cnt:36537969
+should time is a adding type
+Tiering RH [check] time :avg:0.49 total:981746 cnt:1984026
+
+----- traffic result -----
+RAF: 1.076756
+WAF: 3.285831
+
+TRIM 667
+MAPPINGR 105962
+MAPPINGW 97468
+GCMR 0
+GCMW 0
+DATAR 1783133
+DATAW 3677184
+GCDR 916454
+GCDW 771229
+GCMR_DGC 0
+GCMW_DGC 0
+COMPACTIONDATA-R 12530768
+COMPACTIONDATA-W 7536724
+MISSDATAR 136867
+TESTIO 0
+(null) 0
+

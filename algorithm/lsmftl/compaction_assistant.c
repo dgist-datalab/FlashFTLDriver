@@ -118,8 +118,8 @@ static inline bool check_sequential(std::map<uint32_t, uint32_t> *kp_set, write_
 		return false;
 	}
 }
-
-#ifndef MIN_ENTRY_PER_SST
+#if 0
+//#ifdef MIN_ENTRY_OFF
 extern char all_set_page[PAGESIZE];
 static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set, 
 		std::map<uint32_t, uint32_t>::iterator *temp_iter, bool make_rh){
@@ -206,6 +206,9 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 		for(uint32_t j=0; j<i; j++){
 			read_helper_stream_insert(rh, kp_set[j].lba, kp_set[j].piece_ppa);
 		}	
+	}
+	else{
+		rh=NULL;
 	}
 	
 	if(!sequential_file){
@@ -459,7 +462,7 @@ static inline level *TW_compaction(compaction_master *cm, level *src, level *des
 	level_free(temp, LSM.pm);
 	return res;
 }
-
+char rw_debug_flag=0;
 static inline void do_compaction_demote(compaction_master *cm, compaction_req *req, 
 		level *temp_level, uint32_t start_idx, uint32_t end_idx){
 
@@ -467,7 +470,9 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 	static uint32_t demote_cnt=0;
 	printf("demote_cnt: %u\n", demote_cnt++);
 	if(temp_level){
+#ifdef DYNAMIC_WISCKEY
 		temp_level->compacting_wisckey_flag=LSM.next_level_wisckey_compaction;
+#endif
 		LSM.monitor.flushed_kp_num+=LSM.flushed_kp_set->size();
 		rwlock_write_lock(&LSM.level_rwlock[end_idx]);
 		for(std::set<uint32_t>::iterator iter=LSM.flushed_kp_seg->begin(); 
@@ -626,9 +631,6 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		/*coupling version*/
 		std::map<uint32_t, uint32_t>::iterator map_iter;
 		for(map_iter=LSM.flushed_kp_set->begin(); map_iter!=LSM.flushed_kp_set->end(); map_iter++){
-			if(LSM.global_debug_flag && map_iter->first==debug_lba){
-//				printf("break!\n");
-			}
 			version_coupling_lba_version(LSM.last_run_version, map_iter->first, target_version);
 		}
 		delete LSM.flushed_kp_set;
@@ -671,8 +673,9 @@ static inline void do_compaction_demote(compaction_master *cm, compaction_req *r
 		level_free(temp_level, LSM.pm);
 		LSM.pinned_level=NULL;
 		rwlock_write_unlock(&LSM.flushed_kp_set_lock);
-
+#ifdef DYNAMIC_WISCKEY
 		LSM.next_level_wisckey_compaction=lsmtree_target_run_wisckeyable(LSM.param.write_buffer_ent, true);
+#endif
 	}
 	else{
 		version_level_invalidate_number_init(LSM.last_run_version, start_idx);
@@ -950,10 +953,10 @@ again:
 
 		do_compaction(cm, req, temp_level, req->start_level, req->end_level);
 
-		lsmtree_level_summary(&LSM);
+		lsmtree_level_summary(&LSM, false);
 
 		if(level_is_full(LSM.disk[req->end_level], LSM.param.last_size_factor)){
-			if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor)) || force_merging_test()){
+			if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor))){
 				last_level_reclaim(cm, LSM.param.LEVELN-1);
 			}
 			else if(req->end_level==LSM.param.LEVELN-1){
@@ -994,19 +997,53 @@ end:
 				
 				static int cnt=0;
 				printf("force compaction! %u\n", cnt++);
-				if(cnt==33){
+				if(cnt==18){
 					printf("break!\n");
+					LSM.global_debug_flag=true;
 				}
-				lsmtree_level_summary(&LSM);
+				lsmtree_level_summary(&LSM, false);
 				if((req->end_level==LSM.param.LEVELN-2 && level_is_full(LSM.disk[LSM.param.LEVELN-1], LSM.param.last_size_factor))){
 					last_level_reclaim(cm, LSM.param.LEVELN-1);
 	//				goto end;
 				}
 				else{
-					req->start_level=req->end_level;
-					req->end_level++;
-					force=true;
-					goto again;
+					float min_validate_ratio=1.0f;
+					float target_validate_ratio;
+					uint32_t target_version=0;
+					run *target_run=NULL;
+					uint32_t target_ridx;
+					uint32_t ridx;
+					run *rptr;
+					for_each_run_max(LSM.disk[LSM.param.LEVELN-1], rptr, ridx){
+						if(!rptr->now_sst_num) continue;
+						uint32_t version_number=version_ridx_to_version(LSM.last_run_version, LSM.param.LEVELN-1, ridx);
+						if(LSM.last_run_version->version_invalidate_number[version_number]==0) continue;
+						target_validate_ratio=(float)(rptr->now_contents_num - LSM.last_run_version->version_invalidate_number[version_number])/rptr->now_contents_num;
+						if(min_validate_ratio > target_validate_ratio){
+							min_validate_ratio=target_validate_ratio;
+							target_run=rptr;
+							target_version=version_number;
+							target_ridx=ridx;
+						}
+					}
+					if(target_run){
+						run *new_run=compaction_reclaim_run(cm, target_run, target_version);
+						version_invalidate_number_init(LSM.last_run_version, target_version);
+						if(new_run->now_sst_num==0){
+							version_clear_target(LSM.last_run_version, target_version, LSM.param.LEVELN-1);
+							level_empty_run(LSM.disk[LSM.param.LEVELN-1], target_ridx);
+						}
+						else{
+							level_update_run_at_move_originality(LSM.disk[LSM.param.LEVELN-1], target_ridx, new_run, false);
+						}
+						run_free(new_run);
+					}
+					else{
+						req->start_level=req->end_level;
+						req->end_level++;
+						force=true;
+						goto again;
+					}
 				}
 				/*
 				static int cnt=0;

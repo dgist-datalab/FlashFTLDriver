@@ -8,6 +8,11 @@ void *demand_end_req(algo_req * my_req){
 	request *parents=my_req->parents;
 	demand_param *dp;
 	std::map<uint32_t, bool>::iterator iter;
+	if(parents){
+		if(parents->type_lower < 10){
+			parents->type_lower+=my_req->type_lower;
+		}
+	}
 	switch(my_req->type){
 		case MAPPINGR:
 			fdriver_lock(&dmm.flying_map_read_lock);

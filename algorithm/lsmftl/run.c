@@ -50,6 +50,9 @@ static inline void update_range(run *_run, uint32_t start, uint32_t end){
 }
 
 uint32_t run_remove_sst_file_at(run *r, uint32_t idx){
+	if(LSM.global_debug_flag){
+		printf("break!\n");
+	}
 	if(r->now_sst_num==0){
 		EPRINT("???", true);
 	}

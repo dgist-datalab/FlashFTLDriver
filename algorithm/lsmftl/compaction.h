@@ -18,7 +18,7 @@
 #include "sst_page_file_stream.h"
 #include <queue>
 
-#define COMPACTION_TAGS ((QDEPTH)*4)
+#define COMPACTION_TAGS ((512)*4)
 #define TARGETREADNUM(read_arg) (read_arg.to-read_arg.from+1)
 #define COMPACTION_LEVEL_NUM (2)
 
@@ -160,6 +160,8 @@ uint32_t issue_write_kv_for_bis_hot_cold(sst_bf_in_stream ***bis, sst_bf_out_str
 
 void compaction_trivial_move(run *rptr, uint32_t target_version, 
 		uint32_t from_lev_idx, uint32_t to_lev_idx, bool inplace);
+
+run* compaction_convert_sst_page_to_block(run *);
 
 void compaction_debug_func(uint32_t lba, uint32_t piece_ppa, uint32_t target_ridx, level *des);
 void issue_map_read_sst_job(compaction_master *cm, read_arg_container* thread_arg);

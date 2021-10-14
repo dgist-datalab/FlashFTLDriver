@@ -1,0 +1,3570 @@
+signal add!
+bench range:0 ~ 4294967295
+!!! (SYNC) posix memory NOP:1258291!!!
+BF target bit:6 fpr:0.016415 member_set:71428 target_member:14 min_bit:12.857142
+target settings memory usage!
+LEVEL	WAF	SF	run_num	memory
+0	3.00	13.89	27	0.210
+------------------------------------------
+[param] # of level: 2
+[param] normal size factor: 14.000000
+[param] read amplification: 1.100000
+[param] version number :27
+[param] write_buffer ent: 21720
+[param] write_buffer byte: 261120
+[param] reclaim ppa target: 76308 (305232)
+[PERF] WAF:3.00+GC
+[PERF] RAF:1.100
+------------------------------------------
+OP:80
+WB_SEPARATE ENABLE
+INVALIDATION_COUNT_MERGE ENABLE
+TI[0] - run_num:14 data:0.01(%) H:BF_GUARD
+TI[1] - run_num:14 data:0.10(%) H:PLR
+max_version idx:28
+NOS:76
+now waiting req!!
+demote_cnt: 0
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 1
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 2
+version info: v-16 vidx-2 ridx-2 order-2
+10000
+demote_cnt: 3
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 4
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 5
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 6
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 7
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 8
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 9
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 10
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 11
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 12
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 13
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 14
+version info: v-0 vidx-0 ridx-0 order-0
+level idx:1 run 1/14 content_num: 163683 (3.90 %)
+demote_cnt: 15
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 16
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 17
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 18
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 19
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 20
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 21
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 22
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 23
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 24
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 25
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 26
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 27
+version info: v-26 vidx-12 ridx-12 order-12
+20000
+demote_cnt: 28
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 29
+version info: v-1 vidx-1 ridx-1 order-1
+level idx:1 run 2/14 content_num: 333362 (7.95 %)
+demote_cnt: 30
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 31
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 32
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 33
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 34
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 35
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 36
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 37
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 38
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 39
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 40
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 41
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 42
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 43
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 44
+version info: v-2 vidx-2 ridx-2 order-2
+level idx:1 run 3/14 content_num: 500554 (11.93 %)
+demote_cnt: 45
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 46
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 47
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 48
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 49
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 50
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 51
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 52
+version info: v-21 vidx-7 ridx-7 order-7
+30000
+demote_cnt: 53
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 54
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 55
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 56
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 57
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 58
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 59
+version info: v-3 vidx-3 ridx-3 order-3
+level idx:1 run 4/14 content_num: 665499 (15.87 %)
+demote_cnt: 60
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 61
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 62
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 63
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 64
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 65
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 66
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 67
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 68
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 69
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 70
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 71
+version info: v-25 vidx-11 ridx-11 order-11
+40000
+demote_cnt: 72
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 73
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 74
+version info: v-4 vidx-4 ridx-4 order-4
+level idx:1 run 5/14 content_num: 829459 (19.78 %)
+demote_cnt: 75
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 76
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 77
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 78
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 79
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 80
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 81
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 82
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 83
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 84
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 85
+version info: v-24 vidx-10 ridx-10 order-10
+50000
+demote_cnt: 86
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 87
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 88
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 89
+version info: v-5 vidx-5 ridx-5 order-5
+level idx:1 run 6/14 content_num: 977233 (23.30 %)
+demote_cnt: 90
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 91
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 92
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 93
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 94
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 95
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 96
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 97
+version info: v-21 vidx-7 ridx-7 order-7
+60000
+demote_cnt: 98
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 99
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 100
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 101
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 102
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 103
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 104
+version info: v-6 vidx-6 ridx-6 order-6
+level idx:1 run 7/14 content_num: 1130547 (26.95 %)
+demote_cnt: 105
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 106
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 107
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 108
+version info: v-17 vidx-3 ridx-3 order-3
+70000
+demote_cnt: 109
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 110
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 111
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 112
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 113
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 114
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 115
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 116
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 117
+version info: v-26 vidx-12 ridx-12 order-12
+80000
+demote_cnt: 118
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 119
+version info: v-7 vidx-7 ridx-7 order-7
+level idx:1 run 8/14 content_num: 1284188 (30.62 %)
+demote_cnt: 120
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 121
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 122
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 123
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 124
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 125
+version info: v-19 vidx-5 ridx-5 order-5
+90000
+demote_cnt: 126
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 127
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 128
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 129
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 130
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 131
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 132
+version info: v-26 vidx-12 ridx-12 order-12
+100000
+demote_cnt: 133
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 134
+version info: v-8 vidx-8 ridx-8 order-8
+level idx:1 run 9/14 content_num: 1432265 (34.15 %)
+demote_cnt: 135
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 136
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 137
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 138
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 139
+version info: v-18 vidx-4 ridx-4 order-4
+110000
+demote_cnt: 140
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 141
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 142
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 143
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 144
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 145
+version info: v-24 vidx-10 ridx-10 order-10
+120000
+demote_cnt: 146
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 147
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 148
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 149
+version info: v-9 vidx-9 ridx-9 order-9
+level idx:1 run 10/14 content_num: 1580914 (37.69 %)
+demote_cnt: 150
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 151
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 152
+version info: v-16 vidx-2 ridx-2 order-2
+130000
+demote_cnt: 153
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 154
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 155
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 156
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 157
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 158
+version info: v-22 vidx-8 ridx-8 order-8
+140000
+demote_cnt: 159
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 160
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 161
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 162
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 163
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 164
+version info: v-10 vidx-10 ridx-10 order-10
+level idx:1 run 11/14 content_num: 1724600 (41.12 %)
+150000
+demote_cnt: 165
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 166
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 167
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 168
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 169
+version info: v-18 vidx-4 ridx-4 order-4
+160000
+demote_cnt: 170
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 171
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 172
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 173
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 174
+version info: v-23 vidx-9 ridx-9 order-9
+170000
+demote_cnt: 175
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 176
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 177
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 178
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 179
+version info: v-11 vidx-11 ridx-11 order-11
+level idx:1 run 12/14 content_num: 1869850 (44.58 %)
+demote_cnt: 180
+version info: v-14 vidx-0 ridx-0 order-0
+180000
+demote_cnt: 181
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 182
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 183
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 184
+version info: v-18 vidx-4 ridx-4 order-4
+190000
+demote_cnt: 185
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 186
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 187
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 188
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 189
+version info: v-23 vidx-9 ridx-9 order-9
+200000
+demote_cnt: 190
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 191
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 192
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 193
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 194
+version info: v-12 vidx-12 ridx-12 order-12
+level idx:1 run 13/14 content_num: 2014745 (48.04 %)
+demote_cnt: 195
+version info: v-14 vidx-0 ridx-0 order-0
+210000
+demote_cnt: 196
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 197
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 198
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 199
+version info: v-18 vidx-4 ridx-4 order-4
+220000
+demote_cnt: 200
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 201
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 202
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 203
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 204
+version info: v-23 vidx-9 ridx-9 order-9
+230000
+demote_cnt: 205
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 206
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 207
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 208
+version info: v-27 vidx-13 ridx-13 order-13
+demote_cnt: 209
+version info: v-13 vidx-13 ridx-13 order-13
+level idx:1 run 14/14 content_num: 2159602 (51.49 %)
+240000
+demote_cnt: 210
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 211
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 212
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 213
+version info: v-17 vidx-3 ridx-3 order-3
+250000
+demote_cnt: 214
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 215
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 216
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 217
+version info: v-21 vidx-7 ridx-7 order-7
+260000
+demote_cnt: 218
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 219
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 220
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 221
+version info: v-25 vidx-11 ridx-11 order-11
+270000
+demote_cnt: 222
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 223
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:0
+merge 13,12 to 13
+target:76308 now_remain:353014
+demote_cnt: 224
+version info: v-12 vidx-12 ridx-12 order-13
+level idx:1 run 14/14 content_num: 2217113 (52.86 %)
+demote_cnt: 225
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 226
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 227
+version info: v-16 vidx-2 ridx-2 order-2
+280000
+demote_cnt: 228
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 229
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 230
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 231
+version info: v-20 vidx-6 ridx-6 order-6
+290000
+demote_cnt: 232
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 233
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 234
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 235
+version info: v-24 vidx-10 ridx-10 order-10
+300000
+demote_cnt: 236
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 237
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 238
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:1
+merge 12,11 to 12
+target:76308 now_remain:325911
+demote_cnt: 239
+version info: v-11 vidx-11 ridx-11 order-13
+level idx:1 run 14/14 content_num: 2278737 (54.33 %)
+demote_cnt: 240
+version info: v-14 vidx-0 ridx-0 order-0
+310000
+demote_cnt: 241
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 242
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 243
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 244
+version info: v-18 vidx-4 ridx-4 order-4
+320000
+demote_cnt: 245
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 246
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 247
+version info: v-21 vidx-7 ridx-7 order-7
+330000
+demote_cnt: 248
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 249
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 250
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 251
+version info: v-25 vidx-11 ridx-11 order-11
+340000
+demote_cnt: 252
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 253
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:2
+merge 11,10 to 11
+target:76308 now_remain:329882
+demote_cnt: 254
+version info: v-10 vidx-10 ridx-10 order-13
+level idx:1 run 14/14 content_num: 2337122 (55.72 %)
+demote_cnt: 255
+version info: v-14 vidx-0 ridx-0 order-0
+350000
+demote_cnt: 256
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 257
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 258
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 259
+version info: v-18 vidx-4 ridx-4 order-4
+360000
+demote_cnt: 260
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 261
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 262
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 263
+version info: v-22 vidx-8 ridx-8 order-8
+370000
+demote_cnt: 264
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 265
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 266
+version info: v-25 vidx-11 ridx-11 order-11
+380000
+demote_cnt: 267
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 268
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:3
+merge 10,9 to 10
+target:76308 now_remain:317694
+demote_cnt: 269
+version info: v-9 vidx-9 ridx-9 order-13
+level idx:1 run 14/14 content_num: 2396785 (57.14 %)
+demote_cnt: 270
+version info: v-14 vidx-0 ridx-0 order-0
+demote_cnt: 271
+version info: v-15 vidx-1 ridx-1 order-1
+390000
+demote_cnt: 272
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 273
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 274
+version info: v-18 vidx-4 ridx-4 order-4
+400000
+demote_cnt: 275
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 276
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 277
+version info: v-21 vidx-7 ridx-7 order-7
+410000
+demote_cnt: 278
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 279
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 280
+version info: v-24 vidx-10 ridx-10 order-10
+420000
+430000
+440000
+450000
+demote_cnt: 281
+version info: v-25 vidx-11 ridx-11 order-11
+460000
+470000
+480000
+demote_cnt: 282
+version info: v-26 vidx-12 ridx-12 order-12
+490000
+500000
+demote_cnt: 283
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:4
+merge 9,8 to 9
+target:76308 now_remain:305354
+demote_cnt: 284
+version info: v-8 vidx-8 ridx-8 order-13
+level idx:1 run 14/14 content_num: 2459010 (58.63 %)
+510000
+520000
+demote_cnt: 285
+version info: v-14 vidx-0 ridx-0 order-0
+530000
+demote_cnt: 286
+version info: v-15 vidx-1 ridx-1 order-1
+540000
+550000
+demote_cnt: 287
+version info: v-16 vidx-2 ridx-2 order-2
+560000
+demote_cnt: 288
+version info: v-17 vidx-3 ridx-3 order-3
+570000
+demote_cnt: 289
+version info: v-18 vidx-4 ridx-4 order-4
+580000
+demote_cnt: 290
+version info: v-19 vidx-5 ridx-5 order-5
+590000
+demote_cnt: 291
+version info: v-20 vidx-6 ridx-6 order-6
+600000
+demote_cnt: 292
+version info: v-21 vidx-7 ridx-7 order-7
+610000
+demote_cnt: 293
+version info: v-22 vidx-8 ridx-8 order-8
+620000
+630000
+demote_cnt: 294
+version info: v-23 vidx-9 ridx-9 order-9
+640000
+demote_cnt: 295
+version info: v-24 vidx-10 ridx-10 order-10
+650000
+demote_cnt: 296
+version info: v-25 vidx-11 ridx-11 order-11
+660000
+demote_cnt: 297
+version info: v-26 vidx-12 ridx-12 order-12
+670000
+680000
+demote_cnt: 298
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:5
+merge 7,6 to 7
+target:76308 now_remain:338269
+demote_cnt: 299
+version info: v-6 vidx-6 ridx-6 order-13
+level idx:1 run 14/14 content_num: 2567327 (61.21 %)
+690000
+demote_cnt: 300
+version info: v-14 vidx-0 ridx-0 order-0
+700000
+demote_cnt: 301
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 302
+version info: v-16 vidx-2 ridx-2 order-2
+710000
+demote_cnt: 303
+version info: v-17 vidx-3 ridx-3 order-3
+720000
+730000
+demote_cnt: 304
+version info: v-18 vidx-4 ridx-4 order-4
+740000
+750000
+demote_cnt: 305
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 306
+version info: v-20 vidx-6 ridx-6 order-6
+760000
+demote_cnt: 307
+version info: v-21 vidx-7 ridx-7 order-7
+770000
+780000
+demote_cnt: 308
+version info: v-22 vidx-8 ridx-8 order-8
+790000
+demote_cnt: 309
+version info: v-23 vidx-9 ridx-9 order-9
+800000
+demote_cnt: 310
+version info: v-24 vidx-10 ridx-10 order-10
+810000
+demote_cnt: 311
+version info: v-25 vidx-11 ridx-11 order-11
+820000
+demote_cnt: 312
+version info: v-26 vidx-12 ridx-12 order-12
+830000
+demote_cnt: 313
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:6
+merge 6,4 to 6
+target:76308 now_remain:298894
+demote_cnt: 314
+version info: v-4 vidx-4 ridx-4 order-13
+level idx:1 run 14/14 content_num: 2684377 (64.00 %)
+840000
+850000
+demote_cnt: 315
+version info: v-14 vidx-0 ridx-0 order-0
+860000
+demote_cnt: 316
+version info: v-15 vidx-1 ridx-1 order-1
+870000
+demote_cnt: 317
+version info: v-16 vidx-2 ridx-2 order-2
+880000
+890000
+demote_cnt: 318
+version info: v-17 vidx-3 ridx-3 order-3
+900000
+demote_cnt: 319
+version info: v-18 vidx-4 ridx-4 order-4
+910000
+demote_cnt: 320
+version info: v-19 vidx-5 ridx-5 order-5
+920000
+demote_cnt: 321
+version info: v-20 vidx-6 ridx-6 order-6
+930000
+demote_cnt: 322
+version info: v-21 vidx-7 ridx-7 order-7
+940000
+950000
+demote_cnt: 323
+version info: v-22 vidx-8 ridx-8 order-8
+960000
+demote_cnt: 324
+version info: v-23 vidx-9 ridx-9 order-9
+970000
+demote_cnt: 325
+version info: v-24 vidx-10 ridx-10 order-10
+980000
+990000
+demote_cnt: 326
+version info: v-25 vidx-11 ridx-11 order-11
+1000000
+demote_cnt: 327
+version info: v-26 vidx-12 ridx-12 order-12
+1010000
+demote_cnt: 328
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:7
+merge 1,0 to 1
+target:76308 now_remain:277566
+demote_cnt: 329
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 2778385 (66.24 %)
+1020000
+demote_cnt: 330
+version info: v-14 vidx-0 ridx-0 order-0
+1030000
+demote_cnt: 331
+version info: v-15 vidx-1 ridx-1 order-1
+1040000
+demote_cnt: 332
+version info: v-16 vidx-2 ridx-2 order-2
+1050000
+1060000
+demote_cnt: 333
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 334
+version info: v-18 vidx-4 ridx-4 order-4
+1070000
+1080000
+demote_cnt: 335
+version info: v-19 vidx-5 ridx-5 order-5
+1090000
+demote_cnt: 336
+version info: v-20 vidx-6 ridx-6 order-6
+1100000
+demote_cnt: 337
+version info: v-21 vidx-7 ridx-7 order-7
+1110000
+demote_cnt: 338
+version info: v-22 vidx-8 ridx-8 order-8
+1120000
+1130000
+demote_cnt: 339
+version info: v-23 vidx-9 ridx-9 order-9
+1140000
+demote_cnt: 340
+version info: v-24 vidx-10 ridx-10 order-10
+1150000
+demote_cnt: 341
+version info: v-25 vidx-11 ridx-11 order-11
+1160000
+1170000
+demote_cnt: 342
+version info: v-26 vidx-12 ridx-12 order-12
+demote_cnt: 343
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:8
+merge 4,2 to 4
+target:76308 now_remain:252400
+demote_cnt: 344
+version info: v-2 vidx-2 ridx-2 order-13
+level idx:1 run 14/14 content_num: 2874969 (68.54 %)
+1180000
+demote_cnt: 345
+version info: v-14 vidx-0 ridx-0 order-0
+1190000
+1200000
+demote_cnt: 346
+version info: v-15 vidx-1 ridx-1 order-1
+1210000
+demote_cnt: 347
+version info: v-16 vidx-2 ridx-2 order-2
+1220000
+demote_cnt: 348
+version info: v-17 vidx-3 ridx-3 order-3
+1230000
+1240000
+demote_cnt: 349
+version info: v-18 vidx-4 ridx-4 order-4
+1250000
+demote_cnt: 350
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 351
+version info: v-20 vidx-6 ridx-6 order-6
+1260000
+1270000
+demote_cnt: 352
+version info: v-21 vidx-7 ridx-7 order-7
+1280000
+1290000
+demote_cnt: 353
+version info: v-22 vidx-8 ridx-8 order-8
+1300000
+demote_cnt: 354
+version info: v-23 vidx-9 ridx-9 order-9
+1310000
+demote_cnt: 355
+version info: v-24 vidx-10 ridx-10 order-10
+1320000
+demote_cnt: 356
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 357
+version info: v-26 vidx-12 ridx-12 order-12
+1330000
+demote_cnt: 358
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:9
+merge 3,5 to 3
+target:76308 now_remain:232050
+demote_cnt: 359
+version info: v-5 vidx-5 ridx-5 order-13
+level idx:1 run 14/14 content_num: 2958203 (70.53 %)
+1340000
+1350000
+demote_cnt: 360
+version info: v-14 vidx-0 ridx-0 order-0
+1360000
+1370000
+demote_cnt: 361
+version info: v-15 vidx-1 ridx-1 order-1
+1380000
+demote_cnt: 362
+version info: v-16 vidx-2 ridx-2 order-2
+1390000
+demote_cnt: 363
+version info: v-17 vidx-3 ridx-3 order-3
+1400000
+1410000
+demote_cnt: 364
+version info: v-18 vidx-4 ridx-4 order-4
+1420000
+demote_cnt: 365
+version info: v-19 vidx-5 ridx-5 order-5
+demote_cnt: 366
+version info: v-20 vidx-6 ridx-6 order-6
+1430000
+demote_cnt: 367
+version info: v-21 vidx-7 ridx-7 order-7
+1440000
+1450000
+demote_cnt: 368
+version info: v-22 vidx-8 ridx-8 order-8
+1460000
+demote_cnt: 369
+version info: v-23 vidx-9 ridx-9 order-9
+1470000
+demote_cnt: 370
+version info: v-24 vidx-10 ridx-10 order-10
+1480000
+demote_cnt: 371
+version info: v-25 vidx-11 ridx-11 order-11
+1490000
+1500000
+demote_cnt: 372
+version info: v-26 vidx-12 ridx-12 order-12
+1510000
+1520000
+demote_cnt: 373
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:10
+merge 13,12 to 13
+target:76308 now_remain:210172
+demote_cnt: 374
+version info: v-12 vidx-12 ridx-12 order-13
+level idx:1 run 14/14 content_num: 3065189 (73.08 %)
+1530000
+demote_cnt: 375
+version info: v-14 vidx-0 ridx-0 order-0
+1540000
+1550000
+demote_cnt: 376
+version info: v-15 vidx-1 ridx-1 order-1
+1560000
+demote_cnt: 377
+version info: v-16 vidx-2 ridx-2 order-2
+1570000
+demote_cnt: 378
+version info: v-17 vidx-3 ridx-3 order-3
+1580000
+demote_cnt: 379
+version info: v-18 vidx-4 ridx-4 order-4
+1590000
+demote_cnt: 380
+version info: v-19 vidx-5 ridx-5 order-5
+1600000
+1610000
+demote_cnt: 381
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 382
+version info: v-21 vidx-7 ridx-7 order-7
+1620000
+demote_cnt: 383
+version info: v-22 vidx-8 ridx-8 order-8
+1630000
+demote_cnt: 384
+version info: v-23 vidx-9 ridx-9 order-9
+1640000
+1650000
+demote_cnt: 385
+version info: v-24 vidx-10 ridx-10 order-10
+1660000
+1670000
+demote_cnt: 386
+version info: v-25 vidx-11 ridx-11 order-11
+1680000
+demote_cnt: 387
+version info: v-26 vidx-12 ridx-12 order-12
+1690000
+1700000
+demote_cnt: 388
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:11
+merge 11,10 to 11
+target:76308 now_remain:207347
+demote_cnt: 389
+version info: v-10 vidx-10 ridx-10 order-13
+level idx:1 run 14/14 content_num: 3153409 (75.18 %)
+1710000
+demote_cnt: 390
+version info: v-14 vidx-0 ridx-0 order-0
+1720000
+demote_cnt: 391
+version info: v-15 vidx-1 ridx-1 order-1
+1730000
+demote_cnt: 392
+version info: v-16 vidx-2 ridx-2 order-2
+1740000
+demote_cnt: 393
+version info: v-17 vidx-3 ridx-3 order-3
+1750000
+1760000
+demote_cnt: 394
+version info: v-18 vidx-4 ridx-4 order-4
+1770000
+demote_cnt: 395
+version info: v-19 vidx-5 ridx-5 order-5
+1780000
+1790000
+demote_cnt: 396
+version info: v-20 vidx-6 ridx-6 order-6
+1800000
+demote_cnt: 397
+version info: v-21 vidx-7 ridx-7 order-7
+1810000
+1820000
+demote_cnt: 398
+version info: v-22 vidx-8 ridx-8 order-8
+1830000
+demote_cnt: 399
+version info: v-23 vidx-9 ridx-9 order-9
+1840000
+demote_cnt: 400
+version info: v-24 vidx-10 ridx-10 order-10
+1850000
+demote_cnt: 401
+version info: v-25 vidx-11 ridx-11 order-11
+demote_cnt: 402
+version info: v-26 vidx-12 ridx-12 order-12
+1860000
+1870000
+demote_cnt: 403
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:12
+merge 9,8 to 9
+target:76308 now_remain:175915
+demote_cnt: 404
+version info: v-8 vidx-8 ridx-8 order-13
+level idx:1 run 14/14 content_num: 3248103 (77.44 %)
+1880000
+demote_cnt: 405
+version info: v-14 vidx-0 ridx-0 order-0
+1890000
+1900000
+demote_cnt: 406
+version info: v-15 vidx-1 ridx-1 order-1
+1910000
+demote_cnt: 407
+version info: v-16 vidx-2 ridx-2 order-2
+1920000
+1930000
+demote_cnt: 408
+version info: v-17 vidx-3 ridx-3 order-3
+1940000
+demote_cnt: 409
+version info: v-18 vidx-4 ridx-4 order-4
+1950000
+1960000
+demote_cnt: 410
+version info: v-19 vidx-5 ridx-5 order-5
+1970000
+demote_cnt: 411
+version info: v-20 vidx-6 ridx-6 order-6
+1980000
+demote_cnt: 412
+version info: v-21 vidx-7 ridx-7 order-7
+demote_cnt: 413
+version info: v-22 vidx-8 ridx-8 order-8
+1990000
+demote_cnt: 414
+version info: v-23 vidx-9 ridx-9 order-9
+2000000
+demote_cnt: 415
+version info: v-24 vidx-10 ridx-10 order-10
+2010000
+2020000
+demote_cnt: 416
+version info: v-25 vidx-11 ridx-11 order-11
+2030000
+demote_cnt: 417
+version info: v-26 vidx-12 ridx-12 order-12
+2040000
+2050000
+demote_cnt: 418
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:13
+merge 7,6 to 7
+target:76308 now_remain:155919
+demote_cnt: 419
+version info: v-6 vidx-6 ridx-6 order-13
+level idx:1 run 14/14 content_num: 3326516 (79.31 %)
+2060000
+demote_cnt: 420
+version info: v-14 vidx-0 ridx-0 order-0
+2070000
+2080000
+demote_cnt: 421
+version info: v-15 vidx-1 ridx-1 order-1
+2090000
+2100000
+demote_cnt: 422
+version info: v-16 vidx-2 ridx-2 order-2
+2110000
+demote_cnt: 423
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 424
+version info: v-18 vidx-4 ridx-4 order-4
+2120000
+demote_cnt: 425
+version info: v-19 vidx-5 ridx-5 order-5
+2130000
+demote_cnt: 426
+version info: v-20 vidx-6 ridx-6 order-6
+2140000
+2150000
+demote_cnt: 427
+version info: v-21 vidx-7 ridx-7 order-7
+2160000
+demote_cnt: 428
+version info: v-22 vidx-8 ridx-8 order-8
+2170000
+2180000
+demote_cnt: 429
+version info: v-23 vidx-9 ridx-9 order-9
+2190000
+demote_cnt: 430
+version info: v-24 vidx-10 ridx-10 order-10
+2200000
+2210000
+demote_cnt: 431
+version info: v-25 vidx-11 ridx-11 order-11
+2220000
+demote_cnt: 432
+version info: v-26 vidx-12 ridx-12 order-12
+2230000
+demote_cnt: 433
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:14
+merge 1,0 to 1
+target:76308 now_remain:141608
+demote_cnt: 434
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 3391364 (80.86 %)
+2240000
+demote_cnt: 435
+version info: v-14 vidx-0 ridx-0 order-0
+2250000
+demote_cnt: 436
+version info: v-15 vidx-1 ridx-1 order-1
+2260000
+demote_cnt: 437
+version info: v-16 vidx-2 ridx-2 order-2
+2270000
+2280000
+demote_cnt: 438
+version info: v-17 vidx-3 ridx-3 order-3
+2290000
+demote_cnt: 439
+version info: v-18 vidx-4 ridx-4 order-4
+2300000
+2310000
+demote_cnt: 440
+version info: v-19 vidx-5 ridx-5 order-5
+2320000
+demote_cnt: 441
+version info: v-20 vidx-6 ridx-6 order-6
+2330000
+2340000
+demote_cnt: 442
+version info: v-21 vidx-7 ridx-7 order-7
+2350000
+demote_cnt: 443
+version info: v-22 vidx-8 ridx-8 order-8
+demote_cnt: 444
+version info: v-23 vidx-9 ridx-9 order-9
+2360000
+2370000
+demote_cnt: 445
+version info: v-24 vidx-10 ridx-10 order-10
+2380000
+2390000
+demote_cnt: 446
+version info: v-25 vidx-11 ridx-11 order-11
+2400000
+demote_cnt: 447
+version info: v-26 vidx-12 ridx-12 order-12
+2410000
+2420000
+demote_cnt: 448
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:15
+merge 12,5 to 12
+target:76308 now_remain:104742
+demote_cnt: 449
+version info: v-5 vidx-5 ridx-5 order-13
+level idx:1 run 14/14 content_num: 3436761 (81.94 %)
+2430000
+demote_cnt: 450
+version info: v-14 vidx-0 ridx-0 order-0
+2440000
+demote_cnt: 451
+version info: v-15 vidx-1 ridx-1 order-1
+2450000
+demote_cnt: 452
+version info: v-16 vidx-2 ridx-2 order-2
+2460000
+demote_cnt: 453
+version info: v-17 vidx-3 ridx-3 order-3
+2470000
+demote_cnt: 454
+version info: v-18 vidx-4 ridx-4 order-4
+2480000
+2490000
+demote_cnt: 455
+version info: v-19 vidx-5 ridx-5 order-5
+2500000
+demote_cnt: 456
+version info: v-20 vidx-6 ridx-6 order-6
+2510000
+2520000
+2530000
+demote_cnt: 457
+version info: v-21 vidx-7 ridx-7 order-7
+2540000
+demote_cnt: 458
+version info: v-22 vidx-8 ridx-8 order-8
+2550000
+2560000
+demote_cnt: 459
+version info: v-23 vidx-9 ridx-9 order-9
+2570000
+demote_cnt: 460
+version info: v-24 vidx-10 ridx-10 order-10
+2580000
+demote_cnt: 461
+version info: v-25 vidx-11 ridx-11 order-11
+2590000
+demote_cnt: 462
+version info: v-26 vidx-12 ridx-12 order-12
+2600000
+2610000
+demote_cnt: 463
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:16
+merge 2,0 to 2
+demote_cnt: 464
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 3511079 (83.71 %)
+2620000
+demote_cnt: 465
+version info: v-14 vidx-0 ridx-0 order-0
+2630000
+2640000
+demote_cnt: 466
+version info: v-15 vidx-1 ridx-1 order-1
+2650000
+demote_cnt: 467
+version info: v-16 vidx-2 ridx-2 order-2
+2660000
+demote_cnt: 468
+version info: v-17 vidx-3 ridx-3 order-3
+2670000
+2680000
+demote_cnt: 469
+version info: v-18 vidx-4 ridx-4 order-4
+2690000
+demote_cnt: 470
+version info: v-19 vidx-5 ridx-5 order-5
+2700000
+demote_cnt: 471
+version info: v-20 vidx-6 ridx-6 order-6
+2710000
+2720000
+demote_cnt: 472
+version info: v-21 vidx-7 ridx-7 order-7
+2730000
+demote_cnt: 473
+version info: v-22 vidx-8 ridx-8 order-8
+2740000
+2750000
+demote_cnt: 474
+version info: v-23 vidx-9 ridx-9 order-9
+2760000
+demote_cnt: 475
+version info: v-24 vidx-10 ridx-10 order-10
+2770000
+2780000
+demote_cnt: 476
+version info: v-25 vidx-11 ridx-11 order-11
+2790000
+demote_cnt: 477
+version info: v-26 vidx-12 ridx-12 order-12
+gc_data:375 (seg_idx:13)
+gc_data:376 (seg_idx:28)
+2800000
+demote_cnt: 478
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:17
+merge 13,10 to 13
+target:76308 now_remain:91024
+demote_cnt: 479
+version info: v-10 vidx-10 ridx-10 order-13
+level idx:1 run 14/14 content_num: 3543914 (84.49 %)
+2810000
+demote_cnt: 480
+version info: v-14 vidx-0 ridx-0 order-0
+2820000
+demote_cnt: 481
+version info: v-15 vidx-1 ridx-1 order-1
+2830000
+demote_cnt: 482
+version info: v-16 vidx-2 ridx-2 order-2
+2840000
+demote_cnt: 483
+version info: v-17 vidx-3 ridx-3 order-3
+2850000
+2860000
+demote_cnt: 484
+version info: v-18 vidx-4 ridx-4 order-4
+demote_cnt: 485
+version info: v-19 vidx-5 ridx-5 order-5
+2870000
+2880000
+demote_cnt: 486
+version info: v-20 vidx-6 ridx-6 order-6
+2890000
+2900000
+demote_cnt: 487
+version info: v-21 vidx-7 ridx-7 order-7
+2910000
+demote_cnt: 488
+version info: v-22 vidx-8 ridx-8 order-8
+2920000
+demote_cnt: 489
+version info: v-23 vidx-9 ridx-9 order-9
+2930000
+2940000
+demote_cnt: 490
+version info: v-24 vidx-10 ridx-10 order-10
+2950000
+2960000
+demote_cnt: 491
+version info: v-25 vidx-11 ridx-11 order-11
+2970000
+demote_cnt: 492
+version info: v-26 vidx-12 ridx-12 order-12
+2980000
+demote_cnt: 493
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:18
+merge 11,8 to 11
+target:76308 now_remain:79733
+demote_cnt: 494
+version info: v-8 vidx-8 ridx-8 order-13
+level idx:1 run 14/14 content_num: 3587320 (85.53 %)
+2990000
+demote_cnt: 495
+version info: v-14 vidx-0 ridx-0 order-0
+3000000
+demote_cnt: 496
+version info: v-15 vidx-1 ridx-1 order-1
+3010000
+3020000
+demote_cnt: 497
+version info: v-16 vidx-2 ridx-2 order-2
+3030000
+demote_cnt: 498
+version info: v-17 vidx-3 ridx-3 order-3
+3040000
+demote_cnt: 499
+version info: v-18 vidx-4 ridx-4 order-4
+3050000
+demote_cnt: 500
+version info: v-19 vidx-5 ridx-5 order-5
+3060000
+3070000
+demote_cnt: 501
+version info: v-20 vidx-6 ridx-6 order-6
+3080000
+demote_cnt: 502
+version info: v-21 vidx-7 ridx-7 order-7
+3090000
+demote_cnt: 503
+version info: v-22 vidx-8 ridx-8 order-8
+3100000
+3110000
+demote_cnt: 504
+version info: v-23 vidx-9 ridx-9 order-9
+3120000
+demote_cnt: 505
+version info: v-24 vidx-10 ridx-10 order-10
+3130000
+3140000
+demote_cnt: 506
+version info: v-25 vidx-11 ridx-11 order-11
+3150000
+demote_cnt: 507
+version info: v-26 vidx-12 ridx-12 order-12
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836199 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+3160000
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+remain total invalidate_num:836200 16384
+demote_cnt: 508
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:411 (seg_idx:46)
+gc_data:412 (seg_idx:65)
+merge cnt:19
+merge 6,5 to 6
+demote_cnt: 509
+version info: v-5 vidx-5 ridx-5 order-13
+level idx:1 run 14/14 content_num: 3643233 (86.86 %)
+3170000
+demote_cnt: 510
+version info: v-14 vidx-0 ridx-0 order-0
+3180000
+demote_cnt: 511
+version info: v-15 vidx-1 ridx-1 order-1
+3190000
+3200000
+demote_cnt: 512
+version info: v-16 vidx-2 ridx-2 order-2
+3210000
+demote_cnt: 513
+version info: v-17 vidx-3 ridx-3 order-3
+3220000
+demote_cnt: 514
+version info: v-18 vidx-4 ridx-4 order-4
+3230000
+demote_cnt: 515
+version info: v-19 vidx-5 ridx-5 order-5
+3240000
+demote_cnt: 516
+version info: v-20 vidx-6 ridx-6 order-6
+3250000
+demote_cnt: 517
+version info: v-21 vidx-7 ridx-7 order-7
+3260000
+3270000
+demote_cnt: 518
+version info: v-22 vidx-8 ridx-8 order-8
+3280000
+demote_cnt: 519
+version info: v-23 vidx-9 ridx-9 order-9
+3290000
+demote_cnt: 520
+version info: v-24 vidx-10 ridx-10 order-10
+3300000
+demote_cnt: 521
+version info: v-25 vidx-11 ridx-11 order-11
+3310000
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+remain total invalidate_num:790632 16384
+demote_cnt: 522
+version info: v-26 vidx-12 ridx-12 order-12
+3320000
+gc_data:427 (seg_idx:37)
+gc_data:428 (seg_idx:48)
+3330000
+3340000
+demote_cnt: 523
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:20
+merge 4,3 to 4
+demote_cnt: 524
+version info: v-3 vidx-3 ridx-3 order-13
+level idx:1 run 14/14 content_num: 3711144 (88.48 %)
+3350000
+demote_cnt: 525
+version info: v-14 vidx-0 ridx-0 order-0
+3360000
+demote_cnt: 526
+version info: v-15 vidx-1 ridx-1 order-1
+3370000
+demote_cnt: 527
+version info: v-16 vidx-2 ridx-2 order-2
+3380000
+3390000
+demote_cnt: 528
+version info: v-17 vidx-3 ridx-3 order-3
+3400000
+demote_cnt: 529
+version info: v-18 vidx-4 ridx-4 order-4
+3410000
+3420000
+demote_cnt: 530
+version info: v-19 vidx-5 ridx-5 order-5
+3430000
+demote_cnt: 531
+version info: v-20 vidx-6 ridx-6 order-6
+3440000
+demote_cnt: 532
+version info: v-21 vidx-7 ridx-7 order-7
+3450000
+demote_cnt: 533
+version info: v-22 vidx-8 ridx-8 order-8
+3460000
+demote_cnt: 534
+version info: v-23 vidx-9 ridx-9 order-9
+3470000
+3480000
+demote_cnt: 535
+version info: v-24 vidx-10 ridx-10 order-10
+3490000
+demote_cnt: 536
+version info: v-25 vidx-11 ridx-11 order-11
+3500000
+3510000
+demote_cnt: 537
+version info: v-26 vidx-12 ridx-12 order-12
+3520000
+demote_cnt: 538
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:446 (seg_idx:5)
+gc_data:447 (seg_idx:64)
+merge cnt:21
+gc_data:448 (seg_idx:71)
+merge 7,0 to 7
+target:76308 now_remain:85321
+demote_cnt: 539
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 3735169 (89.05 %)
+3530000
+demote_cnt: 540
+version info: v-14 vidx-0 ridx-0 order-0
+3540000
+demote_cnt: 541
+version info: v-15 vidx-1 ridx-1 order-1
+3550000
+3560000
+demote_cnt: 542
+version info: v-16 vidx-2 ridx-2 order-2
+3570000
+demote_cnt: 543
+version info: v-17 vidx-3 ridx-3 order-3
+3580000
+demote_cnt: 544
+version info: v-18 vidx-4 ridx-4 order-4
+3590000
+3600000
+demote_cnt: 545
+version info: v-19 vidx-5 ridx-5 order-5
+3610000
+demote_cnt: 546
+version info: v-20 vidx-6 ridx-6 order-6
+3620000
+3630000
+demote_cnt: 547
+version info: v-21 vidx-7 ridx-7 order-7
+3640000
+demote_cnt: 548
+version info: v-22 vidx-8 ridx-8 order-8
+3650000
+demote_cnt: 549
+version info: v-23 vidx-9 ridx-9 order-9
+3660000
+demote_cnt: 550
+version info: v-24 vidx-10 ridx-10 order-10
+3670000
+demote_cnt: 551
+version info: v-25 vidx-11 ridx-11 order-11
+3680000
+demote_cnt: 552
+version info: v-26 vidx-12 ridx-12 order-12
+3690000
+demote_cnt: 553
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:22
+gc_data:466 (seg_idx:23)
+gc_data:467 (seg_idx:66)
+merge 10,8 to 10
+demote_cnt: 554
+version info: v-8 vidx-8 ridx-8 order-13
+level idx:1 run 14/14 content_num: 3796851 (90.52 %)
+3700000
+3710000
+demote_cnt: 555
+version info: v-14 vidx-0 ridx-0 order-0
+3720000
+demote_cnt: 556
+version info: v-15 vidx-1 ridx-1 order-1
+3730000
+3740000
+demote_cnt: 557
+version info: v-16 vidx-2 ridx-2 order-2
+3750000
+demote_cnt: 558
+version info: v-17 vidx-3 ridx-3 order-3
+3760000
+3770000
+demote_cnt: 559
+version info: v-18 vidx-4 ridx-4 order-4
+3780000
+demote_cnt: 560
+version info: v-19 vidx-5 ridx-5 order-5
+3790000
+3800000
+demote_cnt: 561
+version info: v-20 vidx-6 ridx-6 order-6
+demote_cnt: 562
+version info: v-21 vidx-7 ridx-7 order-7
+3810000
+demote_cnt: 563
+version info: v-22 vidx-8 ridx-8 order-8
+3820000
+3830000
+demote_cnt: 564
+version info: v-23 vidx-9 ridx-9 order-9
+3840000
+demote_cnt: 565
+version info: v-24 vidx-10 ridx-10 order-10
+3850000
+3860000
+demote_cnt: 566
+version info: v-25 vidx-11 ridx-11 order-11
+3870000
+demote_cnt: 567
+version info: v-26 vidx-12 ridx-12 order-12
+gc_data:481 (seg_idx:67)
+gc_data:482 (seg_idx:43)
+3880000
+3890000
+demote_cnt: 568
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:23
+merge 9,5 to 9
+demote_cnt: 569
+version info: v-5 vidx-5 ridx-5 order-13
+level idx:1 run 14/14 content_num: 3831870 (91.36 %)
+3900000
+3910000
+demote_cnt: 570
+version info: v-14 vidx-0 ridx-0 order-0
+3920000
+demote_cnt: 571
+version info: v-15 vidx-1 ridx-1 order-1
+demote_cnt: 572
+version info: v-16 vidx-2 ridx-2 order-2
+3930000
+demote_cnt: 573
+version info: v-17 vidx-3 ridx-3 order-3
+3940000
+demote_cnt: 574
+version info: v-18 vidx-4 ridx-4 order-4
+3950000
+3960000
+demote_cnt: 575
+version info: v-19 vidx-5 ridx-5 order-5
+3970000
+demote_cnt: 576
+version info: v-20 vidx-6 ridx-6 order-6
+3980000
+demote_cnt: 577
+version info: v-21 vidx-7 ridx-7 order-7
+3990000
+4000000
+demote_cnt: 578
+version info: v-22 vidx-8 ridx-8 order-8
+4010000
+demote_cnt: 579
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:496 (seg_idx:39)
+gc_data:497 (seg_idx:7)
+4020000
+4030000
+demote_cnt: 580
+version info: v-24 vidx-10 ridx-10 order-10
+4040000
+demote_cnt: 581
+version info: v-25 vidx-11 ridx-11 order-11
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+4050000
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613809 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+remain total invalidate_num:613810 16384
+demote_cnt: 582
+version info: v-26 vidx-12 ridx-12 order-12
+gc_data:498 (seg_idx:52)
+gc_data:499 (seg_idx:16)
+4060000
+demote_cnt: 583
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:24
+gc_data:502 (seg_idx:28)
+gc_data:503 (seg_idx:40)
+merge 13,1 to 13
+demote_cnt: 584
+version info: v-1 vidx-1 ridx-1 order-13
+level idx:1 run 14/14 content_num: 3880672 (92.52 %)
+4070000
+4080000
+demote_cnt: 585
+version info: v-14 vidx-0 ridx-0 order-0
+4090000
+4100000
+demote_cnt: 586
+version info: v-15 vidx-1 ridx-1 order-1
+4110000
+demote_cnt: 587
+version info: v-16 vidx-2 ridx-2 order-2
+4120000
+demote_cnt: 588
+version info: v-17 vidx-3 ridx-3 order-3
+4130000
+4140000
+demote_cnt: 589
+version info: v-18 vidx-4 ridx-4 order-4
+4150000
+demote_cnt: 590
+version info: v-19 vidx-5 ridx-5 order-5
+4160000
+demote_cnt: 591
+version info: v-20 vidx-6 ridx-6 order-6
+4170000
+demote_cnt: 592
+version info: v-21 vidx-7 ridx-7 order-7
+4180000
+demote_cnt: 593
+version info: v-22 vidx-8 ridx-8 order-8
+4190000
+4200000
+demote_cnt: 594
+version info: v-23 vidx-9 ridx-9 order-9
+4210000
+demote_cnt: 595
+version info: v-24 vidx-10 ridx-10 order-10
+gc_data:518 (seg_idx:31)
+gc_data:519 (seg_idx:30)
+4220000
+4230000
+demote_cnt: 596
+version info: v-25 vidx-11 ridx-11 order-11
+4240000
+demote_cnt: 597
+version info: v-26 vidx-12 ridx-12 order-12
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+4250000
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557089 16384
+remain total invalidate_num:557090 16384
+remain total invalidate_num:557090 16384
+demote_cnt: 598
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:520 (seg_idx:47)
+gc_data:521 (seg_idx:62)
+merge cnt:25
+gc_data:522 (seg_idx:56)
+gc_data:523 (seg_idx:9)
+gc_data:524 (seg_idx:63)
+gc_data:525 (seg_idx:4)
+merge 11,0 to 11
+demote_cnt: 599
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 3920578 (93.47 %)
+4260000
+demote_cnt: 600
+version info: v-14 vidx-0 ridx-0 order-0
+4270000
+4280000
+demote_cnt: 601
+version info: v-15 vidx-1 ridx-1 order-1
+4290000
+demote_cnt: 602
+version info: v-16 vidx-2 ridx-2 order-2
+4300000
+demote_cnt: 603
+version info: v-17 vidx-3 ridx-3 order-3
+demote_cnt: 604
+version info: v-18 vidx-4 ridx-4 order-4
+4310000
+4320000
+demote_cnt: 605
+version info: v-19 vidx-5 ridx-5 order-5
+4330000
+demote_cnt: 606
+version info: v-20 vidx-6 ridx-6 order-6
+4340000
+4350000
+remain total invalidate_num:617872 16384
+remain total invalidate_num:617872 16384
+remain total invalidate_num:617872 16384
+remain total invalidate_num:617872 16384
+remain total invalidate_num:617872 16384
+remain total invalidate_num:617872 16384
+remain total invalidate_num:617872 16384
+remain total invalidate_num:617872 16384
+demote_cnt: 607
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:536 (seg_idx:59)
+gc_data:537 (seg_idx:54)
+4360000
+demote_cnt: 608
+version info: v-22 vidx-8 ridx-8 order-8
+4370000
+4380000
+demote_cnt: 609
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:538 (seg_idx:0)
+gc_data:539 (seg_idx:7)
+4390000
+4400000
+demote_cnt: 610
+version info: v-24 vidx-10 ridx-10 order-10
+4410000
+demote_cnt: 611
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:540 (seg_idx:30)
+gc_data:541 (seg_idx:31)
+4420000
+demote_cnt: 612
+version info: v-26 vidx-12 ridx-12 order-12
+4430000
+demote_cnt: 613
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:542 (seg_idx:39)
+gc_data:543 (seg_idx:46)
+merge cnt:26
+gc_data:544 (seg_idx:73)
+merge 3,1 to 3
+demote_cnt: 614
+version info: v-1 vidx-1 ridx-1 order-13
+level idx:1 run 14/14 content_num: 3981679 (94.93 %)
+4440000
+demote_cnt: 615
+version info: v-14 vidx-0 ridx-0 order-0
+4450000
+demote_cnt: 616
+version info: v-15 vidx-1 ridx-1 order-1
+4460000
+demote_cnt: 617
+version info: v-16 vidx-2 ridx-2 order-2
+4470000
+4480000
+demote_cnt: 618
+version info: v-17 vidx-3 ridx-3 order-3
+4490000
+demote_cnt: 619
+version info: v-18 vidx-4 ridx-4 order-4
+4500000
+4510000
+demote_cnt: 620
+version info: v-19 vidx-5 ridx-5 order-5
+4520000
+demote_cnt: 621
+version info: v-20 vidx-6 ridx-6 order-6
+4530000
+demote_cnt: 622
+version info: v-21 vidx-7 ridx-7 order-7
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+4540000
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+remain total invalidate_num:553063 16384
+demote_cnt: 623
+version info: v-22 vidx-8 ridx-8 order-8
+gc_data:556 (seg_idx:9)
+gc_data:557 (seg_idx:54)
+4550000
+4560000
+demote_cnt: 624
+version info: v-23 vidx-9 ridx-9 order-9
+demote_cnt: 625
+version info: v-24 vidx-10 ridx-10 order-10
+gc_data:558 (seg_idx:59)
+gc_data:559 (seg_idx:6)
+4570000
+demote_cnt: 626
+version info: v-25 vidx-11 ridx-11 order-11
+4580000
+4590000
+demote_cnt: 627
+version info: v-26 vidx-12 ridx-12 order-12
+4600000
+remain total invalidate_num:468163 16384
+remain total invalidate_num:468163 16384
+remain total invalidate_num:468163 16384
+remain total invalidate_num:468163 16384
+remain total invalidate_num:468163 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+remain total invalidate_num:468164 16384
+demote_cnt: 628
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:560 (seg_idx:54)
+gc_data:561 (seg_idx:14)
+merge cnt:27
+gc_data:562 (seg_idx:19)
+gc_data:563 (seg_idx:49)
+merge 8,5 to 8
+demote_cnt: 629
+version info: v-5 vidx-5 ridx-5 order-13
+level idx:1 run 14/14 content_num: 4019047 (95.82 %)
+4610000
+4620000
+demote_cnt: 630
+version info: v-14 vidx-0 ridx-0 order-0
+4630000
+demote_cnt: 631
+version info: v-15 vidx-1 ridx-1 order-1
+4640000
+demote_cnt: 632
+version info: v-16 vidx-2 ridx-2 order-2
+4650000
+demote_cnt: 633
+version info: v-17 vidx-3 ridx-3 order-3
+4660000
+4670000
+demote_cnt: 634
+version info: v-18 vidx-4 ridx-4 order-4
+gc_data:571 (seg_idx:39)
+gc_data:572 (seg_idx:67)
+4680000
+demote_cnt: 635
+version info: v-19 vidx-5 ridx-5 order-5
+4690000
+demote_cnt: 636
+version info: v-20 vidx-6 ridx-6 order-6
+4700000
+demote_cnt: 637
+version info: v-21 vidx-7 ridx-7 order-7
+remain total invalidate_num:532063 16384
+4710000
+remain total invalidate_num:532063 16384
+remain total invalidate_num:532063 16384
+remain total invalidate_num:532063 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+4720000
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532064 16384
+remain total invalidate_num:532065 16384
+remain total invalidate_num:532065 16384
+remain total invalidate_num:532065 16384
+demote_cnt: 638
+version info: v-22 vidx-8 ridx-8 order-8
+gc_data:573 (seg_idx:58)
+gc_data:574 (seg_idx:42)
+4730000
+demote_cnt: 639
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:575 (seg_idx:7)
+gc_data:576 (seg_idx:6)
+4740000
+4750000
+demote_cnt: 640
+version info: v-24 vidx-10 ridx-10 order-10
+4760000
+demote_cnt: 641
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:577 (seg_idx:67)
+gc_data:578 (seg_idx:15)
+4770000
+demote_cnt: 642
+version info: v-26 vidx-12 ridx-12 order-12
+4780000
+demote_cnt: 643
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:579 (seg_idx:42)
+gc_data:580 (seg_idx:45)
+merge cnt:28
+gc_data:583 (seg_idx:64)
+merge 7,4 to 7
+demote_cnt: 644
+version info: v-4 vidx-4 ridx-4 order-13
+level idx:1 run 14/14 content_num: 4055841 (96.70 %)
+4790000
+demote_cnt: 645
+version info: v-14 vidx-0 ridx-0 order-0
+4800000
+4810000
+demote_cnt: 646
+version info: v-15 vidx-1 ridx-1 order-1
+4820000
+4830000
+demote_cnt: 647
+version info: v-16 vidx-2 ridx-2 order-2
+4840000
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+remain total invalidate_num:576108 16384
+demote_cnt: 648
+version info: v-17 vidx-3 ridx-3 order-3
+gc_data:594 (seg_idx:14)
+gc_data:595 (seg_idx:39)
+4850000
+demote_cnt: 649
+version info: v-18 vidx-4 ridx-4 order-4
+4860000
+remain total invalidate_num:527757 16384
+remain total invalidate_num:527758 16384
+remain total invalidate_num:527758 16384
+remain total invalidate_num:527758 16384
+remain total invalidate_num:527758 16384
+remain total invalidate_num:527758 16384
+remain total invalidate_num:527758 16384
+remain total invalidate_num:527758 16384
+demote_cnt: 650
+version info: v-19 vidx-5 ridx-5 order-5
+gc_data:596 (seg_idx:59)
+gc_data:597 (seg_idx:67)
+4870000
+demote_cnt: 651
+version info: v-20 vidx-6 ridx-6 order-6
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+4880000
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+remain total invalidate_num:496853 16384
+demote_cnt: 652
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:598 (seg_idx:7)
+gc_data:599 (seg_idx:9)
+4890000
+demote_cnt: 653
+version info: v-22 vidx-8 ridx-8 order-8
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+remain total invalidate_num:469818 16384
+4900000
+remain total invalidate_num:469818 16384
+demote_cnt: 654
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:600 (seg_idx:67)
+gc_data:601 (seg_idx:58)
+4910000
+4920000
+demote_cnt: 655
+version info: v-24 vidx-10 ridx-10 order-10
+gc_data:602 (seg_idx:6)
+gc_data:603 (seg_idx:22)
+4930000
+demote_cnt: 656
+version info: v-25 vidx-11 ridx-11 order-11
+4940000
+demote_cnt: 657
+version info: v-26 vidx-12 ridx-12 order-12
+4950000
+gc_data:604 (seg_idx:9)
+gc_data:605 (seg_idx:11)
+4960000
+demote_cnt: 658
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:29
+gc_data:606 (seg_idx:16)
+gc_data:609 (seg_idx:28)
+merge 13,0 to 13
+demote_cnt: 659
+version info: v-0 vidx-0 ridx-0 order-13
+level idx:1 run 14/14 content_num: 4091274 (97.54 %)
+4970000
+4980000
+demote_cnt: 660
+version info: v-14 vidx-0 ridx-0 order-0
+4990000
+demote_cnt: 661
+version info: v-15 vidx-1 ridx-1 order-1
+5000000
+demote_cnt: 662
+version info: v-16 vidx-2 ridx-2 order-2
+demote_cnt: 663
+version info: v-17 vidx-3 ridx-3 order-3
+5010000
+5020000
+demote_cnt: 664
+version info: v-18 vidx-4 ridx-4 order-4
+5030000
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+remain total invalidate_num:500388 16384
+demote_cnt: 665
+version info: v-19 vidx-5 ridx-5 order-5
+gc_data:620 (seg_idx:22)
+gc_data:621 (seg_idx:30)
+5040000
+5050000
+demote_cnt: 666
+version info: v-20 vidx-6 ridx-6 order-6
+5060000
+remain total invalidate_num:458433 16384
+remain total invalidate_num:458433 16384
+remain total invalidate_num:458433 16384
+remain total invalidate_num:458433 16384
+remain total invalidate_num:458433 16384
+remain total invalidate_num:458433 16384
+remain total invalidate_num:458433 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+5070000
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+remain total invalidate_num:458434 16384
+demote_cnt: 667
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:622 (seg_idx:39)
+gc_data:623 (seg_idx:7)
+5080000
+demote_cnt: 668
+version info: v-22 vidx-8 ridx-8 order-8
+gc_data:624 (seg_idx:59)
+gc_data:625 (seg_idx:58)
+5090000
+demote_cnt: 669
+version info: v-23 vidx-9 ridx-9 order-9
+5100000
+demote_cnt: 670
+version info: v-24 vidx-10 ridx-10 order-10
+demote_cnt: 671
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:626 (seg_idx:30)
+gc_data:627 (seg_idx:7)
+5110000
+demote_cnt: 672
+version info: v-26 vidx-12 ridx-12 order-12
+5120000
+5130000
+demote_cnt: 673
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:628 (seg_idx:67)
+gc_data:629 (seg_idx:48)
+merge cnt:30
+gc_data:632 (seg_idx:17)
+gc_data:633 (seg_idx:33)
+merge 1,0 to 1
+demote_cnt: 674
+version info: v-0 vidx-0 ridx-0 order-13
+gc_data:635 (seg_idx:58)
+level idx:1 run 14/14 content_num: 4167372 (99.36 %)
+5140000
+demote_cnt: 675
+version info: v-14 vidx-0 ridx-0 order-0
+5150000
+demote_cnt: 676
+version info: v-15 vidx-1 ridx-1 order-1
+5160000
+demote_cnt: 677
+version info: v-16 vidx-2 ridx-2 order-2
+5170000
+5180000
+demote_cnt: 678
+version info: v-17 vidx-3 ridx-3 order-3
+gc_data:639 (seg_idx:50)
+gc_data:640 (seg_idx:40)
+5190000
+demote_cnt: 679
+version info: v-18 vidx-4 ridx-4 order-4
+5200000
+remain total invalidate_num:423608 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+5210000
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+remain total invalidate_num:423609 16384
+demote_cnt: 680
+version info: v-19 vidx-5 ridx-5 order-5
+gc_data:641 (seg_idx:59)
+gc_data:642 (seg_idx:22)
+5220000
+5230000
+demote_cnt: 681
+version info: v-20 vidx-6 ridx-6 order-6
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+5240000
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+remain total invalidate_num:396002 16384
+demote_cnt: 682
+version info: v-21 vidx-7 ridx-7 order-7
+gc_data:643 (seg_idx:10)
+gc_data:644 (seg_idx:39)
+5250000
+5260000
+demote_cnt: 683
+version info: v-22 vidx-8 ridx-8 order-8
+remain total invalidate_num:385217 16384
+remain total invalidate_num:385217 16384
+remain total invalidate_num:385218 16384
+remain total invalidate_num:385219 16384
+remain total invalidate_num:385220 16384
+remain total invalidate_num:385221 16384
+remain total invalidate_num:385222 16384
+remain total invalidate_num:385223 16384
+remain total invalidate_num:385224 16384
+remain total invalidate_num:385225 16384
+remain total invalidate_num:385226 16384
+remain total invalidate_num:385227 16384
+remain total invalidate_num:385228 16384
+remain total invalidate_num:385229 16384
+remain total invalidate_num:385230 16384
+5270000
+remain total invalidate_num:385231 16384
+remain total invalidate_num:385232 16384
+remain total invalidate_num:385233 16384
+remain total invalidate_num:385234 16384
+remain total invalidate_num:385235 16384
+remain total invalidate_num:385236 16384
+remain total invalidate_num:385237 16384
+remain total invalidate_num:385238 16384
+remain total invalidate_num:385239 16384
+remain total invalidate_num:385240 16384
+remain total invalidate_num:385241 16384
+remain total invalidate_num:385242 16384
+remain total invalidate_num:385243 16384
+remain total invalidate_num:385244 16384
+remain total invalidate_num:385245 16384
+remain total invalidate_num:385246 16384
+remain total invalidate_num:385247 16384
+remain total invalidate_num:385248 16384
+remain total invalidate_num:385249 16384
+remain total invalidate_num:385250 16384
+5280000
+remain total invalidate_num:385251 16384
+remain total invalidate_num:385252 16384
+remain total invalidate_num:385253 16384
+remain total invalidate_num:385254 16384
+remain total invalidate_num:385255 16384
+remain total invalidate_num:385256 16384
+remain total invalidate_num:385257 16384
+demote_cnt: 684
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:645 (seg_idx:40)
+gc_data:646 (seg_idx:53)
+5290000
+demote_cnt: 685
+version info: v-24 vidx-10 ridx-10 order-10
+gc_data:647 (seg_idx:22)
+gc_data:648 (seg_idx:47)
+5300000
+5310000
+demote_cnt: 686
+version info: v-25 vidx-11 ridx-11 order-11
+5320000
+demote_cnt: 687
+version info: v-26 vidx-12 ridx-12 order-12
+gc_data:649 (seg_idx:39)
+gc_data:650 (seg_idx:58)
+5330000
+5340000
+demote_cnt: 688
+version info: v-27 vidx-13 ridx-13 order-13
+merge cnt:31
+gc_data:651 (seg_idx:25)
+gc_data:652 (seg_idx:53)
+gc_data:653 (seg_idx:43)
+merge 9,5 to 9
+demote_cnt: 689
+version info: v-5 vidx-5 ridx-5 order-13
+gc_data:659 (seg_idx:47)
+gc_data:660 (seg_idx:74)
+level idx:1 run 14/14 content_num: 4231626 (100.89 %)
+5350000
+demote_cnt: 690
+version info: v-14 vidx-0 ridx-0 order-0
+5360000
+5370000
+demote_cnt: 691
+version info: v-15 vidx-1 ridx-1 order-1
+remain total invalidate_num:428053 16384
+remain total invalidate_num:428054 16384
+remain total invalidate_num:428055 16384
+remain total invalidate_num:428056 16384
+remain total invalidate_num:428057 16384
+remain total invalidate_num:428058 16384
+remain total invalidate_num:428059 16384
+remain total invalidate_num:428060 16384
+remain total invalidate_num:428061 16384
+remain total invalidate_num:428062 16384
+remain total invalidate_num:428063 16384
+remain total invalidate_num:428064 16384
+remain total invalidate_num:428065 16384
+remain total invalidate_num:428066 16384
+remain total invalidate_num:428067 16384
+remain total invalidate_num:428068 16384
+remain total invalidate_num:428069 16384
+5380000
+remain total invalidate_num:428070 16384
+remain total invalidate_num:428071 16384
+remain total invalidate_num:428072 16384
+remain total invalidate_num:428073 16384
+remain total invalidate_num:428074 16384
+remain total invalidate_num:428075 16384
+remain total invalidate_num:428076 16384
+remain total invalidate_num:428077 16384
+remain total invalidate_num:428078 16384
+remain total invalidate_num:428079 16384
+remain total invalidate_num:428080 16384
+remain total invalidate_num:428081 16384
+remain total invalidate_num:428082 16384
+demote_cnt: 692
+version info: v-16 vidx-2 ridx-2 order-2
+gc_data:661 (seg_idx:30)
+gc_data:662 (seg_idx:50)
+5390000
+5400000
+demote_cnt: 693
+version info: v-17 vidx-3 ridx-3 order-3
+remain total invalidate_num:386944 16384
+remain total invalidate_num:386945 16384
+remain total invalidate_num:386946 16384
+remain total invalidate_num:386947 16384
+remain total invalidate_num:386948 16384
+remain total invalidate_num:386949 16384
+remain total invalidate_num:386950 16384
+remain total invalidate_num:386951 16384
+remain total invalidate_num:386952 16384
+remain total invalidate_num:386953 16384
+remain total invalidate_num:386954 16384
+remain total invalidate_num:386955 16384
+remain total invalidate_num:386956 16384
+remain total invalidate_num:386957 16384
+remain total invalidate_num:386958 16384
+remain total invalidate_num:386959 16384
+remain total invalidate_num:386960 16384
+remain total invalidate_num:386961 16384
+remain total invalidate_num:386962 16384
+remain total invalidate_num:386963 16384
+remain total invalidate_num:386964 16384
+remain total invalidate_num:386965 16384
+remain total invalidate_num:386966 16384
+remain total invalidate_num:386967 16384
+remain total invalidate_num:386968 16384
+remain total invalidate_num:386969 16384
+5410000
+remain total invalidate_num:386970 16384
+remain total invalidate_num:386971 16384
+remain total invalidate_num:386972 16384
+remain total invalidate_num:386973 16384
+remain total invalidate_num:386974 16384
+remain total invalidate_num:386975 16384
+remain total invalidate_num:386976 16384
+remain total invalidate_num:386977 16384
+remain total invalidate_num:386978 16384
+demote_cnt: 694
+version info: v-18 vidx-4 ridx-4 order-4
+gc_data:663 (seg_idx:40)
+gc_data:664 (seg_idx:39)
+gc_data:665 (seg_idx:47)
+5420000
+demote_cnt: 695
+version info: v-19 vidx-5 ridx-5 order-5
+5430000
+5440000
+remain total invalidate_num:343343 16384
+remain total invalidate_num:343344 16384
+remain total invalidate_num:343345 16384
+demote_cnt: 696
+version info: v-20 vidx-6 ridx-6 order-6
+gc_data:666 (seg_idx:74)
+gc_data:667 (seg_idx:10)
+5450000
+demote_cnt: 697
+version info: v-21 vidx-7 ridx-7 order-7
+remain total invalidate_num:323092 16384
+remain total invalidate_num:323093 16384
+remain total invalidate_num:323094 16384
+remain total invalidate_num:323095 16384
+remain total invalidate_num:323096 16384
+remain total invalidate_num:323097 16384
+remain total invalidate_num:323098 16384
+remain total invalidate_num:323099 16384
+remain total invalidate_num:323100 16384
+remain total invalidate_num:323101 16384
+remain total invalidate_num:323102 16384
+remain total invalidate_num:323103 16384
+remain total invalidate_num:323104 16384
+remain total invalidate_num:323105 16384
+remain total invalidate_num:323106 16384
+remain total invalidate_num:323107 16384
+remain total invalidate_num:323108 16384
+5460000
+remain total invalidate_num:323109 16384
+remain total invalidate_num:323110 16384
+remain total invalidate_num:323111 16384
+remain total invalidate_num:323112 16384
+remain total invalidate_num:323113 16384
+remain total invalidate_num:323114 16384
+remain total invalidate_num:323115 16384
+remain total invalidate_num:323116 16384
+remain total invalidate_num:323117 16384
+remain total invalidate_num:323118 16384
+remain total invalidate_num:323119 16384
+remain total invalidate_num:323120 16384
+demote_cnt: 698
+version info: v-22 vidx-8 ridx-8 order-8
+gc_data:668 (seg_idx:50)
+gc_data:669 (seg_idx:59)
+5470000
+demote_cnt: 699
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:670 (seg_idx:47)
+gc_data:671 (seg_idx:15)
+gc_data:672 (seg_idx:75)
+5480000
+demote_cnt: 700
+version info: v-24 vidx-10 ridx-10 order-10
+5490000
+demote_cnt: 701
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:673 (seg_idx:10)
+gc_data:674 (seg_idx:40)
+5500000
+demote_cnt: 702
+version info: v-26 vidx-12 ridx-12 order-12
+5510000
+demote_cnt: 703
+version info: v-27 vidx-13 ridx-13 order-13
+gc_data:675 (seg_idx:59)
+gc_data:676 (seg_idx:22)
+merge cnt:32
+gc_data:678 (seg_idx:56)
+gc_data:679 (seg_idx:69)
+gc_data:681 (seg_idx:63)
+merge 11,4 to 11
+demote_cnt: 704
+version info: v-4 vidx-4 ridx-4 order-13
+level idx:1 run 14/14 content_num: 4279982 (102.04 %)
+5520000
+demote_cnt: 705
+version info: v-14 vidx-0 ridx-0 order-0
+remain total invalidate_num:406149 16384
+remain total invalidate_num:406150 16384
+remain total invalidate_num:406151 16384
+remain total invalidate_num:406152 16384
+remain total invalidate_num:406153 16384
+remain total invalidate_num:406154 16384
+remain total invalidate_num:406155 16384
+remain total invalidate_num:406156 16384
+remain total invalidate_num:406157 16384
+remain total invalidate_num:406158 16384
+remain total invalidate_num:406159 16384
+remain total invalidate_num:406160 16384
+remain total invalidate_num:406161 16384
+remain total invalidate_num:406162 16384
+remain total invalidate_num:406163 16384
+remain total invalidate_num:406164 16384
+remain total invalidate_num:406165 16384
+remain total invalidate_num:406166 16384
+remain total invalidate_num:406167 16384
+remain total invalidate_num:406168 16384
+remain total invalidate_num:406169 16384
+5530000
+remain total invalidate_num:406170 16384
+remain total invalidate_num:406171 16384
+remain total invalidate_num:406172 16384
+remain total invalidate_num:406173 16384
+remain total invalidate_num:406174 16384
+remain total invalidate_num:406175 16384
+remain total invalidate_num:406176 16384
+remain total invalidate_num:406177 16384
+remain total invalidate_num:406178 16384
+remain total invalidate_num:406179 16384
+remain total invalidate_num:406180 16384
+remain total invalidate_num:406181 16384
+remain total invalidate_num:406182 16384
+remain total invalidate_num:406183 16384
+remain total invalidate_num:406184 16384
+remain total invalidate_num:406185 16384
+remain total invalidate_num:406186 16384
+remain total invalidate_num:406187 16384
+demote_cnt: 706
+version info: v-15 vidx-1 ridx-1 order-1
+gc_data:687 (seg_idx:15)
+gc_data:688 (seg_idx:30)
+5540000
+demote_cnt: 707
+version info: v-16 vidx-2 ridx-2 order-2
+5550000
+remain total invalidate_num:355558 16384
+remain total invalidate_num:355559 16384
+remain total invalidate_num:355560 16384
+remain total invalidate_num:355561 16384
+remain total invalidate_num:355562 16384
+remain total invalidate_num:355563 16384
+remain total invalidate_num:355564 16384
+remain total invalidate_num:355565 16384
+remain total invalidate_num:355566 16384
+remain total invalidate_num:355567 16384
+remain total invalidate_num:355568 16384
+remain total invalidate_num:355569 16384
+remain total invalidate_num:355570 16384
+remain total invalidate_num:355571 16384
+remain total invalidate_num:355572 16384
+remain total invalidate_num:355573 16384
+remain total invalidate_num:355574 16384
+remain total invalidate_num:355575 16384
+remain total invalidate_num:355576 16384
+remain total invalidate_num:355577 16384
+remain total invalidate_num:355578 16384
+remain total invalidate_num:355579 16384
+remain total invalidate_num:355580 16384
+remain total invalidate_num:355581 16384
+remain total invalidate_num:355582 16384
+demote_cnt: 708
+version info: v-17 vidx-3 ridx-3 order-3
+gc_data:689 (seg_idx:50)
+gc_data:690 (seg_idx:74)
+5560000
+demote_cnt: 709
+version info: v-18 vidx-4 ridx-4 order-4
+gc_data:691 (seg_idx:75)
+gc_data:692 (seg_idx:39)
+5570000
+demote_cnt: 710
+version info: v-19 vidx-5 ridx-5 order-5
+5580000
+5590000
+demote_cnt: 711
+version info: v-20 vidx-6 ridx-6 order-6
+gc_data:693 (seg_idx:30)
+gc_data:694 (seg_idx:51)
+5600000
+demote_cnt: 712
+version info: v-21 vidx-7 ridx-7 order-7
+remain total invalidate_num:270056 16384
+remain total invalidate_num:270057 16384
+remain total invalidate_num:270058 16384
+remain total invalidate_num:270059 16384
+remain total invalidate_num:270060 16384
+remain total invalidate_num:270061 16384
+remain total invalidate_num:270062 16384
+remain total invalidate_num:270063 16384
+5610000
+remain total invalidate_num:270064 16384
+remain total invalidate_num:270065 16384
+remain total invalidate_num:270066 16384
+remain total invalidate_num:270067 16384
+remain total invalidate_num:270068 16384
+remain total invalidate_num:270069 16384
+remain total invalidate_num:270070 16384
+remain total invalidate_num:270071 16384
+remain total invalidate_num:270072 16384
+remain total invalidate_num:270073 16384
+remain total invalidate_num:270074 16384
+demote_cnt: 713
+version info: v-22 vidx-8 ridx-8 order-8
+gc_data:695 (seg_idx:74)
+gc_data:696 (seg_idx:20)
+5620000
+demote_cnt: 714
+version info: v-23 vidx-9 ridx-9 order-9
+gc_data:697 (seg_idx:39)
+gc_data:698 (seg_idx:40)
+gc_data:699 (seg_idx:7)
+5630000
+demote_cnt: 715
+version info: v-24 vidx-10 ridx-10 order-10
+5640000
+remain total invalidate_num:223883 16384
+remain total invalidate_num:223884 16384
+remain total invalidate_num:223885 16384
+demote_cnt: 716
+version info: v-25 vidx-11 ridx-11 order-11
+gc_data:700 (seg_idx:51)
+gc_data:701 (seg_idx:10)
+gc_data:702 (seg_idx:6)
+5650000
+demote_cnt: 717
+version info: v-26 vidx-12 ridx-12 order-12
+5660000
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+remain total invalidate_num:199925 16384
+read error!!: len:0
+
+
+
+(0)[cdf]read---
+0,144761,0.078470
+10,1448899,0.863869
+20,190322,0.967036
+30,49513,0.993875
+40,4794,0.996474
+50,340,0.996658
+60,38,0.996679
+70,16,0.996687
+80,6,0.996691
+90,10,0.996696
+100,3,0.996698
+110,1,0.996698
+120,5,0.996701
+130,3,0.996703
+140,8,0.996707
+150,6,0.996710
+160,4,0.996712
+170,2,0.996713
+180,7,0.996717
+190,5,0.996720
+200,4,0.996722
+210,2,0.996723
+220,5,0.996726
+230,7,0.996730
+240,6,0.996733
+250,2,0.996734
+260,6,0.996737
+270,5,0.996740
+280,1,0.996741
+290,1,0.996741
+300,3,0.996743
+310,4,0.996745
+320,5,0.996748
+330,3,0.996749
+340,2,0.996750
+350,7,0.996754
+360,6,0.996757
+370,6,0.996761
+380,5,0.996763
+390,2,0.996764
+400,4,0.996767
+410,5,0.996769
+420,8,0.996774
+430,7,0.996777
+440,4,0.996780
+450,6,0.996783
+460,7,0.996787
+470,6,0.996790
+480,6,0.996793
+490,4,0.996795
+500,4,0.996798
+510,4,0.996800
+520,4,0.996802
+530,3,0.996803
+540,5,0.996806
+550,3,0.996808
+560,8,0.996812
+570,1,0.996813
+580,7,0.996816
+590,9,0.996821
+600,3,0.996823
+610,4,0.996825
+620,4,0.996827
+630,3,0.996829
+640,6,0.996832
+650,1,0.996833
+660,4,0.996835
+670,4,0.996837
+680,7,0.996841
+690,8,0.996845
+700,6,0.996848
+710,6,0.996852
+720,7,0.996855
+730,6,0.996859
+740,6,0.996862
+750,3,0.996864
+760,7,0.996867
+770,7,0.996871
+780,5,0.996874
+790,5,0.996877
+800,6,0.996880
+810,8,0.996884
+820,6,0.996887
+830,7,0.996891
+840,3,0.996893
+850,11,0.996899
+860,6,0.996902
+870,4,0.996904
+880,9,0.996909
+890,13,0.996916
+900,7,0.996920
+910,5,0.996923
+920,3,0.996924
+930,6,0.996928
+940,7,0.996931
+950,7,0.996935
+960,4,0.996937
+970,7,0.996941
+980,8,0.996945
+990,6,0.996949
+1000,9,0.996954
+1010,3,0.996955
+1020,6,0.996958
+1030,4,0.996961
+1040,1,0.996961
+1050,9,0.996966
+1060,7,0.996970
+1070,7,0.996974
+1080,10,0.996979
+1090,5,0.996982
+1100,9,0.996987
+1110,7,0.996990
+1120,8,0.996995
+1130,1,0.996995
+1140,5,0.996998
+1150,3,0.997000
+1160,4,0.997002
+1180,1,0.997002
+1190,3,0.997004
+1200,3,0.997006
+1210,1,0.997006
+1220,4,0.997008
+1230,6,0.997012
+1240,8,0.997016
+1250,7,0.997020
+1260,8,0.997024
+1270,3,0.997026
+1280,2,0.997027
+1290,12,0.997033
+1300,14,0.997041
+1310,6,0.997044
+1320,9,0.997049
+1330,6,0.997052
+1340,4,0.997054
+1350,9,0.997059
+1360,6,0.997063
+1370,6,0.997066
+1380,8,0.997070
+1390,14,0.997078
+1400,6,0.997081
+1410,13,0.997088
+1420,8,0.997092
+1430,9,0.997097
+1440,7,0.997101
+1450,6,0.997104
+1460,9,0.997109
+1470,11,0.997115
+1480,10,0.997121
+1490,10,0.997126
+1500,9,0.997131
+1510,12,0.997137
+1520,8,0.997142
+1530,14,0.997149
+1540,6,0.997153
+1550,12,0.997159
+1560,12,0.997166
+1570,12,0.997172
+1580,11,0.997178
+1590,13,0.997185
+1600,9,0.997190
+1610,15,0.997198
+1620,13,0.997205
+1630,12,0.997212
+1640,15,0.997220
+1650,9,0.997225
+1660,13,0.997232
+1670,10,0.997237
+1680,12,0.997244
+1690,17,0.997253
+1700,16,0.997261
+1710,31,0.997278
+1720,24,0.997291
+1730,29,0.997307
+1740,35,0.997326
+1750,33,0.997344
+1760,35,0.997363
+1770,40,0.997385
+1780,52,0.997413
+1790,59,0.997445
+1800,60,0.997477
+1810,72,0.997516
+1820,77,0.997558
+1830,62,0.997592
+1840,66,0.997627
+1850,90,0.997676
+1860,96,0.997728
+1870,103,0.997784
+1880,114,0.997846
+1890,84,0.997891
+1900,103,0.997947
+1910,113,0.998008
+1920,136,0.998082
+1930,135,0.998155
+1940,111,0.998215
+1950,106,0.998273
+1960,130,0.998343
+1970,124,0.998411
+1980,155,0.998495
+1990,127,0.998564
+2000,123,0.998630
+2010,102,0.998685
+2020,137,0.998760
+2030,121,0.998825
+2040,126,0.998894
+2050,142,0.998971
+2060,161,0.999058
+2070,147,0.999138
+2080,129,0.999207
+2090,131,0.999278
+2100,108,0.999337
+2110,116,0.999400
+2120,109,0.999459
+2130,109,0.999518
+2140,92,0.999568
+2150,70,0.999606
+2160,70,0.999644
+2170,62,0.999677
+2180,69,0.999715
+2190,52,0.999743
+2200,43,0.999766
+2210,36,0.999786
+2220,23,0.999798
+2230,21,0.999810
+2240,23,0.999822
+2250,12,0.999829
+2260,8,0.999833
+2270,4,0.999835
+2280,4,0.999837
+2290,1,0.999838
+2300,3,0.999840
+2310,1,0.999840
+2320,2,0.999841
+2330,3,0.999843
+2340,3,0.999844
+2350,4,0.999847
+2360,2,0.999848
+2370,2,0.999849
+2380,1,0.999849
+2390,1,0.999850
+2400,1,0.999850
+2410,1,0.999851
+2420,1,0.999851
+2430,2,0.999853
+2440,2,0.999854
+2460,1,0.999854
+2480,1,0.999855
+2490,1,0.999855
+2520,1,0.999856
+2530,1,0.999856
+2560,1,0.999857
+2570,1,0.999857
+2580,1,0.999858
+2600,1,0.999858
+2620,1,0.999859
+2630,1,0.999860
+2640,3,0.999861
+2650,3,0.999863
+2660,3,0.999864
+2670,1,0.999865
+2680,3,0.999867
+2690,2,0.999868
+2700,3,0.999869
+2710,4,0.999872
+2730,4,0.999874
+2740,4,0.999876
+2750,3,0.999878
+2760,2,0.999879
+2770,1,0.999879
+2780,1,0.999880
+2790,5,0.999882
+2800,2,0.999883
+2810,6,0.999887
+2820,2,0.999888
+2830,5,0.999891
+2840,1,0.999891
+2850,2,0.999892
+2860,1,0.999893
+2870,3,0.999894
+2880,5,0.999897
+2890,2,0.999898
+2900,1,0.999899
+2910,2,0.999900
+2920,5,0.999902
+2930,6,0.999906
+2940,1,0.999906
+2950,4,0.999908
+2960,2,0.999909
+2970,4,0.999912
+2980,3,0.999913
+3000,1,0.999914
+3020,2,0.999915
+3030,1,0.999915
+3040,4,0.999918
+3060,1,0.999918
+3070,3,0.999920
+3080,1,0.999920
+3090,1,0.999921
+3100,1,0.999921
+3120,1,0.999922
+3170,1,0.999923
+3250,1,0.999923
+4340,1,0.999924
+5550,1,0.999924
+6760,1,0.999925
+90170,1,0.999925
+90510,1,0.999926
+90590,1,0.999926
+91210,1,0.999927
+91300,1,0.999927
+97100,1,0.999928
+98870,1,0.999928
+99710,1,0.999929
+104740,1,0.999930
+106410,1,0.999930
+108160,1,0.999931
+109380,1,0.999931
+110700,1,0.999932
+110840,1,0.999932
+112750,1,0.999933
+113150,1,0.999933
+114000,1,0.999934
+114280,1,0.999934
+115110,1,0.999935
+117390,1,0.999936
+118340,1,0.999936
+120960,1,0.999937
+130520,1,0.999937
+134780,1,0.999938
+138170,1,0.999938
+140000,1,0.999939
+142120,1,0.999939
+142420,1,0.999940
+142770,1,0.999940
+144330,1,0.999941
+144370,1,0.999941
+144630,1,0.999942
+145120,1,0.999943
+146260,1,0.999943
+147620,1,0.999944
+148390,1,0.999944
+149650,1,0.999945
+149760,1,0.999945
+149790,1,0.999946
+149970,1,0.999946
+150080,1,0.999947
+150650,1,0.999947
+151340,1,0.999948
+151890,1,0.999949
+153040,1,0.999949
+153280,1,0.999950
+153710,1,0.999950
+153820,1,0.999951
+154560,1,0.999951
+154640,1,0.999952
+154830,1,0.999952
+155300,1,0.999953
+155570,1,0.999953
+155850,1,0.999954
+156630,1,0.999954
+156750,1,0.999955
+157720,1,0.999956
+157960,1,0.999956
+158040,1,0.999957
+158070,1,0.999957
+158820,1,0.999958
+159090,1,0.999958
+159240,1,0.999959
+159410,1,0.999959
+159680,1,0.999960
+161280,1,0.999960
+161770,1,0.999961
+162160,1,0.999961
+162260,1,0.999962
+162940,1,0.999963
+163500,1,0.999963
+163860,1,0.999964
+164040,1,0.999964
+164490,1,0.999965
+164690,1,0.999965
+165000,1,0.999966
+165530,1,0.999966
+170430,1,0.999967
+174900,1,0.999967
+175210,1,0.999968
+176230,1,0.999969
+176370,1,0.999969
+177120,1,0.999970
+179420,1,0.999970
+179690,1,0.999971
+180470,1,0.999971
+181310,1,0.999972
+182730,1,0.999972
+184560,1,0.999973
+185570,1,0.999973
+187460,1,0.999974
+187510,1,0.999975
+189380,1,0.999975
+189940,1,0.999976
+191750,1,0.999976
+197030,1,0.999977
+199940,1,0.999977
+200390,1,0.999978
+205000,1,0.999978
+209140,1,0.999979
+218680,1,0.999979
+224970,1,0.999980
+226640,1,0.999981
+237050,1,0.999981
+278060,1,0.999982
+389510,1,0.999982
+414050,1,0.999983
+424890,1,0.999983
+447250,1,0.999984
+484300,1,0.999984
+502770,1,0.999985
+505260,1,0.999985
+505710,1,0.999986
+529000,1,0.999986
+542660,1,0.999987
+543650,1,0.999988
+548340,1,0.999988
+553880,1,0.999989
+556550,1,0.999989
+557030,1,0.999990
+563950,1,0.999990
+568140,1,0.999991
+573800,1,0.999991
+827410,1,0.999992
+864600,1,0.999992
+933920,1,0.999993
+973670,1,0.999994
+1000000,12,1.000000
+a_type	l_type	max	min	avg	cnt	percentage
+0	0	6032902	0	64.894	1711417	92.77009%
+1	0	5730068	7	77.611	136160	7.38077%
+2	0	28	17	21.333	3	0.00016%
+--------------------------------------------
+|            bench type:                   |
+--------------------------------------------
+----algorithm----
+[0~100(usec)]: 0
+[100~200(usec)]: 0
+[200~300(usec)]: 0
+[300~400(usec)]: 0
+[400~500(usec)]: 0
+[500~600(usec)]: 0
+[600~700(usec)]: 0
+[700~800(usec)]: 0
+[800~900(usec)]: 0
+[900~1000(usec)]: 0
+[over_ms]: 0
+[over__s]: 0
+----lower----
+[0~100(usec)]: 0
+[100~200(usec)]: 0
+[200~300(usec)]: 0
+[300~400(usec)]: 0
+[400~500(usec)]: 0
+[500~600(usec)]: 0
+[600~700(usec)]: 0
+[700~800(usec)]: 0
+[800~900(usec)]: 0
+[900~1000(usec)]: 0
+[over_ms]: 0
+[over__s]: 0
+----average----
+[avg_algo]: 0.0
+[avg_low]: 0.0
+-----lower_info----
+[write_op]: 0
+[read_op]: 0
+[trim_op]:0
+[WAF, RAF]: 0.000000, 0.000000
+[if rw test]: 0.000000(WAF), 0.000000(RAF)
+
+----summary----
+[all_time]: 0.0
+[size]: 64707.332031(mb)
+[FAIL NUM] 0
+[SUCCESS RATIO] 1.000000
+[throughput] inf(kb/s)
+             inf(mb/s)
+[IOPS] inf
+[cache hit cnt,ratio] 0, 0.000000
+[cache hit cnt,ratio dftl] 0, 0.000000
+[READ WRITE CNT] 1844794 14717497
+error cnt:2786
+result of ms:
+---
+level idx:0 run 13/14 content_num: 226649 (5.40 %)
+	[0] lba:1051~4181503 sst_file num:1/21
+	[1] lba:2184210~3944430 sst_file num:1/21
+	[2] lba:1572879~3670031 sst_file num:2/21
+	[3] lba:510464~3145743 sst_file num:1/21
+	[4] lba:510552~2891873 sst_file num:3/21
+	[5] lba:510976~2404577 sst_file num:1/21
+	[6] lba:511017~2621455 sst_file num:2/21
+	[7] lba:513500~4184127 sst_file num:1/21
+	[8] lba:1054~4184575 sst_file num:1/21
+	[9] lba:15656~4184747 sst_file num:3/21
+	[10] lba:16202~4187191 sst_file num:1/21
+	[11] lba:16043~4189715 sst_file num:1/21
+	[12] lba:1035~4190343 sst_file num:2/21
+level idx:1 run 14/14 content_num: 4272975 (101.88 %)
+	[0] lba:1041~4149440 sst_file num:4/296
+	[1] lba:1~4141675 sst_file num:6/296
+	[2] lba:1037~4027879 sst_file num:5/296
+	[3] lba:1060~4105058 sst_file num:6/296
+	[4] lba:1035~4181391 sst_file num:4/296
+	[5] lba:1035~4166143 sst_file num:4/296
+	[6] lba:1059~4035418 sst_file num:5/296
+	[7] lba:1029~4044366 sst_file num:11/296
+	[8] lba:1039~4094361 sst_file num:6/296
+	[9] lba:0~4126088 sst_file num:10/296
+	[10] lba:1117~4057970 sst_file num:5/296
+	[11] lba:1034~4133686 sst_file num:10/296
+	[12] lba:1036~3999031 sst_file num:5/296
+	[13] lba:3~4194303 sst_file num:10/296
+----LSMtree monitor log----
+TRIVIAL MOVE cnt:0
+COMPACTION 0 cnt: 671
+COMPACTION 1 cnt: 47
+COMPACTION 2 cnt: 33
+COMPACTION_RECLAIM_RUN_NUM:0
+COMPACTION_EARLY_INVALIDATION: 0
+DATA GC cnt:702
+MAPPING GC cnt:0
+
+merge efficienty:0.71 (10046793/14167198 - valid/total)
+tiering efficienty:inf (14689086/0 - valid/total)
+
+level print
+ptr:0x7f51f82ae140 level idx:0 run 13/14 content_num: 226649 (5.40 %)
+ptr:0x7f525a7f7570 level idx:1 run 14/14 content_num: 4272975 (101.88 %)
+WAF: 3.449123
+
+
+[32-BIT] memory usage: 0.24 for PFTL
+	32367870(bit)
+	4045983.75(byte)
+	3.86(MB)
+  memory breakdown
+	leveling:0 (0.00)
+	tiering:10006270 (0.31)
+	version_bit:20971520 (0.65)
+	write_pinned_end: 1390080 (0.04)
+  Memory usage in level
+	 0 : 1220606 (0.038)
+	 1 : 8785664 (0.271)
+
+
+[48-BIT] memory usage: 0.17 for PFTL
+	33635438(bit)
+	4204429.75(byte)
+	4.01(MB)
+  memory breakdown
+	leveling:0 (0.00 , 0.000)
+	tiering:10578798 (0.31 , 0.053)
+	version_bit:20971520 (0.62)
+	write_pinned_ent: 2085120 (0.06)
+  Memory usage in level
+	 0 : 1460974 (0.043)
+	 1 : 9117824 (0.271)
+
+----- Time result ------
+should time is a adding type
+Tiering RH [make] time :avg:1.41 total:50597629 cnt:35920378
+should time is a adding type
+Tiering RH [check] time :avg:0.57 total:1135036 cnt:1983293
+
+----- traffic result -----
+RAF: 1.076394
+WAF: 3.449123
+
+TRIM 702
+MAPPINGR 21518
+MAPPINGW 7343
+GCMR 0
+GCMW 0
+DATAR 1782411
+DATAW 3677184
+GCDR 816690
+GCDW 672125
+GCMR_DGC 0
+GCMW_DGC 0
+COMPACTIONDATA-R 13408594
+COMPACTIONDATA-W 8326409
+MISSDATAR 136166
+TESTIO 0
+(null) 0

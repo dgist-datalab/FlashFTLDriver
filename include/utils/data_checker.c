@@ -10,6 +10,7 @@ uint32_t *keymap;
 static uint32_t my_seed;
 static fdriver_lock_t data_check_lock;
 //uint32_t test_key=37628;
+
 uint32_t test_key=UINT32_MAX;
 
 int str2int(const char* str, int len)

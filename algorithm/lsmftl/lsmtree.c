@@ -54,7 +54,9 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	io_manager_init(li);
 	LSM.pm=page_manager_init(bm);
 	LSM.cm=compaction_init(COMPACTION_REQ_MAX_NUM);
+#ifdef DYNAMIC_WISCKEY
 	LSM.next_level_wisckey_compaction=true;
+#endif
 	LSM.wb_array=(write_buffer**)malloc(sizeof(write_buffer*) * WRITEBUFFER_NUM);
 	LSM.now_wb=0;
 	for(uint32_t i=0; i<WRITEBUFFER_NUM; i++){
@@ -189,6 +191,10 @@ uint32_t lsmtree_create(lower_info *li, blockmanager *bm, algorithm *){
 	LSM.now_gc_seg_idx=UINT32_MAX;
 	fdriver_mutex_init(&LSM.gc_end_lock);
 	fdriver_mutex_init(&LSM.now_gc_seg_lock);
+	LSM.same_segment_flag=UINT32_MAX;
+#ifdef MIN_ENTRY_PER_SST
+	LSM.unaligned_sst_file_set=NULL;
+#endif
 	return 1;
 }
 
@@ -225,7 +231,7 @@ static void lsmtree_monitor_print(){
 
 	printf("\n");
 	printf("level print\n");
-	lsmtree_level_summary(&LSM);
+	lsmtree_level_summary(&LSM, true);
 	printf("\n");
 
 	uint64_t *level_memory_breakdown=(uint64_t*)calloc(LSM.param.LEVELN, sizeof(uint64_t));
@@ -591,6 +597,7 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 		if(ppa==rb.buffer_ppa){
 			req->parents->type_lower++;
 			processing_data_read_req(req, rb.buffer_value, false);
+
 			fdriver_unlock(&rb.read_buffer_lock);
 			fdriver_unlock(&LSM.now_gc_seg_lock);
 			return BUFFER_HIT;
@@ -607,6 +614,7 @@ static inline uint32_t read_buffer_checker(uint32_t ppa, value_set *value, algo_
 		}
 		else{
 			req->parents->type_lower++;
+
 			rb.pending_req->insert(std::pair<uint32_t, algo_req*>(ppa, req));
 			fdriver_unlock(&rb.pending_lock);
 			fdriver_unlock(&LSM.now_gc_seg_lock);
@@ -624,6 +632,9 @@ static inline void lsmtree_read_param_reinit(lsmtree_read_param* param, request 
 
 	printf("L:%u R:%u sptr:%p\n", param->prev_level, param->prev_run, param->prev_sf);
 
+	if(param->target_level_rw_lock){
+		rwlock_read_unlock(param->target_level_rw_lock);
+	}
 	param->use_read_helper=false;
 	param->prev_run=UINT32_MAX;
 	param->prev_level=-1;
@@ -638,6 +649,10 @@ uint32_t lsmtree_read(request *const req){
 	if(!LSM.cm->tm->tagQ->size()){
 	//	printf("now compactioning\n");
 	//	abort();
+	}
+
+	if(req->global_seq==4228469){
+		printf("break!\n");
 	}
 	//printf("read key:%u\n", req->key);
 	lsmtree_read_param *r_param;
@@ -761,6 +776,10 @@ restart:
 	else{
 		r_param=(lsmtree_read_param*)req->param;
 
+		if(r_param->target_level_rw_lock==NULL){
+			r_param->target_level_rw_lock=&LSM.level_rwlock[r_param->prev_level];
+			rwlock_read_lock(r_param->target_level_rw_lock);
+		}
 		/*gced sstfile check*/
 		sst_file *sptr=run_retrieve_sst(&LSM.disk[r_param->prev_level]->array[r_param->prev_run], req->key);
 		if(sptr!=r_param->prev_sf){
@@ -991,10 +1010,12 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 	uint32_t offset;
 	uint32_t piece_ppa=req->ppa;
 
-	if(parents->magic){
-		static int magic_end_cnt=0;
-		printf("[%u]magic end req->seq:%u\n", magic_end_cnt++, parents->global_seq);
+	if(parents){
+		if(parents->type_lower<10){
+			parents->type_lower+=req->type_lower;
+		}
 	}
+
 
 #ifdef RWLOCK_PRINT
 	uint32_t rw_lock_lev=0;
@@ -1053,6 +1074,7 @@ static void processing_data_read_req(algo_req *req, char *v, bool from_end_req_p
 			printf("%u read_unlock - %u\n", rw_lock_lev, r_param->prev_level);
 #endif
 			rwlock_read_unlock(r_param->target_level_rw_lock);
+			r_param->target_level_rw_lock=NULL;
 		}
 		free(req);
 		if(!inf_assign_try(parents)){
@@ -1084,7 +1106,7 @@ void *lsmtree_read_end_req(algo_req *req){
 			for(;target_r_iter->first==PIECETOPPA(req->ppa) && 
 					target_r_iter!=rb.pending_req->end();){
 				pending_req=target_r_iter->second;
-				processing_data_read_req(pending_req, parents->value->value, false);
+				processing_data_read_req(pending_req, parents->value->value, true);
 				rb.pending_req->erase(target_r_iter++);
 			}
 			rb.issue_req->erase(req->ppa/L2PGAP);
@@ -1099,10 +1121,10 @@ void *lsmtree_read_end_req(algo_req *req){
 }
 
 
-void lsmtree_level_summary(lsmtree *lsm){
+void lsmtree_level_summary(lsmtree *lsm, bool force){
 #ifdef LSM_DEBUG
 	for(uint32_t i=0; i<lsm->param.LEVELN; i++){
-		printf("ptr:%p ", lsm->disk[i]); level_print(lsm->disk[i]);
+		printf("ptr:%p ", lsm->disk[i]); level_print(lsm->disk[i], force);
 	}
 	lsmtree_print_WAF(lsm->li);
 #endif
@@ -1435,19 +1457,29 @@ void lsmtree_after_compaction_processing(lsmtree *lsm){
 }
 
 void lsmtree_init_ordering_param(){
+
+#ifdef MIN_ENTRY_PER_SST
+	#ifdef MIN_ENTRY_OFF
+	LSM.sst_sequential_available_flag=false;
+	LSM.randomness_check=RANGE;
+	#else
 	LSM.sst_sequential_available_flag=true;
 	LSM.randomness_check=0;
+	#endif
 	LSM.now_pinned_sst_file_num=0;
 	LSM.processed_entry_num=0;
 	LSM.processing_lba=UINT32_MAX;
+	LSM.same_segment_flag=UINT32_MAX;
 	if(LSM.unaligned_sst_file_set){
 		run_free(LSM.unaligned_sst_file_set);
 		LSM.unaligned_sst_file_set=NULL;
 	}
+#endif
 }
 
 
 bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper){
+#ifdef DYNAMIC_WISCKEY
 	uint64_t using_memory=0;
 	for(uint32_t i=LSM.param.LEVELN-1; i<LSM.param.LEVELN; i++){
 		run *rptr;
@@ -1468,6 +1500,9 @@ bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper){
 	//printf("max_bf:%lu max_plr:%lu, using_memory:%lu\n", LSM.param.tr.BF_memory, LSM.param.tr.PLR_memory, using_memory);
 	//printf("remain_memory:%lu, needed_memory:%lu result:%s\n", remain_memory, needed_memory, needed_memory<=remain_memory?"wisckey":"none");
 	return needed_memory<=remain_memory;
+#else
+	return false;
+#endif
 }
 
 uint32_t lsmtree_print_log(){
@@ -1475,6 +1510,9 @@ uint32_t lsmtree_print_log(){
 	if(LSM.li->print_traffic){
 		LSM.li->print_traffic(LSM.li);
 	}
+	free(LSM.monitor.compaction_cnt);
+	memset(&LSM.monitor, 0, sizeof(LSM.monitor));
+	LSM.monitor.compaction_cnt=(uint32_t*)calloc(LSM.param.LEVELN+1, sizeof(uint32_t));
 	return 1;
 }
 
@@ -1559,7 +1597,7 @@ void lsmtree_compactioning_set_gced_flag(uint32_t seg_idx){
 	if(LSM.read_arg_set){
 		for(uint32_t i=0; i<LSM.now_compaction_stream_num; i++){
 			read_issue_arg *temp=LSM.read_arg_set[i];
-			for(uint32_t j=temp->from; j<=temp->to; j++){
+			for(uint32_t j=0; j<temp->to-temp->from+1; j++){
 				if(temp->page_file==false){
 					map_range *mr=&temp->map_target_for_gc[j];
 					if(!mr) continue; //mr can be null, when it used all data.

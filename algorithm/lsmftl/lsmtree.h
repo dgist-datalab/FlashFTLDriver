@@ -28,12 +28,13 @@
 #define MIN_ENTRY_PER_SST 128
 #define MIN_SEQ_ENTRY_NUM 4
 #define WB_SEPARATE
-#define INVALIDATION_COUNT_MERGE
 #define DYNAMIC_HELPER_ASSIGN
+#define INVALIDATION_COUNT_MERGE
+//#define MIN_ENTRY_OFF
+#define DYNAMIC_WISCKEY
 
 #define DEMAND_SEG_LOCK
 #define UPDATING_COMPACTION_DATA
-#define DYNAMIC_WISCKEY
 
 enum{
 	DEMOTE_RUN, KEEP_RUN,
@@ -86,11 +87,9 @@ typedef struct tree_param{
 	double run_range_size[21];
 	double level_size_ratio[21];
 	double WAF;
-#ifdef DYNAMIC_WISCKEY
 	uint64_t BF_memory;
 	uint64_t PLR_memory;
 	uint64_t memory_limit_for_helper;
-#endif
 }tree_param;
 
 typedef struct lsmtree_parameter{
@@ -162,6 +161,8 @@ typedef struct lsmtree{
 	struct run * unaligned_sst_file_set;
 #endif
 	
+	uint32_t same_segment_flag;
+	uint32_t same_target_segment;
 	rwlock *level_rwlock;
 
 	fdriver_lock_t flush_lock;
@@ -227,7 +228,7 @@ uint32_t lsmtree_write(request *const req);
 uint32_t lsmtree_flush(request *const req);
 uint32_t lsmtree_remove(request *const req);
 void lsmtree_compaction_end_req(struct compaction_req*);
-void lsmtree_level_summary(lsmtree *lsm);
+void lsmtree_level_summary(lsmtree *lsm, bool force);
 void lsmtree_content_print(lsmtree *lsm, bool print_sst);
 void lsmtree_find_version_with_lock(uint32_t lba, lsmtree_read_param *param);
 sst_file *lsmtree_find_target_sst_mapgc(uint32_t lba, uint32_t map_ppa);
@@ -255,7 +256,7 @@ uint32_t lsmtree_get_seg_invalidate_number();
 bool lsmtree_target_run_wisckeyable(uint32_t run_contents_num, bool bf_helper);
 
 bool invalidate_kp_entry(uint32_t lba, uint32_t piece_ppa, uint32_t old_version, bool aborting);
-static inline bool lsmtree_is_gc_available(lsmtree *lsm, uint32_t seg_idx){
+static inline bool lsmtree_is_gc_unavailable(lsmtree *lsm, uint32_t seg_idx){
 	bool res;
 	fdriver_lock(&lsm->gc_unavailable_seg_lock);
 	res=lsm->gc_unavailable_seg[seg_idx]!=0?true:false;

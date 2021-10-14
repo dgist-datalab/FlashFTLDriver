@@ -164,9 +164,9 @@ static inline bool KEYVALCHECK(KEYT a){
 #define V_PTR char * const
 #define PTR char*
 #define ASYNC 1
-#define QSIZE (512)
+#define QSIZE (128)
 #define LOWQDEPTH (128)
-#define QDEPTH (512)
+#define QDEPTH (128)
 
 #define THPOOL
 #define NUM_THREAD 4

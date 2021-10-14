@@ -1,0 +1,5 @@
+./dftl_driver -t 0 -p 21 > coarse_result 2>&1
+./dftl_driver -t 1 -p 21 > fine_result 2>&1
+./dftl_driver -t 2 -p 21 > sftl_result 2>&1
+./dftl_driver -t 3 -p 21 > tpftl_result 2>&1
+./page_driver > page_result 2>&1

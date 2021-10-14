@@ -184,6 +184,21 @@ void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv
 		/*flushed_kp_set*/
 		find_iter=LSM.flushed_kp_set->find(iter->first);
 		if(find_iter!=LSM.flushed_kp_set->end()){
+
+#ifdef MIN_ENTRY_PER_SST
+			if(LSM.unaligned_sst_file_set && LSM.unaligned_sst_file_set->now_sst_num){
+				uint32_t idx=run_retrieve_sst_idx(LSM.unaligned_sst_file_set, find_iter->first);
+				if(idx!=UINT32_MAX){
+					invalidate_sst_file_map(&LSM.unaligned_sst_file_set->sst_set[idx]);
+					run_remove_sst_file_at(LSM.unaligned_sst_file_set, idx);
+					if(LSM.unaligned_sst_file_set->now_sst_num==0){
+						run_free(LSM.unaligned_sst_file_set);
+						LSM.unaligned_sst_file_set=NULL;
+					}
+				}
+			}
+#endif
+
 			find_iter->second=iter->second->new_piece_ppa;
 			LSM.flushed_kp_seg->insert(
 					iter->second->new_piece_ppa/L2PGAP/_PPS);
@@ -204,7 +219,6 @@ void gc_helper_for_direct_mapping(std::map<uint32_t, gc_mapping_check_node*>*gkv
 			continue;
 		}
 #endif
-
 		/*flushed_kp_temp_set*/
 		find_iter=LSM.flushed_kp_temp_set->find(iter->first);
 		if(find_iter!=LSM.flushed_kp_temp_set->end()){

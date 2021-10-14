@@ -169,7 +169,9 @@ void bench_add(bench_type type, uint32_t start, uint32_t end, uint64_t number){
 
 	for(int j=0;j<ALGOTYPE;j++){
 		for(int k=0;k<LOWERTYPE;k++){
-			_master->datas[idx].ftl_poll[j][k].min = UINT64_MAX;
+			for(int i=0; i<BUFFER_HIT; i++){
+				_master->datas[idx].ftl_poll[j][k][i].min = UINT64_MAX;
+			}
 			//_master->datas[i].ftl_npoll[j][k].min = UINT64_MAX;
 		}
 	}
@@ -414,9 +416,9 @@ void bench_print(){
 	}
 }
 
-void bench_update_typetime(bench_data *_d, uint8_t a_type,uint8_t l_type, uint64_t time){
+void bench_update_typetime(bench_data *_d, uint8_t a_type,uint8_t l_type,uint8_t buffer_hit, uint64_t time){
 	bench_ftl_time *temp;
-	temp = &_d->ftl_poll[a_type][l_type];
+	temp = &_d->ftl_poll[a_type][l_type][buffer_hit];
 	temp->total_micro += time;
 	temp->max = temp->max < time ? time : temp->max;
 	temp->min = temp->min > time ? time : temp->min;
@@ -424,12 +426,18 @@ void bench_update_typetime(bench_data *_d, uint8_t a_type,uint8_t l_type, uint64
 }
 
 void bench_type_cdf_print(bench_data *_d){
-	fprintf(stderr,"a_type\tl_type\tmax\tmin\tavg\tcnt\tpercentage\n");
+	fprintf(stderr,"a_type\tBH\tl_type\tmax\tmin\tavg\tcnt\tpercentage\n");
 	for(int i = 0; i < ALGOTYPE; i++){
-		for(int j = 0; j < LOWERTYPE; j++){
-			if(!_d->ftl_poll[i][j].cnt)
-				continue;
-			fprintf(stderr,"%d\t%d\t%lu\t%lu\t%.3f\t%lu\t%.5f%%\n",i,j,_d->ftl_poll[i][j].max,_d->ftl_poll[i][j].min,(float)_d->ftl_poll[i][j].total_micro/_d->ftl_poll[i][j].cnt,_d->ftl_poll[i][j].cnt,(float)_d->ftl_poll[i][j].cnt/_d->read_cnt*100);
+		for(int j = 0; j < BUFFER_HIT; j++){
+			for(int k=0; k<LOWERTYPE; k++){
+				if(!_d->ftl_poll[i][k][j].cnt){
+					continue;
+				}
+				fprintf(stderr,"%d\t%d\t%d\t%lu\t%lu\t%.3f\t%lu\t%.5f%%\n",i, j, k, 
+						_d->ftl_poll[i][k][j].max,_d->ftl_poll[i][k][j].min,
+						(float)_d->ftl_poll[i][k][j].total_micro/_d->ftl_poll[i][k][j].cnt,_d->ftl_poll[i][k][j].cnt,
+						(float)_d->ftl_poll[i][k][j].cnt/_d->read_cnt*100);
+			}
 		}
 	}
 }
@@ -517,7 +525,7 @@ void bench_reap_data(request *const req,lower_info *li){
 	bench_data *_data=&_master->datas[idx];
 
 	if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
-		bench_update_typetime(_data, req->type_ftl, req->type_lower,req->latency_checker.micro_time);
+		bench_update_typetime(_data, req->type_ftl, req->type_lower, req->buffer_hit, req->latency_checker.micro_time);
 	}
 	
 	if(req->type==FS_NOTFOUND_T){

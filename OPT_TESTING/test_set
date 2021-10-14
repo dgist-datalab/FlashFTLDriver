@@ -1,0 +1,5 @@
+./ALL_ENB_LFTL > ALL_LFTL_result 2>&1
+./HC_ENB_LFTL > HC_LFTL_result 2>&1
+./INV_ENB_LFTL > INV_LFTL_result 2>&1
+./NORMAL_LFTL > NORMAL_LFTL_result 2>&1
+./WB_ENB_LFTL > WB_LFTL_result 2>&1

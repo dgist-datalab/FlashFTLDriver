@@ -54,12 +54,12 @@ static inline void compaction_error_check
 		if(target_version==version_map_lba(LSM.last_run_version, min_lba)){
 			if(src){
 				printf("src\n");
-				level_print(src);
+				level_print(src, false);
 			}
 			printf("des\n");
-			level_print(des);
+			level_print(des, false);
 			printf("res\n");
-			level_print(res);
+			level_print(res, false);
 			if(kp_set){
 				printf("first_compaction_cnt:%u\n", compaction_num);
 			}
@@ -72,11 +72,11 @@ static inline void compaction_error_check
 	if(!(GET_LEV_END_LBA(res)>=max_lba)){
 		if(target_version==version_map_lba(LSM.last_run_version,max_lba)){
 			printf("src\n");
-			level_print(src);
+			level_print(src, false);
 			printf("des\n");
-			level_print(des);
+			level_print(des, false);
 			printf("res\n");
-			level_print(res);
+			level_print(res, false);
 			if(kp_set){
 				printf("first_compaction_cnt:%u\n", compaction_num);
 			}
@@ -330,7 +330,6 @@ uint32_t stream_sorting(level *des, uint32_t stream_num, sst_pf_out_stream **os_
 				continue;
 			}
 			key_ptr_pair now=sst_pos_pick(os_set[i]);
-	
 
 			if(target_idx==UINT32_MAX){
 				 target_pair=now;

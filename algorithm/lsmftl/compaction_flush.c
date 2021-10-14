@@ -8,21 +8,12 @@ extern uint32_t debug_lba;
 extern uint32_t debug_piece_ppa;
 typedef std::map<uint32_t, uint32_t>::iterator map_iter;
 
-static inline void invalidate_sst_file_map(sst_file *sptr){
-	switch(sptr->type){
-		case PAGE_FILE:
-			invalidate_map_ppa(LSM.pm->bm, sptr->file_addr.map_ppa, true);
-			break;
-		case BLOCK_FILE:
-			if(sptr->map_num!=1){
-				EPRINT("can't be", true);
-			}
-			invalidate_map_ppa(LSM.pm->bm, sptr->block_file_map[0].ppa, true);
-			break;
-	}
-}
 
+#ifdef MIN_ENTRY_PER_SST
 static inline bool sequential_flag_update(int value){
+#ifdef MIN_ENTRY_OFF
+	return LSM.sst_sequential_available_flag;
+#endif
 	LSM.now_pinned_sst_file_num+=value;
 	if(LSM.now_pinned_sst_file_num + 
 			CEILING_TARGET(LSM.flushed_kp_set->size()-LSM.processed_entry_num, KP_IN_PAGE) < LSM.param.max_sst_in_pinned_level){
@@ -35,6 +26,9 @@ static inline bool sequential_flag_update(int value){
 }
 
 static inline bool sequential_flag_test(int test){
+#ifdef MIN_ENTRY_OFF
+	return LSM.sst_sequential_available_flag;
+#endif
 	uint32_t test_num=LSM.now_pinned_sst_file_num+test;
 	if(test_num + 
 			CEILING_TARGET(LSM.flushed_kp_set->size()-LSM.processed_entry_num, KP_IN_PAGE) < LSM.param.max_sst_in_pinned_level){
@@ -91,9 +85,20 @@ static inline void flush_and_move(std::map<uint32_t, uint32_t> *kp_set,
 			if(idx!=UINT32_MAX){
 				invalidate_sst_file_map(&LSM.unaligned_sst_file_set->sst_set[idx]);
 				run_remove_sst_file_at(LSM.unaligned_sst_file_set, idx);
+				if(LSM.unaligned_sst_file_set->now_sst_num==0){
+					run_free(LSM.unaligned_sst_file_set);
+					LSM.unaligned_sst_file_set=NULL;
+				}
 			}
 		}
 
+		if(LSM.same_segment_flag==UINT32_MAX){
+			LSM.same_target_segment=SEGNUM(temp_kp_set[i].piece_ppa);
+			LSM.same_segment_flag=1;
+		}
+		else if(LSM.same_segment_flag==1 && LSM.same_target_segment!=SEGNUM(temp_kp_set[i].piece_ppa)){
+			LSM.same_segment_flag=0;
+		}
 		res_iter=kp_set->insert(
 				std::pair<uint32_t, uint32_t>(temp_kp_set[i].lba, temp_kp_set[i].piece_ppa));
 
@@ -150,10 +155,16 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 
 	static bool function_debug_flag=false;
 
-	if(SEGNUM(page_manager_pick_new_ppa(LSM.pm, false, DATASEG)*L2PGAP) != SEGNUM(iter->second)){
+	uint32_t seg_idx=0;
+	if((seg_idx=SEGNUM(page_manager_pick_new_ppa(LSM.pm, false, DATASEG)*L2PGAP)) != SEGNUM(iter->second)){
 		/*this is an inevitable situation*/
 		now_sequential_file=false;
 	}
+
+#ifdef MIN_ENTRY_OFF
+	uint32_t check_prev_piece_ppa=UINT32_MAX;
+	now_sequential_file=true;
+#endif
 
 	uint32_t prev_processed_entry_num=*processed_entry_num;
 
@@ -174,6 +185,20 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 
 		kp_set[i].lba=iter->first;
 		kp_set[i].piece_ppa=iter->second;
+#ifdef MIN_ENTRY_OFF
+		if(seg_idx!=SEGNUM(kp_set[i].piece_ppa)){
+			now_sequential_file=false;
+		}
+		else{
+			if(check_prev_piece_ppa==UINT32_MAX){
+				check_prev_piece_ppa=kp_set[i].piece_ppa;
+			}
+			else if(check_prev_piece_ppa > kp_set[i].piece_ppa){
+				now_sequential_file=false;
+			}
+		}
+		check_prev_piece_ppa=kp_set[i].piece_ppa;
+#endif
 
 //		if(LSM.global_debug_flag && kp_set[i].lba==debug_lba){
 //			printf("%u target is into sstfile\n", debug_lba);
@@ -323,6 +348,8 @@ static sst_file *kp_to_sstfile(std::map<uint32_t, uint32_t> *flushed_kp_set,
 	if(LSM.global_debug_flag && res->start_lba <=debug_lba && res->end_lba>=debug_lba){
 		printf("%u in start_lba:%u ~ end_lba:%u\n", debug_lba, res->start_lba, res->end_lba);
 	}
+
+	//printf("sstfile:%u~%u\n", res->start_lba, res->end_lba);
 
 	algo_req *write_req=(algo_req*)malloc(sizeof(algo_req));
 	write_req->type=MAPPINGW;
@@ -535,11 +562,10 @@ level *make_pinned_level(std::map<uint32_t, uint32_t> * kp_set){
 	return res;
 }
 
-#ifdef MIN_ENTRY_PER_SST
 level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	//static int cnt=0;
 	//printf("flush cnt:%u\n", cnt++);
-	if(page_manager_get_total_remain_page(LSM.pm, false, false) < MAX(wb->buffered_entry_num/L2PGAP, 2)){
+	if(page_manager_get_total_remain_page(LSM.pm, false, false) <= MAX(wb->buffered_entry_num/L2PGAP, 2)){
 		__do_gc(LSM.pm, false, KP_IN_PAGE/L2PGAP);
 	}
 	rwlock_write_lock(&LSM.flush_wait_wb_lock);
@@ -561,8 +587,9 @@ level* flush_memtable(write_buffer *wb, bool is_gc_data){
 	if(now_remain_page_num<2){
 		now_remain_page_num=page_aligning_data_segment(LSM.pm, 2);
 	}
-
+/*
 	if(now_remain_page_num < wb->data->size()/L2PGAP+1){
+		printf("alinging called!\n");
 		map_iter m_iter;
 		m_iter=LSM.flushed_kp_set->begin();
 		run *temp_run;
@@ -584,7 +611,8 @@ level* flush_memtable(write_buffer *wb, bool is_gc_data){
 			now_remain_page_num=page_aligning_data_segment(LSM.pm, 2);
 		}
 	}
-
+*/
+	
 	if(wb->data->size()){
 		flush_and_move(LSM.flushed_kp_set,
 #ifdef WB_SEPARATE
@@ -594,13 +622,38 @@ level* flush_memtable(write_buffer *wb, bool is_gc_data){
 #endif
 				wb, UINT32_MAX);
 	}
-	
-	if(	now_buffered_entry_num() >= LSM.param.write_buffer_ent){
+
+	now_remain_page_num=page_manager_get_remain_page(LSM.pm, false);
+	uint32_t needed_map_num=CEILING_TARGET(LSM.flushed_kp_set->size(), KP_IN_PAGE);
+	needed_map_num-=LSM.unaligned_sst_file_set?LSM.unaligned_sst_file_set->now_sst_num:0;
+	int32_t after_map_write_remain_page=now_remain_page_num-needed_map_num;
+//#ifndef MIN_ENTRY_OFF
+	if(LSM.same_segment_flag && LSM.sst_sequential_available_flag && 
+			(after_map_write_remain_page>=0 && after_map_write_remain_page <2)){
+		run *temp_run;
+		if(LSM.unaligned_sst_file_set){
+			EPRINT("processing?", true);
+		}
+		fa_make_pinned_level(NULL, &temp_run, LSM.flushed_kp_set, needed_map_num);
+		if(temp_run){
+			if(LSM.unaligned_sst_file_set){
+				run_free(LSM.unaligned_sst_file_set);
+			}
+
+			LSM.unaligned_sst_file_set=temp_run;
+		}
+	}
+//#endif
+
+	if(now_buffered_entry_num() >= LSM.param.write_buffer_ent){
 		making_level=true;
 	}
 
 	/*make temp level*/
 	if(making_level){
+		if(needed_map_num > now_remain_page_num){
+			__do_gc(LSM.pm, false, needed_map_num-now_remain_page_num);
+		}
 		LSM.pinned_level=fa_make_pinned_level(LSM.pinned_level, NULL,LSM.flushed_kp_set, UINT32_MAX);
 		res=LSM.pinned_level;
 	}

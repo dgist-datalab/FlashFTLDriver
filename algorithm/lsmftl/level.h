@@ -102,6 +102,7 @@ sst_file* level_find_target_run_idx(level *lev, uint32_t lba, uint32_t ppa, uint
 void level_sptr_update_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr);
 void level_sptr_add_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx, sst_file *sptr);
 void level_sptr_remove_at_in_gc(level *lev, uint32_t ridx, uint32_t sptr_idx);
+void level_empty_run(level *lev, uint32_t ridx);
 
 static inline bool level_check_overlap(level *a, level *b){
 	if(b->now_sst_num==0 || a->now_sst_num==0) return false;
@@ -183,7 +184,7 @@ static inline bool level_is_appendable(level *lev, uint32_t append_target_num){
 }
 
 void level_tiering_sst_analysis(level *lev, blockmanager *bm, struct version *v, bool);
-void level_print(level *lev);
+void level_print(level *lev, bool force);
 void level_content_print(level *lev, bool print_sst);
 uint32_t get_level_content_num(level *lev);
 uint32_t level_run_populate_analysis(run *r);

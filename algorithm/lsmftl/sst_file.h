@@ -70,6 +70,7 @@ static inline void sst_shallow_copy(sst_file *des, sst_file *src){
 }
 
 void sst_set_file_map(sst_file *, uint32_t, map_range*);
+void invalidate_sst_file_map(sst_file *sptr);
 uint32_t sst_find_map_addr(sst_file *, uint32_t lba);
 uint32_t sst_find_map_idx(sst_file *, uint32_t lba);
 uint32_t sst_lower_bound_map_idx(sst_file *, uint32_t lba);

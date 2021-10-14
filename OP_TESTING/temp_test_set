@@ -1,0 +1,4 @@
+./70/dftl_driver -t 3 -p 21 > ./70/tpftl_result 2>&1
+./75/dftl_driver -t 3 -p 21 > ./75/tpftl_result 2>&1
+./80/dftl_driver -t 3 -p 21 > ./80/tpftl_result 2>&1
+./85/dftl_driver -t 3 -p 21 > ./85/tpftl_result 2>&1

@@ -86,7 +86,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 				printf("%u page hit(piece_ppa:%u)\n", req->key,value->ppa);
 			}
 			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-			req->type_ftl=req->type_lower=0;
+			req->buffer_hit++;
 			req->end_req(req);
 			fdriver_unlock(&rb.read_buffer_lock);
 			return;
@@ -112,6 +112,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 			fdriver_unlock(&rb.pending_lock);
 		}
 		else{
+			req->buffer_hit++;
 			rb.pending_req->insert(std::pair<uint32_t, algo_req*>(ppa, my_req));
 			fdriver_unlock(&rb.pending_lock);
 			return;
@@ -252,7 +253,11 @@ static void processing_pending_req(algo_req *req, value_set *v){
 	request *parents=req->parents;
 	page_param *param=(page_param*)req->param;
 	memcpy(param->value->value, &v->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
-	parents->type_ftl=parents->type_lower=0;
+	if(parents){
+		if(parents->type_lower < 10){
+			parents->type_lower+=req->type_lower;
+		}
+	}
 	parents->end_req(parents);
 	free(param);
 	free(req);
@@ -264,6 +269,12 @@ void *page_end_req(algo_req* input){
 	rb_r_iter target_r_iter_temp;
 	algo_req *pending_req;
 	page_param* param=(page_param*)input->param;
+	request *res=input->parents;
+	if(res){
+		if(res->type_lower < 10){
+			res->type_lower+=input->type_lower;
+		}
+	}
 	switch(input->type){
 		case DATAW:
 			inf_free_valueset(param->value,FS_MALLOC_W);
@@ -274,6 +285,7 @@ void *page_end_req(algo_req* input){
 			for(;target_r_iter->first==param->value->ppa/L2PGAP && 
 					target_r_iter!=rb.pending_req->end();){
 				pending_req=target_r_iter->second;
+				pending_req->type_lower=input->type_lower;
 				processing_pending_req(pending_req, param->value);
 				rb.pending_req->erase(target_r_iter++);
 			}
@@ -291,9 +303,7 @@ void *page_end_req(algo_req* input){
 
 			break;
 	}
-	request *res=input->parents;
 	if(res){
-		res->type_ftl=res->type_lower=0;
 		res->end_req(res);//you should call the parents end_req like this
 	}
 	free(param);
