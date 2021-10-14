@@ -15,6 +15,8 @@
 #define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriver/algorithm/lsmftl/design_knob"
 double *plr_dp;
 double *line_per_chunk;
+double *normal_plr_dp;
+
 uint32_t global_error;
 extern float gbf_min_bit;
 
@@ -25,12 +27,14 @@ void plr_func(void *arg, int __idx){
 	if(idx==10){
 	}
 	printf("idx:%u!\n", idx);
-    plr_dp[idx]=plr_memory_calc_avg((range/1000*idx), global_error, range, false, &line_per_chunk[idx]);
+    plr_dp[idx]=plr_memory_calc_avg((range/1000*idx), global_error, range, false, 
+			&line_per_chunk[idx], &normal_plr_dp[idx]);
 	free(arg);
 }
 
 void init_memory_info(uint32_t error){
 	plr_dp=(double*)calloc(1001, sizeof(double));
+	normal_plr_dp=(double*)calloc(1001, sizeof(double));
 	line_per_chunk=(double*)calloc(1001, sizeof(double));
 	char plr_table_map[512]={0,};
     sprintf(plr_table_map,"%s/plr_table/%d.map", DIR_PATH, error);
@@ -75,6 +79,14 @@ void init_memory_info(uint32_t error){
 			printf("%d temp:%d, sizeof():%lu %p\n", fd, written_byte, sizeof(plr_dp), plr_dp);
 			perror("??\n");
 		}
+
+		if((written_byte=write(fd, normal_plr_dp, sizeof(double) * 1001))!=-1){
+			fsync(fd);
+		}
+		else{
+			printf("%d temp:%d, sizeof():%lu %p\n", fd, written_byte, sizeof(plr_dp), plr_dp);
+			perror("??\n");
+		}
 	//	EPRINT("please add new table for fpr", true);
 	//	exit(1);
 	}
@@ -90,11 +102,22 @@ void init_memory_info(uint32_t error){
 		}else{
 			printf("???\n");
 		}
+		if(read(fd, normal_plr_dp, 1001*sizeof(double))){
+
+		}else{
+			printf("???\n");
+		}
 	}
-/*
+
+	printf("opt memory usage\n");
 	for(uint32_t i=1; i<=1000; i++){
 		printf("%u\t%lf\n", i, plr_dp[i]);
-	}*/
+	}
+	printf("normal memory usage\n");
+	for(uint32_t i=1; i<=1000; i++){
+		printf("%u\t%lf\n", i, normal_plr_dp[i]);
+	}
+
 	gbf_set_prepare((float)error/100, 1000000, BLOOM_ONLY);
 	close(fd);
 }

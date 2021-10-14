@@ -54,7 +54,8 @@ uint64_t plr_memory_calc(uint32_t entry_num,
 }
 
 double plr_memory_calc_avg(uint32_t entry_num, 
-		uint32_t error, uint32_t DEV_size, bool wiskey, double *line_per_chunk){
+		uint32_t error, uint32_t DEV_size, bool wiskey, 
+		double *line_per_chunk, double *normal_plr_dp){
 
 	uint32_t *target=(uint32_t*)malloc(sizeof(uint32_t)*entry_num);
 	memcpy(target, random_seq, sizeof(uint32_t)*entry_num);
@@ -67,8 +68,10 @@ double plr_memory_calc_avg(uint32_t entry_num,
 	}
 	plr->insert_end();
 	double res=plr->memory_usage(48);
+	double normal_memory=plr->get_normal_memory_usage(48);
 	*line_per_chunk=plr->get_line_per_chunk();
 	delete plr;
 	free(target);
+	*normal_plr_dp=normal_memory/entry_num;
 	return (res+(wiskey?entry_num*48:0))/entry_num;
 }

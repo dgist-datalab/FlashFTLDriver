@@ -4,6 +4,7 @@
 #include "../include/FS.h"
 #include "../bench/bench.h"
 #include "../bench/measurement.h"
+#include "cheeze_hg_block.h"
 
 #ifdef KVSSD
 #include "../include/data_struct/hash_kv.h"
@@ -266,6 +267,8 @@ uint32_t inf_algorithm_caller(request *const inf_req){
 
 void inf_print_log(){
 	bench_print_cdf();
+	//request_print_log();
+	//request_memset_print_log();
 	if(mp.algo->print_log){
 		mp.algo->print_log();
 	}
@@ -636,6 +639,7 @@ extern std::multimap<uint32_t, request *> *stop_req_list;
 extern std::map<uint32_t, request *> *stop_req_log_list;
 
 void inf_free(){
+	//inf_print_lot();
 	if(stop_req_list){
 		delete stop_req_list;
 		delete stop_req_log_list;

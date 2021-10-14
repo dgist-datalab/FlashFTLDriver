@@ -23,6 +23,7 @@ SRCS +=\
 	   gc_helper.c\
 	   lsmtree_testing.c\
 	   lsmtree_setting.c\
+	   lsmtree_temp_param_setting.c\
 	   oob_manager.c\
 #	   gc.c\
 #	   helper_algorithm/bf_set.c\

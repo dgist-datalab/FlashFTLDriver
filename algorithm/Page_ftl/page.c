@@ -174,6 +174,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		if(a_buffer.key[i]==req->key){
 			overlapped_idx=i;
 			overlap=true;
+			
 			break;
 		}
 	}
@@ -181,10 +182,16 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
 
 	if(req){
+		if(overlap){
+			inf_free_valueset(a_buffer.value[target_idx], FS_MALLOC_W);
+		}
 		a_buffer.value[target_idx]=req->value;
 		a_buffer.key[target_idx]=req->key;
 	}
 	else{
+		if(overlap){
+			inf_free_valueset(a_buffer.value[target_idx], FS_MALLOC_W);
+		}
 		a_buffer.value[target_idx]=value;
 		a_buffer.key[target_idx]=key;
 	}

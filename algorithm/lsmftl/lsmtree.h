@@ -276,6 +276,7 @@ read_helper_param lsmtree_get_target_rhp(uint32_t level_idx);
 void lsmtree_init_ordering_param();
 void lsmtree_compactioning_set_print(uint32_t seg_idx);
 void lsmtree_compactioning_set_gced_flag(uint32_t seg_idx);
+void lsmtree_tiering_memory_waf_calculator(uint32_t limit_round);
 #define MAKE_L0COMP_REQ(wb, param, is_gc_data)\
 	alloc_comp_req(-1,0,(wb),lsmtree_compaction_end_req, (void*)(param), (is_gc_data))
 
