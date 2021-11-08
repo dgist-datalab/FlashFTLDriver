@@ -1,4 +1,5 @@
 #include "seq_block_manager.h"
+#include "../../include/debug_utils.h"
 #include <stdlib.h>
 #include <stdio.h>
 

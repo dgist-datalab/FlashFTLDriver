@@ -2,7 +2,7 @@
 #define POSIX_HEADER
 #include "../../include/container.h"
 
-#define LASYNC
+//#define LASYNC
 #define FS_LOWER_W 1
 #define FS_LOWER_R 2
 #define FS_LOWER_T 3
@@ -36,6 +36,7 @@ typedef struct posix_request {
 }posix_request;
 
 typedef struct mem_seg {
-	PTR storage;
+	char * storage;
+	char oob[OOB_SIZE];
 } mem_seg;
 #endif

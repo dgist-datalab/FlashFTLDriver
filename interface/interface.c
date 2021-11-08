@@ -304,7 +304,7 @@ void *p_main(void *__input){
 	return NULL;
 }
 
-bool inf_make_req_fromApp(char _type, KEYT _key,uint32_t offset, uint32_t len,PTR _value,void *_req, void*(*end_func)(void*)){
+bool inf_make_req_fromApp(char _type, KEYT _key,uint32_t offset, uint32_t len,char * _value,void *_req, void*(*end_func)(void*)){
 	/*
 	static bool start=false;
 	if(!start){
@@ -333,7 +333,7 @@ bool inf_make_req_fromApp(char _type, KEYT _key,uint32_t offset, uint32_t len,PT
         req=inf_get_req_instance(_type,_key,_value,len,0,true);
         value = req->value;
         //((struct buse*)_req)->value=value;
-		//value->value=(PTR)malloc(PAGESIZE);
+		//value->value=(char *)malloc(PAGESIZE);
 		value->rmw_value=_value;
 		value->offset=offset;
 		//value->len=len;
@@ -827,7 +827,7 @@ bool inf_iter_req_apps(char type, char *prefix, uint8_t key_len,char **value, in
 }
 #endif
 
-value_set *inf_get_valueset(PTR in_v, int type, uint32_t length){
+value_set *inf_get_valueset(char * in_v, int type, uint32_t length){
 	value_set *res=(value_set*)malloc(sizeof(value_set));
 	//check dma alloc type
     if(type==FS_BUSE_R || type==FS_BUSE_W){
@@ -850,7 +850,7 @@ value_set *inf_get_valueset(PTR in_v, int type, uint32_t length){
 	}
 	else{
 		res->dmatag=-1;
-		res->value=(PTR)malloc(length);
+		res->value=(char *)malloc(length);
 	}
 	res->length=length;
 
@@ -860,6 +860,38 @@ value_set *inf_get_valueset(PTR in_v, int type, uint32_t length){
 	}
 	else{
 		memset(res->value,0,length);
+	}
+	res->ppa=UINT32_MAX;
+	return res;
+}
+
+value_set *inf_get_valueset_oob(char * in_v, char *oob, int type, uint32_t length){
+	value_set *res=(value_set*)malloc(sizeof(value_set));
+	//check dma alloc type
+#ifdef DVALUE
+	length=(length/PIECE+(length%PIECE?1:0))*PIECE;
+#endif
+	if(length==PAGESIZE)
+		res->dmatag=F_malloc((void**)&(res->value),PAGESIZE,type);
+	else if(length>PAGESIZE){
+		abort();
+	}
+	else{
+		res->dmatag=-1;
+		res->value=(char *)malloc(length);
+	}
+	res->length=length;
+
+	res->from_app=false;
+	if(in_v){
+		memcpy(res->value,in_v,length);
+	}
+	else{
+		memset(res->value,0,length);
+	}
+
+	if(oob && type==FS_MALLOC_W){
+		memcpy(res->oob, oob, OOB_SIZE);
 	}
 	res->ppa=UINT32_MAX;
 	return res;

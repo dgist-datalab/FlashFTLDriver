@@ -9,12 +9,14 @@ struct blockmanager base_bm={
 	.pick_block=base_pick_block,
 	.free_seg_num=NULL,
 	.get_segment=base_get_segment,
+	.retrieve_segment=base_retrieve_segment,
 	.get_page_num=base_get_page_num,
 	.pick_page_num=base_pick_page_num,
 	.check_full=base_check_full,
 	.is_gc_needed=base_is_gc_needed, 
 	.get_gc_target=base_get_gc_target,
 	.trim_segment=base_trim_segment,
+	.trim_segment_force=base_trim_segment_force,
 	.free_segment=base_free_segment,
 	.populate_bit=base_populate_bit,
 	.unpopulate_bit=base_unpopulate_bit,
@@ -192,6 +194,7 @@ void base_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_in
 		q_enqueue((void*)b,c->free_block);
 		rb_find_int(p->seg_map,b->seg_idx,&target_node);
 		target_seg=(__segment*)target_node->item;
+
 		target_seg->invalid_blocks++;
 		if(target_seg->invalid_blocks==BPS){
 			free(target_seg);
@@ -358,4 +361,44 @@ __block *base_pick_block(struct blockmanager *bm, uint32_t page_num){
 
 void base_free_segment(struct blockmanager*, __segment*){
 
+}
+
+__segment* base_retrieve_segment(struct blockmanager *bm, uint32_t seg_idx){
+	bbm_pri *p=(bbm_pri*)bm->private_data;
+	Redblack target_node;
+	__segment *target_seg;
+
+	rb_find_int(p->seg_map, seg_idx, &target_node);
+	target_seg=(__segment*)target_node->item;
+
+	return target_seg;
+}
+
+void base_trim_segment_force (struct blockmanager *bm, __segment* seg, struct lower_info* li){
+	bbm_pri *p=(bbm_pri*)bm->private_data;
+	Redblack target_node;
+	__segment *target_seg;
+	for(int i=0; i<BPS; i++){
+		__block *b=seg->blocks[i];
+		li->trim_a_block(GETBLOCKPPA(b),ASYNC);
+		b->invalidate_number=0;
+		b->validate_number=0;
+		b->now=0;
+		memset(b->bitset,0,_PPB/8);
+
+		memset(b->oob_list,0,sizeof(b->oob_list));
+
+		channel* c=&p->base_channel[i];
+	//	mh_insert_append(c->max_heap,(void*)b);
+		q_enqueue((void*)b,c->free_block);
+		rb_find_int(p->seg_map,b->seg_idx,&target_node);
+		target_seg=(__segment*)target_node->item;
+
+		target_seg->invalid_blocks++;
+		if(target_seg->invalid_blocks==BPS){
+			free(target_seg);
+			rb_delete(target_node,true);
+		}
+	}
+	free(seg);
 }

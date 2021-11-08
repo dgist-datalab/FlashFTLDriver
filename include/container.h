@@ -32,6 +32,7 @@ typedef struct value_set{
 	uint8_t status;
 	uint32_t len;
 	uint32_t offset;
+	char oob[OOB_SIZE];
 }value_set;
 
 
@@ -115,6 +116,7 @@ struct algo_req{
 	request * parents;
 	MeasureTime latency_lower;
 	uint8_t type;
+	value_set *value;
 	bool rapid;
 	uint8_t type_lower;
 	//0: normal, 1 : no tag, 2: read delay 4:write delay
@@ -125,8 +127,8 @@ struct algo_req{
 struct lower_info {
 	uint32_t (*create)(struct lower_info*, blockmanager *bm);
 	void* (*destroy)(struct lower_info*);
-	void* (*write)(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req);
-	void* (*read)(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req);
+	void* (*write)(uint32_t ppa, uint32_t size, value_set *value, bool async,algo_req * const req);
+	void* (*read)(uint32_t ppa, uint32_t size, value_set *value, bool async,algo_req * const req);
 	void* (*device_badblock_checker)(uint32_t ppa,uint32_t size,void *(*process)(uint64_t, uint8_t));
 	void* (*trim_block)(uint32_t ppa,bool async);
 	void* (*trim_a_block)(uint32_t ppa,bool async);
@@ -164,6 +166,7 @@ struct lower_info {
 	uint64_t all_pages_in_dev;//for scale up test
 
 	uint64_t req_type_cnt[LREQ_TYPE_NUM];
+	void *private_data;
 	//anything
 };
 
@@ -184,7 +187,7 @@ struct algorithm{
 };
 
 typedef struct __OOBT{
-	char d[128];
+	char d[OOB_SIZE];
 }__OOB;
 
 typedef struct masterblock{
@@ -229,12 +232,14 @@ struct blockmanager{
 	__block *(*pick_block)(struct blockmanager*, uint32_t page_num);
 	uint32_t (*free_seg_num)(struct blockmanager *);
 	__segment* (*get_segment) (struct blockmanager*, bool isreserve);
+	__segment* (*retrieve_segment) (struct blockmanager*, uint32_t seg_idx);
 	int (*get_page_num)(struct blockmanager*, __segment*);
 	int (*pick_page_num)(struct blockmanager*, __segment*);
 	bool (*check_full)(struct blockmanager*, __segment*, uint8_t type);
 	bool (*is_gc_needed) (struct blockmanager*);
 	__gsegment* (*get_gc_target) (struct blockmanager*);
 	void (*trim_segment) (struct blockmanager*, __gsegment*, struct lower_info*);
+	void (*trim_segment_force) (struct blockmanager*, __segment*, struct lower_info*);
 	void (*free_segment)(struct blockmanager *,__segment*);
 	int (*populate_bit) (struct blockmanager*, uint32_t ppa);
 	int (*unpopulate_bit) (struct blockmanager*, uint32_t ppa);

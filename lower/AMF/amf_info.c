@@ -32,7 +32,7 @@ typedef struct amf_wrapper{
 
 amf_wrapper *wrapper_array;
 std::queue<amf_wrapper*>* wrap_q;
-
+//[seg#,page,chip,bus,card]
 #define extract_bus_num(a) ((a>>1)&0x7)
 
 void amf_traffic_print(lower_info *);
@@ -123,7 +123,6 @@ uint32_t amf_info_create(lower_info *li, blockmanager *bm){
 	for(uint32_t i=0; i<QDEPTH; i++){
 		wrap_q->push(&wrapper_array[i]);
 	}
-
 	return 1;
 }
 

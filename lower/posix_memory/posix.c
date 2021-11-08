@@ -31,15 +31,22 @@ char *result_addr;
 
 void posix_traffic_print(lower_info *li);
 
+typedef struct physical_page_cache{
+	uint32_t ppa;
+}physical_page_cache;
+
+pthread_mutex_t page_cache_lock=PTHREAD_MUTEX_INITIALIZER;
+physical_page_cache pp_cache[QDEPTH];
+
 lower_info my_posix={
 	.create=posix_create,
 	.destroy=posix_destroy,
 #ifdef LASYNC
-	.write=posix_make_push,
-	.read=posix_make_pull,
+	.write=posix_make_write,
+	.read=posix_make_read,
 #else
-	.write=posix_push_data,
-	.read=posix_pull_data,
+	.write=posix_write,
+	.read=posix_read,
 #endif
 	.device_badblock_checker=NULL,
 #ifdef LASYNC
@@ -93,10 +100,10 @@ void *l_main(void *__input){
 		}
 		switch(inf_req->type){
 			case FS_LOWER_W:
-				posix_push_data(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
+				posix_write(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
 				break;
 			case FS_LOWER_R:
-				posix_pull_data(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
+				posix_read(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
 				break;
 			case FS_LOWER_T:
 				posix_trim_block(inf_req->key, inf_req->isAsync);
@@ -107,7 +114,7 @@ void *l_main(void *__input){
 	return NULL;
 }
 
-void *posix_make_push(uint32_t PPA, uint32_t size, value_set* value, bool async, algo_req *const req){
+void *posix_make_write(uint32_t PPA, uint32_t size, value_set* value, bool async, algo_req *const req){
 	bool flag=false;
 	posix_request *p_req=(posix_request*)malloc(sizeof(posix_request));
 	p_req->type=FS_LOWER_W;
@@ -131,7 +138,7 @@ void *posix_make_push(uint32_t PPA, uint32_t size, value_set* value, bool async,
 	return NULL;
 }
 
-void *posix_make_pull(uint32_t PPA, uint32_t size, value_set* value, bool async, algo_req *const req){
+void *posix_make_read(uint32_t PPA, uint32_t size, value_set* value, bool async, algo_req *const req){
 	bool flag=false;
 	posix_request *p_req=(posix_request*)malloc(sizeof(posix_request));
 	if(PPA > _NOP){
@@ -208,6 +215,9 @@ uint32_t posix_create(lower_info *li, blockmanager *b){
 
 	memset(li->req_type_cnt,0,sizeof(li->req_type_cnt));
 
+	for(uint32_t i=0; i<QDEPTH; i++){
+		pp_cache[i].ppa=UINT32_MAX;
+	}
 	return 1;
 }
 
@@ -241,7 +251,7 @@ extern bb_checker checker;
 inline uint32_t convert_ppa(uint32_t PPA){
 	return PPA;
 }
-void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
+void *posix_write(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
 	if(PPA==lower_test_ppa){
@@ -276,14 +286,32 @@ void *posix_push_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 		abort();
 	}
 	memcpy(seg_table[PPA].storage,value->value,size);
+	memcpy(seg_table[PPA].oob, value->oob, OOB_SIZE);
 
 	req->end_req(req);
 	return NULL;
 }
 
-void *posix_pull_data(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
+void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
+
+	bool ishit=false;
+	pthread_mutex_lock(&page_cache_lock);
+	if(PPA==pp_cache[PPA%QDEPTH].ppa){
+		ishit=true;
+		if(!seg_table[PPA].storage){
+			printf("%u not populated! end_req:%p\n",PPA, req->end_req);
+			abort();
+		} else {
+			memcpy(value->value,seg_table[PPA].storage,size);
+		}
+	}
+	pthread_mutex_unlock(&page_cache_lock);
+	if(ishit){
+		req->end_req(req);
+		return NULL;
+	}
 
 	if(PPA==lower_test_ppa){
 		printf("%u (piece:%u) target read\n", lower_test_ppa, lower_test_ppa*2);
@@ -320,9 +348,14 @@ void *posix_pull_data(uint32_t _PPA, uint32_t size, value_set* value, bool async
 		abort();
 	} else {
 		memcpy(value->value,seg_table[PPA].storage,size);
+		memcpy(value->oob, seg_table[PPA].oob, OOB_SIZE);
 	}
 	req->type_lower=1;
 
+
+	pthread_mutex_lock(&page_cache_lock);
+	pp_cache[PPA%QDEPTH].ppa=_PPA;
+	pthread_mutex_unlock(&page_cache_lock);
 
 	req->end_req(req);
 	return NULL;

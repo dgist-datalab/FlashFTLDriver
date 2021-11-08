@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=lsmftl
+export TARGET_ALGO=layeredLSM
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -18,7 +18,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
-#-fsanitize=address\
+-fsanitize=address\
 
 export COMMONFLAGS+=\
 			-Wno-write-strings\
@@ -29,7 +29,8 @@ export COMMONFLAGS+=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-DREAL_BENCH_MODE\
+			-DPARALLEL_MANAGER\
+#			-DREAL_BENCH_MODE\
 #-O3 -march=native -mtune=native -flto=20 \
 #-DTRACE_COLLECT\
 #			-DTRACE_REPLAY\
@@ -116,6 +117,7 @@ SRCS +=\
 	./include/utils/tag_q.c\
 	./blockmanager/base_block_manager.c\
 	./blockmanager/bb_checker.c\
+	./parallel_unit_manager/pu_manager.c\
 
 TARGETOBJ =\
 			$(patsubst %.c,%.o,$(SRCS))\

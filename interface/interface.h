@@ -40,7 +40,8 @@ bool inf_assign_try(request *req);
 void inf_free();
 void inf_print_debug();
 void* qmanager_find_by_algo(KEYT key);
-value_set *inf_get_valueset(PTR,int,uint32_t length);//NULL is uninitial, non-NULL is memcpy
+value_set *inf_get_valueset(char *data, int, uint32_t length);//NULL is uninitial, non-NULL is memcpy
+value_set *inf_get_valueset_oob(char *data, char *oob, int, uint32_t length);//NULL is uninitial, non-NULL is memcpy
 void inf_free_valueset(value_set*, int);
 void inf_lower_log_print();
 

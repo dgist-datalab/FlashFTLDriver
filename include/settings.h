@@ -51,7 +51,7 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 16L
+#define GIGAUNIT 8L
 #ifndef OP
 #define OP 85
 #endif
@@ -77,6 +77,7 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)<(b)?(b):(a))
 
+#define OOB_SIZE 128
 
 #define interface_vector
 #define LPAGESIZE 4096
@@ -161,8 +162,6 @@ static inline bool KEYVALCHECK(KEYT a){
 	#define KEYT uint32_t
 #endif
 #define BLOCKT uint32_t
-#define V_PTR char * const
-#define PTR char*
 #define ASYNC 1
 #define QSIZE (128)
 #define LOWQDEPTH (128)
@@ -184,12 +183,6 @@ static inline bool KEYVALCHECK(KEYT a){
 #define SPINSYNC
 //#define BUSE_MEASURE
 //#define BUSE_ASYNC 0
-
-#define EPRINT(error, isabort)\
-	do{\
-		printf("[%s:%d]-%s\n", __FILE__,__LINE__, (error));\
-		if((isabort)){abort();}\
-	}while(0)
 
 
 static inline void print_stacktrace()

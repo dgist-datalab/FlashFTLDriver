@@ -10,6 +10,7 @@ extern struct algorithm page_ftl;
 extern struct algorithm algo_lsm;
 extern struct algorithm demand_ftl;
 extern struct algorithm lsm_ftl;
+extern struct algorithm layered_lsm;
 
 //device layer
 extern struct lower_info memio_info;
@@ -18,6 +19,7 @@ extern struct lower_info net_info;
 extern struct lower_info my_posix; //posix, posix_memory,posix_async
 extern struct lower_info no_info;
 extern struct lower_info amf_info;
+extern struct lower_info pu_manager;
 
 //block manager
 extern struct blockmanager base_bm;
@@ -25,6 +27,9 @@ extern struct blockmanager pt_bm;
 extern struct blockmanager seq_bm;
 
 static void layer_info_mapping(master_processor *mp,int argc, char **argv){
+#ifdef PARALLEL_MANAGER
+	mp->li=&pu_manager;
+#else
 #if defined(posix) || defined(posix_async) || defined(posix_memory)
 	mp->li=&my_posix;
 #elif defined(bdbm_drv)
@@ -38,6 +43,7 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 #elif defined(AMF)
 	mp->li=&amf_info;
 #endif
+#endif
 
 
 #ifdef normal
@@ -50,6 +56,8 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 	mp->algo=&__demand;
 #elif defined(lsmftl)
 	mp->algo=&lsm_ftl;
+#elif defined(layeredLSM)
+	mp->algo=&layered_lsm;
 #elif defined(badblock)
 	mp->algo=&__badblock;
 #endif

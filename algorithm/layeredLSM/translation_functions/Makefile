@@ -1,0 +1,25 @@
+SRCS +=\
+	exact_mapping.c\
+	bf.c\
+
+
+OBJS :=\
+	$(patsubst %.c,%.o,$(SRCS))\
+
+TARGETOBJ:=\
+	$(addprefix ../../../object/,$(OBJS))\
+
+LEAK: all
+all: $(TARGETOBJ)
+
+libnom.a : $(TARGETOBJ)
+	$(AR) r $(@) $(TARGETOBJ)
+
+%.o :%.c
+	$(CC) $(CFLAGS_ALGO) -c $< -o $@
+
+../../../object/%.o:%.c
+	$(CC) $(CFLAGS_ALGO) -c $< -o $@
+
+clean : 
+	@$(RM) *.o

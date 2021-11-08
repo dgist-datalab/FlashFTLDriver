@@ -38,4 +38,8 @@ static inline void bitmap_free(bitmap* b){
 	free(b);
 }
 
+static inline void bitmap_reinit(bitmap *b, uint32_t member_num){
+	memset(b, 0, member_num/8+(member_num%8?1:0) * sizeof(uint8_t));
+}
+
 #endif
