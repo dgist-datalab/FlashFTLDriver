@@ -128,3 +128,13 @@ void __checking_data_free(){
 	free(keymap);
 	fdriver_destroy(&data_check_lock);
 }
+
+void __checking_data_dump(FILE *fp){
+	fwrite(keymap, sizeof(uint32_t), RANGE, fp);
+}
+
+void __checking_data_load(FILE *fp){
+	keymap=(uint32_t *)malloc(sizeof(uint32_t)*RANGE);
+	fdriver_mutex_init(&data_check_lock);
+	fread(keymap, sizeof(uint32_t), RANGE, fp);
+}

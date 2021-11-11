@@ -23,6 +23,9 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <map>
 
 extern Redblack rb_tree;
@@ -357,7 +360,7 @@ bool inf_make_req_fromApp(char _type, KEYT _key,uint32_t offset, uint32_t len,ch
 	return true;
 }
 
-void inf_init(int apps_flag, int total_num, int argc, char **argv, bool data_check_flag){
+void inf_init(int apps_flag, int total_num, bool data_load, int argc, char **argv, bool data_check_flag){
 #ifdef BUSE_MEASURE
     measure_init(&infTime);
     measure_init(&infendTime);
@@ -390,23 +393,14 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv, bool data_che
 		bench_add(NOR,0,-1,total_num);
 	}
 
-	layer_info_mapping(&mp, argc, argv);
+	layer_info_mapping(&mp, data_load, argc, argv);	
 	mp._data_check_flag=data_check_flag;
 	if(mp._data_check_flag){
 		__checking_data_init();
 	}
-	
-/*
-	mp.li->create(mp.li,mp.bm);
-#ifdef partition
-	int temp[PARTNUM];
-	temp[MAP_S]=MAPPART_SEGS;
-	temp[DATA_S]=DATAPART_SEGS;
-	mp.bm->pt_create(mp.bm,PARTNUM,temp,mp.li);
-#else
-	mp.bm->create(mp.bm,mp.li);
-#endif
-	mp.algo->create(mp.li,mp.bm,mp.algo);*/
+	if(data_load){
+		inf_load("test.dump");
+	}
 }
 
 
@@ -639,7 +633,7 @@ bool inf_end_req( request * const req){
 extern std::multimap<uint32_t, request *> *stop_req_list;
 extern std::map<uint32_t, request *> *stop_req_log_list;
 
-void inf_free(){
+void inf_free(bool data_dump, char *filename){
 	//inf_print_lot();
 	if(stop_req_list){
 		delete stop_req_list;
@@ -671,8 +665,15 @@ void inf_free(){
     printf("infendTime : ");
     measure_adding_print(&infendTime);
 #endif
+
+	if(data_dump){
+		inf_dump(filename);
+	}
+
 	mp.algo->destroy(mp.li,mp.algo);
 	mp.li->destroy(mp.li);
+	mp.bm->destroy(mp.bm);
+
 	if(mp._data_check_flag){
 		__checking_data_free();
 	}
@@ -931,3 +932,26 @@ void inf_lower_log_print(){
     }
 }
 
+uint32_t inf_dump(char *filename){
+	FILE *fp=fopen(filename, "w");
+	mp.bm->dump(mp.bm, fp);
+	mp.li->dump(mp.li, fp);
+	mp.algo->dump(fp);
+	if(mp._data_check_flag){
+		__checking_data_dump(fp);
+	}
+	fclose(fp);
+	return 1;
+}
+
+uint32_t inf_load(char *filename){
+	FILE *fp=fopen(filename, "r");
+	mp.bm->load(mp.bm, mp.li, fp);
+	mp.li->load(mp.li, fp);
+	mp.algo->load(mp.li, mp.bm, mp.algo, fp);
+	if(mp._data_check_flag){
+		__checking_data_load(fp);
+	}
+	fclose(fp);
+	return 1;
+}

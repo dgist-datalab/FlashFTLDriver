@@ -51,7 +51,7 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 8L
+#define GIGAUNIT 4L
 #ifndef OP
 #define OP 85
 #endif

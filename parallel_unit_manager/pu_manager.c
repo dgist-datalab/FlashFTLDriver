@@ -33,6 +33,9 @@ lower_info pu_manager={
 	.lower_show_info		=	pu_show_info,
 	.lower_tag_num	=	pu_lower_tag_num,
 	.print_traffic	=	pu_traffic_print,
+	.dump=pu_dump,
+	.load=pu_load,
+
 };
 
 static uint8_t test_type(uint8_t type){
@@ -108,20 +111,21 @@ static inline void release_pu_wrapper(pu_wrapper *pw){
 
 void *pu_end_req (algo_req *algo_req){
 	pu_wrapper *pu=(pu_wrapper*)algo_req->param;
-	/*TODO:DO SOMETHING*/
+
 
 	pthread_mutex_lock(&pu_cache_lock);
 	pu_temp_cache[pu->ppa%QDEPTH].ppa=pu->ppa;
 	memcpy(pu_temp_cache[pu->ppa%QDEPTH].page, pu->data->value, PAGESIZE);
 	pthread_mutex_unlock(&pu_cache_lock);
 
-	release_pu_wrapper(pu);
+	algo_req->param=pu->param;
 	algo_req->end_req=pu->end_req;
+	release_pu_wrapper(pu);
 	algo_req->end_req(algo_req);
 	return NULL;
 }
 
-uint32_t pu_create(lower_info *_li, blockmanager *bm){
+void pu_create_body(lower_info *_li){
 	lower_info *li;
 #if defined(posix) || defined(posix_async) || defined(posix_memory)
 	li=&my_posix;
@@ -137,19 +141,27 @@ uint32_t pu_create(lower_info *_li, blockmanager *bm){
 	li=&amf_info;
 #endif
 	
-	li->create(li, bm);
 	_li->private_data=(void*)li;
-	pu_wrapper_array=(pu_wrapper*)calloc(QDEPTH, sizeof(pu_wrapper_array));
+	pu_wrap_q=new std::queue<pu_wrapper*>();
+	pu_wrapper_array=(pu_wrapper*)calloc(QDEPTH, sizeof(pu_wrapper));
 	for(uint32_t i=0; i<QDEPTH; i++){
 		pu_wrap_q->push(&pu_wrapper_array[i]);
 		pu_temp_cache[i].ppa=UINT32_MAX;
 	}
+}
+
+uint32_t pu_create(lower_info *_li, blockmanager *bm){
+	pu_create_body(_li);
+	lower_info *li=(lower_info*)_li->private_data;
+	li->create(li, bm);
 	return 1;
 }
 
 void* pu_destroy(lower_info *li){
 	lower_info *real_lower=(lower_info*)li->private_data;
 	real_lower->destroy(real_lower);
+	free(pu_wrapper_array);
+	delete pu_wrap_q;
 	return NULL;
 }
 
@@ -158,7 +170,7 @@ void* pu_write(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req
 	pu_wrapper *temp_pu_wrapper=get_pu_wrapper(PU_WRITE, ppa, req, req->param, 
 			value, req->end_req);
 	req->end_req=pu_end_req;
-	req->param=(void *)temp_pu_wrapper;
+	req->param=(void*)temp_pu_wrapper;
 	real_lower->write(ppa, size, value, async, req);
 	return NULL;
 }
@@ -234,4 +246,15 @@ void pu_flying_req_wait(){
 		real_lower->lower_flying_req_wait();
 	}
 	return;
+}
+
+uint32_t	pu_dump(lower_info *li, FILE *fp){
+	lower_info *real_lower=(lower_info*)pu_manager.private_data;
+	return real_lower->dump(real_lower, fp);
+}
+
+uint32_t	pu_load(lower_info *_li, FILE *fp){
+	pu_create_body(_li);
+	lower_info *real_lower=(lower_info*)pu_manager.private_data;
+	return real_lower->load(real_lower, fp);
 }

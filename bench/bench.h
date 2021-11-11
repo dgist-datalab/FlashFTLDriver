@@ -22,7 +22,7 @@
 typedef struct{
 	FSTYPE type;
 	KEYT key;
-	V_PTR value;
+	char* value;
 	uint32_t range;
 	uint32_t length;
 	int mark;

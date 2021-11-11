@@ -9,7 +9,8 @@
 typedef struct block_set{
 	uint32_t total_invalid_number;
 	uint32_t total_valid_number;
-	uint32_t used_page_num;
+	uint32_t block_set_idx;
+	bool isused;
 	uint8_t type;
 	__block *blocks[BPS];
 	void *hptr;
@@ -25,7 +26,6 @@ typedef struct seq_bm_private{
 	int pnum;
 	queue **free_logical_seg_q_pt;
 	queue *invalid_block_q;
-	uint8_t *seg_populate_bit;
 	mh **max_heap_pt;
 }sbm_pri;
 
@@ -34,7 +34,8 @@ uint32_t seq_destroy (struct blockmanager*);
 uint32_t seq_free_seg_num(struct blockmanager*);
 __block* seq_get_block (struct blockmanager*, __segment *);
 __block *seq_pick_block(struct blockmanager *, uint32_t page_num);
-__segment* seq_get_segment (struct blockmanager*, bool isreserve);
+__segment* seq_get_segment (struct blockmanager*, uint32_t  type);
+__segment* seq_get_segment_target(struct blockmanager*, uint32_t seg_idx, uint32_t  type);
 bool seq_check_full(struct blockmanager *,__segment *active, uint8_t type);
 bool seq_is_gc_needed (struct blockmanager*);
 __gsegment* seq_get_gc_target (struct blockmanager*);
@@ -60,10 +61,14 @@ void seq_invalidate_number_decrease(struct blockmanager *bm, uint32_t ppa);
 uint32_t seq_get_invalidate_number(struct blockmanager *bm, uint32_t seg_idx);
 uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm);
 
+uint32_t seq_load(struct blockmanager *bm, lower_info *li, FILE* fp);
+uint32_t seq_dump(struct blockmanager *bm, FILE *fp);
+//uint32_t seq_get_segment_loading(struct blockmanager *);
+//uint32_t seq_load_done(struct blockmanager *bm)
 
 uint32_t seq_pt_create(struct blockmanager *, int, int*, lower_info *);
 uint32_t seq_pt_destroy(struct blockmanager *);
-__segment* seq_pt_get_segment (struct blockmanager*, int pt_num, bool isreserve);
+__segment* seq_pt_get_segment (struct blockmanager*, int pt_num, uint32_t type);
 __gsegment* seq_pt_get_gc_target (struct blockmanager*, int pt_num);
 void seq_pt_trim_segment(struct blockmanager*, int pt_num, __gsegment *, lower_info*);
 int seq_pt_remain_page(struct blockmanager*, __segment *active,int pt_num);

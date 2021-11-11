@@ -17,3 +17,5 @@ void		pu_show_info();
 uint32_t	pu_lower_tag_num();
 void		pu_flying_req_wait();
 void		pu_traffic_print(lower_info *);
+uint32_t	pu_dump(lower_info *li, FILE *fp);
+uint32_t	pu_load(lower_info *li, FILE *fp);

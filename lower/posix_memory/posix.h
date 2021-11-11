@@ -9,8 +9,8 @@
 
 uint32_t posix_create(lower_info*,blockmanager *);
 void *posix_destroy(lower_info*);
-void* posix_push_data(uint32_t ppa, uint32_t size, value_set *value,bool async, algo_req * const req);
-void* posix_pull_data(uint32_t ppa, uint32_t size, value_set* value,bool async,algo_req * const req);
+void* posix_write(uint32_t ppa, uint32_t size, value_set *value,bool async, algo_req * const req);
+void* posix_read(uint32_t ppa, uint32_t size, value_set* value,bool async,algo_req * const req);
 void* posix_make_push(uint32_t ppa, uint32_t size, value_set *value,bool async, algo_req * const req);
 void* posix_make_pull(uint32_t ppa, uint32_t size, value_set *value,bool async, algo_req * const req);
 void* posix_badblock_checker(uint32_t ppa, uint32_t size, void*(*process)(uint64_t,uint8_t));
@@ -25,6 +25,9 @@ uint32_t posix_hw_do_merge(uint32_t lp_num, ppa_t *lp_array, uint32_t hp_num,ppa
 char * posix_hw_get_kt();
 char *posix_hw_get_inv();
 uint32_t convert_ppa(uint32_t);
+uint32_t posix_dump(lower_info *li, FILE *p);
+uint32_t posix_load(lower_info *li, FILE *p);
+
 
 typedef struct posix_request {
 	FSTYPE type;

@@ -18,17 +18,17 @@ typedef struct upper_request{
 	const FSTYPE type;
 	const KEYT key;
 	uint32_t length;
-	V_PTR value;
+	char* value;
 	//anything
 }upper_request;
 
 typedef struct value_set{
-	PTR value;
+	char* value;
 	uint32_t length;
 	int dmatag; //-1 == not dma_alloc, others== dma_alloc
 	uint32_t ppa;
 	bool from_app;
-	PTR rmw_value;
+	char* rmw_value;
 	uint8_t status;
 	uint32_t len;
 	uint32_t offset;
@@ -146,6 +146,8 @@ struct lower_info {
 	char *(*hw_get_inv)();
 #endif
 	void (*print_traffic)(struct lower_info *);
+	uint32_t (*dump)(lower_info *li, FILE *fp);
+	uint32_t (*load)(lower_info *li, FILE *fp );
 	struct blockmanager *bm;
 
 	lower_status (*statusOfblock)(BLOCKT);
@@ -181,6 +183,8 @@ struct algorithm{
 	uint32_t (*remove)(request *const);
 	uint32_t (*test)();
 	uint32_t (*print_log)();
+	uint32_t (*dump)(FILE *fp);
+	uint32_t (*load)(lower_info *li, blockmanager *bm, struct algorithm *, FILE *fp);
 	lower_info* li;
 	struct blockmanager *bm;
 	void *algo_body;
@@ -225,13 +229,18 @@ typedef struct ghostsegment{ //for gc
 	uint32_t validate_number;
 }__gsegment;
 
+enum{
+	BLOCK_RESERVE, BLOCK_ACTIVE, BLOCK_LOAD,
+};
+
 struct blockmanager{
 	uint32_t (*create) (struct blockmanager*,lower_info *);
 	uint32_t (*destroy) (struct blockmanager*);
 	__block* (*get_block) (struct blockmanager*,__segment*);
 	__block *(*pick_block)(struct blockmanager*, uint32_t page_num);
 	uint32_t (*free_seg_num)(struct blockmanager *);
-	__segment* (*get_segment) (struct blockmanager*, bool isreserve);
+	__segment* (*get_segment) (struct blockmanager*, uint32_t isreserve);
+	__segment* (*get_segment_target) (struct blockmanager *, uint32_t seg_idx, uint32_t type);
 	__segment* (*retrieve_segment) (struct blockmanager*, uint32_t seg_idx);
 	int (*get_page_num)(struct blockmanager*, __segment*);
 	int (*pick_page_num)(struct blockmanager*, __segment*);
@@ -256,9 +265,14 @@ struct blockmanager{
 	uint32_t (*get_invalidate_number)(struct blockmanager *, uint32_t seg_idx);
 	uint32_t (*get_invalidate_blk_number)(struct blockmanager *);
 
+	uint32_t (*load)(struct blockmanager *, lower_info *li, FILE * fp);
+//	uint32_t (*get_segment_loading)(struct blockmanager *);
+//	uint32_t (*load_done)(struct blockmanager *);
+	uint32_t (*dump)(struct blockmanager *, FILE* fp);
+
 	uint32_t (*pt_create) (struct blockmanager*, int part_num, int *each_part_seg_num, lower_info *);
 	uint32_t (*pt_destroy) (struct blockmanager*);
-	__segment* (*pt_get_segment) (struct blockmanager*, int pt_num, bool isreserve);
+	__segment* (*pt_get_segment) (struct blockmanager*, int pt_num, uint32_t isreserve);
 	__gsegment* (*pt_get_gc_target) (struct blockmanager*, int pt_num);
 	void (*pt_trim_segment)(struct blockmanager*, int pt_num, __gsegment *, lower_info*);
 	int (*pt_remain_page)(struct blockmanager*, __segment *active,int pt_num);
@@ -268,7 +282,6 @@ struct blockmanager{
 
 	lower_info *li;
 	void *private_data;
-	uint32_t assigned_page;
 };
 
 #define SEGNUM(ppa)  (((ppa)/L2PGAP)/_PPS)

@@ -49,7 +49,7 @@ uint32_t seq_pt_destroy(struct blockmanager *bm){
 	return 1;
 }
 
-__segment* seq_pt_get_segment (struct blockmanager*bm, int pt_num, bool isreserve){
+__segment* seq_pt_get_segment (struct blockmanager*bm, int pt_num, uint32_t isreserve){
 	__segment* res=(__segment*)malloc(sizeof(__segment));
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	
@@ -59,8 +59,9 @@ __segment* seq_pt_get_segment (struct blockmanager*bm, int pt_num, bool isreserv
 		abort();
 	}
 
-	if(!isreserve)
+	if(isreserve==BLOCK_ACTIVE){
 		mh_insert_append(p->max_heap_pt[pt_num], (void*)free_block_set);
+	}
 
 	memcpy(res->blocks, free_block_set->blocks, sizeof(__block*)*BPS);
 	res->seg_idx=res->blocks[0]->block_num/BPS;

@@ -34,6 +34,8 @@ struct algorithm page_ftl={
 	.remove=page_remove,
 	.test=NULL,
 	.print_log=print_traffic,
+	.dump=page_dump,
+	.load=page_load,
 };
 
 uint32_t print_traffic(){
@@ -44,11 +46,9 @@ uint32_t print_traffic(){
 }
 
 page_read_buffer rb;
-
-uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
+void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo){
 	algo->li=li; //lower_info means the NAND CHIP
 	algo->bm=bm; //blockmanager is managing invalidation 
-	page_map_create();
 
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
 	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
@@ -64,6 +64,11 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 		return 1;
 	}
 #endif
+}
+
+uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
+	page_create_body(li, bm, algo);
+	page_map_create();
 	return 1;
 }
 

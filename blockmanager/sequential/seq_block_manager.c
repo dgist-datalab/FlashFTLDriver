@@ -13,6 +13,7 @@ struct blockmanager seq_bm={
 	.pick_block=seq_pick_block,
 	.free_seg_num=seq_free_seg_num,
 	.get_segment=seq_get_segment,
+	.get_segment_target=seq_get_segment_target,
 	.get_page_num=seq_get_page_num,
 	.pick_page_num=seq_pick_page_num,
 	.check_full=seq_check_full,
@@ -34,6 +35,8 @@ struct blockmanager seq_bm={
 	.invalidate_number_decrease=seq_invalidate_number_decrease,
 	.get_invalidate_number=seq_get_invalidate_number,
 	.get_invalidate_blk_number=seq_get_invalidate_blk_number,
+	.load=seq_load,
+	.dump=seq_dump,
 
 	.pt_create=seq_pt_create,
 	.pt_destroy=seq_pt_destroy,
@@ -85,7 +88,6 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	p->seq_block=(__block*)calloc(sizeof(__block), _NOB);
 	p->logical_segment=(block_set*)calloc(sizeof(block_set), _NOS);
 	p->assigned_block=p->free_block=0;
-	p->seg_populate_bit=(uint8_t*)calloc(_NOS/8+(_NOS%8?1:0), sizeof(uint8_t));
 
 	int glob_block_idx=0;
 	for(int i=0; i<_NOS; i++){
@@ -96,6 +98,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 			p->logical_segment[i].blocks[j]=&p->seq_block[glob_block_idx];
 			glob_block_idx++;
 		}
+		p->logical_segment[i].block_set_idx=i;
 		p->logical_segment[i].total_invalid_number=0;
 		p->logical_segment[i].total_valid_number=0;
 	}
@@ -113,14 +116,108 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	return 1;
 }
 
+uint32_t seq_dump(struct blockmanager *bm, FILE *fp){
+	sbm_pri *p=(sbm_pri *)bm->private_data;
+	uint64_t temp_NOS=_NOS;
+	uint64_t temp_NOB=_NOB;
+	uint64_t temp_BPS=BPS;
+	printf("temp_NOS:%lu, temp_NOB:%lu, temp_BPS:%lu\n", temp_NOS, temp_NOB, temp_BPS);
+	fwrite(&temp_NOS, sizeof(temp_NOS), 1, fp); //write the total umber of segment
+	fwrite(&temp_NOB, sizeof(temp_NOB), 1, fp); // write the total number of blocks
+	fwrite(&temp_BPS, sizeof(temp_BPS), 1, fp); //write the number of blocks in a segment
+	
+	int glob_block_idx=0;
+	for(uint32_t i=0; i<_NOS; i++){
+		/*write logical_segment*/
+		block_set *l_segment=&p->logical_segment[i];
+		printf("now position :%lu\n", ftell(fp));
+		fwrite(l_segment, sizeof(block_set), 1, fp);
+
+		for(uint32_t j=0; j<BPS; j++){
+			__block *b=&p->seq_block[glob_block_idx];
+			fwrite(b, sizeof(__block), 1, fp); //write a block
+			fwrite(b->bitset, sizeof(uint8_t), _PPB*L2PGAP/8, fp);//write bitset
+			glob_block_idx++;
+		}
+	}
+	printf("last- now position :%lu\n", ftell(fp));
+	return 1;
+}
+
+uint32_t seq_load(struct blockmanager *bm, lower_info *li, FILE *fp){
+	bm->li=li;
+	uint64_t read_NOS, read_NOB, read_BPS;
+
+	fread(&read_NOS, sizeof(read_NOS), 1, fp);
+	fread(&read_NOB, sizeof(read_NOS), 1, fp);
+	fread(&read_BPS, sizeof(read_NOS), 1, fp);
+	printf("read_NOS:%lu, read_NOB:%lu, read_BPS:%lu\n", read_NOS, read_NOB, read_BPS);
+
+	if(read_NOS!=_NOS || read_NOB!=_NOB || read_BPS!=BPS){
+		EPRINT("different device setting", true);
+	}
+	
+	if(bm->private_data){
+		EPRINT("already block manager data exists", true);
+	}
+
+	sbm_pri *p=(sbm_pri*)malloc(sizeof(sbm_pri));
+	p->seq_block=(__block*)calloc(sizeof(__block), _NOB);
+	p->logical_segment=(block_set*)calloc(sizeof(block_set), _NOS);
+	p->assigned_block=p->free_block=0;
+
+	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt);
+	q_init(&p->free_logical_segment_q, _NOS);
+	q_init(&p->invalid_block_q, _NOS);
+
+	int global_block_idx=0;
+	for(uint32_t i=0; i<_NOS; i++){
+		block_set *l_segment=&p->logical_segment[i];
+		printf("now position :%lu\n", ftell(fp));
+		fread(l_segment, sizeof(block_set), 1, fp);
+		l_segment->hptr=NULL;
+
+		for(uint32_t j=0; j<BPS; j++){
+			__block *b=&p->seq_block[global_block_idx];
+			l_segment->blocks[j]=b;
+			fread(b, sizeof(__block), 1, fp);
+			b->bitset=(uint8_t*)calloc(_PPB*L2PGAP/8,1);
+			fread(b->bitset, sizeof(uint8_t), _PPB * L2PGAP/8, fp);
+			b->hptr=NULL;
+			global_block_idx++;
+		}
+	}
+
+	for(uint32_t i=0; i<_NOS; i++){
+		block_set *l_segment=&p->logical_segment[i];
+
+		if(l_segment->total_invalid_number && l_segment->total_invalid_number == l_segment->total_valid_number){
+			q_enqueue((void*)l_segment, p->invalid_block_q);
+			p->assigned_block++;
+		}
+		else if(l_segment->isused==false){
+			q_enqueue((void*)l_segment, p->free_logical_segment_q);	
+			p->free_block++;
+		}
+		else{
+			mh_insert_append(p->max_heap,(void*)l_segment);
+			p->assigned_block++;
+		}
+	}
+
+	printf("last - now position :%lu\n", ftell(fp));
+	bm->private_data=(void*)p;
+	return 1;
+}
+
 uint32_t seq_destroy (struct blockmanager* bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	free(p->seq_block);
 	free(p->logical_segment);
 	mh_free(p->max_heap);
-	free(p->seg_populate_bit);
 	q_free(p->free_logical_segment_q);
 	free(p);
+	bm->private_data=NULL;
 	return 1;
 }
 
@@ -129,18 +226,14 @@ __block* seq_get_block (struct blockmanager* bm, __segment* s){
 	return s->blocks[s->now++];
 }
 
-__segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
+__segment *get_segment_body(block_set *free_block_set, sbm_pri *p, uint32_t type){
 	__segment* res=(__segment*)malloc(sizeof(__segment));
-	sbm_pri *p=(sbm_pri*)bm->private_data;
-	
-	block_set *free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
-	
 	if(!free_block_set){
 		EPRINT("dev full??", false);
 		return NULL;
 	}
 
-	if(free_block_set->total_invalid_number || free_block_set->total_valid_number){
+	if(type!=BLOCK_LOAD && (free_block_set->total_invalid_number || free_block_set->total_valid_number)){
 		EPRINT("how can it be!\n", true);
 	}
 
@@ -150,10 +243,11 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	}
 
 
-	if(isreserve){
+	if(type==BLOCK_RESERVE){
 
 	}
 	else{
+		free_block_set->isused=true;
 		mh_insert_append(p->max_heap, (void*)free_block_set);
 	}
 
@@ -164,7 +258,25 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	res->invalid_blocks=0;
 	res->used_page_num=0;
 	res->seg_idx=res->blocks[0]->block_num/BPS;
+
+	if(type==BLOCK_LOAD){
+		for(uint32_t i=0; i<BPS; i++){
+			__block *b=free_block_set->blocks[i];
+			if(b->now==_PPB){
+				res->now++;
+			}
+			res->used_page_num+=b->now;
+		}
+	}
+	return res;
+}
+
+__segment* seq_get_segment (struct blockmanager* bm, uint32_t type){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
 	
+	block_set *free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
+	__segment* res=get_segment_body(free_block_set, p, type);
+
 	p->assigned_block++;
 	p->free_block--;
 
@@ -173,12 +285,46 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 		printf("missing segment error\n");
 		abort();
 	}
-/*
-	if(p->seg_populate_bit[res->seg_idx/8] & (1<<(res->seg_idx%8))){
-		EPRINT("already populate!\n", true);
+	return res;
+}
+
+__segment* seq_get_segment_target (struct blockmanager* bm, uint32_t seg_idx, uint32_t type){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	queue *temp_free_block;
+	q_init(&temp_free_block, _NOS);
+	
+	block_set *free_block_set=NULL;
+	uint32_t q_size=p->free_logical_segment_q->size; 
+	for(uint32_t i=0; i<q_size; i++){
+		free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
+		if(free_block_set->block_set_idx==seg_idx){
+			break;
+		}
+		else{
+			q_enqueue((void*)free_block_set, temp_free_block);
+		}
 	}
 
-	p->seg_populate_bit[res->seg_idx/8] |=(1<<(res->seg_idx%8));*/
+	__segment* res=get_segment_body(free_block_set, p, type);
+
+	q_size=p->free_logical_segment_q->size;
+	for(uint32_t i=0; i<q_size; i++){
+		free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
+		q_enqueue((void*)free_block_set, temp_free_block);
+	}
+
+	
+	q_free(p->free_logical_segment_q);
+	p->free_logical_segment_q=temp_free_block;
+
+	p->assigned_block++;
+	p->free_block--;
+
+
+	if(p->assigned_block+p->free_block!=_NOS){
+		printf("missing segment error\n");
+		abort();
+	}
 	return res;
 }
 
@@ -189,15 +335,18 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 	uint32_t segment_idx=segment_start_block_number/BPS;
 	block_set *bs=&p->logical_segment[segment_idx];
 
+	bs->isused=true;
 	mh_insert_append(p->max_heap, (void*)bs);
 
-	return seq_get_segment(bm,true);
+	return seq_get_segment(bm, BLOCK_RESERVE);
 }
 
 
 void seq_reinsert_segment(struct blockmanager *bm, uint32_t seg_idx){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	block_set *bs=&p->logical_segment[seg_idx];
+
+	bs->isused=true;
 	mh_insert_append(p->max_heap, (void*)bs);
 }
 
@@ -306,6 +455,7 @@ void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_inf
 	block_set *bs=&p->logical_segment[segment_idx];
 	bs->total_invalid_number=0;
 	bs->total_valid_number=0;
+	bs->isused=false;
 	/*
 	if(bs==&p->logical_segment[1228928/16384]){
 		bs->blocks[(1228928%16384)%256]
@@ -490,7 +640,6 @@ int seq_get_page_num(struct blockmanager* bm,__segment *s){
 	
 	if(page>_PPB) abort();
 	s->used_page_num++;
-	bm->assigned_page++;
 
 	if(s->used_page_num!=res%_PPS+1){
 		abort();

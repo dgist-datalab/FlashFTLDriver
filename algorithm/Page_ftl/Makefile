@@ -2,6 +2,7 @@ SRCS +=\
 	   page.c\
 	   map.c\
 	   gc.c\
+	   data_dump.c\
 
 OBJS :=\
 	$(patsubst %.c,%.o,$(SRCS))\

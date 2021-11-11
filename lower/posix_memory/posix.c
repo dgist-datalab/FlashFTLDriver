@@ -8,6 +8,7 @@
 #include "../../interface/queue.h"
 #include "../../interface/bb_checker.h"
 #include "../../include/utils/cond_lock.h"
+#include "../../include/debug_utils.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -17,6 +18,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <limits.h>
+#include <queue>
 //#include <readline/readline.h>
 //#include <readline/history.h>
 pthread_mutex_t fd_lock;
@@ -70,6 +72,8 @@ lower_info my_posix={
 	.hw_get_inv=posix_hw_get_inv
 #endif
 	.print_traffic=posix_traffic_print,
+	.dump=posix_dump,
+	.load=posix_load,
 };
 
 void posix_traffic_print(lower_info *li){
@@ -183,7 +187,7 @@ void *posix_make_trim(uint32_t PPA, bool async){
 }
 #endif
 
-uint32_t posix_create(lower_info *li, blockmanager *b){
+static uint32_t posix_create_body(lower_info *li){
 	li->NOB=_NOS;
 	li->NOP=_NOP;
 	li->SOB=BLOCKSIZE*BPS;
@@ -194,7 +198,7 @@ uint32_t posix_create(lower_info *li, blockmanager *b){
 	li->TS=TOTALSIZE;
 	lower_flying=cl_init(QDEPTH,true);
 	
-	invalidate_ppa_ptr=(char*)malloc(sizeof(uint32_t)*PPA_LIST_SIZE*20);
+	//invalidate_ppa_ptr=(char*)malloc(sizeof(uint32_t)*PPA_LIST_SIZE*20);
 
 #ifdef LASYNC
 	printf("!!! (ASYNC) posix memory NOP:%d!!!\n",li->NOP);
@@ -213,11 +217,81 @@ uint32_t posix_create(lower_info *li, blockmanager *b){
 	pthread_create(&t_id,NULL,&l_main,NULL);
 #endif
 
-	memset(li->req_type_cnt,0,sizeof(li->req_type_cnt));
-
 	for(uint32_t i=0; i<QDEPTH; i++){
 		pp_cache[i].ppa=UINT32_MAX;
 	}
+	return 1;
+}
+
+uint32_t posix_create(lower_info *li, blockmanager *b){
+	posix_create_body(li);
+	memset(li->req_type_cnt,0,sizeof(li->req_type_cnt));
+	return 1;
+}
+
+uint32_t posix_dump(lower_info *li, FILE *fp){
+	uint64_t temp_NOP=_NOP;
+	printf("now position :%lu\n", ftell(fp));
+	printf("temp_NOP:%lu\n", _NOP);
+	fwrite(&temp_NOP,sizeof(uint64_t), 1, fp);
+	printf("now position :%lu\n", ftell(fp));
+	std::queue<uint32_t> empty_list;
+	for(uint32_t i=0; i<li->NOP; i++){
+		if(seg_table[i].storage==NULL){
+			empty_list.push(i);
+		}
+	}
+	uint32_t empty_list_size=empty_list.size();
+	fwrite(&empty_list_size,sizeof(uint32_t), 1, fp);
+
+	for(uint32_t i=0; i<empty_list_size; i++){
+		uint32_t target_ppa=empty_list.front();
+		fwrite(&target_ppa,sizeof(uint32_t), 1, fp);
+		empty_list.pop();
+	}
+
+	for(uint32_t i=0; i<li->NOP; i++){
+		if(seg_table[i].storage!=NULL){
+			fwrite(seg_table[i].storage, 1, PAGESIZE, fp);
+		}
+	}
+
+	fwrite(li->req_type_cnt, sizeof(uint64_t), LREQ_TYPE_NUM, fp);
+	return 1;
+}
+
+uint32_t posix_load(lower_info *li, FILE *fp){
+	posix_create_body(li);
+
+	uint64_t now_NOP;
+	printf("now position :%lu\n", ftell(fp));
+	fread(&now_NOP, sizeof(uint64_t), 1, fp);
+	printf("now_NOP:%lu\n", now_NOP);
+	printf("now position :%lu\n", ftell(fp));
+	if(now_NOP!=_NOP){
+		EPRINT("device setting is differ", true);
+	}
+
+	uint32_t empty_list_size=0;
+	fread(&empty_list_size, sizeof(uint32_t), 1, fp);
+
+	uint32_t *empty_list=(uint32_t *)malloc(sizeof(uint32_t) * 
+			empty_list_size);
+	fread(empty_list, sizeof(uint32_t), empty_list_size, fp);
+
+	for(uint32_t i=0; i<li->NOP; i++){
+		bool ispass=false;
+		for(uint32_t j=0; j<empty_list_size; j++){
+			if(i==empty_list[j]){
+				ispass=true;
+			}
+		}
+		if(ispass) continue;
+		seg_table[i].storage=(char*)malloc(PAGESIZE);
+		fread(seg_table[i].storage, 1, PAGESIZE, fp);
+	}
+
+	fread(li->req_type_cnt, sizeof(uint64_t), LREQ_TYPE_NUM, fp);
 	return 1;
 }
 
@@ -279,7 +353,7 @@ void *posix_write(uint32_t _PPA, uint32_t size, value_set* value, bool async,alg
 	}
 
 	if(!seg_table[PPA].storage){
-		seg_table[PPA].storage = (PTR)malloc(PAGESIZE);
+		seg_table[PPA].storage = (char *)malloc(PAGESIZE);
 	}
 	else{
 		printf("cannot write! plz write before erase!\n");

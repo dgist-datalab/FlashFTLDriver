@@ -29,7 +29,7 @@ uint32_t base_create (struct blockmanager*, lower_info *li);
 uint32_t base_destroy (struct blockmanager*);
 __block* base_get_block (struct blockmanager*, __segment *);
 __block *base_pick_block(struct blockmanager *, uint32_t page_num);
-__segment* base_get_segment (struct blockmanager*, bool isreserve);
+__segment* base_get_segment (struct blockmanager*, uint32_t type);
 __segment* base_retrieve_segment(struct blockmanager *, uint32_t seg_idx);
 bool base_check_full(struct blockmanager *,__segment *active, uint8_t type);
 bool base_is_gc_needed (struct blockmanager*);

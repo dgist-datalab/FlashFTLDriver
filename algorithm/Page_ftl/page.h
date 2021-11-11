@@ -30,4 +30,6 @@ uint32_t page_read(request *const);
 uint32_t page_write(request *const);
 uint32_t page_remove(request *const);
 uint32_t page_flush(request *const);
+uint32_t page_dump(FILE *fp);
+uint32_t page_load(lower_info *li, blockmanager *bm, algorithm *algo, FILE *fp);
 void *page_end_req(algo_req*);

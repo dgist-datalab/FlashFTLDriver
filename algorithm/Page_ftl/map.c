@@ -13,8 +13,8 @@ void page_map_create(){
 		p->mapping[i]=UINT_MAX;
 	}
 	
-	p->reserve=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
-	p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //now active block for inserted request.
+	p->reserve=page_ftl.bm->get_segment(page_ftl.bm, BLOCK_RESERVE); //reserve for GC
+	p->active=page_ftl.bm->get_segment(page_ftl.bm,BLOCK_ACTIVE); //now active block for inserted request.
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
 }
 

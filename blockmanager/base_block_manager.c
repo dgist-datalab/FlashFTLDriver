@@ -9,6 +9,7 @@ struct blockmanager base_bm={
 	.pick_block=base_pick_block,
 	.free_seg_num=NULL,
 	.get_segment=base_get_segment,
+	.get_segment_target=NULL,
 	.retrieve_segment=base_retrieve_segment,
 	.get_page_num=base_get_page_num,
 	.pick_page_num=base_pick_page_num,
@@ -32,6 +33,8 @@ struct blockmanager base_bm={
 	.invalidate_number_decrease=NULL,
 	.get_invalidate_number=NULL,
 	.get_invalidate_blk_number=NULL,
+	.load=NULL,
+	.dump=NULL,
 
 	.pt_create=NULL,
 	.pt_destroy=NULL,
@@ -117,12 +120,12 @@ __block* base_get_block (struct blockmanager* bm, __segment* s){
 	return s->blocks[s->now++];
 }
 
-__segment* base_get_segment (struct blockmanager* bm, bool isreserve){
+__segment* base_get_segment (struct blockmanager* bm, uint32_t type){
 	__segment* res=(__segment*)malloc(sizeof(__segment));
 	bbm_pri *p=(bbm_pri*)bm->private_data;
 	for(int i=0; i<BPS; i++){
 		__block *b=(__block*)q_dequeue(p->base_channel[i].free_block);
-		if(!isreserve){
+		if(type==BLOCK_ACTIVE){
 			mh_insert_append(p->base_channel[i].max_heap,(void*)b);
 		}
 		if(!b) {
@@ -311,7 +314,6 @@ int base_get_page_num(struct blockmanager* bm,__segment *s){
 	
 	s->used_page_num++;
 	if(page>_PPB) abort();
-	bm->assigned_page++;
 	return res;
 }
 

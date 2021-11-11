@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=layeredLSM
+export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -18,7 +18,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
--fsanitize=address\
+#-fsanitize=address\
 
 export COMMONFLAGS+=\
 			-Wno-write-strings\
@@ -193,7 +193,8 @@ libdriver.a: $(TARGETOBJ)
 	mkdir -p object && mkdir -p data
 	cd ./blockmanager/$(TARGET_BM) && $(MAKE) && cd ../../
 	cd ./algorithm/$(TARGET_ALGO) && $(MAKE) clean && $(MAKE) && cd ../../
-	cd ./lower/$(TARGET_LOWER) && $(MAKE) && cd ../../ 
+	cd ./lower/$(TARGET_LOWER) && $(MAKE) && cd ../../
+	mv ./parallel_unit_manager/*.o ./object/
 	mv ./include/data_struct/*.o ./object/
 	mv -f ./blockmanager/*.o ./object/
 	mv ./include/utils/*.o ./object/

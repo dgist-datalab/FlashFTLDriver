@@ -6,7 +6,7 @@ typedef struct page_map_body{
 	bool isfull;
 	uint32_t assign_page;
 
-	/*segment is a kind of Physical Block*/
+	/*segment is kind of Physical Block*/
 	__segment *reserve; //for gc
 	__segment *active; //for gc
 }pm_body;
