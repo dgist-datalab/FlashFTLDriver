@@ -4,7 +4,7 @@
 #include "../include/container.h"
 #include "threading.h"
 
-void inf_init(int apps_flag,int test_num, bool data_load, int argc, char **argv, bool checkingdata);
+void inf_init(int apps_flag,int test_num, int argc, char **argv);
 #ifdef USINGAPP
 bool inf_make_req(const FSTYPE,const KEYT, char *);
 #else
@@ -37,7 +37,7 @@ void inf_print_log();
 uint32_t inf_algorithm_caller(request *const);
 bool inf_end_req(request*const);
 bool inf_assign_try(request *req);
-void inf_free(bool data_dump, char *filename);
+void inf_free();
 void inf_print_debug();
 void* qmanager_find_by_algo(KEYT key);
 value_set *inf_get_valueset(char *data, int, uint32_t length);//NULL is uninitial, non-NULL is memcpy

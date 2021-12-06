@@ -38,6 +38,7 @@ typedef struct fine_cache_monitor{
 #endif
 }fine_cache_monitor;
 
+
 uint32_t fine_init(struct my_cache *, uint32_t total_caching_physical_pages);
 uint32_t fine_free(struct my_cache *);
 uint32_t fine_is_needed_eviction(struct my_cache *, uint32_t , uint32_t *, uint32_t eviction_hint);
@@ -56,3 +57,4 @@ void fine_force_put_mru(struct my_cache *, GTD_entry *, mapping_entry *, uint32_
 bool fine_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint);
 int32_t fine_get_remain_space(struct my_cache *, uint32_t total_eviction_hint);
 void fine_print_log(struct my_cache*);
+bool fine_dump_cache_update(struct my_cache *, GTD_entry*, char *data);

@@ -29,6 +29,8 @@ my_cache sftl_cache_func{
 	.get_eviction_mapping_entry=NULL,
 	.update_eviction_target_translation=sftl_update_eviction_target_translation,
 	.evict_target=NULL,
+	.dump_cache_update=sftl_dump_cache_update,
+	.load_specialized_meta=sftl_load_specialized_meta,
 	.update_dynamic_size=sftl_update_dynamic_size,
 	.exist=sftl_exist,
 	.print_log=NULL,
@@ -678,4 +680,50 @@ uint32_t sftl_update_hit_eviction_hint(struct my_cache *, uint32_t lba, uint32_t
 
 int32_t sftl_get_remain_space(struct my_cache *, uint32_t total_eviction_hint){
 	return scm.max_caching_byte-scm.now_caching_byte-total_eviction_hint;
+}
+
+bool sftl_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
+	if(!etr->private_data) return false;
+	sftl_cache *sc=(sftl_cache*)((lru_node*)etr->private_data)->data;
+
+	bool target;
+	uint32_t max=PAGESIZE/sizeof(uint32_t);
+	uint32_t last_ppa=0;
+	uint32_t head_idx=0;
+	uint32_t *ppa_array=(uint32_t*)data;
+	uint32_t ppa_array_idx=0;
+	uint32_t offset=0;
+	uint32_t total_head=0;
+
+	for_each_bitmap_forward(sc->map, offset, target, max){	
+		if(target){
+			last_ppa=sc->head_array[head_idx++];
+			ppa_array[ppa_array_idx++]=last_ppa;	
+		}
+		else{
+			ppa_array[ppa_array_idx++]=++last_ppa;
+		}
+	}
+
+	free(sc->head_array);
+	bitmap_free(sc->map);
+	lru_delete(scm.lru, (lru_node*)etr->private_data);
+	etr->private_data=NULL;
+	scm.now_caching_byte-=scm.gtd_size[etr->idx];
+
+	return true;
+}
+
+
+void sftl_load_specialized_meta(struct my_cache *cache, GTD_entry *etr, char *data){
+	uint32_t *ppa_list=(uint32_t*)data;
+	uint32_t head_num=1;
+	for(uint32_t i=1; i<PAGESIZE/sizeof(uint32_t); i++){
+		if(ppa_list[i]==ppa_list[i-1]+1){
+		}
+		else{
+			head_num++;
+		}
+	}
+	scm.gtd_size[etr->idx]=head_num*sizeof(uint32_t)+BITMAPSIZE;
 }

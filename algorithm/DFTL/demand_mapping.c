@@ -289,7 +289,8 @@ static inline void update_cache_entry_wrapper(GTD_entry *target_etr, uint32_t lb
 	}
 }
 
-void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
+
+void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
 	uint32_t total_logical_page_num;
 	uint32_t total_translation_page_num;
 
@@ -301,14 +302,6 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 	}
 	else{
 
-	}
-
-	dmm.GTD=(GTD_entry*)calloc(total_translation_page_num,sizeof(GTD_entry));
-	for(uint32_t i=0; i<total_translation_page_num; i++){
-		fdriver_mutex_init(&dmm.GTD[i].lock);
-		dmm.GTD[i].idx=i;
-		dmm.GTD[i].pending_req=list_init();
-		dmm.GTD[i].physical_address=UINT32_MAX;
 	}
 
 
@@ -327,7 +320,6 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 	printf("--------------------\n");
 	printf("|DFTL settings\n");
 	
-	
 	printf("|cache type: %s\n", cache_type(dmm.c_type));
 	printf("|cache size: %.2lf(mb)\n", ((double)dmm.max_caching_pages * PAGESIZE)/M);
 	printf("|\tratio of PFTL: %.2lf%%\n", ((double)dmm.max_caching_pages * PAGESIZE)/(SHOWINGSIZE/K)*100);
@@ -335,6 +327,22 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 	uint32_t cached_entry=dmm.cache->init(dmm.cache, dmm.max_caching_pages);
 	printf("|\tcaching percentage: %.2lf%%\n", (double)cached_entry/total_logical_page_num *100);
 	printf("--------------------\n");
+}
+
+void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
+	demand_map_create_body(total_caching_physical_pages, li, bm);
+
+	uint32_t total_logical_page_num;
+	uint32_t total_translation_page_num;
+	total_logical_page_num=(SHOWINGSIZE/LPAGESIZE);
+	total_translation_page_num=total_logical_page_num/(PAGESIZE/sizeof(DMF));
+	dmm.GTD=(GTD_entry*)calloc(total_translation_page_num,sizeof(GTD_entry));
+	for(uint32_t i=0; i<total_translation_page_num; i++){
+		fdriver_mutex_init(&dmm.GTD[i].lock);
+		dmm.GTD[i].idx=i;
+		dmm.GTD[i].pending_req=list_init();
+		dmm.GTD[i].physical_address=UINT32_MAX;
+	}
 }
 
 void demand_map_free(){
@@ -934,15 +942,10 @@ uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_para
 	static bool print_all=false;
 	static bool debug_flag=false;
 	uint32_t temp_res_value;
-/*
-	if(debug_flag){
-		printf("break! df\n");
-	}
-*/
+
 	if(test_key==now_pair->lba){
 		static int cnt=0;
 		printf("%d L:%u P:%u\n", cnt++, now_pair->lba, now_pair->ppa);
-		//print_all=true;
 	}
 
 	if(print_all){

@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <limits.h>
 #include <queue>
+#include <set>
 //#include <readline/readline.h>
 //#include <readline/history.h>
 pthread_mutex_t fd_lock;
@@ -231,10 +232,7 @@ uint32_t posix_create(lower_info *li, blockmanager *b){
 
 uint32_t posix_dump(lower_info *li, FILE *fp){
 	uint64_t temp_NOP=_NOP;
-	printf("now position :%lu\n", ftell(fp));
-	printf("temp_NOP:%lu\n", _NOP);
 	fwrite(&temp_NOP,sizeof(uint64_t), 1, fp);
-	printf("now position :%lu\n", ftell(fp));
 	std::queue<uint32_t> empty_list;
 	for(uint32_t i=0; i<li->NOP; i++){
 		if(seg_table[i].storage==NULL){
@@ -264,10 +262,7 @@ uint32_t posix_load(lower_info *li, FILE *fp){
 	posix_create_body(li);
 
 	uint64_t now_NOP;
-	printf("now position :%lu\n", ftell(fp));
 	fread(&now_NOP, sizeof(uint64_t), 1, fp);
-	printf("now_NOP:%lu\n", now_NOP);
-	printf("now position :%lu\n", ftell(fp));
 	if(now_NOP!=_NOP){
 		EPRINT("device setting is differ", true);
 	}
@@ -278,15 +273,17 @@ uint32_t posix_load(lower_info *li, FILE *fp){
 	uint32_t *empty_list=(uint32_t *)malloc(sizeof(uint32_t) * 
 			empty_list_size);
 	fread(empty_list, sizeof(uint32_t), empty_list_size, fp);
+	
+	std::set<uint32_t> temp_set;
+	for(uint32_t j=0; j<empty_list_size; j++){
+		temp_set.insert(empty_list[j]);
+	}
 
 	for(uint32_t i=0; i<li->NOP; i++){
-		bool ispass=false;
-		for(uint32_t j=0; j<empty_list_size; j++){
-			if(i==empty_list[j]){
-				ispass=true;
-			}
+		if(temp_set.find(i)!=temp_set.end()) {
+			seg_table[i].storage=NULL;
+			continue;
 		}
-		if(ispass) continue;
 		seg_table[i].storage=(char*)malloc(PAGESIZE);
 		fread(seg_table[i].storage, 1, PAGESIZE, fp);
 	}

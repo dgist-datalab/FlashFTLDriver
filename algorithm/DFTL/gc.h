@@ -1,4 +1,5 @@
 #include "../../include/container.h"
+#include "../../include/debug_utils.h"
 #include "../../interface/interface.h"
 #include "demand_mapping.h"
 
@@ -14,6 +15,7 @@ typedef struct align_gc_buffer{
 
 typedef struct gc_value{
 	uint32_t ppa;
+	uint32_t gtd_idx;
 	value_set *value;
 	bool isdone;
 }gc_value;

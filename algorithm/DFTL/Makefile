@@ -4,6 +4,7 @@ SRCS +=\
 	   gc_map.c\
 	   demand_io.c\
 	   demand_mapping.c\
+	   data_dump.c\
 
 DIRS := $(shell find ./caching/ -type d)
 

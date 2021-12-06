@@ -33,7 +33,7 @@ int main(int argc,char* argv[]){
 	bench_parameters* bp=bench_parsing_parameters(&argc,argv);
 
 	if(bp){
-		inf_init(0,0, false, argc,argv, bp->data_check_flag);
+		inf_init(0,0,argc,argv);
 		bench_init();
 		bench_vectored_configure();
 		for(int i=0; i<bp->max_bench_num; i++){
@@ -42,7 +42,7 @@ int main(int argc,char* argv[]){
 		}
 	}
 	else{
-		inf_init(0,0, true, argc,argv, true);
+		inf_init(0,0,argc,argv);
 		bench_init();
 		bench_vectored_configure();
 	//	bench_add(VECTOREDSSET,0,RANGE,RANGE);
@@ -71,8 +71,7 @@ int main(int argc,char* argv[]){
 #endif
 	}
 
-	inf_free(true, "test.dump");
-	//inf_load("test.dump");
+	inf_free();
 	if(bp){
 		bench_parameters_free(bp);
 	}

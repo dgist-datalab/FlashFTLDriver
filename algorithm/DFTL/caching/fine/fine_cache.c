@@ -33,6 +33,8 @@ my_cache fine_cache_func{
 	.get_eviction_mapping_entry=fine_get_eviction_entry,
 	.update_eviction_target_translation=fine_update_eviction_target_translation,
 	.evict_target=fine_evict_target, 
+	.dump_cache_update=fine_dump_cache_update,
+	.load_specialized_meta=NULL,
 	.update_dynamic_size=NULL,
 	.exist=fine_exist,
 	.print_log=fine_print_log,
@@ -480,4 +482,28 @@ bool fine_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint){
 
 int32_t fine_get_remain_space(struct my_cache *, uint32_t total_eviction_hint){
 	return fcm.max_caching_map-fcm.now_caching_map-total_eviction_hint;
+}
+
+bool fine_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
+	uint32_t gtd_idx=etr->idx;
+	if(fcm.GTD_internal_state[gtd_idx]==0){
+		fcm.GTD_internal_state[gtd_idx]=1;
+		memset(data, -1, PAGESIZE);
+	}
+	fine_cache *fc;
+	uint32_t unit=PAGESIZE/sizeof(DMF);
+	uint32_t changed=0;
+	uint32_t *ppa_list=(uint32_t*)data;
+	for(uint32_t i=0; i<unit; i++){
+		fc=__find_lru_map(gtd_idx*unit + i);
+		if(!fc) continue;
+		if(get_flag(fc)==DIRTY_FLAG){
+			changed++;
+			uint32_t old_ppa=ppa_list[GETOFFSET(fc->lba)];
+			//invalidate ppa
+			//invalidate_ppa(old_ppa);//it would be invalidated early function.
+			ppa_list[GETOFFSET(fc->lba)]=fc->ppa;
+		}
+	}
+	return changed?1:0;
 }

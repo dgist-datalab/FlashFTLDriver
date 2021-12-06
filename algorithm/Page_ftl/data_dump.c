@@ -7,7 +7,6 @@ extern align_buffer a_buffer;
 
 uint32_t page_dump(FILE *fp){
 	/*write data in align_buffer*/
-	printf("now position :%lu\n", ftell(fp));
 	fwrite(&a_buffer.idx, sizeof(uint8_t), 1, fp);
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		fwrite(a_buffer.value[i]->value, sizeof(char), PAGESIZE, fp);
@@ -40,7 +39,6 @@ uint32_t page_dump(FILE *fp){
 extern void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo);
 uint32_t page_load(lower_info *li, blockmanager *bm, algorithm *algo, FILE *fp){
 	page_create_body(li, bm, algo);
-	printf("now position :%lu\n", ftell(fp));
 
 	/*read data in align_buffer*/
 	fread(&a_buffer.idx, sizeof(uint8_t), 1, fp);
@@ -53,7 +51,7 @@ uint32_t page_load(lower_info *li, blockmanager *bm, algorithm *algo, FILE *fp){
 
 
 	/*read active and reserve segment*/
-	pm_body *p=(pm_body*)calloc(sizeof(pm_body), 1);
+	pm_body *p=(pm_body*)calloc(1, sizeof(pm_body));
 	uint32_t active, reserve;
 	fread(&active, sizeof(uint32_t), 1, fp);
 	if(active!=UINT32_MAX){

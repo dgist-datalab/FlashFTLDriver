@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <map>
+#include <getopt.h>
 
 extern Redblack rb_tree;
 extern pthread_mutex_t rb_lock;
@@ -360,13 +361,64 @@ bool inf_make_req_fromApp(char _type, KEYT _key,uint32_t offset, uint32_t len,ch
 	return true;
 }
 
-void inf_init(int apps_flag, int total_num, bool data_load, int argc, char **argv, bool data_check_flag){
+void inf_parsing(int *argc, char **argv){
+	struct option options[]={
+		{"data-load", 0, 0, 0},
+		{"data-dump", 0, 0, 0},
+		{"data-check", 0, 0, 0},
+		{0,0,0,0}
+	};
+
+	char *temp_argv[10];
+	int temp_cnt=0;
+	for(int i=0; i<*argc; i++){
+		if(strncmp(argv[i],"--data-load",strlen("--data-load"))==0) continue;
+		if(strncmp(argv[i],"--data-dump",strlen("--data-dump"))==0) continue;
+		if(strncmp(argv[i],"--data-check",strlen("--data-check"))==0) continue;
+		temp_argv[temp_cnt++]=argv[i];
+	}
+	temp_argv[temp_cnt]=NULL;
+	if(temp_cnt==*argc) return;
+
+	int opt;
+	int index;
+	opterr=0;
+
+	while((opt=getopt_long(*argc,argv,"",options,&index))!=-1){
+		switch(opt){
+			case 0:
+				switch(index){
+					case 0: //data-load
+						mp.data_load=true;
+						break;
+					case 1: //data-dump
+						mp.data_dump=true;
+						break;
+					case 2: //data-check
+						mp._data_check_flag=true;
+						break;
+				}
+				break;
+			default:
+				break;
+		}
+	}
+
+	for(int i=0; i<=temp_cnt; i++){
+		argv[i]=temp_argv[i];
+	}
+	*argc=temp_cnt;
+	optind=0;
+}
+
+void inf_init(int apps_flag, int total_num, int argc, char **argv){
 #ifdef BUSE_MEASURE
     measure_init(&infTime);
     measure_init(&infendTime);
 #endif
 
 	tm=tag_manager_init(QDEPTH);
+	inf_parsing(&argc, argv);
 	//tm=tag_manager_init(1);
 	mp.processors=(processor*)malloc(sizeof(processor)*1);
 	for(int i=0; i<1; i++){
@@ -393,12 +445,11 @@ void inf_init(int apps_flag, int total_num, bool data_load, int argc, char **arg
 		bench_add(NOR,0,-1,total_num);
 	}
 
-	layer_info_mapping(&mp, data_load, argc, argv);	
-	mp._data_check_flag=data_check_flag;
+	layer_info_mapping(&mp, mp.data_load, argc, argv);	
 	if(mp._data_check_flag){
 		__checking_data_init();
 	}
-	if(data_load){
+	if(mp.data_load){
 		inf_load("test.dump");
 	}
 }
@@ -633,7 +684,7 @@ bool inf_end_req( request * const req){
 extern std::multimap<uint32_t, request *> *stop_req_list;
 extern std::map<uint32_t, request *> *stop_req_log_list;
 
-void inf_free(bool data_dump, char *filename){
+void inf_free(){
 	//inf_print_lot();
 	if(stop_req_list){
 		delete stop_req_list;
@@ -666,8 +717,8 @@ void inf_free(bool data_dump, char *filename){
     measure_adding_print(&infendTime);
 #endif
 
-	if(data_dump){
-		inf_dump(filename);
+	if(mp.data_dump){
+		inf_dump("test.dump");
 	}
 
 	mp.algo->destroy(mp.li,mp.algo);
@@ -934,6 +985,9 @@ void inf_lower_log_print(){
 
 uint32_t inf_dump(char *filename){
 	FILE *fp=fopen(filename, "w");
+	if(mp.algo->dump_prepare){
+		mp.algo->dump_prepare();
+	}
 	mp.bm->dump(mp.bm, fp);
 	mp.li->dump(mp.li, fp);
 	mp.algo->dump(fp);

@@ -24,16 +24,6 @@
 #define BENCH_LOG "./result/"
 #define CACHING_RATIO 1
 
-#ifdef DEBUG
-#define DPRINTF(fmt, ...) \
-	do{\
-		printf(fmt, __VA_ARGS__); \
-	}while(0)
-#else
-#define DPRINTF(fmt, ...)\
-	do{}while(0)
-#endif
-
 #define K (1024)
 #define M (1024*K)
 #define G (1024*M)
@@ -51,7 +41,7 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 4L
+#define GIGAUNIT 8L
 #ifndef OP
 #define OP 85
 #endif

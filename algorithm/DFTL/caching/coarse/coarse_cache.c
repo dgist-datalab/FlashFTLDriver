@@ -26,6 +26,8 @@ my_cache coarse_cache_func{
 	.get_eviction_mapping_entry=NULL,
 	.update_eviction_target_translation=coarse_update_eviction_target_translation,
 	.evict_target=NULL,
+	.dump_cache_update=coarse_dump_cache_update,
+	.load_specialized_meta=NULL,
 	.update_dynamic_size=NULL,
 	.exist=coarse_exist,
 	.print_log=NULL,
@@ -235,4 +237,13 @@ bool coarse_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint){
 
 int32_t coarse_get_remain_space(struct my_cache *, uint32_t total_eviction_hint){
 	return ccm.max_caching_page-ccm.now_caching_page-total_eviction_hint;
+}
+
+bool coarse_dump_cache_update(struct my_cache *,GTD_entry *etr, char *data){
+	if(!etr->private_data){
+		return false;
+	}
+	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
+	memcpy(data, c_data, PAGESIZE);
+	return true;
 }

@@ -33,3 +33,4 @@ bool coarse_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_
 bool coarse_exist(struct my_cache *, uint32_t lba);
 void coarse_force_put_mru(struct my_cache*, struct GTD_entry *, mapping_entry *,uint32_t lba);
 int32_t coarse_get_remain_space(struct my_cache *, uint32_t total_eviction_hint);
+bool coarse_dump_cache_update(struct my_cache *, GTD_entry* etr, char *data);

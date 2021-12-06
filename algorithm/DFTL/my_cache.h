@@ -37,6 +37,8 @@ typedef struct my_cache{
 	struct mapping_entry *(*get_eviction_mapping_entry)(struct my_cache *, uint32_t lba, uint32_t now_eviction_hint, void **tp_data, bool *all_entry_evictinig);//if return value is NULL, it is clean eviction.
 	bool (*update_eviction_target_translation)(struct my_cache* , uint32_t lba, GTD_entry *etr, mapping_entry *map, char *data, void *additional_data, bool batch_update);
 	bool (*evict_target)(struct my_cache *,GTD_entry *, mapping_entry *);
+	bool (*dump_cache_update)(struct my_cache *, GTD_entry *, char *data);
+	void (*load_specialized_meta)(struct my_cache *, GTD_entry *, char *data);
 	void (*update_dynamic_size)(struct my_cache *, uint32_t lba, char *data);
 	bool (*exist)(struct my_cache *, uint32_t lba);
 	void (*print_log)(struct my_cache*);

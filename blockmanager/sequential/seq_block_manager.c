@@ -130,7 +130,6 @@ uint32_t seq_dump(struct blockmanager *bm, FILE *fp){
 	for(uint32_t i=0; i<_NOS; i++){
 		/*write logical_segment*/
 		block_set *l_segment=&p->logical_segment[i];
-		printf("now position :%lu\n", ftell(fp));
 		fwrite(l_segment, sizeof(block_set), 1, fp);
 
 		for(uint32_t j=0; j<BPS; j++){
@@ -140,7 +139,6 @@ uint32_t seq_dump(struct blockmanager *bm, FILE *fp){
 			glob_block_idx++;
 		}
 	}
-	printf("last- now position :%lu\n", ftell(fp));
 	return 1;
 }
 
@@ -173,7 +171,6 @@ uint32_t seq_load(struct blockmanager *bm, lower_info *li, FILE *fp){
 	int global_block_idx=0;
 	for(uint32_t i=0; i<_NOS; i++){
 		block_set *l_segment=&p->logical_segment[i];
-		printf("now position :%lu\n", ftell(fp));
 		fread(l_segment, sizeof(block_set), 1, fp);
 		l_segment->hptr=NULL;
 
@@ -205,13 +202,16 @@ uint32_t seq_load(struct blockmanager *bm, lower_info *li, FILE *fp){
 		}
 	}
 
-	printf("last - now position :%lu\n", ftell(fp));
 	bm->private_data=(void*)p;
 	return 1;
 }
 
 uint32_t seq_destroy (struct blockmanager* bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
+	for(uint32_t i=0; i<BPS*_NOS; i++){
+		__block *b=&p->seq_block[i];
+		free(b->bitset);
+	}
 	free(p->seq_block);
 	free(p->logical_segment);
 	mh_free(p->max_heap);

@@ -22,6 +22,8 @@ my_cache tp_cache_func{
 	.get_eviction_mapping_entry=tp_get_eviction_entry,
 	.update_eviction_target_translation=tp_update_eviction_target_translation,
 	.evict_target=tp_evict_target, 
+	.dump_cache_update=tp_dump_cache_update,
+	.load_specialized_meta=NULL,
 	.update_dynamic_size=tp_update_dynamic_size,
 	.exist=tp_exist,
 	.print_log=tp_print_log,
@@ -878,4 +880,25 @@ void tp_print_log(struct my_cache *){
 	printf("total tn_num:%u (%.2lf) total tc_num:%u avg tc per tn:%.2lf\n", tn_cnt, (float)tn_cnt/(RANGE/(PAGESIZE/sizeof(uint32_t))), total_tc_cnt, (float)total_tc_cnt/tn_cnt);
 	printf("effective cache rate:%.2lf\n", (float)total_tc_cnt/RANGE);
 	printf("========================\n");
+}
+
+bool tp_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
+	uint32_t gtd_idx=etr->idx;
+	if(!etr->private_data){
+		return false;
+	}
+	tp_node *tn=(tp_node*)etr->private_data;
+	lru_node *ln, *lnn;
+	tp_cache_node *tc;
+	uint32_t changed=0;
+	uint32_t *ppa_list=(uint32_t*)data;
+	for_each_lru_list_safe(tn->tp_lru, ln, lnn){
+		tc=(tp_cache_node*)ln->data;
+		if(get_tc_flag(tc)==DIRTY_FLAG){
+			ppa_list[tc->offset]=tc->ppa;
+			changed++;
+		}
+	}
+	
+	return changed?true:false;
 }

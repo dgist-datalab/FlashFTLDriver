@@ -20,19 +20,20 @@ struct algorithm demand_ftl={
 	.flush=page_flush,
 	.remove=page_remove,
 	.test=NULL,
-	.print_log=demand_print_log
+	.print_log=demand_print_log,
+	.dump_prepare=update_cache_mapping,
+	.dump=demand_dump,
+	.load=demand_load,
 };
 
 page_read_buffer rb;
 uint32_t read_buffer_hit_cnt=0;
 
-uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
+
+void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo){
 	algo->li=li; //lower_info means the NAND CHIP
 	algo->bm=bm; //blockmanager is managing invalidation 
 
-	demand_map_create(UINT32_MAX,li,bm);
-
-	demand_ftl.algo_body=(void*)pm_body_create(bm);
 	a_buffer.value=(char*)malloc(PAGESIZE);
 
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
@@ -40,6 +41,12 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
+}
+
+uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
+	page_create_body(li, bm, algo);
+	demand_map_create(UINT32_MAX,li,bm);
+	demand_ftl.algo_body=(void*)pm_body_create(bm);
 	return 1;
 }
 

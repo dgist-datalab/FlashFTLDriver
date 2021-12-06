@@ -303,8 +303,11 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	blockmanager *bm=demand_ftl.bm;
 	/*you can check if the gc is needed or not, using this condition*/
-	if(demand_ftl.bm->check_full(demand_ftl.bm, p->active,MASTER_PAGE) && demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
-		do_gc();//call gc
+	if(demand_ftl.bm->check_full(demand_ftl.bm, p->active,MASTER_PAGE)){
+		if(demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
+			demand_ftl.bm->is_gc_needed(demand_ftl.bm);
+			do_gc();//call gc
+		}
 	}
 
 retry:
@@ -360,6 +363,7 @@ void *page_gc_end_req(algo_req *input){
 			gv->isdone=true;
 			break;
 		case GCMW:	
+			gv->isdone=true;
 			inf_free_valueset(gv->value,FS_MALLOC_R);
 			free(gv);
 			break;

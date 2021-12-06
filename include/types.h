@@ -21,7 +21,7 @@
 #define FS_BUSE_W 18
 #define FS_FLUSH_T 19
 
-#define LREQ_TYPE_NUM 16
+#define LREQ_TYPE_NUM 17
 #define TRIM 0
 #define MAPPINGR 1
 #define MAPPINGW 2
@@ -37,6 +37,8 @@
 #define COMPACTIONDATAW 12
 #define MISSDATAR 13
 #define TEST_IO 14
+#define DUMPW 15
+#define DUMPR 16
 
 #define FS_MALLOC_W 1
 #define FS_MALLOC_R 2
