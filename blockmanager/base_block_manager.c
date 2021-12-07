@@ -184,7 +184,7 @@ void base_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_in
 	__segment *target_seg;
 	for(int i=0; i<BPS; i++){
 		__block *b=gs->blocks[i];
-		li->trim_a_block(GETBLOCKPPA(b),ASYNC);
+		li->trim_a_block(GETBLOCKPPA(b));
 		b->invalidate_number=0;
 		b->validate_number=0;
 		b->now=0;
@@ -382,7 +382,7 @@ void base_trim_segment_force (struct blockmanager *bm, __segment* seg, struct lo
 	__segment *target_seg;
 	for(int i=0; i<BPS; i++){
 		__block *b=seg->blocks[i];
-		li->trim_a_block(GETBLOCKPPA(b),ASYNC);
+		li->trim_a_block(GETBLOCKPPA(b));
 		b->invalidate_number=0;
 		b->validate_number=0;
 		b->now=0;

@@ -470,7 +470,7 @@ void seq_trim_segment (struct blockmanager* bm, __gsegment* gs, struct lower_inf
 		abort();
 	}
 
-	li->trim_block(segment_startblock_number*_PPB, ASYNC);
+	li->trim_block(segment_startblock_number*_PPB);
 	free(gs);
 }
 

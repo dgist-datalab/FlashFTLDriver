@@ -57,7 +57,7 @@ void bb_write_bb_checker(lower_info *li,uint32_t testing_page){
 		param->ppa=i;
 		param->v=inf_get_valueset(temp_test,FS_SET_T,PAGESIZE);
 		temp->param=(void*)param;
-		li->write(i,PAGESIZE,param->v,ASYNC,temp);
+		li->write(i,PAGESIZE,param->v,temp);
 	}
 }
 
@@ -73,7 +73,7 @@ void bb_read_bb_checker(lower_info *li,uint32_t testing_page){
 		param->ppa=i;
 		param->v=inf_get_valueset(NULL,FS_GET_T,PAGESIZE);
 		temp->param=(void*)param;
-		li->read(i,PAGESIZE,param->v,ASYNC,temp);
+		li->read(i,PAGESIZE,param->v,temp);
 	}
 }
 

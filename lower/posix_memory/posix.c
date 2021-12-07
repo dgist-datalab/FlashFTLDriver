@@ -51,6 +51,8 @@ lower_info my_posix={
 	.write=posix_write,
 	.read=posix_read,
 #endif
+	.write_sync=posix_write_sync,
+	.read_sync=posix_read_sync,
 	.device_badblock_checker=NULL,
 #ifdef LASYNC
 	.trim_block=posix_make_trim,
@@ -87,8 +89,38 @@ void posix_traffic_print(lower_info *li){
 }
 
 uint32_t d_write_cnt, m_write_cnt, gcd_write_cnt, gcm_write_cnt;
-//uint32_t lower_test_ppa=655468/2;
 uint32_t lower_test_ppa=UINT32_MAX;
+
+static uint8_t convert_type(uint8_t type) {
+	return (type & (0xff>>1));
+}
+void data_copy_from(uint32_t ppa, char *data){
+	if(!seg_table[ppa].storage){
+		printf("%u not populated!\n", ppa );
+		abort();
+	}
+	else{
+		memcpy(data, seg_table[ppa].storage, PAGESIZE);
+	}
+}
+
+void data_copy_to(uint32_t ppa, char *data){
+	if(!seg_table[ppa].storage){
+		seg_table[ppa].storage = (char *)malloc(PAGESIZE);
+	}
+	else{
+		printf("cannot write! plz write before erase!\n");
+		abort();
+	}
+	memcpy(seg_table[ppa].storage,data,PAGESIZE);
+}
+
+static void collect_io_type(uint32_t type){
+	uint32_t test_type = convert_type(type);
+	if(test_type < LREQ_TYPE_NUM){
+		my_posix.req_type_cnt[test_type]++;
+	}
+}
 
 #ifdef LASYNC
 void *l_main(void *__input){
@@ -103,87 +135,77 @@ void *l_main(void *__input){
 		if(!(inf_req=(posix_request*)q_dequeue(p_q))){
 			continue;
 		}
-		switch(inf_req->type){
-			case FS_LOWER_W:
-				posix_write(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
-				break;
-			case FS_LOWER_R:
-				posix_read(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
-				break;
-			case FS_LOWER_T:
-				posix_trim_block(inf_req->key, inf_req->isAsync);
-				break;
+		if(inf_req->isAsync){
+			switch(inf_req->type){
+				case FS_LOWER_W:
+					posix_write(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
+					break;
+				case FS_LOWER_R:
+					posix_read(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
+					break;
+				case FS_LOWER_T:
+					posix_trim_block(inf_req->key, inf_req->isAsync);
+					break;
+			}
+			free(inf_req);
 		}
-		free(inf_req);
+		else{
+			switch(inf_req->type){
+				case FS_LOWER_W: 
+					data_copy_to(inf_req->key, inf_req->data);
+					break;
+				case FS_LOWER_R:
+					data_copy_from(inf_req->key, inf_req->data);
+					break;
+			}
+			fdriver_unlock(&inf_req->lock);
+		}
 	}
 	return NULL;
 }
 
-void *posix_make_write(uint32_t PPA, uint32_t size, value_set* value, bool async, algo_req *const req){
+void posix_async_make_req(posix_request *p_req){
 	bool flag=false;
-	posix_request *p_req=(posix_request*)malloc(sizeof(posix_request));
-	p_req->type=FS_LOWER_W;
-	if(PPA > _NOP){
-		printf("over range!\n");
-		abort();
-	}
-	p_req->key=PPA;
-	p_req->value=value;
-	p_req->upper_req=req;
-	p_req->isAsync=async;
-	p_req->size=size;
-
-	while(!flag){
-		if(q_enqueue((void*)p_req,p_q)){
-			cl_release(lower_flying);
-			flag=true;
-		}
-
-	}
-	return NULL;
-}
-
-void *posix_make_read(uint32_t PPA, uint32_t size, value_set* value, bool async, algo_req *const req){
-	bool flag=false;
-	posix_request *p_req=(posix_request*)malloc(sizeof(posix_request));
-	if(PPA > _NOP){
-		printf("over range!\n");
-		abort();
-	}
-	p_req->type=FS_LOWER_R;
-	p_req->key=PPA;
-	p_req->value=value;
-	p_req->upper_req=req;
-	p_req->isAsync=async;
-	p_req->size=size;
-	req->type_lower=0;
-	bool once=true;
 	while(!flag){
 		if(q_enqueue((void*)p_req,p_q)){
 			cl_release(lower_flying);
 			flag=true;
 		}	
-		if(!flag && once){
-			req->type_lower=1;
-			once=false;
-		}
 	}
+}
+
+posix_request* posix_get_preq(FSTYPE type, uint32_t PPA, value_set *value, char *data, bool async,
+		algo_req *const req){
+	posix_request *p_req=(posix_request*)calloc(1, sizeof(posix_request));
+	p_req->type=type;
+	p_req->key=PPA;
+	p_req->value=value;
+	p_req->upper_req=req;
+	p_req->size=size;
+	p_req->data=data;
+	p_req->isAsync=async;
+	if(!p_req->isAsync){
+		fdriver_mutex_init(&p_req->lock);
+		fdriver_lock(&p_req->lock);
+	}
+	return p_req;
+}
+
+void *posix_make_write(uint32_t PPA, uint32_t size, value_set* value, algo_req *const req){
+	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_W, PPA, value, NULL, true req);
+	posix_async_make_req(p_req);
 	return NULL;
 }
 
-void *posix_make_trim(uint32_t PPA, bool async){
-	bool flag=false;
-	posix_request *p_req=(posix_request*)malloc(sizeof(posix_request));
-	p_req->type=FS_LOWER_T;
-	p_req->key=PPA;
-	p_req->isAsync=async;
-	
-	while(!flag){
-		if(q_enqueue((void*)p_req,p_q)){
-			cl_release(lower_flying);
-			flag=true;
-		}
-	}
+void *posix_make_read(uint32_t PPA, uint32_t size, value_set* value, algo_req *const req){
+	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_R, PPA, value, NULL, true, req);
+	posix_async_make_req(p_req);
+	return NULL;
+}
+
+void *posix_make_trim(uint32_t PPA){
+	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_T, PPA, NULL, NULL, true, NULL);
+	posix_async_make_req(p_req);
 	return NULL;
 }
 #endif
@@ -315,19 +337,15 @@ void *posix_destroy(lower_info *li){
 	return NULL;
 }
 
-static uint8_t convert_type(uint8_t type) {
-	return (type & (0xff>>1));
-}
 extern bb_checker checker;
 inline uint32_t convert_ppa(uint32_t PPA){
 	return PPA;
 }
-void *posix_write(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
+void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const req){
 	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
 	if(PPA==lower_test_ppa){
 		printf("%u (piece:%u) target write\n", lower_test_ppa, lower_test_ppa*2);
-	//	EPRINT("168017 write", false);
 	}
 	if(PPA>_NOP){
 		printf("address error!\n");
@@ -343,96 +361,66 @@ void *posix_write(uint32_t _PPA, uint32_t size, value_set* value, bool async,alg
 		abort();
 	}
 
-	test_type = convert_type(req->type);
-
-	if(test_type < LREQ_TYPE_NUM){
-		my_posix.req_type_cnt[test_type]++;
-	}
-
-	if(!seg_table[PPA].storage){
-		seg_table[PPA].storage = (char *)malloc(PAGESIZE);
-	}
-	else{
-		printf("cannot write! plz write before erase!\n");
-		abort();
-	}
-	memcpy(seg_table[PPA].storage,value->value,size);
-	memcpy(seg_table[PPA].oob, value->oob, OOB_SIZE);
+	collect_io_type(req->type);
+	data_copy_to(PPA, value->value);
 
 	req->end_req(req);
 	return NULL;
 }
 
-void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
-	uint8_t test_type;
+void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, algo_req *const req){
 	uint32_t PPA=convert_ppa(_PPA);
-
-	bool ishit=false;
-	pthread_mutex_lock(&page_cache_lock);
-	if(PPA==pp_cache[PPA%QDEPTH].ppa){
-		ishit=true;
-		if(!seg_table[PPA].storage){
-			printf("%u not populated! end_req:%p\n",PPA, req->end_req);
-			abort();
-		} else {
-			memcpy(value->value,seg_table[PPA].storage,size);
-		}
-	}
-	pthread_mutex_unlock(&page_cache_lock);
-	if(ishit){
-		req->end_req(req);
-		return NULL;
-	}
-
-	if(PPA==lower_test_ppa){
-		printf("%u (piece:%u) target read\n", lower_test_ppa, lower_test_ppa*2);
-	//	EPRINT("168017 read", false);
-	}
-
 	if(PPA>_NOP){
 		printf("address error!\n");
 		abort();
 	}
-
-//	printf("%u _PPA: %u\n", req->ppa, _PPA);
-
-	if(req->type_lower!=1 && req->type_lower!=0){
-		req->type_lower=0;
+	if(PPA==lower_test_ppa){
+		printf("%u (piece:%u) target write\n", lower_test_ppa, lower_test_ppa*2);
 	}
 	if(value->dmatag==-1){
 		printf("dmatag -1 error!\n");
 		abort();
 	}
 
-
 	if(my_posix.SOP*PPA >= my_posix.TS){
 		printf("\nread error\n");
 		abort();
 	}
 
-	test_type = convert_type(req->type);
-	if(test_type < LREQ_TYPE_NUM){
-		my_posix.req_type_cnt[test_type]++;
-	}
-	if(!seg_table[PPA].storage){
-		printf("%u not populated! end_req:%p\n",PPA, req->end_req);
-		abort();
-	} else {
-		memcpy(value->value,seg_table[PPA].storage,size);
-		memcpy(value->oob, seg_table[PPA].oob, OOB_SIZE);
-	}
-	req->type_lower=1;
-
-
-	pthread_mutex_lock(&page_cache_lock);
-	pp_cache[PPA%QDEPTH].ppa=_PPA;
-	pthread_mutex_unlock(&page_cache_lock);
+	collect_io_type(req->type);
+	data_copy_from(PPA, value->value);
 
 	req->end_req(req);
 	return NULL;
 }
 
-void *posix_trim_block(uint32_t _PPA, bool async){
+void *posix_write_sync(uint32_t type, uint32_t ppa, char *data){
+	collect_io_type(type);
+#ifdef LASYNC
+	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_W, PPA, NULL, data, false, req);
+	posix_async_make_req(p_req);
+	fdriver_lock(&p_req->lock);
+	free(p_req);
+#else
+	data_copy_to(ppa, data);
+#endif
+	return NULL;
+}
+
+void *posix_read_sync(uint32_t type, uint32_t ppa, char *data){
+	collect_io_type(type);
+#ifdef LASYNC
+	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_R, PPA, NULL, data, false, req);
+	posix_async_make_req(p_req);
+	fdriver_lock(&p_req->lock);
+	free(p_req);
+#else
+	data_copy_from(ppa, data);
+#endif
+	return NULL;
+}
+
+void *posix_trim_block(uint32_t _PPA){
 	uint32_t PPA=convert_ppa(_PPA);
 	if(my_posix.SOP*PPA >= my_posix.TS || PPA%my_posix.PPS != 0){
 		printf("\ntrim error\n");
@@ -459,7 +447,7 @@ void posix_flying_req_wait(){
 #endif
 }
 
-void* posix_trim_a_block(uint32_t _PPA, bool async){
+void* posix_trim_a_block(uint32_t _PPA){
 
 	uint32_t PPA=convert_ppa(_PPA);
 	if(PPA>_NOP){

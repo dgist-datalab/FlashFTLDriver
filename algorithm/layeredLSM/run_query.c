@@ -32,7 +32,7 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 	res->param=(void *)param;
 	res->type=DATAR;
 	res->end_req=__run_read_end_req;
-	g_li->read(ppa, PAGESIZE, value, ASYNC, res);
+	g_li->read(ppa, PAGESIZE, value, res);
 }
 
 uint32_t run_query(run *r, request *req){

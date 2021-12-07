@@ -128,11 +128,14 @@ struct algo_req{
 struct lower_info {
 	uint32_t (*create)(struct lower_info*, blockmanager *bm);
 	void* (*destroy)(struct lower_info*);
-	void* (*write)(uint32_t ppa, uint32_t size, value_set *value, bool async,algo_req * const req);
-	void* (*read)(uint32_t ppa, uint32_t size, value_set *value, bool async,algo_req * const req);
+	void* (*write)(uint32_t ppa, uint32_t size, value_set *value, algo_req * const req);
+	void* (*read)(uint32_t ppa, uint32_t size, value_set *value, algo_req * const req);
+	void* (*write_sync)(uint32_t type, uint32_t ppa, char *data);
+	void* (*read_sync)(uint32_t type, uint32_t ppa, char *data);
+
 	void* (*device_badblock_checker)(uint32_t ppa,uint32_t size,void *(*process)(uint64_t, uint8_t));
-	void* (*trim_block)(uint32_t ppa,bool async);
-	void* (*trim_a_block)(uint32_t ppa,bool async);
+	void* (*trim_block)(uint32_t ppa);
+	void* (*trim_a_block)(uint32_t ppa);
 	void* (*refresh)(struct lower_info*);
 	void (*stop)();
 	int (*lower_alloc) (int type, char** buf);
@@ -140,12 +143,6 @@ struct lower_info {
 	void (*lower_flying_req_wait) ();
 	void (*lower_show_info)();
 	uint32_t (*lower_tag_num)();
-#ifdef Lsmtree
-	void* (*read_hw)(uint32_t ppa, char *key,uint32_t key_len, value_set *value,bool async,algo_req * const req);
-	uint32_t (*hw_do_merge)(uint32_t lp_num, ppa_t *lp_array, uint32_t hp_num,ppa_t *hp_array,ppa_t *tp_array, uint32_t* ktable_num, uint32_t *invliadate_num);
-	char *(*hw_get_kt)();
-	char *(*hw_get_inv)();
-#endif
 	void (*print_traffic)(struct lower_info *);
 	uint32_t (*dump)(lower_info *li, FILE *fp);
 	uint32_t (*load)(lower_info *li, FILE *fp );

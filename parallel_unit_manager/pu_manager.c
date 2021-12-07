@@ -22,6 +22,8 @@ lower_info pu_manager={
 	.destroy	=	pu_destroy,
 	.write		=	pu_write,
 	.read		=	pu_read,
+	.write_sync =	pu_write_sync,
+	.read_sync	=	pu_read_sync,
 	.device_badblock_checker=NULL,
 	.trim_block		=	pu_trim_block,
 	.trim_a_block	=	NULL,
@@ -165,47 +167,60 @@ void* pu_destroy(lower_info *li){
 	return NULL;
 }
 
-void* pu_write(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req){
+void* pu_write(uint32_t ppa, uint32_t size, value_set *value,algo_req * const req){
 	lower_info *real_lower=(lower_info*)pu_manager.private_data;
 	pu_wrapper *temp_pu_wrapper=get_pu_wrapper(PU_WRITE, ppa, req, req->param, 
 			value, req->end_req);
 	req->end_req=pu_end_req;
 	req->param=(void*)temp_pu_wrapper;
-	real_lower->write(ppa, size, value, async, req);
-	return NULL;
+	return real_lower->write(ppa, size, value, req);
 }
 
 
-void* pu_read(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req){
-
+static bool buffer_hit_check(uint32_t ppa, char *data){
 	bool ishit=false;
 	pthread_mutex_lock(&pu_cache_lock);
 	if(pu_temp_cache[ppa%QDEPTH].ppa==ppa){
-		memcpy(value->value, pu_temp_cache[ppa%QDEPTH].page, PAGESIZE);
+		memcpy(data, pu_temp_cache[ppa%QDEPTH].page, PAGESIZE);
 		ishit=true;
 	}
 	pthread_mutex_unlock(&pu_cache_lock);
+	return ishit;
+}
 
-	if(ishit){
+void* pu_read(uint32_t ppa, uint32_t size, value_set *value,algo_req * const req){
+	if(buffer_hit_check(ppa, value->value)){
 		req->end_req(req);
 		return NULL;
 	}
 
 	lower_info *real_lower=(lower_info*)pu_manager.private_data;
-	pu_wrapper *temp_pu_wrapper=get_pu_wrapper(PU_WRITE, ppa, req, req->param, 
+	pu_wrapper *temp_pu_wrapper=get_pu_wrapper(PU_READ, ppa, req, req->param, 
 			value, req->end_req);
 	req->end_req=pu_end_req;
 	req->param=(void *)temp_pu_wrapper;
-	real_lower->read(ppa, size, value, async, req);
-	return NULL;
+	return real_lower->read(ppa, size, value, req);
 }
 
-void* pu_trim_block(uint32_t ppa,bool async){
+void *		pu_write_sync(uint32_t type, uint32_t ppa, char *data){
+	lower_info *real_lower=(lower_info*)pu_manager.private_data;
+	return real_lower->write_sync(type, ppa ,data);
+}
+
+void *		pu_read_sync(uint32_t type, uint32_t ppa, char *data){
+	if(buffer_hit_check(ppa, data)){
+		return NULL;
+	}
+	lower_info *real_lower=(lower_info*)pu_manager.private_data;
+	return real_lower->read_sync(type, ppa ,data);
+}
+
+void* pu_trim_block(uint32_t ppa){
 	lower_info *real_lower=(lower_info*)pu_manager.private_data;
 	for(uint32_t i=0; i<QDEPTH; i++){
 		pu_temp_cache[i].ppa=UINT32_MAX;
 	}
-	real_lower->trim_block(ppa, async);
+	real_lower->trim_block(ppa);
 	return NULL;
 }
 

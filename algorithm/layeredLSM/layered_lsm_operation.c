@@ -49,7 +49,7 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	entry_num_last_run=(RANGE%run_num?RANGE%run_num:entry_per_run);
 	run_array=(run**)malloc(sizeof(run *) *run_num);
 	for(uint32_t i=0; i<run_num; i++){
-		run_array[i]=run_init(BF, i==run_num-1?entry_num_last_run:entry_per_run, 0.1, bm);
+		run_array[i]=run_init(EXACT, i==run_num-1?entry_num_last_run:entry_per_run, 0.1, bm);
 	}
 
 	return 1;

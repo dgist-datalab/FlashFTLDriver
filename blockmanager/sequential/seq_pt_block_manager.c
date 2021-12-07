@@ -110,7 +110,7 @@ void seq_pt_trim_segment(struct blockmanager* bm, int pt_num, __gsegment *gs, lo
 
 	q_enqueue((void*)bs, p->free_logical_seg_q_pt[pt_num]);
 
-	li->trim_block(segment_startblock_number*_PPB, ASYNC);
+	li->trim_block(segment_startblock_number*_PPB);
 	free(gs);
 }
 

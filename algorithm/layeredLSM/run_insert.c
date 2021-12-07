@@ -1,17 +1,7 @@
 #include "run.h"
 
 extern lower_info *g_li;
-/*
-run *run_init(uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm){
-	run *res=(run*)malloc(sizeof(run));
-	res->max_entry_num=entry_num;
-	res->now_entry_num=0;
-	res->mf=map_function_factory(map_type, entry_num, fpr);
-	res->pp=NULL;
-	res->st_body=st_array_init(entry_num, bm);
-	return res;
-}
-*/
+
 static void* __run_write_end_req(algo_req *req){
 	if(req->type!=DATAW){
 		EPRINT("not allowed type", true);
@@ -37,7 +27,7 @@ static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blo
 	if(oob_set){
 		sm->set_oob(sm, oob_set, sizeof(uint32_t) * L2PGAP, ppa);
 	}
-	g_li->write(ppa, PAGESIZE, value, ASYNC, res);
+	g_li->write(ppa, PAGESIZE, value, res);
 }
 
 static void __run_write_buffer(run *r, bool force){
@@ -96,14 +86,3 @@ void run_insert_done(run *r){
 	pp_free(r->pp);
 	r->pp=NULL;
 }
-
-/*
-void run_free(run *r){
-	if(r->pp){
-		EPRINT("what happened?", true);
-	}
-	r->mf->free(r->mf);
-	st_array_free(r->st_body);
-	free(r);
-}
-*/

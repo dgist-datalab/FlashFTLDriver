@@ -6,10 +6,12 @@
 
 uint32_t	pu_create(lower_info *li, blockmanager *bm);
 void*		pu_destroy(lower_info *li);
-void*		pu_write(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req);
-void* 		pu_read(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req);
+void*		pu_write(uint32_t ppa, uint32_t size, value_set *value,algo_req * const req);
+void* 		pu_read(uint32_t ppa, uint32_t size, value_set *value, algo_req * const req);
+void *		pu_write_sync(uint32_t type, uint32_t ppa, char *data);
+void *		pu_read_sync(uint32_t type, uint32_t ppa, char *data);
 void* 		pu_device_badblock_checker(uint32_t ppa,uint32_t size,void *(*process)(uint64_t, uint8_t));
-void* 		pu_trim_block(uint32_t ppa,bool async);
+void* 		pu_trim_block(uint32_t ppa);
 //void* 		pu_trim_a_block(uint32_t ppa,bool async);
 void* 		pu_refresh(struct lower_info*);
 void		pu_stop();
