@@ -1,5 +1,6 @@
 #include "plr_helper.h"
 #include "../../../include/settings.h"
+#include "../../../include/debug_utils.h"
 #include <stdlib.h>
 #include <stdio.h>
 

@@ -5,6 +5,7 @@
 typedef struct exact_map{
 	uint32_t *map;
 	uint32_t max_map_num;
+	uint32_t now_map_num;
 }exact_map;
 
 /*
@@ -33,12 +34,13 @@ void exact_insert(map_function *m, uint32_t lba, uint32_t offset);
 /*
  * Function: exact_query
  * --------------------- 
- *		return physical address (offset) which is retrieved by exact_map
+ *		return psa which has probability of storing the target data.
  * 
  * m: 
- * lba: target lba
+ * request: target request for quering
+ * param: it is assigned by this function to process read
  * */
-uint32_t exact_query(map_function *m, uint32_t lba);
+uint32_t exact_query(map_function *m, request *req, map_read_param ** param);
 
 /*
  * Function: exact_query_retry
@@ -47,13 +49,10 @@ uint32_t exact_query(map_function *m, uint32_t lba);
  *		since the fpr is always 0, the retry logic is useless
  *
  *	m:
- *	lba: target lba
- *	prev_offset: prev_offset
- *	oob_set: oob_set 
+ *	param: previous query information
  *
  * */
-uint32_t exact_query_retry(map_function *m, uint32_t lba, 
-		uint32_t prev_offset, uint32_t *oob_set);
+uint32_t exact_query_retry(map_function *m, map_read_param *param);
 
 /*
  * Function: exact_make_done

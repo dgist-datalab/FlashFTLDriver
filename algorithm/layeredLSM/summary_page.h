@@ -1,6 +1,7 @@
 #ifndef SUMMARY_PAGE
 #define SUMMARY_PAGE
 #include "../../include/settings.h"
+#include "../../interface/interface.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -8,21 +9,33 @@
 #define MAX_CUR_POINTER (PAGESIZE/sizeof(summary_pair))
 #define MAX_IDX_SP (MAX_CUR_POINTER-1)
 
-typedef struct summray_pair{
+enum{
+	NO_PR, WRITE_PR, READ_PR,
+};
+
+typedef struct summary_pair{
 	uint32_t lba;
 	uint32_t psa;
 }summary_pair;
 
 typedef struct summary_page{
 	uint32_t write_pointer;
-	char body[PAGESIZE];
+	value_set *value;
+	char *body;
 }summary_page;
 
 typedef struct summary_page_iterator{
 	uint32_t read_pointer;
 	summary_page *sp;
+	value_set *value;
 	char *body;
 }summary_page_iter;
+
+typedef struct summary_page_meta{
+	uint32_t ppa;
+	uint32_t pr_type;
+	void *private_data;
+}summary_page_meta;
 
 #define for_each_sp_pair(sp, idx, p)\
 	for(idx=0; idx<MAX_CUR_POINTER &&\
@@ -70,15 +83,15 @@ bool sp_insert(summary_page *sp, uint32_t lba, uint32_t psa);
 	sp:
 	p: target summary pair
  */
-bool sp_insert_pair(summary_page *sp, summary_pair p);
+bool sp_insert_spair(summary_page *sp, summary_pair p);
 
 /*
 	Function: sp_get_data
 	--------------------
-		return summary_page's body
+		return summary_page's value
 	sp:
  */
-char *sp_get_data(summary_page *sp);
+value_set *sp_get_data(summary_page *sp);
 
 /*
 	Function: sp_find_psa
@@ -95,6 +108,7 @@ uint32_t sp_find_psa(summary_page *sp, uint32_t lba);
 	sp:
  */
 void sp_print_all(summary_page *sp);
+
 
 /*
 	Function: spi_init

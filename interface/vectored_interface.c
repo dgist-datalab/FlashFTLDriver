@@ -49,7 +49,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 	txn->done_cnt=0;
 	txn->end_req=end_req;
 	txn->mark=mark;
-	txn->req_array=(request*)malloc(sizeof(request)*txn->size);
+	txn->req_array=(request*)calloc(txn->size, sizeof(request));
 
 	static uint32_t seq=0;
 	uint32_t prev_lba=UINT32_MAX;

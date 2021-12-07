@@ -1,6 +1,9 @@
 #include "./bf.h"
 #include <math.h>
 
+#define ABS(a) (a<0? -a:a)
+#define EPSILON 0.00000000001f
+
 static inline double func(double x, uint32_t member, float target_fpr){
 	return pow(x, member)+member*(target_fpr-1)*x-(target_fpr*member-member+1);
 }
@@ -23,18 +26,17 @@ static inline double newton(double init_value, uint32_t member, float target_fpr
 
 		if(cnt>100000)break;
 	}while(1);
-	//printf("cnt:%u\n",cnt);
 
 	return 1-res;
 }
 
-double get_target_each_fpr(float block_fpr, uint32_t member_num){
+double get_target_each_fpr(uint32_t member_num, float block_fpr){
 	return newton(0.5, member_num, block_fpr);
 }
 
 double get_number_of_bits(double target_fpr){
 	double t=1/target_fpr;
-	uint64_t tt=ceil(log2(t));
+	//uint64_t tt=ceil(log2(t));
 	//printf("tt:%u\n",tt);
 	return ceil(log2(t));//tt;//pow(2,log2(t)) < t ? tt+1: tt;
 }
@@ -44,6 +46,7 @@ bloom_filter_meta *bf_parameter_setting(uint32_t contents_num, float fpr){
 	res->entry_fpr=get_target_each_fpr(contents_num, fpr);
 	res->real_bits_per_entry=get_number_of_bits(res->entry_fpr);
 	res->bits=ceil(res->real_bits_per_entry);
+	res->contents_num=contents_num;
 	return res;
 }
 

@@ -1,5 +1,6 @@
 #include "bf_set.h"
 #include "compressed_bloomfilter.h"
+#include "../../../include/debug_utils.h"
 #include <math.h>
 #define ABS(a) (a<0? -a:a)
 #define EPSILON 0.00000000001f

@@ -60,7 +60,6 @@ static void make_benches(bench_parameters *bp, char *input){
 
 bench_parameters *bench_parsing_parameters(int *argc, char **argv){
 	struct option options[]={
-		{"data-check",1,0,0},
 		{"benchmarks",1,0,0},
 		{0,0,0,0}
 	};
@@ -68,7 +67,6 @@ bench_parameters *bench_parsing_parameters(int *argc, char **argv){
 	char *temp_argv[10];
 	int temp_cnt=0;
 	for(int i=0; i<*argc; i++){
-		if(strncmp(argv[i],"--data-check",strlen("--data-check"))==0) continue;
 		if(strncmp(argv[i],"--benchmarks",strlen("--benchmarks"))==0) continue;
 		temp_argv[temp_cnt++]=argv[i];
 	}
@@ -84,17 +82,7 @@ bench_parameters *bench_parsing_parameters(int *argc, char **argv){
 		switch(opt){
 			case 0:
 				switch(index){
-					case 0: //data-check flag
-						if(optarg!=NULL){
-							if(optarg[0]=='t' || optarg[0]=='T'){
-								res->data_check_flag=true;
-							}
-							else{
-								res->data_check_flag=false;
-							}
-						}
-						break;
-					case 1: //bench marks
+					case 0:
 						if(optarg!=NULL){
 							make_benches(res, optarg);
 						}

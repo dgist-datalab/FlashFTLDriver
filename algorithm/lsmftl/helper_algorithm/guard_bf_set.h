@@ -33,11 +33,15 @@ static inline uint32_t gbf_get_memory_usage_bit(guard_bf_set *gbf_set, uint32_t 
 	for(uint32_t i=0; i<gbf_set->set_num; i++){
 		uint32_t bf_set_memory=0;
 		if((bf_set_memory=((bf_set*)gbf_set->body[i].array)->memory_usage_bit)){
-			res+=bf_set_memory+2*lba_unit;
+			res+=bf_set_memory+lba_unit;
 		}
 		else break;
 	}
 	return res;
+}
+
+static inline uint32_t gbf_get_cnt(guard_bf_set *gbf_set){
+	return gbf_set->set_num;
 }
 
 #endif

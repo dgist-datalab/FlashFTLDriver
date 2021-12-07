@@ -8,6 +8,7 @@ static volatile uint32_t BO_sub_member_num=UINT32_MAX;
 static volatile uint32_t prev_bit=UINT32_MAX;
 float gbf_min_bit=0.0f;
 extern uint32_t debug_lba;
+extern uint32_t calc_target_bit;
 #ifdef FAST
 static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32_t type){
     member=member>14?1000000:member;
@@ -17,11 +18,10 @@ static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32
     uint32_t result_member_num=0;
     for(uint32_t i=(1+1); i<member/2; i++){
         uint32_t member_set_num=member/i;// + (member%i?1:0);
-        double target_each_fpr=get_target_each_fpr(target_fpr, i);
-        double bit=get_number_of_bits(target_each_fpr);
-        double avg_bit=(double)(bit* i + (48 * 2))/i;
+        float target_each_fpr=get_target_each_fpr(target_fpr,i );
+        uint32_t bit=get_number_of_bits(target_each_fpr);
+        float avg_bit=(float)(bit* i + (calc_target_bit * 2))/i;
 
-		printf("%d %lf %lf %f\n", i, target_each_fpr, bit, avg_bit);
         if(gbf_min_bit==0.0f){
             gbf_min_bit=avg_bit;
         }
@@ -33,6 +33,7 @@ static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32
             result_each_fpr=target_each_fpr;
             result_member_num=member_set_num;
         }
+        else break;
     }   
 
     BP_sub_member_num=BO_sub_member_num=target_number;
@@ -55,7 +56,7 @@ static inline void find_sub_member_num(float target_fpr, uint32_t member, uint32
         uint32_t member_set_num=member/i;// + (member%i?1:0);
         double target_each_fpr=get_target_each_fpr(target_fpr, i);
         double bit=get_number_of_bits(target_each_fpr);
-        double avg_bit=(double)(bit* i + (48))/i;
+        double avg_bit=(double)(bit* i + (calc_target_bit))/i;
 
 	//	printf("%d %lf %lf %f\n", i, target_each_fpr, bit, avg_bit);
         if(gbf_min_bit==0.0f){

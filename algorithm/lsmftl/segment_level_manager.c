@@ -1,6 +1,7 @@
 #include "segment_level_manager.h"
 #include "../../include/settings.h"
 #include "../../include/container.h"
+#include "../../include/debug_utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 SLM slm_manager;

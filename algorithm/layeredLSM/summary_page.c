@@ -1,14 +1,18 @@
 #include "summary_page.h"
 #include "../../include/debug_utils.h"
 #include "../../include/search_template.h"
+#include "../../interface/interface.h"
+extern char all_set_data[PAGESIZE];
 summary_page *sp_init(){
 	summary_page *res=(summary_page *)malloc(sizeof(summary_page));
 	res->write_pointer=0;
-	memset(res->body, -1, PAGESIZE);
+	res->value=inf_get_valueset(all_set_data, FS_MALLOC_W, PAGESIZE);
+	res->body=res->value->value;
 	return res;
 }
 
 void sp_free(summary_page *sp){
+	inf_free_valueset(sp->value, FS_MALLOC_W);
 	free(sp);
 }
 
@@ -26,15 +30,15 @@ bool sp_insert(summary_page *sp, uint32_t lba, uint32_t psa){
 	else return false;
 }
 
-bool sp_insert_pair(summary_page *sp, summary_pair p){
+bool sp_insert_spair(summary_page *sp, summary_pair p){
 	memcpy(&sp->body[sp->write_pointer*sizeof(summary_pair)], &p, sizeof(summary_pair));
 	sp->write_pointer++;
 	if(sp->write_pointer==MAX_CUR_POINTER) return true;
 	else return false;
 }
 
-char *sp_get_data(summary_page *sp){
-	return sp->body;
+value_set *sp_get_data(summary_page *sp){
+	return sp->value;
 }
 
 int summary_pair_cmp(summary_pair p, uint32_t target){return p.lba-target;}
@@ -74,7 +78,7 @@ summary_pair spi_pick_pair(summary_page_iter *spi){
 		return end_of_pair;
 	}
 	else{
-		return (((summary_pair*)spi->body)[spi->read_pointer * sizeof(summray_pair)]);
+		return (((summary_pair*)spi->body)[spi->read_pointer * sizeof(summary_pair)]);
 	}
 }
 

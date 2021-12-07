@@ -52,10 +52,11 @@ uint64_t plr_memory_calc(uint32_t entry_num,
 	free(target);
 	return res+(wiskey?entry_num*48:0);
 }
-
+extern uint32_t calc_target_bit;
 double plr_memory_calc_avg(uint32_t entry_num, 
 		uint32_t error, uint32_t DEV_size, bool wiskey, 
-		double *line_per_chunk, double *normal_plr_dp){
+		double *line_per_chunk, double *normal_plr_dp,
+		uint64_t *line_cnt, uint64_t* chunk_cnt){
 
 	uint32_t *target=(uint32_t*)malloc(sizeof(uint32_t)*entry_num);
 	memcpy(target, random_seq, sizeof(uint32_t)*entry_num);
@@ -67,11 +68,14 @@ double plr_memory_calc_avg(uint32_t entry_num,
 		plr->insert(target[i], wiskey?i:i/4);
 	}
 	plr->insert_end();
-	double res=plr->memory_usage(48);
-	double normal_memory=plr->get_normal_memory_usage(48);
+	double res=plr->memory_usage(calc_target_bit);
+	double normal_memory=plr->get_normal_memory_usage(calc_target_bit);
 	*line_per_chunk=plr->get_line_per_chunk();
+	*line_cnt=plr->get_line_cnt();
+	*chunk_cnt=plr->get_chunk_cnt();
+
 	delete plr;
 	free(target);
 	*normal_plr_dp=normal_memory/entry_num;
-	return (res+(wiskey?entry_num*48:0))/entry_num;
+	return (res+(wiskey?entry_num*calc_target_bit:0))/entry_num;
 }

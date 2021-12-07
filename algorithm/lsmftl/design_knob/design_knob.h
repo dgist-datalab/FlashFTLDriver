@@ -15,5 +15,7 @@ void init_memory_info(uint32_t error);
 double bf_memory_per_ent(double ratio);
 double plr_memory_per_ent(double ratio);
 double get_line_per_chunk(double ratio);
+uint64_t line_cnt(double ratio);
+uint64_t chunk_cnt(double ratio);
 void destroy_memory_info();
 #endif

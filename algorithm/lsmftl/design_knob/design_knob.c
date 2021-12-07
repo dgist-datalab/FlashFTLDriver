@@ -12,10 +12,12 @@
 #include "../../../include/settings.h"
 #include "../../../include/utils/thpool.h"
 #define MIN(a,b) ((a)<(b)?(a):(b))
-#define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriver/algorithm/lsmftl/design_knob"
+#define DIR_PATH "/home/kukania/BloomFTL-project/FAST/algorithm/lsmftl/design_knob"
 double *plr_dp;
 double *line_per_chunk;
 double *normal_plr_dp;
+uint64_t *line_cnt_dp;
+uint64_t *chunk_cnt_dp;
 
 uint32_t global_error;
 extern float gbf_min_bit;
@@ -28,14 +30,36 @@ void plr_func(void *arg, int __idx){
 	}
 	printf("idx:%u!\n", idx);
     plr_dp[idx]=plr_memory_calc_avg((range/1000*idx), global_error, range, false, 
-			&line_per_chunk[idx], &normal_plr_dp[idx]);
+			&line_per_chunk[idx], &normal_plr_dp[idx], &line_cnt_dp[idx], &chunk_cnt_dp[idx]);
 	free(arg);
+}
+
+static void write_data(int fd, char *data, uint32_t size_of, uint32_t cnt){
+	uint32_t written_byte;
+	if((written_byte=write(fd, data, size_of *cnt))!=-1){
+		fsync(fd);
+	}
+	else{
+		printf("%d temp:%d, sizeof():%lu %p\n", fd, written_byte, size_of, data);
+		perror("??\n");
+	}
+}
+
+static void read_data(int fd, char *data, uint32_t size_of, uint32_t cnt){
+	if(read(fd, data, cnt *size_of)){
+
+	}else{
+		printf("???\n");
+	}
 }
 
 void init_memory_info(uint32_t error){
 	plr_dp=(double*)calloc(1001, sizeof(double));
 	normal_plr_dp=(double*)calloc(1001, sizeof(double));
 	line_per_chunk=(double*)calloc(1001, sizeof(double));
+	line_cnt_dp=(uint64_t *)calloc(1001, sizeof(uint64_t));
+	chunk_cnt_dp=(uint64_t *)calloc(1001, sizeof(uint64_t));
+
 	char plr_table_map[512]={0,};
     sprintf(plr_table_map,"%s/plr_table/%d.map", DIR_PATH, error);
 	int fd=open(plr_table_map, O_CREAT | O_RDWR, 0666);
@@ -63,50 +87,22 @@ void init_memory_info(uint32_t error){
         thpool_wait(plr_make_th);
 //		free(temp);
 		thpool_destroy(plr_make_th);
-		int written_byte;
-		if((written_byte=write(fd, plr_dp, sizeof(double) * 1001))!=-1){
-			fsync(fd);
-		}
-		else{
-			printf("%d temp:%d, sizeof():%lu %p\n", fd, written_byte, sizeof(plr_dp), plr_dp);
-			perror("??\n");
-		}
 
-		if((written_byte=write(fd, line_per_chunk, sizeof(double) * 1001))!=-1){
-			fsync(fd);
-		}
-		else{
-			printf("%d temp:%d, sizeof():%lu %p\n", fd, written_byte, sizeof(plr_dp), plr_dp);
-			perror("??\n");
-		}
+		write_data(fd, (char*)plr_dp, sizeof(double), 1001);
+		write_data(fd, (char*)line_per_chunk, sizeof(double), 1001);
+		write_data(fd, (char*)normal_plr_dp, sizeof(double), 1001);
+		write_data(fd, (char*)line_cnt_dp, sizeof(uint64_t), 1001);
+		write_data(fd, (char*)chunk_cnt_dp, sizeof(uint64_t), 1001);
 
-		if((written_byte=write(fd, normal_plr_dp, sizeof(double) * 1001))!=-1){
-			fsync(fd);
-		}
-		else{
-			printf("%d temp:%d, sizeof():%lu %p\n", fd, written_byte, sizeof(plr_dp), plr_dp);
-			perror("??\n");
-		}
 	//	EPRINT("please add new table for fpr", true);
 	//	exit(1);
 	}
 	else{
-		if(read(fd, plr_dp, 1001*sizeof(double))){
-
-		}else{
-			printf("???\n");
-		}
-
-		if(read(fd, line_per_chunk, 1001*sizeof(double))){
-
-		}else{
-			printf("???\n");
-		}
-		if(read(fd, normal_plr_dp, 1001*sizeof(double))){
-
-		}else{
-			printf("???\n");
-		}
+		read_data(fd,(char*) plr_dp, sizeof(double), 1001);
+		read_data(fd,(char*) line_per_chunk, sizeof(double), 1001);
+		read_data(fd,(char*) normal_plr_dp, sizeof(double), 1001);
+		read_data(fd,(char*) line_cnt_dp, sizeof(uint64_t), 1001);
+		read_data(fd,(char*) chunk_cnt_dp, sizeof(uint64_t), 1001);
 	}
 
 	printf("opt memory usage\n");
@@ -142,4 +138,20 @@ double get_line_per_chunk(double ratio){
 
 void destroy_memory_info(){
 	free(plr_dp);
+}
+
+uint64_t line_cnt(double ratio){
+	uint32_t temp=ratio*1000;
+	if(temp==0){
+		return 0;
+	}
+	return line_cnt_dp[temp];
+}
+
+uint64_t chunk_cnt(double ratio){
+	uint32_t temp=ratio*1000;
+	if(temp==0){
+		return 0;
+	}
+	return chunk_cnt_dp[temp];
 }

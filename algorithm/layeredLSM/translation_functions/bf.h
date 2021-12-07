@@ -13,6 +13,7 @@ typedef struct bloom_filter_meta{
 	double real_bits_per_entry;
 	float entry_fpr;
 	uint32_t bits;
+	uint32_t contents_num;
 }bloom_filter_meta;
 
 /*

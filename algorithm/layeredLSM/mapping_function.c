@@ -1,6 +1,6 @@
 #include "./mapping_function.h"
 #include "./translation_functions/exact_mapping.h"
-#include "./translation_functions/bf_mappaing.h"
+#include "./translation_functions/bf_mapping.h"
 
 map_function *map_function_factory(uint32_t type, uint32_t contents_num, float fpr){
 	map_function *res=NULL;

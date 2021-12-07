@@ -1,6 +1,7 @@
 SRCS +=\
 	exact_mapping.c\
 	bf.c\
+	bf_mapping.c\
 
 
 OBJS :=\

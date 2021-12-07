@@ -28,13 +28,12 @@
 #define MIN_ENTRY_PER_SST 128
 #define MIN_SEQ_ENTRY_NUM 4
 #define WB_SEPARATE
-#define DYNAMIC_HELPER_ASSIGN
 #define INVALIDATION_COUNT_MERGE
-//#define MIN_ENTRY_OFF
-#define DYNAMIC_WISCKEY
+#define DYNAMIC_HELPER_ASSIGN
 
 #define DEMAND_SEG_LOCK
 #define UPDATING_COMPACTION_DATA
+#define DYNAMIC_WISCKEY
 
 enum{
 	DEMOTE_RUN, KEEP_RUN,
@@ -78,6 +77,7 @@ typedef struct tree_param{
 	uint64_t run_num;
 	uint64_t total_run_num_bit;
 	uint64_t entry_bit;
+	uint64_t entry_num[21];
 	uint32_t plr_cnt;
 //	double run_num;
 	double bloom_bit;
@@ -87,9 +87,11 @@ typedef struct tree_param{
 	double run_range_size[21];
 	double level_size_ratio[21];
 	double WAF;
+#ifdef DYNAMIC_WISCKEY
 	uint64_t BF_memory;
 	uint64_t PLR_memory;
 	uint64_t memory_limit_for_helper;
+#endif
 }tree_param;
 
 typedef struct lsmtree_parameter{

@@ -1,10 +1,13 @@
 SRCS +=\
-	   block_table.c\
-	   sorted_table.c\
-	   page_aligner.c\
-	   layered_lsm_operation.c\
-	   summary_page.c\
+	   ./block_table.c\
+	   ./sorted_table.c\
+	   ./page_aligner.c\
+	   ./layered_lsm_operation.c\
+	   ./summary_page.c\
 	   ./mapping_function.c\
+	   ./run_query.c\
+	   ./run_insert.c\
+	   ./run_util.c\
 
 
 OBJS :=\

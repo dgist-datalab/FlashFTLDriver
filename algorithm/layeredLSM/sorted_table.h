@@ -1,12 +1,13 @@
 #ifndef SORTED_TABLE_H
-#define SROTED_TABLE_H
+#define SORTED_TABLE_H
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 #include "../../include/container.h"
 #include "../../include/settings.h"
-#include "block_table.h"
+#include "./block_table.h"
+#include "./summary_page.h"
 #define CEILING(a,b) (a/b + (a%b?1:0))
 #define MAX_SECTOR_IN_RC ((_PPB-1)*L2PGAP)
 //#define EXTRACT_PPA(PSA) (PSA/L2PGAP)
@@ -23,7 +24,16 @@ typedef struct sorted_table_array{
 	L2P_bm *bm;
 	bool summary_write_alert; //for letting run know when it should issue summary block
 	STE *pba_array;
+
+	uint32_t sp_idx;
+	summary_page_meta *sp_meta;
 }st_array;
+
+typedef struct summary_write_param{
+	uint32_t idx;
+	st_array *sa;
+	value_set *value;
+}summary_write_param;
 
 /*
 	Function: st_array_init
@@ -52,6 +62,7 @@ void st_array_free(st_array *sa);
 	-----------------------------------
 		Returns PSA by translating LSA
 
+
 	sa: target sa
 	intra_idx: target idx in the run
 */
@@ -63,8 +74,9 @@ uint32_t st_array_read_translation(st_array *sa, uint32_t intra_idx);
 		Returns PSA where to write summary address
 
 	sa: target sa
+	force: if it is set to true, it forcely return the ppa;
 */
-uint32_t st_array_summary_translation(st_array *sa);
+uint32_t st_array_summary_translation(st_array *sa, bool force);
 
 /*
 	Function: st_array_write_translation
@@ -74,6 +86,40 @@ uint32_t st_array_summary_translation(st_array *sa);
 	sa: target sa
 */
 uint32_t st_array_write_translation(st_array *sa);
+
+
+/*
+ * Function: st_array_insert_pair
+ * --------------------- 
+ *		inserting lba and psa 
+ *
+ * sa: 
+ * lba: target_lba
+ * psa: target_psa
+ * */
+uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa);
+
+/*
+ * Function: st_array_get_summary_param
+ * --------------------- 
+ *		return summary page information to write
+ *
+ * sa: 
+ * ppa:		the physical address of summary data
+ * force:	if it is set to true, this function returns summary data 
+ *			even if the data is not aligned.
+ * */
+summary_write_param *st_array_get_summary_param(st_array *sa, uint32_t ppa, bool force);
+
+/*
+ * Function: st_array_summary_write_done
+ * --------------------- 
+ *		free sp_meta which is written
+ *
+ * sa: 
+ * sp_idx: target sp meta idx
+ * */
+void st_array_summary_write_done(summary_write_param *swp);
 
 /*
 	Function: __st_update_map
