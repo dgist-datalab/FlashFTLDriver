@@ -17,6 +17,7 @@ uint32_t page_dump(FILE *fp){
 	uint32_t temp_seg_idx=UINT32_MAX;
 	/*write active segment and reserve*/
 	if(p->active){
+		printf("acvtive seg idx :%u\n", p->active->seg_idx);
 		fwrite(&p->active->seg_idx, sizeof(uint32_t),1,fp);
 	}
 	else{
@@ -24,6 +25,7 @@ uint32_t page_dump(FILE *fp){
 	}
 
 	if(p->reserve){
+		printf("reserve seg idx :%u\n", p->reserve->seg_idx);
 		fwrite(&p->reserve->seg_idx, sizeof(uint32_t),1,fp);
 	}
 	else{
@@ -45,7 +47,7 @@ uint32_t page_load(lower_info *li, blockmanager *bm, algorithm *algo, FILE *fp){
 	char temp_data[PAGESIZE];
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		fread(temp_data, sizeof(char), PAGESIZE, fp);
-		a_buffer.value[i]=inf_get_valueset(temp_data, PAGESIZE, FS_MALLOC_W);
+		a_buffer.value[i]=inf_get_valueset(temp_data, FS_MALLOC_W, PAGESIZE);
 	}
 	fread(a_buffer.key, sizeof(uint32_t), a_buffer.idx, fp);
 

@@ -62,9 +62,7 @@ static void layer_info_mapping(master_processor *mp, bool data_load, int argc, c
 		mp->li->create(mp->li,mp->bm);
 	}
 
-	if(!data_load){
-		mp->bm=blockmanager_factory(SEQ_BM, mp->li);
-	}
+	mp->bm=blockmanager_factory(SEQ_BM, mp->li);
 
 
 	if(mp->algo->argument_set){

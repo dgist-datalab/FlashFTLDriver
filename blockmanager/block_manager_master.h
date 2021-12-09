@@ -2,6 +2,7 @@
 #define __BMM_H__
 #include "../include/container.h"
 #include "./sequential/seq_block_manager.h"
+#include "../include/debug_utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -40,6 +41,23 @@ struct blockmanager * blockmanager_factory(uint32_t type, lower_info *li);
  *	bm:
  * */
 void blockmanager_free(struct blockmanager *bm);
+
+/*
+ * Function: blockmanager_master_dump
+ * -------------------------------
+ *		dump data to fp
+ *
+ *  fp:
+ * */
+void blockmanager_master_dump(FILE *fp);
+
+/*
+ * Function: blockmanager_master_load
+ * -------------------------------
+ *		dump data from fp
+ *  fp:
+ * */
+void blockmanager_master_load(FILE *fp);
 
 /*
  * Function: block_reinit

@@ -35,4 +35,6 @@ void sbm_insert_gc_target(struct blockmanager *bm, uint32_t seg_idx);
 uint32_t sbm_total_free_page_num(struct blockmanager *bm, __segment *s);
 uint32_t sbm_seg_invalidate_piece_num(struct blockmanager *bm, uint32_t seg_idx);
 uint32_t sbm_invalidate_seg_num(struct blockmanager *bm);
+uint32_t sbm_dump(struct blockmanager *bm, FILE *fp);
+uint32_t sbm_load(struct blockmanager *bm, FILE *fp);
 #endif

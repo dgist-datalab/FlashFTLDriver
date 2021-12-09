@@ -43,8 +43,8 @@ static inline void __set_function(blockmanager *bm){
 	bm->total_free_page_num=sbm_total_free_page_num;
 	bm->seg_invalidate_piece_num=sbm_seg_invalidate_piece_num;
 	bm->invalidate_seg_num=sbm_invalidate_seg_num;
-	bm->load=NULL;
-	bm->dump=NULL;
+	bm->load=sbm_load;
+	bm->dump=sbm_dump;
 }
 
 blockmanager*  sbm_create (lower_info *li){
@@ -82,11 +82,11 @@ void sbm_free (blockmanager* bm){
 
 static inline void __segment_assign_post(sbm_pri *pri, __segment *target, uint32_t type){
 	switch (type){
+		case BLOCK_LOAD:
 		case BLOCK_RESERVE:
 			break;
-		case BLOCK_LOAD:
 		case BLOCK_ACTIVE:
-			mh_insert_append(pri->max_heap, (void*)target);
+				mh_insert_append(pri->max_heap, (void*)target);
 			break;
 	}
 	pri->num_free_seg--;
@@ -112,11 +112,16 @@ __segment *sbm_pick_seg(blockmanager *bm, uint32_t seg_idx, uint32_t type){
 		}
 		else{
 			q_enqueue((void*)temp_free_block, temp_free_q);
+			temp_free_block=NULL;
 		}
 	}
 
 	q_free(pri->free_segment_q);
 	pri->free_segment_q=temp_free_q;
+
+	if(temp_free_block==NULL){
+		temp_free_block=&pri->seg_set[seg_idx];
+	}
 
 	__segment_assign_post(pri, temp_free_block, type);
 	return temp_free_block;
@@ -285,4 +290,59 @@ uint32_t sbm_invalidate_seg_num(blockmanager *bm){
 		}
 	}
 	return res;
+}
+
+uint32_t sbm_dump(struct blockmanager *bm, FILE *fp){
+	sbm_pri *p=(sbm_pri *)bm->private_data;
+	blockmanager_master_dump(fp);
+	for(uint32_t i=0; i<_NOS; i++){
+		fwrite(&p->seg_set[i], sizeof(__segment), 1, fp);
+		for(uint32_t j=0; j<BPS; j++){
+			fwrite(&p->seg_set[i].blocks[j]->block_idx, 
+					sizeof(p->seg_set[i].blocks[j]->block_idx), 1, fp);
+		}
+		if(p->seg_set[i].private_data){
+			printf("[dump]%u -> assigned\n", i);
+		}
+		else{
+			printf("[dump]%u -> not assigned\n", i);
+		}
+	}
+	return 1;
+}
+
+uint32_t sbm_load(blockmanager *bm, FILE *fp){
+	blockmanager_master_load(fp);
+	sbm_pri *p=(sbm_pri *)bm->private_data;
+	q_free(p->free_segment_q);
+	q_init(&p->free_segment_q, _NOS);
+	p->num_free_seg=0;
+
+	__segment temp_segment;
+	for(uint32_t i=0; i<_NOS; i++){
+		fread(&temp_segment, sizeof(temp_segment), 1, fp);
+		memcpy(&p->seg_set[i], &temp_segment, sizeof(temp_segment));
+
+		uint32_t block_idx;
+		for(uint32_t j=0; j<BPS; j++){
+			fread(&block_idx, 
+					sizeof(block_idx), 1, fp);
+			p->seg_set[i].blocks[j]=&BMM.total_block_set[block_idx];
+		}
+
+		if(p->seg_set[i].private_data){
+			mh_insert_append(p->max_heap, (void*)&p->seg_set[i]);
+		}
+		else{
+			q_enqueue((void*)&p->seg_set[i], p->free_segment_q);
+			p->num_free_seg++;
+		}
+		if(p->seg_set[i].private_data){
+			printf("[load]%u -> assigned\n", i);
+		}
+		else{
+			printf("[load]%u -> not assigned\n", i);
+		}
+	}
+	return 1;
 }

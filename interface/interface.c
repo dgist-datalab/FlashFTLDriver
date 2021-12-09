@@ -989,7 +989,10 @@ uint32_t inf_dump(char *filename){
 
 uint32_t inf_load(char *filename){
 	FILE *fp=fopen(filename, "r");
-	mp.bm->load(mp.bm, mp.li, fp);
+	if(!fp){
+		EPRINT("fp error", true);
+	}
+	mp.bm->load(mp.bm, fp);
 	mp.li->load(mp.li, fp);
 	mp.algo->load(mp.li, mp.bm, mp.algo, fp);
 	if(mp._data_check_flag){

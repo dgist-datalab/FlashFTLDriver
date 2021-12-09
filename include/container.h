@@ -195,7 +195,7 @@ typedef struct __OOBT{
 typedef struct masterblock{
 	uint32_t block_idx;
 	uint16_t now_assigned_pptr;
-	uint8_t* bitset;
+	uint8_t bitset[_PPB*L2PGAP/8];
 	__OOB oob_list[_PPB];
 	//uint16_t invalidate_piece_num;
 	//uint16_t validate_piece_num;
@@ -251,7 +251,7 @@ struct blockmanager{
 	uint32_t (*seg_invalidate_piece_num)(struct blockmanager *, uint32_t seg_idx);
 	uint32_t (*invalidate_seg_num)(struct blockmanager *);
 
-	uint32_t (*load)(struct blockmanager *, lower_info *li, FILE * fp);
+	uint32_t (*load)(struct blockmanager *, FILE * fp);
 	uint32_t (*dump)(struct blockmanager *, FILE* fp);
 
 	lower_info *li;
