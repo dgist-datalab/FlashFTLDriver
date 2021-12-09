@@ -4,81 +4,35 @@
 #include "../../interface/queue.h"
 #include "../../include/data_struct/heap.h"
 #include "../bb_checker.h"
+#include "../block_manager_master.h"
 #include <stdint.h>
-
-typedef struct block_set{
-	uint32_t total_invalid_number;
-	uint32_t total_valid_number;
-	uint32_t block_set_idx;
-	bool isused;
-	uint8_t type;
-	__block *blocks[BPS];
-	void *hptr;
-}block_set;
+#include <stdlib.h>
 
 typedef struct seq_bm_private{
-	__block *seq_block;
-	block_set *logical_segment;
-	queue *free_logical_segment_q;
+	__segment seg_set[_NOS];
 	mh *max_heap;
-	uint32_t assigned_block;
-	uint32_t free_block;
-	int pnum;
-	queue **free_logical_seg_q_pt;
-	queue *invalid_block_q;
-	mh **max_heap_pt;
+	queue *free_segment_q;
+	uint32_t num_free_seg;
 }sbm_pri;
 
-uint32_t seq_create (struct blockmanager*, lower_info *li);
-uint32_t seq_destroy (struct blockmanager*);
-uint32_t seq_free_seg_num(struct blockmanager*);
-__block* seq_get_block (struct blockmanager*, __segment *);
-__block *seq_pick_block(struct blockmanager *, uint32_t page_num);
-__segment* seq_get_segment (struct blockmanager*, uint32_t  type);
-__segment* seq_get_segment_target(struct blockmanager*, uint32_t seg_idx, uint32_t  type);
-bool seq_check_full(struct blockmanager *,__segment *active, uint8_t type);
-bool seq_is_gc_needed (struct blockmanager*);
-__gsegment* seq_get_gc_target (struct blockmanager*);
-void seq_trim_segment (struct blockmanager*, __gsegment*, struct lower_info*);
-int seq_populate_bit (struct blockmanager*, uint32_t ppa);
-int seq_unpopulate_bit (struct blockmanager*, uint32_t ppa);
-bool seq_query_bit(struct blockmanager *, uint32_t ppa);
-int seq_erase_bit (struct blockmanager*, uint32_t ppa);
-bool seq_is_valid_page (struct blockmanager*, uint32_t ppa);
-bool seq_is_invalid_page (struct blockmanager*, uint32_t ppa);
-void seq_set_oob(struct blockmanager*, char *data, int len, uint32_t ppa);
-char* seq_get_oob(struct blockmanager*, uint32_t ppa);
-void seq_release_segment(struct blockmanager*, __segment *);
-__segment* seq_change_reserve(struct blockmanager* ,__segment *reserve);
-int seq_get_page_num(struct blockmanager* ,__segment *);
-int seq_pick_page_num(struct blockmanager* ,__segment *);
-void seq_reinsert_segment(struct blockmanager *, uint32_t seg_idx);
-uint32_t seq_remain_free_page(struct blockmanager *, __segment *);
-
-uint32_t seq_map_ppa(struct blockmanager* , uint32_t lpa);
-void seq_free_segment(struct blockmanager *, __segment *);
-void seq_invalidate_number_decrease(struct blockmanager *bm, uint32_t ppa);
-uint32_t seq_get_invalidate_number(struct blockmanager *bm, uint32_t seg_idx);
-uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm);
-
-uint32_t seq_load(struct blockmanager *bm, lower_info *li, FILE* fp);
-uint32_t seq_dump(struct blockmanager *bm, FILE *fp);
-//uint32_t seq_get_segment_loading(struct blockmanager *);
-//uint32_t seq_load_done(struct blockmanager *bm)
-
-uint32_t seq_pt_create(struct blockmanager *, int, int*, lower_info *);
-uint32_t seq_pt_destroy(struct blockmanager *);
-__segment* seq_pt_get_segment (struct blockmanager*, int pt_num, uint32_t type);
-__gsegment* seq_pt_get_gc_target (struct blockmanager*, int pt_num);
-void seq_pt_trim_segment(struct blockmanager*, int pt_num, __gsegment *, lower_info*);
-int seq_pt_remain_page(struct blockmanager*, __segment *active,int pt_num);
-bool seq_pt_isgc_needed(struct blockmanager*, int pt_num);
-__segment* seq_change_pt_reserve(struct blockmanager *,int pt_num, __segment *reserve);
-uint32_t seq_pt_reserve_to_free(struct blockmanager*, int pt_num, __segment *reserve);
-
-
-void seq_mh_swap_hptr(void *a, void *b);
-void seq_mh_assign_hptr(void *a, void *hn);
-int seq_get_cnt(void *a);
-
+struct blockmanager *sbm_create(lower_info *li);
+void sbm_free(struct blockmanager *bm);
+__segment *sbm_get_seg(struct blockmanager *, uint32_t type);
+__segment *sbm_pick_seg(struct blockmanager *bm, uint32_t seg_idx, uint32_t type);
+int32_t sbm_get_page_addr(__segment *);
+int32_t sbm_pick_page_addr(__segment *);
+bool sbm_is_gc_needed(struct blockmanager *);
+__gsegment* sbm_get_gc_target(struct blockmanager*);
+void sbm_trim_segment(struct blockmanager *, __gsegment *);
+int sbm_bit_set(struct blockmanager*, uint32_t piece_ppa);
+int sbm_bit_unset(struct blockmanager*, uint32_t piece_ppa);
+bool sbm_bit_query(struct blockmanager*,uint32_t piece_ppa);
+bool sbm_is_invalid_piece(struct blockmanager*,uint32_t piece_ppa);
+void sbm_set_oob(struct blockmanager*,char *data, int len, uint32_t ppa);
+char *sbm_get_oob(struct blockmanager*,uint32_t ppa);
+void sbm_change_reserve_to_active(struct blockmanager *bm, __segment *s);
+void sbm_insert_gc_target(struct blockmanager *bm, uint32_t seg_idx);
+uint32_t sbm_total_free_page_num(struct blockmanager *bm, __segment *s);
+uint32_t sbm_seg_invalidate_piece_num(struct blockmanager *bm, uint32_t seg_idx);
+uint32_t sbm_invalidate_seg_num(struct blockmanager *bm);
 #endif

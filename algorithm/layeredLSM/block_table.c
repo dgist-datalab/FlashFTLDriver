@@ -38,9 +38,10 @@ void L2PBm_invalidate_PBA(L2P_bm *bm, uint32_t PBA){
 	bm->PBA_map[PBA/_PPB]=NO_MAP;
 
 	if(bm->seg_trimed_block_num[seg_idx]==BPS){
+		/*
 		__segment *target_seg=bm->segment_manager->retrieve_segment(bm->segment_manager, seg_idx);
 		bm->segment_manager->trim_segment_force(bm->segment_manager, target_seg, bm->segment_manager->li);
-
+		*/
 		bitmap_reinit(bm->seg_block_bit[seg_idx], BPS);
 		bm->seg_trimed_block_num=0;
 	}

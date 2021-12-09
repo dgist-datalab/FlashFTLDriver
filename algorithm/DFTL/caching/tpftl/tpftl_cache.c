@@ -382,12 +382,12 @@ uint32_t tp_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, uin
 			continue;
 		}*/
 
-		if(ppa_list[tc->offset]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,ppa_list[tc->offset])){
+		if(ppa_list[tc->offset]!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm,ppa_list[tc->offset])){
 			printf("insert debug_lba %u:%u %u-th pref:%u\n", lba+i, ppa_list[tc->offset], i, prefetching_len);
 			if(etr){
 				printf("invalidated ppa read %u:%u (l,p), map_ppa:%u\n", lba+i, ppa_list[tc->offset], etr->physical_address);
 				for(uint32_t j=0; j<L2PGAP; j++){
-					if(!demand_ftl.bm->query_bit(demand_ftl.bm, etr->physical_address+j)){
+					if(!demand_ftl.bm->bit_query(demand_ftl.bm, etr->physical_address+j)){
 						EPRINT("double invalidated ppa in map!", false);
 					}
 					else{
@@ -730,7 +730,7 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba,
 				old_ppa=ppa_list[tc->offset];
 				ppa_list[tc->offset]=tc->ppa;
 				set_tc_flag(tc, CLEAN_FLAG);
-				if(!demand_ftl.bm->query_bit(demand_ftl.bm, tc->ppa)){
+				if(!demand_ftl.bm->bit_query(demand_ftl.bm, tc->ppa)){
 					printf("wtf1! %lu:%u\n", GETLBA(tn, tc), tc->ppa);
 					abort();
 				}

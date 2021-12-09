@@ -6,16 +6,11 @@
 #include "../bench/measurement.h"
 #include "cheeze_hg_block.h"
 
-#ifdef KVSSD
-#include "../include/data_struct/hash_kv.h"
-#else
-#include "../include/data_struct/hash.h"
-#endif
-
 #include "../include/data_struct/redblack.h"
 #include "../include/utils/cond_lock.h"
 #include "../include/utils/tag_q.h"
 #include "../include/utils/data_checker.h"
+#include "../blockmanager/block_manager_master.h"
 #include "buse.h"
 #include "layer_info.h"
 #include <stdio.h>
@@ -430,12 +425,7 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv){
 
 		q_init(&t->req_q,QSIZE);
 		q_init(&t->retry_q,QSIZE);
-
-#ifdef interface_vector
 		pthread_create(&t->t_id,NULL,&vectored_main, NULL);
-#else
-		pthread_create(&t->t_id,NULL,&p_main,NULL);
-#endif
 	}
 
 
@@ -458,7 +448,6 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv){
 static request* inf_get_req_common(request *req, bool fromApp, int mark){
 	static uint32_t seq_num=0;
 	req->end_req=inf_end_req;
-	req->isAsync=ASYNC;
 	req->param=NULL;
 	req->type_ftl = 0;
 	req->type_lower = 0;
@@ -723,7 +712,7 @@ void inf_free(){
 
 	mp.algo->destroy(mp.li,mp.algo);
 	mp.li->destroy(mp.li);
-	mp.bm->destroy(mp.bm);
+	blockmanager_free(mp.bm);
 
 	if(mp._data_check_flag){
 		__checking_data_free();

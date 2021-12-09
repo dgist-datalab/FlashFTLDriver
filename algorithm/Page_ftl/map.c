@@ -33,7 +33,7 @@ uint32_t page_map_assign(KEYT* lba, uint32_t max_idx){
 		/*mapping update*/
 		p->mapping[t_lba]=res*L2PGAP+i;
 		if(t_lba==test_key){
-
+			printf("test_key(%u) is set to %u\n", test_key, res*L2PGAP+i);
 		}
 	//	DPRINTF("\tmap set : %u->%u\n", t_lba, p->mapping[t_lba]);
 	}
@@ -68,7 +68,7 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 
 	/*when the gc phase, It should get a page from the reserved block*/
-	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve);
+	res=page_ftl.bm->get_page_addr(p->reserve);
 	uint32_t old_ppa, new_ppa;
 	for(uint32_t i=0; i<idx; i++){
 		KEYT t_lba=lba[i];
@@ -79,7 +79,7 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx){
 		/*mapping update*/
 		p->mapping[t_lba]=res*L2PGAP+i;
 		if(t_lba==test_key){
-
+			printf("test_key(%u) is set to %u in gc\n", test_key, res*L2PGAP+i);
 		}
 	}
 

@@ -1,6 +1,7 @@
 #ifndef __H_LINFO__
 #define __H_LINFO__
 #include "../include/container.h"
+#include "../blockmanager/block_manager_master.h"
 #include "threading.h"
 //alogrithm layer
 extern struct algorithm __normal;
@@ -20,11 +21,6 @@ extern struct lower_info my_posix; //posix, posix_memory,posix_async
 extern struct lower_info no_info;
 extern struct lower_info amf_info;
 extern struct lower_info pu_manager;
-
-//block manager
-extern struct blockmanager base_bm;
-extern struct blockmanager pt_bm;
-extern struct blockmanager seq_bm;
 
 static void layer_info_mapping(master_processor *mp, bool data_load, int argc, char **argv){
 #ifdef PARALLEL_MANAGER
@@ -61,36 +57,22 @@ static void layer_info_mapping(master_processor *mp, bool data_load, int argc, c
 #elif defined(badblock)
 	mp->algo=&__badblock;
 #endif
-	
 
-#if defined(partition) && !defined(Page_ftl)
-	mp->bm=&pt_bm;
-#elif defined(sequential)
-	mp->bm=&seq_bm;
-#else
-	mp->bm=&base_bm;
-#endif
 	if(!data_load){
 		mp->li->create(mp->li,mp->bm);
 	}
-#if (defined(partition) && !defined(Page_ftl))
-	printf("PARTNUM: %u, MAP: %lu, DATA: %lu\n", PARTNUM, MAPPART_SEGS, DATAPART_SEGS);
-	int temp[PARTNUM];
-	temp[MAP_S]=MAPPART_SEGS;
-	temp[DATA_S]=DATAPART_SEGS;
+
 	if(!data_load){
-		mp->bm->pt_create(mp->bm,PARTNUM,temp,mp->li);
+		mp->bm=blockmanager_factory(SEQ_BM, mp->li);
 	}
-#else
-	if(!data_load){
-		mp->bm->create(mp->bm,mp->li);
-	}
-#endif
+
+
 	if(mp->algo->argument_set){
 		mp->algo->argument_set(argc,argv);
 	}
+
 	if(!data_load){
-		mp->algo->create(mp->li,mp->bm,mp->algo);
+		mp->algo->create(mp->li, mp->bm, mp->algo);
 	}
 }
 #endif

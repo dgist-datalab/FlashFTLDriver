@@ -206,7 +206,7 @@ static inline void mapping_sanity_checker_with_cache(char *value, uint32_t etr_i
 #endif
 	uint32_t *map=(uint32_t*)value;
 	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
-		if(map[i]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm, map[i])){
+		if(map[i]!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm, map[i])){
 			//uint32_t lba=((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, map[i]/L2PGAP))[map[i]%L2PGAP];
 			uint32_t lba=GTD_IDX_TO_FIRST_LBA(etr_idx)+i;
 			if(!dmm.cache->exist(dmm.cache, lba)){
@@ -273,7 +273,7 @@ static inline void update_cache_entry_wrapper(GTD_entry *target_etr, uint32_t lb
 			printf("HIT - lba:%u ppa:%u -> %u, read_mapping:%u\n", lba, old_ppa, ppa, dmm.cache->get_mapping(dmm.cache, lba));
 		}
 #endif
-		if(!demand_ftl.bm->query_bit(demand_ftl.bm, old_ppa)){
+		if(!demand_ftl.bm->bit_query(demand_ftl.bm, old_ppa)){
 			uint32_t r_lba=((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, old_ppa/L2PGAP))[old_ppa%L2PGAP];
 			if(r_lba!=lba){
 				printf("????\n");
@@ -745,7 +745,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 			uint32_t temp_ppa=((uint32_t*)temp_value)[mapping->lba%4096];
 			already_in_cache=dmm.cache->insert_entry_from_translation(dmm.cache, etr, mapping->lba, temp_value, 
 					&dmm.eviction_hint, dp->now_eviction_hint);
-			if(!already_in_cache && temp_ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm, temp_ppa)){
+			if(!already_in_cache && temp_ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm, temp_ppa)){
 				printf("wtf %u %u gtd-ppa:%u:%u\n", mapping->lba, temp_ppa,etr->idx, etr->physical_address);
 				abort();
 			}

@@ -63,7 +63,6 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		temp->end_req=vectored_end_req;
 		temp->param=NULL;
 		temp->value=NULL;
-		temp->isAsync=ASYNC;
 		temp->seq=seq++;
 		temp->type_ftl=0;
 		temp->type_lower=0;

@@ -235,7 +235,7 @@ sst_bf_in_stream * sst_bis_init(__segment *seg, page_manager *pm, bool make_read
 	res->prev_lba=UINT32_MAX;
 	res->start_lba=UINT32_MAX;
 
-	res->start_piece_ppa=pm->bm->pick_page_num(pm->bm, seg)*L2PGAP;
+	res->start_piece_ppa=pm->bm->pick_page_addr(seg)*L2PGAP;
 	res->piece_ppa_length=(_PPS-seg->used_page_num)*L2PGAP;
 	res->map_data=new std::queue<value_set*>();
 	res->pm=pm;
@@ -413,7 +413,6 @@ void sst_bis_free(sst_bf_in_stream *bis){
 	}
 	
 	if(bis->seg->used_page_num==_PPS){
-		free(bis->seg);
 	}
 	else{
 		/*

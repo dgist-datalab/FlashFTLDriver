@@ -1,19 +1,21 @@
 #include "gc.h"
 #include "map.h"
 #include "../../include/data_struct/list.h"
+#include "../../include/debug_utils.h"
 #include <stdlib.h>
 #include <stdint.h>
 
 extern algorithm page_ftl;
+extern uint32_t test_key;
 void invalidate_ppa(uint32_t t_ppa){
 	/*when the ppa is invalidated this function must be called*/
-	page_ftl.bm->unpopulate_bit(page_ftl.bm, t_ppa);
+	page_ftl.bm->bit_unset(page_ftl.bm, t_ppa);
 }
 
 void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx){
 	/*when the ppa is validated this function must be called*/
 	for(uint32_t i=0; i<max_idx; i++){
-		page_ftl.bm->populate_bit(page_ftl.bm,ppa * L2PGAP+i);
+		page_ftl.bm->bit_set(page_ftl.bm,ppa * L2PGAP+i);
 	}
 
 	/*this function is used for write some data to OOB(spare area) for reverse mapping*/
@@ -37,13 +39,13 @@ gc_value* send_req(uint32_t ppa, uint8_t type, value_set *value){
 			my_req->type_lower=0;
 			/*when read a value, you can assign free value by this function*/
 			res->value=inf_get_valueset(NULL,FS_MALLOC_R,PAGESIZE);
-			page_ftl.li->read(ppa,PAGESIZE,res->value,ASYNC,my_req);
+			page_ftl.li->read(ppa,PAGESIZE,res->value,my_req);
 			break;
 		case GCDW:
 			res=(gc_value*)malloc(sizeof(gc_value));
 			res->value=value;
 			my_req->param=(void *)res;
-			page_ftl.li->write(ppa,PAGESIZE,res->value,ASYNC,my_req);
+			page_ftl.li->write(ppa,PAGESIZE,res->value,my_req);
 			break;
 	}
 	return res;
@@ -109,12 +111,10 @@ next:
 		g_buffer.idx=0;	
 	}
 
-	bm->trim_segment(bm,target,page_ftl.li); //erase a block
-
-	bm->free_segment(bm, p->active);
-
+	bm->trim_segment(bm,target); //erase a block
 	p->active=p->reserve;//make reserved to active block
-	p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
+	bm->change_reserve_to_active(bm, p->reserve);
+	p->reserve=bm->get_segment(bm, BLOCK_RESERVE); //get new reserve block from block_manager
 }
 
 void do_gc(){
@@ -135,7 +135,7 @@ void do_gc(){
 		//this function check the page is valid or not
 		bool should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(bm->is_invalid_page(bm,page*L2PGAP+i)) continue;
+			if(bm->is_invalid_piece(bm,page*L2PGAP+i)) continue;
 			else{
 				should_read=true;
 				break;
@@ -157,7 +157,7 @@ void do_gc(){
 			if(!gv->isdone) continue;
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
-				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
+				if(bm->is_invalid_piece(bm,gv->ppa*L2PGAP+i)) continue;
 				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
@@ -185,12 +185,10 @@ void do_gc(){
 		g_buffer.idx=0;	
 	}
 
-	bm->trim_segment(bm,target,page_ftl.li); //erase a block
-
-	bm->free_segment(bm, p->active);
-
+	bm->trim_segment(bm,target); //erase a block
 	p->active=p->reserve;//make reserved to active block
-	p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
+	bm->change_reserve_to_active(bm, p->reserve);
+	p->reserve=bm->get_segment(bm, BLOCK_RESERVE); //get new reserve block from block_manager
 
 	list_free(temp_list);
 }
@@ -200,18 +198,17 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	uint32_t res;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
-	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && page_ftl.bm->is_gc_needed(page_ftl.bm)){
+	if(page_ftl.bm->check_full(p->active) && page_ftl.bm->is_gc_needed(page_ftl.bm)){
 //		new_do_gc();//call gc
 		do_gc();//call gc
 	}
 
 retry:
-	/*get a page by bm->get_page_num, when the active block doesn't have block, return UINT_MAX*/
-	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active);
+	/*get a page by bm->get_page_addr, when the active block doesn't have block, return UINT_MAX*/
+	res=page_ftl.bm->get_page_addr(p->active);
 
 	if(res==UINT32_MAX){
-		page_ftl.bm->free_segment(page_ftl.bm, p->active);
-		p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
+		p->active=page_ftl.bm->get_segment(page_ftl.bm,BLOCK_ACTIVE); //get a new block
 		goto retry;
 	}
 

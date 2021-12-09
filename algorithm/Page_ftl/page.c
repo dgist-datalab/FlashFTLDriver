@@ -127,10 +127,10 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 
 	switch(type){
 		case DATAR:
-			page_ftl.li->read(ppa,PAGESIZE,value,ASYNC,my_req);
+			page_ftl.li->read(ppa,PAGESIZE,value,my_req);
 			break;
 		case DATAW:
-			page_ftl.li->write(ppa,PAGESIZE,value,ASYNC,my_req);
+			page_ftl.li->write(ppa,PAGESIZE,value,my_req);
 			break;
 	}
 }

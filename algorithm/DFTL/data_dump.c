@@ -43,13 +43,13 @@ static gc_value * send_dump_req(uint32_t ppa, uint8_t type, value_set *value,
 			my_req->param=(void *)res;
 			my_req->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 			res->value=my_req->value;
-			demand_ftl.li->read(ppa, PAGESIZE, my_req->value, ASYNC, my_req);
+			demand_ftl.li->read(ppa, PAGESIZE, my_req->value,  my_req);
 			break;
 		case DUMPW:
 			gv->isdone=false;
 			my_req->value=value;
 			my_req->param=(void*)gv;
-			demand_ftl.li->write(ppa, PAGESIZE, my_req->value, ASYNC, my_req);
+			demand_ftl.li->write(ppa, PAGESIZE, my_req->value,  my_req);
 			break;
 	}
 	return res;
@@ -188,25 +188,25 @@ uint32_t demand_load(lower_info *li, blockmanager *bm, struct algorithm *algo, F
 	//for data segment
 	fread(&active, sizeof(uint32_t), 1, fp);
 	if(active!=UINT32_MAX){
-		p->active=bm->get_segment_target(bm, active, BLOCK_LOAD);
+		p->active=bm->pick_segment(bm, active, BLOCK_LOAD);
 	}
 	else{p->active=NULL;}
 
 	fread(&reserve, sizeof(uint32_t), 1, fp);
 	if(reserve!=UINT32_MAX){
-		p->reserve=bm->get_segment_target(bm, reserve, BLOCK_RESERVE);
+		p->reserve=bm->pick_segment(bm, reserve, BLOCK_RESERVE);
 	}
 	else{p->reserve=NULL;}
 	//for mapping segment
 	fread(&active, sizeof(uint32_t), 1, fp);
 	if(active!=UINT32_MAX){
-		p->map_active=bm->get_segment_target(bm, active, BLOCK_LOAD);
+		p->map_active=bm->pick_segment(bm, active, BLOCK_LOAD);
 	}
 	else{p->map_active=NULL;}
 
 	fread(&reserve, sizeof(uint32_t), 1, fp);
 	if(reserve!=UINT32_MAX){
-		p->map_reserve=bm->get_segment_target(bm, reserve, BLOCK_RESERVE);
+		p->map_reserve=bm->pick_segment(bm, reserve, BLOCK_RESERVE);
 	}
 	else{p->map_reserve=NULL;}
 	/*read seg_type_checker*/

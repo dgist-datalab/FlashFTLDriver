@@ -49,7 +49,7 @@ void validate_piece_ppa(blockmanager *bm, uint32_t piece_num, uint32_t *piece_pp
 		}
 #endif
 
-		if(!bm->populate_bit(bm, piece_ppa[i]) && should_abort){
+		if(!bm->bit_set(bm, piece_ppa[i]) && should_abort){
 			EPRINT("bit error", true);
 		}
 	}
@@ -105,13 +105,13 @@ bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abor
 		return true;
 	}
 
-	if(!bm->unpopulate_bit(bm, piece_ppa)){
+	/*first query at check*/
+	if(!should_abort && !bm->bit_query(bm, piece_ppa)){
+		return false;
+	}
+	if(!bm->bit_unset(bm, piece_ppa)){
 		if(should_abort){
 			EPRINT("bit error", true);
-		}
-		else{
-			bm->invalidate_number_decrease(bm, piece_ppa);
-			return false;
 		}
 	}
 	return true;
@@ -120,13 +120,9 @@ bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool should_abor
 page_manager* page_manager_init(struct blockmanager *_bm){
 	page_manager *pm=(page_manager*)calloc(1,sizeof(page_manager));
 	pm->bm=_bm;
-	pm->current_segment[DATA_S]=_bm->get_segment(_bm, false);
+	pm->current_segment[DATA_S]=_bm->get_segment(_bm, BLOCK_ACTIVE);
 	pm->seg_type_checker[pm->current_segment[DATA_S]->seg_idx]=SEPDATASEG;
-	pm->reserve_segment[DATA_S]=_bm->get_segment(_bm, true);
-
-	//pm->current_segment[MAP_S]=_bm->get_segment(_bm, false);
-	//pm->seg_type_checker[pm->current_segment[MAP_S]->seg_idx]=MAPSEG;
-	//pm->reserve_segment[MAP_S]=_bm->get_segment(_bm, true);
+	pm->reserve_segment[DATA_S]=_bm->get_segment(_bm, BLOCK_RESERVE);
 
 	pm->remain_data_segment_q=new std::list<__segment*>();
 
@@ -189,7 +185,7 @@ void validate_map_ppa(blockmanager *bm, uint32_t map_ppa, uint32_t start_lba, ui
 #endif
 
 	for(uint32_t i=0; i<L2PGAP; i++){
-		if(!bm->populate_bit(bm, map_ppa*L2PGAP+i) && should_abort){
+		if(!bm->bit_set(bm, map_ppa*L2PGAP+i) && should_abort){
 			EPRINT("bit error", true);
 		}
 	}
@@ -213,13 +209,13 @@ void invalidate_map_ppa(blockmanager *bm, uint32_t map_ppa, bool should_abort){
 #endif
 
 	for(uint32_t i=0; i<L2PGAP; i++){
-		if(!bm->unpopulate_bit(bm, map_ppa*L2PGAP+i)){
+		if(!should_abort && !bm->bit_query(bm, map_ppa *L2PGAP +i)){
+			continue;
+		}
+		if(!bm->bit_unset(bm, map_ppa*L2PGAP+i)){
 			if(flag){
 				EPRINT("bit error", true);
 			} 
-			else{
-				bm->invalidate_number_decrease(bm, map_ppa*L2PGAP+i);
-			}
 		}
 	}
 }
@@ -237,19 +233,17 @@ retry:
 	else{
 		seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
 	}
-	if(!seg || bm->check_full(bm, seg, MASTER_PAGE)){
+	if(!seg || bm->check_full(seg)){
 		if(temp_used){
 			temp_used=false;
-			free(seg);
 			pm->remain_data_segment_q->pop_front();
 			goto retry;
 		}
 		if(bm->is_gc_needed(bm)){
 			//EPRINT("before get ppa, try to gc!!\n", true);
 			if(__do_gc(pm,is_map, is_map?1:(1+1))){ //just trim
-				free(seg);
 				if(!pm->current_segment[is_map?MAP_S:DATA_S]){
-					pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+					pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,BLOCK_ACTIVE);
 				}
 				goto retry;
 			}
@@ -261,21 +255,20 @@ retry:
 			
 			}
 			else{
-				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,BLOCK_ACTIVE);
 			}
 			
 		}
 		else{
 			if(seg){
-				free(seg);
 			}
-			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,BLOCK_ACTIVE);
 		}
 
 		pm->seg_type_checker[pm->current_segment[is_map?MAP_S:DATA_S]->seg_idx]=type;
 		goto retry;
 	}
-	res=bm->get_page_num(bm, seg);
+	res=bm->get_page_addr(seg);
 	return res;
 }
 
@@ -293,30 +286,27 @@ retry:
 		seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
 	}
 
-	if(!seg || bm->check_full(bm, seg, MASTER_PAGE)){
+	if(!seg || bm->check_full(seg)){
 		if(temp_used){
 			temp_used=false;
-			free(seg);
 	//		pm->remain_data_segment_q->pop_front();
 			goto retry;
 		}
 		if(bm->is_gc_needed(bm)){
 			//EPRINT("before get ppa, try to gc!!\n", true);
 			if(__do_gc(pm,is_map, _PPS)){ //just trim
-				free(seg);
 			}
 			else{ //copy trim
 				
 			}
 			if(!pm->current_segment[is_map?MAP_S:DATA_S]){
-				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,BLOCK_ACTIVE);
 			}
 		}
 		else{
 			if(seg){
-				free(seg);
 			}
-			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,BLOCK_ACTIVE);
 		}
 
 		pm->seg_type_checker[pm->current_segment[is_map?MAP_S:DATA_S]->seg_idx]=type;
@@ -341,10 +331,10 @@ retry:
 uint32_t page_manager_get_new_ppa_from_seg(page_manager *pm, __segment *seg){
 	uint32_t res;
 	blockmanager *bm=pm->bm;
-	if(bm->check_full(bm, seg, MASTER_PAGE)){
+	if(bm->check_full(seg)){
 		EPRINT("plz check gc before get new_ppa", true);
 	}
-	res=bm->get_page_num(bm, seg);
+	res=bm->get_page_addr(seg);
 	return res;
 }
 
@@ -361,45 +351,42 @@ retry:
 		seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
 	}
 
-	if(!seg || bm->check_full(bm, seg, MASTER_PAGE)){
+	if(!seg || bm->check_full(seg)){
 		if(temp_used){
 			temp_used=false;
-			free(seg);
 			pm->remain_data_segment_q->pop_front();
 			goto retry;
 		}
 		if(bm->is_gc_needed(bm)){
 			//EPRINT("before get ppa, try to gc!!\n", true);
 			if(__do_gc(pm,is_map, is_map?1:(1+1))){ //just trim
-				free(seg);
 			}
 			else{ //copy trim
 				
 			}
 			if(!pm->current_segment[is_map?MAP_S:DATA_S]){
-				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+				pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,BLOCK_ACTIVE);
 			}
 		}
 		else{
 			if(seg){
-				free(seg);
 			}
-			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,false);
+			pm->current_segment[is_map?MAP_S:DATA_S]=bm->get_segment(bm,BLOCK_ACTIVE);
 		}
 
 		pm->seg_type_checker[pm->current_segment[is_map?MAP_S:DATA_S]->seg_idx]=type;
 		goto retry;
 	}
-	return bm->pick_page_num(bm, seg);
+	return bm->pick_page_addr(seg);
 }
 
 uint32_t page_manager_pick_new_ppa_from_seg(page_manager *pm, __segment *seg){
 	uint32_t res;
 	blockmanager *bm=pm->bm;
-	if(bm->check_full(bm, seg, MASTER_PAGE)){
+	if(bm->check_full(seg)){
 		EPRINT("plz check gc before get new_ppa", true);
 	}
-	res=bm->pick_page_num(bm, seg);
+	res=bm->pick_page_addr(seg);
 	return res;
 }
 
@@ -408,7 +395,7 @@ bool page_manager_is_gc_needed(page_manager *pm, uint32_t needed_page,
 	blockmanager *bm=pm->bm;
 	__segment *seg=is_map?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
 	if(seg->used_page_num + needed_page>= _PPS) return true;
-	return bm->check_full(bm, seg, MASTER_PAGE) && bm->is_gc_needed(bm); 
+	return bm->check_full(seg) && bm->is_gc_needed(bm); 
 }
 
 
@@ -424,14 +411,13 @@ uint32_t page_manager_get_remain_page(page_manager *pm, bool ismap){
 	}
 }
 
-uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_num){
+uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_addr){
 	//bool isfinish=false;
 	__segment *seg;
 	uint32_t q_size=pm->remain_data_segment_q->size();
 	for(uint32_t i=0; i<q_size; i++){
 		seg=pm->remain_data_segment_q->front();
-		if(_PPS-seg->used_page_num <= target_page_num){
-			free(seg);
+		if(_PPS-seg->used_page_num <= target_page_addr){
 			pm->remain_data_segment_q->pop_front();
 		}
 		else{
@@ -440,8 +426,7 @@ uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_num){
 	}
 
 	if(!pm->current_segment[DATA_S] ||
-			_PPS-pm->current_segment[DATA_S]->used_page_num <= target_page_num){
-		free(pm->current_segment[DATA_S]);
+			_PPS-pm->current_segment[DATA_S]->used_page_num <= target_page_addr){
 		page_manager_move_next_seg(LSM.pm, false, false, DATASEG);
 	}
 
@@ -450,10 +435,10 @@ uint32_t page_aligning_data_segment(page_manager *pm, uint32_t target_page_num){
 
 uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap, bool include_inv_block){
 	if(ismap){
-		return pm->bm->remain_free_page(pm->bm, pm->current_segment[MAP_S]);
+		return pm->bm->total_free_page_num(pm->bm, pm->current_segment[MAP_S]);
 	}
 	else{
-		uint32_t inv_blk_num=include_inv_block?pm->bm->get_invalidate_blk_number(pm->bm):0;
+		uint32_t inv_blk_num=include_inv_block?pm->bm->invalidate_seg_num(pm->bm):0;
 		uint32_t temp_data_page_num=0;
 		if(pm->remain_data_segment_q->size()){
 			seg_list_iter iter=pm->remain_data_segment_q->begin();
@@ -462,10 +447,10 @@ uint32_t page_manager_get_total_remain_page(page_manager *pm, bool ismap, bool i
 			}
 		}
 		if(pm->current_segment[DATA_S]){
-			return pm->bm->remain_free_page(pm->bm, pm->current_segment[DATA_S])+temp_data_page_num+inv_blk_num*_PPS;
+			return pm->bm->total_free_page_num(pm->bm, pm->current_segment[DATA_S])+temp_data_page_num+inv_blk_num*_PPS;
 		}
 		else{
-			return pm->bm->remain_free_page(pm->bm, NULL)+temp_data_page_num+inv_blk_num*_PPS;
+			return pm->bm->total_free_page_num(pm->bm, NULL)+temp_data_page_num+inv_blk_num*_PPS;
 		}
 	}
 }
@@ -475,16 +460,15 @@ uint32_t page_manager_get_reserve_new_ppa(page_manager *pm, bool ismap, uint32_t
 retry:
 	__segment *seg=ismap?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
 
-	if(!seg || bm->check_full(bm, seg, MASTER_PAGE) || seg->seg_idx==seg_idx){
+	if(!seg || bm->check_full(seg) || seg->seg_idx==seg_idx){
 		if(seg){
-			free(seg);
 		}
 		pm->current_segment[ismap?MAP_S:DATA_S]=pm->reserve_segment[ismap?MAP_S:DATA_S];
 		pm->reserve_segment[ismap?MAP_S:DATA_S]=NULL;
 		pm->seg_type_checker[pm->current_segment[ismap?MAP_S:DATA_S]->seg_idx]=ismap?MAPSEG:DATASEG;
 		goto retry;
 	}
-	return bm->get_page_num(bm, seg);
+	return bm->get_page_addr(seg);
 }
 
 uint32_t page_manager_get_reserve_remain_ppa(page_manager *pm, bool ismap, uint32_t seg_idx){
@@ -492,9 +476,8 @@ uint32_t page_manager_get_reserve_remain_ppa(page_manager *pm, bool ismap, uint3
 retry:
 	__segment *seg=ismap?pm->current_segment[MAP_S] : pm->current_segment[DATA_S];
 	
-	if(!seg || bm->check_full(bm, seg, MASTER_PAGE) || seg->seg_idx==seg_idx){
+	if(!seg || bm->check_full(seg) || seg->seg_idx==seg_idx){
 		if(seg){
-			free(seg);
 		}
 		pm->current_segment[ismap?MAP_S:DATA_S]=pm->reserve_segment[ismap?MAP_S:DATA_S];
 		pm->reserve_segment[ismap?MAP_S:DATA_S]=NULL;
@@ -507,7 +490,8 @@ retry:
 uint32_t page_manager_change_reserve(page_manager *pm, bool ismap){
 	blockmanager *bm=pm->bm;
 	if(pm->reserve_segment[ismap?MAP_S:DATA_S]==NULL){
-		pm->reserve_segment[ismap?MAP_S:DATA_S]=bm->change_reserve(bm, pm->current_segment[ismap?MAP_S:DATA_S]);
+		bm->change_reserve_to_active(bm, pm->current_segment[ismap?MAP_S:DATA_S]);
+		pm->reserve_segment[ismap?MAP_S:DATA_S]=bm->get_segment(bm, BLOCK_RESERVE);
 	}
 	return 1;
 }
@@ -518,7 +502,7 @@ uint32_t page_manager_move_next_seg(page_manager *pm, bool ismap, bool isreserve
 		pm->reserve_segment[ismap?MAP_S:DATA_S]=NULL;
 	}
 	else{
-		pm->current_segment[ismap?MAP_S:DATA_S]=pm->bm->get_segment(pm->bm, false);
+		pm->current_segment[ismap?MAP_S:DATA_S]=pm->bm->get_segment(pm->bm, BLOCK_ACTIVE);
 		pm->seg_type_checker[pm->current_segment[ismap?MAP_S:DATA_S]->seg_idx]=type;
 	}
 	return 1;
@@ -551,11 +535,11 @@ static void gc_issue_read_node(gc_read_node *gn, lower_info *li){
 	req->end_req=gc_end_req;
 	if(gn->is_mapping){
 		req->type=GCMR;
-		li->read(gn->piece_ppa, PAGESIZE, gn->data, ASYNC, req);
+		li->read(gn->piece_ppa, PAGESIZE, gn->data,  req);
 	}
 	else{
 		req->type=GCDR;
-		li->read(PIECETOPPA(gn->piece_ppa), PAGESIZE, gn->data, ASYNC, req);
+		li->read(PIECETOPPA(gn->piece_ppa), PAGESIZE, gn->data,  req);
 	}
 }
 
@@ -564,7 +548,7 @@ static void gc_issue_write_node(uint32_t ppa, value_set *data, bool ismap, lower
 	req->param=(void*)data;
 	req->type=ismap?GCMW:GCDW;
 	req->end_req=gc_end_req;
-	li->write(ppa, PAGESIZE, data, ASYNC, req);
+	li->write(ppa, PAGESIZE, data,  req);
 }
 
 void *gc_end_req(algo_req *req){
@@ -587,7 +571,7 @@ void *gc_end_req(algo_req *req){
 }
 
 
-bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_num){
+bool  __do_gc(page_manager *pm, bool ismap, uint32_t target_page_addr){
 	bool res=false;
 	__gsegment *victim_target;
 	std::queue<uint32_t> temp_queue;
@@ -604,7 +588,7 @@ retry:
 	if(ismap){
 		if(pm->seg_type_checker[seg_idx]!=MAPSEG &&  
 				(pm->current_segment[DATA_S]==NULL || pm->current_segment[DATA_S]->seg_idx!=seg_idx) && 
-				victim_target->invalidate_number==victim_target->validate_number){
+				victim_target->all_invalid){
 			goto out;
 		}
 		else if(pm->seg_type_checker[seg_idx]==MAPSEG){
@@ -614,7 +598,7 @@ retry:
 	else{
 		if(pm->seg_type_checker[seg_idx]==MAPSEG &&  
 				(pm->current_segment[MAP_S]==NULL || pm->current_segment[MAP_S]->seg_idx!=seg_idx) && 
-				victim_target->invalidate_number==victim_target->validate_number){
+				victim_target->all_invalid){
 			goto out;
 		}
 		else if(pm->seg_type_checker[seg_idx]!=MAPSEG){
@@ -641,7 +625,7 @@ out:
 //		if(LSM.global_debug_flag) printf("[%lu] %u is locked\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
-	else if(victim_target->invalidate_number<=L2PGAP*2 && victim_target->invalidate_number!=victim_target->validate_number){
+	else if(victim_target->invalidate_piece_num<=L2PGAP*2 && !victim_target->all_invalid){
 //		if(LSM.global_debug_flag) printf("[%lu] %u is not enough invalid\n", temp_queue.size(), seg_idx);
 		goto retry_logic;
 	}
@@ -656,7 +640,7 @@ out:
 		case SEPDATASEG:
 			while(diff_type_queue.size()){
 				seg_idx=diff_type_queue.front();
-				pm->bm->reinsert_segment(pm->bm, seg_idx);
+				pm->bm->insert_gc_target(pm->bm, seg_idx);
 				diff_type_queue.pop();
 			}
 			__gc_data(pm, pm->bm, victim_target);
@@ -665,7 +649,7 @@ out:
 		case MAPSEG:
 			while(diff_type_queue.size()){
 				seg_idx=diff_type_queue.front();
-				pm->bm->reinsert_segment(pm->bm, seg_idx);
+				pm->bm->insert_gc_target(pm->bm, seg_idx);
 				diff_type_queue.pop();
 			}
 			__gc_mapping(pm, pm->bm, victim_target);
@@ -674,10 +658,10 @@ out:
 	}
 	while(temp_queue.size()){
 		seg_idx=temp_queue.front();
-		pm->bm->reinsert_segment(pm->bm, seg_idx);
+		pm->bm->insert_gc_target(pm->bm, seg_idx);
 		temp_queue.pop();
 	}
-	if(remain_page<target_page_num)
+	if(remain_page<target_page_addr)
 		goto retry;
 
 	return res;
@@ -687,17 +671,17 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_mapping++;
 //	printf("gc_mapping:%u (seg_idx:%u)\n", LSM.monitor.gc_mapping, victim->seg_idx);
 	check_victim_is_active(pm, victim);
-	if(victim->invalidate_number==_PPS*L2PGAP || victim->all_invalid){
+	if(victim->invalidate_piece_num==_PPS*L2PGAP || victim->all_invalid){
 #ifdef LSM_DEBUG
 		if(debug_piece_ppa/L2PGAP/_PPS==victim->seg_idx){
 			printf("gc_mapping:%u (seg_idx%u) clean\n", LSM.monitor.gc_mapping, victim->seg_idx);
 		}
 #endif
-		bm->trim_segment(bm, victim, bm->li);
+		bm->trim_segment(bm, victim);
 		page_manager_change_reserve(pm, true);
 		return true;
 	}
-	else if(victim->invalidate_number>_PPS*L2PGAP){
+	else if(victim->invalidate_piece_num>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
 	
@@ -710,7 +694,7 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	gc_read_node *gn;
 
 	for_each_page_in_seg(victim, page, bidx, pidx){
-		if(bm->is_invalid_page(bm, page*L2PGAP)) continue;
+		if(bm->is_invalid_piece(bm, page*L2PGAP)) continue;
 		else{
 			gn=gc_read_node_init(true, page);
 			gc_target_queue->push(gn);
@@ -740,7 +724,7 @@ bool __gc_mapping(page_manager *pm, blockmanager *bm, __gsegment *victim){
 		gc_target_queue->pop();
 	}
 	
-	bm->trim_segment(bm, victim, bm->li);
+	bm->trim_segment(bm, victim);
 	page_manager_change_reserve(pm, true);
 
 	delete gc_target_queue;
@@ -1055,16 +1039,16 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	LSM.monitor.gc_data++;
 	lsmtree_block_already_gc_seg(&LSM, victim->seg_idx);
 	check_victim_is_active(pm, victim);
-	if(victim->invalidate_number==victim->validate_number){
+	if(victim->all_invalid){
 		fdriver_lock(&LSM.now_gc_seg_lock);
 		LSM.now_gc_seg_idx=UINT32_MAX;
 		fdriver_unlock(&LSM.now_gc_seg_lock);
-		bm->trim_segment(bm, victim, bm->li);
+		bm->trim_segment(bm, victim);
 		page_manager_change_reserve(pm, false);
 
 		return true;
 	}
-	else if(victim->invalidate_number>_PPS*L2PGAP){
+	else if(victim->invalidate_piece_num>_PPS*L2PGAP){
 		EPRINT("????", true);
 	}
 	
@@ -1088,7 +1072,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	for_each_page_in_seg(victim, page, bidx, pidx){
 		should_read=false;
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(bm->is_invalid_page(bm, page*L2PGAP+i)) continue;
+			if(bm->is_invalid_piece(bm, page*L2PGAP+i)) continue;
 			else{
 				should_read=true;
 				temp[valid_piece_ppa_num++]=page*L2PGAP+i;
@@ -1101,18 +1085,18 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 			gc_issue_read_node(gn, bm->li);	
 		}
 	}
-
-	if(((_PPS*L2PGAP-victim->invalidate_number)-(victim->validate_number-victim->invalidate_number))>=(1+1)){
-		if(valid_piece_ppa_num+victim->invalidate_number!=victim->validate_number){
+/*
+	if(((_PPS*L2PGAP-victim->invalidate_piece_num)-(victim->validate_piece_num-victim->invalidate_piece_num))>=(1+1)){
+		if(valid_piece_ppa_num+victim->invalidate_piece_num!=victim->validate_piece_num){
 			printf("valid list\n");
 			for(uint32_t i=0; i<BPS; i++){
-				printf("%u invalid_number:%u validate_number:%u\n", i,victim->blocks[i]->invalidate_number, victim->blocks[i]->validate_number);
+				printf("%u invalid_number:%u validate_number:%u\n", i,victim->blocks[i]->invalidate_piece_num, victim->blocks[i]->validate_piece_num);
 			}
 			printf("_PPS:%u BPS:%u\n", _PPS, BPS);
 			EPRINT("not match validation!",true);
 		}
 	}
-
+*/
 	value_set **free_target=(value_set**)malloc(sizeof(value_set*)*read_page_num);
 
 	uint32_t* oob_lba;
@@ -1143,7 +1127,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 			printf("break!\n");
 		}
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(bm->is_invalid_page(bm, ppa*L2PGAP+i)){
+			if(bm->is_invalid_piece(bm, ppa*L2PGAP+i)){
 				continue;
 			}
 			else{
@@ -1385,7 +1369,7 @@ bool __gc_data(page_manager *pm, blockmanager *bm, __gsegment *victim){
 	fdriver_unlock(&LSM.now_gc_seg_lock);
 
 	uint32_t victim_seg_idx=victim->seg_idx;
-	bm->trim_segment(bm, victim, bm->li);
+	bm->trim_segment(bm, victim);
 
 	lsmtree_compactioning_set_gced_flag(victim_seg_idx);
 

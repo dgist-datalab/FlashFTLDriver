@@ -12,7 +12,7 @@
 #include "../../../include/settings.h"
 #include "../../../include/utils/thpool.h"
 #define MIN(a,b) ((a)<(b)?(a):(b))
-#define DIR_PATH "/home/kukania/BloomFTL-project/FAST/algorithm/lsmftl/design_knob"
+#define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriver/algorithm/lsmftl/design_knob"
 double *plr_dp;
 double *line_per_chunk;
 double *normal_plr_dp;

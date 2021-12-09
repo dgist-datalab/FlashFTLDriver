@@ -58,8 +58,8 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 void destroy_temp(lower_info *, struct algorithm *){
 	L2PBm_free(bm);
 	for(uint32_t i=0; i<run_num; i++){
-		printf("run_print %u ------\n", i);
-		run_print(run_array[i]);
+		//printf("run_print %u ------\n", i);
+		//run_print(run_array[i]);
 		run_free(run_array[i]);
 	}
 	free(run_array);

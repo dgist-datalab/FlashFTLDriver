@@ -64,7 +64,7 @@ algo_req* demand_mapping_read(uint32_t ppa, lower_info *li, request *req, void *
 	my_req->end_req=demand_end_req;
 	my_req->param=param;
 	my_req->ppa=ppa;
-	li->read(ppa, PAGESIZE, req->value, ASYNC, my_req);
+	li->read(ppa, PAGESIZE, req->value,  my_req);
 	return my_req;
 }
 
@@ -76,7 +76,7 @@ void demand_mapping_write(uint32_t ppa, lower_info *li, request *req, void *para
 	my_req->end_req=demand_end_req;
 	my_req->param=param;
 	my_req->ppa=ppa;
-	li->write(ppa, PAGESIZE, req->value, ASYNC, my_req);
+	li->write(ppa, PAGESIZE, req->value,  my_req);
 }
 
 void demand_mapping_inter_read(uint32_t ppa, lower_info *li, gc_map_value *param){
@@ -88,7 +88,7 @@ void demand_mapping_inter_read(uint32_t ppa, lower_info *li, gc_map_value *param
 	my_req->param=(void *)param;
 	my_req->ppa=ppa;
 
-	li->read(ppa, PAGESIZE, param->value, ASYNC, my_req);
+	li->read(ppa, PAGESIZE, param->value,  my_req);
 }
 
 void demand_mapping_inter_write(uint32_t ppa, lower_info *li, gc_map_value *param){
@@ -100,5 +100,5 @@ void demand_mapping_inter_write(uint32_t ppa, lower_info *li, gc_map_value *para
 	my_req->param=(void *)param;
 	my_req->ppa=ppa;
 
-	li->write(ppa, PAGESIZE, param->value, ASYNC, my_req);
+	li->write(ppa, PAGESIZE, param->value,  my_req);
 }

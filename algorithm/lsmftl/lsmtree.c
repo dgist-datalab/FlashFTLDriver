@@ -1319,7 +1319,7 @@ read_helper_param lsmtree_get_target_rhp(uint32_t level_idx){
 uint32_t lsmtree_get_seg_invalidate_number(){
 	uint32_t res=0;
 	for(uint32_t i=0; i<_NOS; i++){
-		res+=LSM.pm->bm->get_invalidate_number(LSM.pm->bm, i);
+		res+=LSM.pm->bm->seg_invalidate_piece_num(LSM.pm->bm, i);
 	}
 	return res;
 }
@@ -1329,7 +1329,7 @@ uint32_t lsmtree_seg_debug(lsmtree *lsm){
 	blockmanager *bm=pm->bm;
 	for(uint32_t i=0; i<_NOS; i++){
 		printf("%u block:%s inv:%u type:%s locked_num:%u\n", i, lsm->gc_unavailable_seg[i]?"true":"false",
-				bm->get_invalidate_number(bm, i), 
+				bm->seg_invalidate_piece_num(bm, i), 
 				get_seg_type_name(pm, i),
 				lsm->gc_unavailable_seg[i]
 				);
@@ -1382,7 +1382,7 @@ uint32_t lsmtree_total_invalidate_num(lsmtree *lsm){
 		if(lsm->gc_unavailable_seg[i]){
 			continue;
 		}
-		res+=bm->get_invalidate_number(bm, i);
+		res+=bm->seg_invalidate_piece_num(bm, i);
 	}
 	return res;
 }

@@ -49,7 +49,7 @@ extern uint32_t test_ppa;
 static inline void fine_mapping_sanity_checker(char *value){
 	uint32_t *map=(uint32_t*)value;
 	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
-		if(map[i]!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm, map[i])){
+		if(map[i]!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm, map[i])){
 			uint32_t lba=((uint32_t*)demand_ftl.bm->get_oob(demand_ftl.bm, map[i]/4))[map[i]%4];
 			
 			if(fine_exist(NULL,lba)){
@@ -250,7 +250,7 @@ uint32_t fine_insert_entry_from_translation(struct my_cache *, GTD_entry *etr, u
 	fine_cache *fc=(fine_cache*)malloc(sizeof(fine_cache));
 	fc->lba=lba;
 	fc->ppa=map[GETOFFSET(lba)];
-	if(fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
+	if(fc->ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm,fc->ppa)){
 		printf("invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 		abort();
 	}
@@ -293,7 +293,7 @@ mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t
 		if(get_flag(fc)==EVICTING_FLAG) continue;
 
 		if(get_flag(fc)==CLEAN_FLAG){
-			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
+			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm,fc->ppa)){
 				printf("eviction invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 				abort();
 			}
@@ -308,7 +308,7 @@ mapping_entry *fine_get_eviction_entry(struct my_cache *, uint32_t lba, uint32_t
 			return NULL;
 		}
 		else{
-			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
+			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm,fc->ppa)){
 				printf("eviction invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 				abort();
 			}
@@ -356,7 +356,7 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 		uint32_t unit=PAGESIZE/sizeof(DMF);
 		for(uint32_t i=0; i<unit; i++){
 			fc=__find_lru_map(gtd_idx*unit+i);
-			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
+			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm,fc->ppa)){
 				printf("update invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 				abort();
 			}
@@ -388,7 +388,7 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 		for(uint32_t i=0; i<PAGESIZE/sizeof(DMF);i++){
 			fc=(fine_cache*)lru_find(fcm.lru, gtd_idx*PAGESIZE/sizeof(DMF)+i);
 			if(!fc) continue;
-			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,fc->ppa)){
+			if(fc && fc->ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm,fc->ppa)){
 				printf("update invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 				abort();
 			}
@@ -421,7 +421,7 @@ bool fine_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_en
 		printf("target tr_page evicting [post]: %u,%u\n", debug_lba, ((uint32_t*)data)[GETOFFSET(debug_lba)]);
 	}
 	ppa_list[GETOFFSET(map->lba)]=map->ppa;
-	if(map->ppa!=UINT32_MAX && !demand_ftl.bm->query_bit(demand_ftl.bm,map->ppa)){
+	if(map->ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm,map->ppa)){
 		printf("update invalidated lba:%u ppa:%u\n", fc->lba, fc->ppa);
 		abort();
 	}

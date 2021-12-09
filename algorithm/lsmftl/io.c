@@ -40,11 +40,11 @@ void io_manager_issue_internal_write(uint32_t ppa, value_set *value, algo_req *a
 		uint32_t tag=tag_manager_get_tag(io_m.tm);
 		sync_wrapper *wrapper=&io_m.wrapper[tag];
 		set_wrapper(wrapper, al_req, tag);
-		io_m.li->write(ppa, PAGESIZE ,value, ASYNC, al_req);
+		io_m.li->write(ppa, PAGESIZE ,value,  al_req);
 		fdriver_lock(&io_m.sync_mutex[tag]);
 	}
 	else{
-		io_m.li->write(ppa, PAGESIZE ,value, ASYNC, al_req);
+		io_m.li->write(ppa, PAGESIZE ,value,  al_req);
 	}
 }
 
@@ -53,15 +53,15 @@ void io_manager_issue_internal_read(uint32_t ppa, value_set *value, algo_req *al
 		uint32_t tag=tag_manager_get_tag(io_m.tm);
 		sync_wrapper *wrapper=&io_m.wrapper[tag];
 		set_wrapper(wrapper, al_req, tag);
-		io_m.li->read(ppa, PAGESIZE ,value, ASYNC, al_req);
+		io_m.li->read(ppa, PAGESIZE ,value,  al_req);
 		fdriver_lock(&io_m.sync_mutex[tag]);
 	}else{
-		io_m.li->read(ppa, PAGESIZE ,value, ASYNC, al_req);
+		io_m.li->read(ppa, PAGESIZE ,value,  al_req);
 	}
 }
 
 void io_manager_issue_write(uint32_t ppa, value_set *value, algo_req *al_req, bool sync){
-	io_m.li->write(ppa, PAGESIZE ,value, ASYNC, al_req);
+	io_m.li->write(ppa, PAGESIZE ,value,  al_req);
 }
 
 
@@ -96,9 +96,9 @@ void io_manager_issue_read(uint32_t ppa, value_set *value, algo_req *al_req, boo
 	uint32_t tag=tag_manager_get_tag(io_m.tm);
 	sync_wrapper *wrapper=&io_m.wrapper[tag];
 	set_seg_lockwrapper(wrapper, al_req, tag, ppa);
-	io_m.li->read(ppa, PAGESIZE ,value, ASYNC, al_req);
+	io_m.li->read(ppa, PAGESIZE ,value,  al_req);
 #else
-	io_m.li->read(ppa, PAGESIZE ,value, ASYNC, al_req);
+	io_m.li->read(ppa, PAGESIZE ,value,  al_req);
 #endif
 }
 

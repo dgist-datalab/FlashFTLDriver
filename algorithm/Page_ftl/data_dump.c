@@ -55,7 +55,7 @@ uint32_t page_load(lower_info *li, blockmanager *bm, algorithm *algo, FILE *fp){
 	uint32_t active, reserve;
 	fread(&active, sizeof(uint32_t), 1, fp);
 	if(active!=UINT32_MAX){
-		p->active=page_ftl.bm->get_segment_target(page_ftl.bm, active, BLOCK_LOAD);
+		p->active=page_ftl.bm->pick_segment(page_ftl.bm, active, BLOCK_LOAD);
 	}
 	else{
 		p->active=NULL;
@@ -63,7 +63,7 @@ uint32_t page_load(lower_info *li, blockmanager *bm, algorithm *algo, FILE *fp){
 
 	fread(&reserve, sizeof(uint32_t), 1, fp);
 	if(reserve!=UINT32_MAX){
-		p->reserve=page_ftl.bm->get_segment_target(page_ftl.bm, reserve, BLOCK_RESERVE);
+		p->reserve=page_ftl.bm->pick_segment(page_ftl.bm, reserve, BLOCK_RESERVE);
 	}
 	else{
 		p->reserve=NULL;

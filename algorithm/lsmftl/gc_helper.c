@@ -25,7 +25,7 @@ void gc_issue_mapcheck_read(gc_mapping_check_node *gmc, lower_info *li){
 	req->param=(void*)gmc;
 	req->end_req=gc_map_check_end_req;
 	req->type=GCMR_DGC;
-	li->read(gmc->map_ppa, PAGESIZE, gmc->mapping_data, ASYNC, req);
+	li->read(gmc->map_ppa, PAGESIZE, gmc->mapping_data,  req);
 }
 
 static void sst_file_update_mapping(sst_file *sptr, value_set *vs, uint32_t level, uint32_t max_piece_ppa, page_manager *pm){
@@ -267,7 +267,7 @@ void gc_helper_issue_read_node(sst_file *sptr, gc_mapping_check_node *gcn, lower
 		EPRINT("double issue", true);
 	}
 	gcn->is_issued_node=true;
-	li->read(sptr->file_addr.map_ppa, PAGESIZE, gcn->mapping_data, ASYNC, req);
+	li->read(sptr->file_addr.map_ppa, PAGESIZE, gcn->mapping_data,  req);
 }
 
 void gc_helper_issue_write_node(uint32_t map_ppa, char *data, lower_info *li){
@@ -276,7 +276,7 @@ void gc_helper_issue_write_node(uint32_t map_ppa, char *data, lower_info *li){
 	req->param=(void*)value;
 	req->end_req=gc_helper_end_req;
 	req->type=GCMW;
-	li->write(map_ppa, PAGESIZE, value, ASYNC, req);
+	li->write(map_ppa, PAGESIZE, value,  req);
 }
 
 bool updating_compactioning_mapping(uint32_t seg_idx, uint32_t lba, uint32_t old_map_ppa, uint32_t new_map_ppa){

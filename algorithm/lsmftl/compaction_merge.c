@@ -17,7 +17,7 @@ void read_map_param_init(read_issue_arg *read_arg, map_range *mr){
 	uint32_t param_idx=0;
 	for(int i=read_arg->from; i<=read_arg->to; i++){
 		//param=compaction_get_read_param(_cm);
-		if(LSM.pm->bm->is_invalid_page(LSM.pm->bm, mr[i].ppa*L2PGAP)){
+		if(LSM.pm->bm->is_invalid_piece(LSM.pm->bm, mr[i].ppa*L2PGAP)){
 			printf("ppa:%u piece_ppa:%u break!\n", mr[i].ppa, mr[i].ppa*L2PGAP);
 		}
 		param=(inter_read_alreq_param*)calloc(1, sizeof(inter_read_alreq_param));
