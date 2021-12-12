@@ -115,13 +115,6 @@ void data_copy_to(uint32_t ppa, char *data){
 	memcpy(seg_table[ppa].storage,data,PAGESIZE);
 }
 
-static void collect_io_type(uint32_t type){
-	uint32_t test_type = convert_type(type);
-	if(test_type < LREQ_TYPE_NUM){
-		my_posix.req_type_cnt[test_type]++;
-	}
-}
-
 #ifdef LASYNC
 void *l_main(void *__input){
 	posix_request *inf_req;
@@ -361,7 +354,7 @@ void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const
 		abort();
 	}
 
-	collect_io_type(req->type);
+	collect_io_type(req->type, &my_posix);
 	data_copy_to(PPA, value->value);
 
 	req->end_req(req);
@@ -387,7 +380,7 @@ void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, algo_req *const
 		abort();
 	}
 
-	collect_io_type(req->type);
+	collect_io_type(req->type, &my_posix);
 	data_copy_from(PPA, value->value);
 
 	req->end_req(req);
@@ -395,7 +388,7 @@ void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, algo_req *const
 }
 
 void *posix_write_sync(uint32_t type, uint32_t ppa, char *data){
-	collect_io_type(type);
+	collect_io_type(type, &my_posix);
 #ifdef LASYNC
 	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_W, PPA, NULL, data, false, req);
 	posix_async_make_req(p_req);
@@ -408,7 +401,7 @@ void *posix_write_sync(uint32_t type, uint32_t ppa, char *data){
 }
 
 void *posix_read_sync(uint32_t type, uint32_t ppa, char *data){
-	collect_io_type(type);
+	collect_io_type(type, &my_posix);
 #ifdef LASYNC
 	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_R, PPA, NULL, data, false, req);
 	posix_async_make_req(p_req);

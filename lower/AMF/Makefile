@@ -1,5 +1,7 @@
 SRCS +=\
 		amf_info.c\
+		./normal_write.c\
+		./block_buffer_write.c\
 
 OBJS :=\
 	$(patsubst %.c,%.o,$(SRCS))\

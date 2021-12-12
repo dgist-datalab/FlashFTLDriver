@@ -1,7 +1,9 @@
-#include "./libamfdriver/AmfManager.h"
 #include "amf_info.h"
 #include "../../include/settings.h"
 #include "../../bench/bench.h"
+#include "../../include/debug_utils.h"
+#include "./block_buffer_write.h"
+#include "./normal_write.h"
 #include <pthread.h>
 #include <unistd.h>
 #include <queue>
@@ -12,38 +14,19 @@ char **mem_pool;
 char *temp_mem_buf;
 #endif
 
-void amf_call_back_r(void *req);
-void amf_call_back_w(void *req);
-void amf_call_back_e(void *req);
 void amf_error_call_back_r(void *req);
 void amf_error_call_back_w(void *req);
 void amf_error_call_back_e(void *req);
 
-typedef struct dummy_req{
-	uint32_t test_ppa;
-	uint8_t type;
-}dummy_req;
-
-typedef struct amf_wrapper{
-	uint32_t cnt;
-	uint32_t ppa;
-	algo_req *req;
-}amf_wrapper;
-
-amf_wrapper *wrapper_array;
-std::queue<amf_wrapper*>* wrap_q;
-//[seg#,page,chip,bus,card]
-#define extract_bus_num(a) ((a>>1)&0x7)
-
 void amf_traffic_print(lower_info *);
-pthread_mutex_t channel_lock=PTHREAD_MUTEX_INITIALIZER;
-uint32_t channel_overlap[8];
 
 lower_info amf_info={
 	.create=amf_info_create,
 	.destroy=amf_info_destroy,
 	.write=amf_info_write,
 	.read=amf_info_read,
+	.write_sync=amf_info_write_sync,
+	.read_sync=amf_info_read_sync,
 	.device_badblock_checker=NULL,
 	.trim_block=amf_info_trim_block,
 	.trim_a_block=NULL,
@@ -56,12 +39,10 @@ lower_info amf_info={
 
 	.lower_tag_num=amf_info_lower_tag_num,
 	.print_traffic=amf_traffic_print,
-};
 
-static uint8_t test_type(uint8_t type){
-	uint8_t t_type=0xff>>1;
-	return type&t_type;
-}
+	.dump=amf_info_dump,
+	.load=amf_info_load,
+};
 
 void amf_traffic_print(lower_info *li){
 	static int cnt=0;
@@ -71,58 +52,36 @@ void amf_traffic_print(lower_info *li){
 	}
 }
 
-pthread_cond_t wrapper_cond=PTHREAD_COND_INITIALIZER;
-pthread_mutex_t wrapper_lock=PTHREAD_MUTEX_INITIALIZER;
-
-static inline amf_wrapper* get_amf_wrapper(uint32_t ppa){
-	amf_wrapper *res;
-	pthread_mutex_lock(&wrapper_lock);
-	while(wrap_q->empty()){
-		pthread_cond_wait(&wrapper_cond, &wrapper_lock);
-	}
-	res=wrap_q->front();
-	res->cnt=0;
-	res->ppa=ppa;
-	wrap_q->pop();
-	pthread_mutex_unlock(&wrapper_lock);
-	return res;
-}
-
-static inline void release_amf_wrapper(amf_wrapper *amw){
-	pthread_mutex_lock(&wrapper_lock);
-	wrap_q->push(amw);
-	pthread_cond_broadcast(&wrapper_cond);
-	pthread_mutex_unlock(&wrapper_lock);
-}
-
-uint32_t amf_info_create(lower_info *li, blockmanager *bm){
+static inline void __amf_info_create_body(){
+#ifndef TESTING
 	if (access("aftl.bin", F_OK)!=-1){
 		am=AmfOpen(1);
 	}
 	else{
 		am=AmfOpen(2);
 	}
+#endif
 
+#if BPS!=AMF_PUNIT
+	printf("buffer_block wirte on lower_info");
+	p_bbuf_init();
+#else
+	printf("normal wirte on lower_info");
+	normal_write_init();
+#endif
+	mem_pool=(char**)malloc(sizeof(char*)*_NOP);
+	temp_mem_buf=(char*)malloc(PAGESIZE);
+}
 
-	SetReadCb(am, amf_call_back_r, amf_error_call_back_r);
-	SetWriteCb(am, amf_call_back_w, amf_error_call_back_w);
-	SetEraseCb(am, amf_call_back_e, amf_error_call_back_e);
+uint32_t amf_info_create(lower_info *li, blockmanager *bm){
+	__amf_info_create_body();
 
 #ifdef LOWER_MEM_DEV
 	printf("lower mem dev  mode\n");
-	mem_pool=(char**)malloc(sizeof(char*)*_NOP);
 	for(uint32_t i=0; i<_NOP; i++){
 		mem_pool[i]=(char*)malloc(PAGESIZE);
 	}
-
-	temp_mem_buf=(char*)malloc(PAGESIZE);
 #endif
-
-	wrapper_array=(amf_wrapper*)malloc(sizeof(amf_wrapper)*QDEPTH);
-	wrap_q=new std::queue<amf_wrapper*>();
-	for(uint32_t i=0; i<QDEPTH; i++){
-		wrap_q->push(&wrapper_array[i]);
-	}
 	return 1;
 }
 
@@ -138,7 +97,14 @@ void* amf_info_destroy(lower_info *li){
     fprintf(stderr,"Total WAF: %.2f\n\n", (float)(li->req_type_cnt[2]+li->req_type_cnt[4]+li->req_type_cnt[6]+li->req_type_cnt[8]) / li->req_type_cnt[6]);
 
 	li->write_op=li->read_op=li->trim_op=0;
-	AmfClose(am);
+
+
+#if BPS!=AMF_PUNIT
+	p_bbuf_free();
+#else
+	normal_write_free();
+#endif
+
 
 #ifdef LOWER_MEM_DEV
 	for(uint32_t i=0; i<_NOP; i++){
@@ -148,81 +114,62 @@ void* amf_info_destroy(lower_info *li){
 	free(temp_mem_buf);
 #endif
 
-	free(wrapper_array);
-	delete wrap_q;
+#ifndef TESTING
+	AmfClose(am);
+#endif
 	return NULL;
 }
 
-void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req){
-	uint8_t t_type=test_type(req->type);
-	if(t_type < LREQ_TYPE_NUM){
-		amf_info.req_type_cnt[t_type]++;
-	}
+void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,algo_req * const req){
+	collect_io_type(req->type, &amf_info);
 
 	req->test_ppa=ppa;
 	req->type_lower=0;
 
-	pthread_mutex_lock(&channel_lock);
-	if(channel_overlap[extract_bus_num(ppa)]++){
-		req->type_lower++;
-	}
-	pthread_mutex_unlock(&channel_lock);
-
-#ifdef LOWER_MEM_DEV
-	amf_wrapper *temp_req=get_amf_wrapper(ppa);
-	temp_req->req=req;
 	memcpy(mem_pool[ppa], value->value, PAGESIZE);
-	for(uint32_t i=0; i<R2PGAP; i++){
-		AmfWrite(am, ppa*R2PGAP+i, temp_mem_buf, (void *)temp_req);
-	}
+#if BPS!=AMF_PUNIT
+	p_bbuf_issue(LOWER_WRITE, ppa, value->value, req);
 #else
-	AmfWrite(am, ppa, value->value, (void *)req);
+	normal_write_issue(LOWER_WRITE, ppa, value->value, req);
 #endif
 	return NULL;
 }
 
 
-void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,bool async,algo_req * const req){
-	uint8_t t_type=test_type(req->type);
-	if(t_type < LREQ_TYPE_NUM){
-		amf_info.req_type_cnt[t_type]++;
-	}
+void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,algo_req * const req){
+	collect_io_type(req->type, &amf_info);
 
 	req->test_ppa=ppa;
 	req->type_lower=0;
 
-	pthread_mutex_lock(&channel_lock);
-	if(channel_overlap[extract_bus_num(ppa)]++){
-		req->type_lower++;
-	}
-	pthread_mutex_unlock(&channel_lock);
-
-#ifdef LOWER_MEM_DEV
-	amf_wrapper *temp_req=get_amf_wrapper(ppa);
-	temp_req->req=req;
 	memcpy(value->value, mem_pool[ppa], PAGESIZE);
-	for(uint32_t i=0; i<R2PGAP; i++){
-		AmfRead(am, ppa*R2PGAP+i, temp_mem_buf, (void *)temp_req);
-	}
+#if BPS!=AMF_PUNIT
+	p_bbuf_issue(LOWER_READ, ppa, value->value, req);
 #else
-	AmfRead(am, ppa, value->value, (void *)req);
+	normal_write_issue(LOWER_READ, ppa, value->value, req);
 #endif
+
 	return NULL;
 }
 
-void* amf_info_trim_block(uint32_t ppa,bool async){
-	dummy_req *temp=(dummy_req*)malloc(sizeof(dummy_req));
-	amf_info.req_type_cnt[TRIM]++;
-	temp->type=TRIM;
-	if((ppa*R2PGAP)%PAGES_PER_SEGMENT){
-		printf("not aligned! %u\n");
+void* amf_info_trim_block(uint32_t ppa){
+	collect_io_type(TRIM, &amf_info);
+
+#if BPS!=AMF_PUNIT
+	if(REAL_PPA(ppa,0)!=0){
+		printf("not aligned! %u\n", ppa);
 		print_stacktrace();
 		abort();
 	}
-	temp->test_ppa=ppa;
-	for(uint32_t i=0; i< 128; i++){
-		AmfErase(am,ppa*R2PGAP+i,(void*)temp);
+	p_bbuf_issue(LOWER_TRIM, ppa, NULL, NULL);
+#else
+	if((ppa*R2PGAP)%PAGES_PER_SEGMENT){
+		printf("not aligned! %u\n", ppa);
+		print_stacktrace();
+		abort();
 	}
+	normal_write_issue(LOWER_TRIM, ppa, NULL, NULL);
+#endif
 	return NULL;
 }
 
@@ -241,41 +188,65 @@ uint32_t amf_info_lower_tag_num(){
 }
 
 void amf_flying_req_wait(){
+#ifndef TESTING
 	while(IsAmfBusy(am)){}
+#endif
 	return;
 }
 
-void amf_call_back_r(void *_req){
-	amf_wrapper *wrapper=(amf_wrapper*)_req;
-
-	wrapper->cnt++;
-	if(wrapper->cnt==R2PGAP){
-		pthread_mutex_lock(&channel_lock);
-		channel_overlap[extract_bus_num(wrapper->ppa)]--;
-		pthread_mutex_unlock(&channel_lock); 
-
-		algo_req *req=(algo_req*)wrapper->req;
-		req->end_req(req);
-		release_amf_wrapper(wrapper);
-	}
+void *amf_info_write_sync(uint32_t type, uint32_t ppa, char *data){
+	collect_io_type(type, &amf_info);
+	memcpy(mem_pool[ppa], data, PAGESIZE);
+#if BPS!=AMF_PUNIT
+	p_bbuf_sync_issue(LOWER_WRITE, ppa, data);
+#else
+	normal_write_sync_issue(LOWER_WRITE, ppa, data);
+#endif
+	return NULL;
 }
 
-void amf_call_back_w(void *_req){
-	amf_wrapper *wrapper=(amf_wrapper*)_req;
-	wrapper->cnt++;
-	if(wrapper->cnt==R2PGAP){
-		pthread_mutex_lock(&channel_lock);
-		channel_overlap[extract_bus_num(wrapper->ppa)]--;
-		pthread_mutex_unlock(&channel_lock);
-
-		algo_req *req=(algo_req*)wrapper->req;
-		req->end_req(req);
-		release_amf_wrapper(wrapper);
-	}
+void *amf_info_read_sync(uint32_t type, uint32_t ppa, char *data){
+	collect_io_type(type, &amf_info);
+	memcpy(data, mem_pool[ppa], PAGESIZE);
+#if BPS!=AMF_PUNIT
+	p_bbuf_sync_issue(LOWER_READ, ppa, data);
+#else
+	normal_write_sync_issue(LOWER_READ, ppa, data);
+#endif
+	return NULL;
 }
 
-void amf_call_back_e(void *_req){
+uint32_t amf_info_dump(lower_info*li, FILE *fp){
+	uint64_t temp_NOP=_NOP;
+	fwrite(&temp_NOP,sizeof(uint64_t), 1, fp);
 
+#ifdef LOWER_MEM_DEV
+	for(uint32_t i=0; i<_NOP; i++){
+		fwrite(mem_pool[i], 1, PAGESIZE, fp);
+	}
+#endif
+
+	fwrite(li->req_type_cnt, sizeof(uint64_t), LREQ_TYPE_NUM, fp);
+	return 1;
+}
+
+uint32_t amf_info_load(lower_info *li, FILE *fp){
+	__amf_info_create_body();
+	uint64_t now_NOP;
+	fread(&now_NOP, sizeof(uint64_t), 1, fp);
+	if(now_NOP!=_NOP){
+		EPRINT("device setting is differ", true);
+	}
+
+#ifdef LOWER_MEM_DEV
+	for(uint32_t i=0; i<_NOP; i++){
+		mem_pool[i]=(char*)malloc(PAGESIZE);
+		fread(mem_pool[i], 1, PAGESIZE, fp);
+	}
+#endif
+
+	fread(li->req_type_cnt, sizeof(uint64_t), LREQ_TYPE_NUM, fp);
+	return 1;
 }
 
 void amf_error_call_back_r(void *_req){
@@ -296,6 +267,5 @@ void amf_error_call_back_e(void *_req){
 	dummy_req *req=(dummy_req*)_req;
 
 	printf("error! in AMF erase ppa:%u\n",req->test_ppa);
-
 	//req->end_req(req);
 }

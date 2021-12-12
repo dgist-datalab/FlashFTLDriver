@@ -8,4 +8,5 @@
 #define fdriver_try_lock(a) sem_trywait(a)
 #define fdriver_unlock(a) sem_post(a)
 #define fdriver_destroy(a) sem_destroy(a)
+#define fdriver_getvalue(a,b) sem_getvalue(a,b)
 #endif

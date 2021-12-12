@@ -169,6 +169,12 @@ struct lower_info {
 	//anything
 };
 
+static void collect_io_type(uint32_t type, lower_info *li){
+	if(type < LREQ_TYPE_NUM){
+		li->req_type_cnt[type]++;
+	}
+}
+
 struct algorithm{
 	/*interface*/
 	uint32_t (*argument_set) (int argc, char**argv);

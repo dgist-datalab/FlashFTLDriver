@@ -15,7 +15,7 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 16L
+#define GIGAUNIT 8L
 #ifndef OP
 #define OP 85
 #endif
@@ -26,7 +26,7 @@
 #define PAGESIZE (PAGE_TARGET_KILO*K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
 
-#if 1 
+#if 0
 	#define CARD_NUM 2
 	#define BUS_NUM 8
 	#define CHIP_NUM 8
@@ -39,7 +39,7 @@
 #define BPS (BUS_NUM *CHIP_NUM*CARD_NUM)
 #define _PPS (_PPB*BPS)
 
-#define PUNIT (64)
+#define PUNIT (128)
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)<(b)?(b):(a))
