@@ -12,7 +12,7 @@
 //#include "device_ifc/AmfRequest.h"
 //#include "connectal_lib/cpp/DmaBuffer.h"
 
-#define NUM_TAGS 128
+#define NUM_TAGS (128)
 
 #define NUM_CARDS 2
 #define PAGES_PER_BLOCK 256 //(8)

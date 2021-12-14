@@ -72,3 +72,7 @@ void tag_manager_free_manager(tag_manager *tm){
 	free(tm);
 }
 
+
+void tag_manager_wait(tag_manager *tm){
+	while(tm->max_tag_num!=tm->tagQ->size()){}
+}

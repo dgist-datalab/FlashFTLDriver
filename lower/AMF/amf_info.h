@@ -8,12 +8,13 @@ enum{
 	LOWER_WRITE, LOWER_READ, LOWER_TRIM,
 };
 
-#define TESTING
+//#define TESTING
 #define LOWER_MEM_DEV
 #define REAL_PAGE_SIZE 8192
 #define R2PGAP (PAGESIZE/REAL_PAGE_SIZE)
 #define RPPB 256
 #define AMF_PUNIT 128
+#define REAL_PUNIT(ppa) (ppa&(AMF_PUNIT-1))
 
 uint32_t amf_info_create(lower_info *li, blockmanager *bm);
 void* amf_info_destroy(lower_info *li);

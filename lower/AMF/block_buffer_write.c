@@ -1,4 +1,5 @@
 #include "./block_buffer_write.h"
+#include "../../bench/measurement.h"
 #define NOT_ASSIGNED_TAG UINT32_MAX 
 extern AmfManager *am;
 bool stopflag;
@@ -13,16 +14,26 @@ extern void amf_error_call_back_e(void *req);
 void p_bbuf_call_back_io(void *req);
 void p_bbuf_call_back_e(void *req);
 
+typedef struct debug_buffer{
+	uint32_t not_idle_cnt;
+	uint32_t no_data_cnt;
+	MeasureTime amf_time;
+}debug_buffer;
+
+static debug_buffer monitor;
+
 void p_bbuf_init(){
 	SetReadCb(am,  p_bbuf_call_back_io, amf_error_call_back_r);
 	SetWriteCb(am, p_bbuf_call_back_io, amf_error_call_back_w);
 	SetEraseCb(am, p_bbuf_call_back_e, amf_error_call_back_e);
 
+	measure_init(&monitor.amf_time);
+
 	physical_block_buffer *t_buf;
 	for(uint32_t i=0; i<AMF_PUNIT; i++){
 		t_buf=&buf_array[i];
 		t_buf->idx=i;
-		fdriver_mutex_init(&t_buf->idle_check_lock);
+		fdriver_lock_init(&t_buf->idle_check_lock, 1);
 		fdriver_mutex_init(&t_buf->schedule_lock);
 		t_buf->tag=tag_manager_init(RPPB);
 		for(uint32_t j=0; j<RPPB; j++){
@@ -116,7 +127,7 @@ static inline void __p_bbuf_issue(physical_block_buffer *t_buf, uint32_t type, u
 
 void p_bbuf_issue(uint32_t type, uint32_t ppa, char *data, algo_req *input){
 	uint32_t loop_cnt=(type==LOWER_TRIM?1:R2PGAP);
-	uint32_t target_buf_idx=BUF_IDX(AMF_PUNIT);
+	uint32_t target_buf_idx=BUF_IDX(ppa);
 	physical_block_buffer *t_buf=&buf_array[target_buf_idx];
 	return_param *rp=__get_return_param(t_buf, false);
 
@@ -126,7 +137,7 @@ void p_bbuf_issue(uint32_t type, uint32_t ppa, char *data, algo_req *input){
 
 void p_bbuf_sync_issue(uint32_t type, uint32_t ppa, char *data){
 	uint32_t loop_cnt=(type==LOWER_TRIM?1:R2PGAP);
-	uint32_t target_buf_idx=BUF_IDX(AMF_PUNIT);
+	uint32_t target_buf_idx=BUF_IDX(ppa);
 	physical_block_buffer *t_buf=&buf_array[target_buf_idx];
 	return_param *rp=__get_return_param(t_buf, true);
 
@@ -142,9 +153,14 @@ void p_bbuf_join(){
 
 void p_bbuf_free(){
 	p_bbuf_join();
+	printf("NI:ND %u:%u\n",monitor.not_idle_cnt, monitor.no_data_cnt);
+	/*
 	for(uint32_t i=0; i< AMF_PUNIT; i++){
+		tag_manager_wait(buf_array[i].tag);
 		tag_manager_free_manager(buf_array[i].tag);
-	}
+		tag_manager_wait(buf_array[i].rp_tag);
+		tag_manager_free_manager(buf_array[i].rp_tag);
+	}*/
 }
 
 void *p_bbuf_main(void *){
@@ -168,11 +184,15 @@ void *p_bbuf_main(void *){
 		}
 		physical_block_buffer *t_buf=&buf_array[now_buf++%AMF_PUNIT];
 		if(t_buf->schedule_queue.empty()){ 	
+	//		printf("no data continue\n");
+			monitor.no_data_cnt++;
 			continue;
 		}
 		int value=0;
 		fdriver_getvalue(&t_buf->idle_check_lock, &value);
 		if(value==0){
+		//	printf("not idle continue\n");
+			monitor.not_idle_cnt++;
 			continue;
 		}
 		fdriver_lock(&t_buf->idle_check_lock);
@@ -181,6 +201,10 @@ void *p_bbuf_main(void *){
 		std::list<uint32_t>::iterator iter=t_buf->schedule_queue.begin();
 		uint32_t target_tag=*iter;
 		t_req=&t_buf->req[target_tag];
+		/*
+		char temp[255]={0,};
+		sprintf(temp, "%u-%d-%lu:", t_buf->idx, value, t_buf->schedule_queue.size());
+		measure_start(&monitor.amf_time);*/
 		switch(t_req->type){
 			case LOWER_WRITE:
 #ifdef TESTING
@@ -204,6 +228,7 @@ void *p_bbuf_main(void *){
 #endif
 				break;
 		}
+		//measure_end(&monitor.amf_time, temp);
 		t_buf->schedule_queue.erase(iter);
 		fdriver_unlock(&t_buf->schedule_lock);
 	}

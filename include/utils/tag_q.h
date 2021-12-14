@@ -8,7 +8,7 @@ typedef struct tag_manager{
 	std::queue<uint32_t> *tagQ;
 	pthread_mutex_t tag_lock;
 	pthread_cond_t tag_cond;
-	uint32_t max_tag_num;
+	volatile uint32_t max_tag_num;
 #ifdef FD_DEBUG
 	std::set<uint32_t>* check_tag;
 #endif
@@ -19,4 +19,5 @@ uint32_t tag_manager_get_tag(tag_manager *);
 void tag_manager_free_tag(tag_manager *, uint32_t tag_num);
 bool tag_manager_empty(tag_manager*);
 void tag_manager_free_manager(tag_manager *);
+void tag_manager_wait(tag_manager *);
 #endif

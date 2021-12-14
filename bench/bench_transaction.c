@@ -45,8 +45,8 @@ char *get_vectored_bench(uint32_t *mark){
 	*mark=_master->n_num;
 
 #ifdef PROGRESS
-	if(m->command_issue_num % (m->command_num/100)==0){
-		printf("\r testing...... [%.2lf%%]",(double)(m->command_issue_num)/(m->command_num/100));
+	if((m->command_num/100?m->command_issue_num % (m->command_num/100)==0:true)){
+		printf("\r testing...... [%.2lf%%]",(double)(m->command_issue_num)/(m->command_num));
 		fflush(stdout);
 	}
 #endif

@@ -15,7 +15,7 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 8L
+#define GIGAUNIT 4L
 #ifndef OP
 #define OP 85
 #endif
@@ -26,7 +26,7 @@
 #define PAGESIZE (PAGE_TARGET_KILO*K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
 
-#if 0
+#if 1
 	#define CARD_NUM 2
 	#define BUS_NUM 8
 	#define CHIP_NUM 8
@@ -62,9 +62,9 @@
 #define KEYT uint32_t
 #define BLOCKT uint32_t
 
-#define QSIZE (128)
-#define LOWQDEPTH (128)
-#define QDEPTH (128)
+#define QSIZE		(128) 
+#define LOWQDEPTH	(128)
+#define QDEPTH		(128)
 
 #define THPOOL
 #define NUM_THREAD 4

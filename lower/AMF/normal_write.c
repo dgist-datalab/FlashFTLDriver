@@ -16,6 +16,9 @@ pthread_mutex_t wrapper_lock=PTHREAD_MUTEX_INITIALIZER;
 amf_wrapper *wrapper_array;
 std::queue<amf_wrapper*>* wrap_q;
 
+
+static MeasureTime amf_time;
+
 static inline amf_wrapper* get_amf_wrapper(uint32_t ppa, bool sync){
 	amf_wrapper *res;
 	pthread_mutex_lock(&wrapper_lock);
@@ -56,18 +59,23 @@ void normal_write_init(){
 		fdriver_mutex_init(&wrapper_array[i].lock);
 		wrap_q->push(&wrapper_array[i]);
 	}
+	measure_init(&amf_time);
 }
 
 static inline void __issue(uint32_t type, char *data, amf_wrapper *temp_req){
 	for(uint32_t i=0; i<R2PGAP; i++){
+		/*
+		char temp[10]={0,};
+		sprintf(temp, "%u",(temp_req->ppa*R2PGAP+i) & (AMF_PUNIT-1));
+		measure_start(&amf_time);*/
 		switch(type){
 #ifndef TESTING
 			case LOWER_WRITE:
-				AmfWrite(am, temp_req->ppa*R2PGAP+i, &data[i*PAGESIZE], 
+				AmfWrite(am, temp_req->ppa*R2PGAP+i, &data[i*REAL_PAGE_SIZE], 
 						(void *)temp_req);
 				break;
 			case LOWER_READ:
-				AmfRead(am, temp_req->ppa*R2PGAP+i, &data[i*PAGESIZE], 
+				AmfRead(am, temp_req->ppa*R2PGAP+i, &data[i*REAL_PAGE_SIZE], 
 						(void *)temp_req);
 				break;
 			case LOWER_TRIM:
@@ -83,6 +91,7 @@ static inline void __issue(uint32_t type, char *data, amf_wrapper *temp_req){
 				break;
 #endif
 		}
+		//measure_end(&amf_time, temp);
 	}
 }
 
