@@ -1,7 +1,6 @@
 #include "./exact_mapping.h"
 #include "../../../include/debug_utils.h"
 #include <stdlib.h>
-
 map_function* exact_map_init(uint32_t contents_num, float fpr){
 	map_function *res=(map_function*)calloc(1, sizeof(map_function));
 	res->insert=exact_insert;
@@ -17,20 +16,21 @@ map_function* exact_map_init(uint32_t contents_num, float fpr){
 	ex_map->map=(uint32_t*)malloc(sizeof(uint32_t) * contents_num);
 	memset(ex_map->map, -1, sizeof(uint32_t) * contents_num);
 
-	ex_map->now_map_num=0;
-	ex_map->max_map_num=contents_num;
-
 	res->private_data=(void*)ex_map;
 	return res;
 }
 
-void exact_insert(map_function *m, uint32_t lba, uint32_t offset){
+uint32_t exact_insert(map_function *m, uint32_t lba, uint32_t offset){
 	exact_map *ex_map=(exact_map*)m->private_data;
-	if(ex_map->now_map_num >= ex_map->max_map_num){
+	if(map_full_check(m)){
 		EPRINT("over range", true);
 	}
-	ex_map->now_map_num++;
-	ex_map->map[lba%ex_map->max_map_num]=offset;
+	if(ex_map->map[lba%m->max_contents_num]!=(uint32_t)-1){
+		return ex_map->map[lba%m->max_contents_num];
+	}
+	ex_map->map[lba%m->max_contents_num]=offset;
+	map_increase_contents_num(m);
+	return INSERT_SUCCESS;
 }
 
 uint32_t exact_query(map_function *m, request *req, map_read_param **param){
@@ -42,7 +42,7 @@ uint32_t exact_query(map_function *m, request *req, map_read_param **param){
 	res_param->oob_set=NULL;
 	res_param->private_data=NULL;
 	*param=res_param;
-	uint32_t target_offset=req->key%ex_map->max_map_num;
+	uint32_t target_offset=req->key%m->max_contents_num;
 	if(ex_map->map[target_offset]==UINT32_MAX){
 		return NOT_FOUND;
 	}
@@ -51,7 +51,7 @@ uint32_t exact_query(map_function *m, request *req, map_read_param **param){
 
 uint32_t exact_query_retry(map_function *m, map_read_param *param){
 	exact_map *ex_map=(exact_map*)m->private_data;
-	uint32_t target_offset=param->p_req->key%ex_map->max_map_num;
+	uint32_t target_offset=param->p_req->key%m->max_contents_num;
 	if(ex_map->map[target_offset]==UINT32_MAX){
 		return NOT_FOUND;
 	}

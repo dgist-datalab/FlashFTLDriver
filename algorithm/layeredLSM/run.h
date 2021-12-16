@@ -3,13 +3,19 @@
 #include "./sorted_table.h"
 #include "./mapping_function.h"
 #include "./page_aligner.h"
+#include "./shortcut.h"
 #include <stdlib.h>
 #include <stdio.h>
 
 typedef struct run{
 	uint32_t max_entry_num;
 	uint32_t now_entry_num;
+	struct shortcut_info *info;
 	struct map_function *mf;
+
+	uint32_t validate_piece_num;
+	uint32_t invalidate_piece_num;
+
 	pp_buffer *pp;
 	st_array *st_body;
 }run;
@@ -28,9 +34,11 @@ static inline run *run_init(uint32_t map_type, uint32_t entry_num, float fpr, L2
 	run *res=(run*)malloc(sizeof(run));
 	res->max_entry_num=entry_num;
 	res->now_entry_num=0;
-	res->mf=map_function_factory(map_type, entry_num, fpr);
+	res->mf=map_function_factory(map_type, entry_num, fpr, 48);
 	res->pp=NULL;
 	res->st_body=st_array_init(entry_num, bm);
+	res->info=NULL;
+	res->validate_piece_num=res->invalidate_piece_num=0;
 	return res;
 }
 
@@ -59,6 +67,10 @@ static inline void run_free(run *r){
  * */
 static inline bool run_is_full(run *r){
 	return r->now_entry_num==r->max_entry_num;
+}
+
+static inline bool run_is_empty(run *r){
+	return r->now_entry_num==0;
 }
 
 /*
@@ -118,10 +130,34 @@ uint32_t run_query(run *r, request *req);
  * oob_set: oob (lba set in physical_page) to adjust intra offset
  * */
 uint32_t run_query_retry(run *r, request *req);
+
+/*
+ * Function: run_translate_intra_offset
+ *------------------------------------
+ *		return psa from intra offset
+ *r:
+ *intra_offset:
+ * */
+uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset);
+
 //#################################### run_query.c done
 
 //#################################### run_util.c
 void run_print(run *r);
 //#################################### run_util.c done
+//
+
+//################################### run_merge.c 
+/*
+ * Function: run_merge
+ * ------------------
+ *		merging run
+ *
+ * run_num: total number of run to merge
+ * rset: set of run which is sorted by version
+ *
+ * */
+run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_bm *bm);
+//################################### run_merge.c done
 
 #endif

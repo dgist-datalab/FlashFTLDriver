@@ -4,10 +4,15 @@ SRCS +=\
 	   ./page_aligner.c\
 	   ./layered_lsm_operation.c\
 	   ./summary_page.c\
+	   ./summary_page_iter.c\
+	   ./summary_page_set.c\
 	   ./mapping_function.c\
 	   ./run_query.c\
 	   ./run_insert.c\
+	   ./run_merge.c\
 	   ./run_util.c\
+	   ./shortcut.c\
+	   ./compaction.c\
 
 
 OBJS :=\
@@ -19,6 +24,8 @@ TARGETOBJ:=\
 LEAK: all
 all: $(TARGETOBJ)
 	cd ./translation_functions && make
+	mv ./translation_functions/*.o ../../object/
+	mv ./translation_functions/plr/*.o ../../object/
 
 libnom.a : $(TARGETOBJ)
 	$(AR) r $(@) $(TARGETOBJ)
@@ -31,3 +38,4 @@ libnom.a : $(TARGETOBJ)
 
 clean : 
 	@$(RM) *.o
+	cd ./translation_functions/  && make clean

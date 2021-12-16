@@ -8,8 +8,7 @@
 #include "../../include/settings.h"
 #include "./block_table.h"
 #include "./summary_page.h"
-#define CEILING(a,b) (a/b + (a%b?1:0))
-#define MAX_SECTOR_IN_RC ((_PPB-1)*L2PGAP)
+#define MAX_SECTOR_IN_RC ((_PPB)*L2PGAP)
 //#define EXTRACT_PPA(PSA) (PSA/L2PGAP)
 typedef struct sorted_table_entry{
 	uint32_t PBA; //mapping for RCI to PBA
@@ -33,6 +32,7 @@ typedef struct summary_write_param{
 	uint32_t idx;
 	st_array *sa;
 	value_set *value;
+	summary_page_meta *spm;
 }summary_write_param;
 
 /*
@@ -45,8 +45,9 @@ typedef struct summary_write_param{
 
 	max_sector_num: the amount of sectors in the target run
 	bm: it is necessary to assign new empty RC to returned SA when it needs space to write.
+	store_summary_page_flag: if it is true, st_array store inserted data in summary_page
  */
-st_array *st_array_init(uint32_t max_sector_num, L2P_bm *bm);
+st_array *st_array_init(uint32_t max_sector_num, L2P_bm *bm );
 
 /*
 	Function: st_array_free
@@ -99,6 +100,15 @@ uint32_t st_array_write_translation(st_array *sa);
  * */
 uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa);
 
+/*
+ * Function: st_array_block_lock
+ * --------------------- 
+ *		prevent block from GC
+ *
+ * sa: 
+ * idx: index of block to lock
+ * */
+void st_array_block_lock(st_array *sa, uint32_t idx);
 /*
  * Function: st_array_get_summary_param
  * --------------------- 

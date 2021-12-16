@@ -6,6 +6,8 @@
 #include "../../include/debug_utils.h"
 #include "./mapping_function.h"
 #include "./run.h"
+#include "./shortcut.h"
+#include "./compaction.h"
 
 uint32_t argument_set_temp(int ,char **){return 1;}
 uint32_t operation_temp(request *const ){return 1;}
@@ -36,6 +38,7 @@ uint32_t run_num=16;
 uint32_t entry_per_run;
 uint32_t entry_num_last_run;
 run **run_array;
+sc_master *shortcut;
 
 char all_set_data[PAGESIZE];
 
@@ -47,32 +50,60 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	memset(all_set_data, -1, PAGESIZE);
 	entry_per_run=RANGE/run_num;
 	entry_num_last_run=(RANGE%run_num?RANGE%run_num:entry_per_run);
-	run_array=(run**)malloc(sizeof(run *) *run_num);
+	run_array=(run**)calloc(run_num, sizeof(run *));
+	shortcut=shortcut_init(run_num/2, (uint32_t)RANGE);
+	/*
 	for(uint32_t i=0; i<run_num; i++){
-		run_array[i]=run_init(EXACT, i==run_num-1?entry_num_last_run:entry_per_run, 0.1, bm);
+		run_array[i]=run_init(TREE_MAP, i==run_num-1?entry_num_last_run:entry_per_run, 0.1, bm);
 	}
-
+	*/
 	return 1;
 }
 
 void destroy_temp(lower_info *, struct algorithm *){
 	L2PBm_free(bm);
 	for(uint32_t i=0; i<run_num; i++){
-		//printf("run_print %u ------\n", i);
-		//run_print(run_array[i]);
-		run_free(run_array[i]);
+		if(run_array[i]){
+			run_free(run_array[i]);
+		}
 	}
+	shortcut_free(shortcut);
 	free(run_array);
+}
+
+static inline uint32_t empty_space(){
+	for(uint32_t i=0; i<run_num; i++){
+		if(run_array[i]==NULL) return i;
+	}
+	EPRINT("error??", true);
+	return UINT32_MAX;
 }
 
 uint32_t write_temp(request *const req){
 	static bool debug_flag=false;
-	static uint32_t cnt=0;
-	uint32_t ridx=cnt++/entry_per_run;
-	run_insert(run_array[ridx], req->key, req->value->value);
+	static run *now_run=NULL;
 	
-	if(run_is_full(run_array[ridx])){
-		run_insert_done(run_array[ridx]);
+	if(now_run==NULL){
+		uint32_t idx=empty_space();
+		run_array[idx]=run_init(TREE_MAP, entry_per_run, 0.1, bm);
+		now_run=run_array[idx];
+	}
+
+	if(run_is_empty(now_run)){
+		shortcut_add_run(shortcut, now_run);
+	}
+
+	shortcut_link_lba(shortcut, now_run, req->key);
+	run_insert(now_run, req->key, req->value->value);
+	
+	if(run_is_full(now_run)){
+		run_insert_done(now_run);
+		if(shortcut_compaction_trigger(shortcut)){
+			run *res=compaction_test(shortcut, 2, TREE_MAP, 0.1, bm);
+			uint32_t idx=empty_space();
+			run_array[idx]=res;
+		}
+		now_run=NULL;
 	}
 	req->end_req(req);
 	return 1;
@@ -83,13 +114,20 @@ char *buffer_checker(request *req){
 }
 
 uint32_t read_temp(request *const req){
+	uint32_t res;
+	run *t_run=shortcut_query(shortcut, req->key);
+
 	if(!req->retry){
-		static uint32_t cnt=0;
-		uint32_t ridx=cnt++/entry_per_run;
-		run_query(run_array[ridx], req);
+		res=run_query(t_run, req);
 	}
 	else{
-		run_query_retry(run_extract_target(req), req);
+		res=run_query_retry(t_run, req);
+	}
+
+	if(res==NOT_FOUND){
+		req->type==FS_NOTFOUND_T;
+		printf("%u not found\n", req->key);
+		abort();
 	}
 	return 1;
 }

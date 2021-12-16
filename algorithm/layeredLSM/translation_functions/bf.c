@@ -46,7 +46,7 @@ bloom_filter_meta *bf_parameter_setting(uint32_t contents_num, float fpr){
 	res->entry_fpr=get_target_each_fpr(contents_num, fpr);
 	res->real_bits_per_entry=get_number_of_bits(res->entry_fpr);
 	res->bits=ceil(res->real_bits_per_entry);
-	res->contents_num=contents_num;
+	//res->contents_num=contents_num;
 	return res;
 }
 

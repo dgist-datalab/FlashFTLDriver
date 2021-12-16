@@ -19,7 +19,12 @@ typedef struct L2P_block_manager{
 
 	uint32_t now_segment_idx;		//if this variable is set to UINT32_MAX, 
 									//it needs to be assigend a new segment
+
+	__segment* reserve_seg;
+	__segment* reserve_summary_seg;
+	__segment* now_summary_seg;
 	uint32_t now_block_idx;
+	uint32_t now_seg_idx;
 	blockmanager *segment_manager; 
 }L2P_bm;
 
@@ -72,16 +77,10 @@ uint32_t L2PBm_pick_empty_PBA(L2P_bm *bm);
  */
 void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid);
 
-/*the below is deprecated code*/
 /*
-	Function: translate_run_chunk_id
-	--------------------------------
-		returns physical address by looking up the parameter map
-
-	bm:
-	PBA:
-static inline uint32_t translate_run_chunk_id(L2P_bm *bm, uint32_t RCI){
-	return bm->RC_map[RCI];
-}
- */
+ * Function:L2PBm_get_map_ppa
+ * -------------------------
+ *		return ppa for summary page
+ * */
+uint32_t L2PBm_get_map_ppa(L2P_bm *bm);
 #endif

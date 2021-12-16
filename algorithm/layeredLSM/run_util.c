@@ -10,7 +10,8 @@ void run_print(run *r){
 		g_li->read_sync(TEST_IO, sa->sp_meta[i].ppa, data);
 		summary_pair *pair=(summary_pair*)data;
 		for(uint32_t idx=0; pair[idx].lba!=UINT32_MAX && idx<MAX_CUR_POINTER; ++idx ){
-			printf("%u : %u\n",pair[idx].lba, pair[idx].psa);
+			printf("%u : %u\n",pair[idx].lba, 
+					run_translate_intra_offset(r, pair[idx].intra_offset));
 		}
 	}
 }

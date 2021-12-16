@@ -1,5 +1,7 @@
 #include "run.h"
+#include "piece_ppa.h"
 
+extern sc_master *shortcut;
 extern lower_info *g_li;
 
 static void* __run_write_end_req(algo_req *req){
@@ -30,27 +32,45 @@ static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blo
 	g_li->write(ppa, PAGESIZE, value, res);
 }
 
-static void __run_write_buffer(run *r, bool force){
-	uint32_t target_ppa, psa, inter_offset;
+static void __run_write_buffer(run *r, blockmanager *sm, bool force){
+	uint32_t target_ppa, psa, intra_offset;
 	for(uint32_t i=0; i<r->pp->buffered_num; i++){
-		inter_offset=r->st_body->write_pointer;
+		intra_offset=r->st_body->write_pointer;
 		psa=st_array_write_translation(r->st_body);
 		uint32_t lba=r->pp->LBA[i];
 		if(i==0) target_ppa=psa/L2PGAP;
-		st_array_insert_pair(r->st_body, lba, psa);
-		r->mf->insert(r->mf, lba, inter_offset);
+
+		if(validate_piece_ppa(sm, psa, true)!=BIT_SUCCESS){
+			EPRINT("double insert error", true);
+		}
+		r->validate_piece_num++;
+
+		st_array_insert_pair(r->st_body, lba, intra_offset);
+		uint32_t res=r->mf->insert(r->mf, lba, intra_offset);
+		if(res!=INSERT_SUCCESS){
+			res=run_translate_intra_offset(r, res);
+			if(invalidate_piece_ppa(sm, res, true)!=BIT_SUCCESS){
+				EPRINT("double delete error", true);
+			}
+			r->invalidate_piece_num++;
+		}
 	}
 	__run_issue_write(target_ppa, pp_get_write_target(r->pp, force), (char*)r->pp->LBA, 
-			r->st_body->bm->segment_manager, NULL);
+			sm, NULL);
 
 }
 
-static void __run_write_meta(run *r, bool force){
+static void __run_write_meta(run *r, blockmanager *sm, bool force){
 	static uint32_t temp_data[L2PGAP]={UINT32_MAX,UINT32_MAX,};
 	uint32_t target_ppa=st_array_summary_translation(r->st_body, force)/L2PGAP;
 	summary_write_param *swp=st_array_get_summary_param(r->st_body, target_ppa, force);
 	if(!swp) return;
-	__run_issue_write(target_ppa, swp->value, NULL, 
+
+	if(validate_ppa(sm, target_ppa, true)!=BIT_SUCCESS){
+		EPRINT("map write error", true);
+	}
+
+	__run_issue_write(target_ppa, swp->value, (char*)temp_data, 
 			r->st_body->bm->segment_manager, (void*)swp);
 }
 
@@ -58,19 +78,20 @@ bool run_insert(run *r, uint32_t lba, char *data){
 	if(r->max_entry_num < r->now_entry_num){
 		return false;
 	}
-
 	if(!r->pp){
 		r->pp=pp_init();
 	}
 
 
+	shortcut_unlink_and_link_lba(shortcut, r, lba);
+
 	if(pp_insert_value(r->pp, lba, data)){
-		__run_write_buffer(r, false);
+		__run_write_buffer(r, r->st_body->bm->segment_manager, false);
 		pp_reinit_buffer(r->pp);
 	}
 
 	if(r->st_body->summary_write_alert){
-		__run_write_meta(r, false);
+		__run_write_meta(r, r->st_body->bm->segment_manager, false);
 	}
 
 	r->now_entry_num++;
@@ -79,9 +100,9 @@ bool run_insert(run *r, uint32_t lba, char *data){
 
 void run_insert_done(run *r){
 	if(r->pp->buffered_num!=0){
-		__run_write_buffer(r, true);
+		__run_write_buffer(r, r->st_body->bm->segment_manager, true);
 	}
-	__run_write_meta(r, true);
+	__run_write_meta(r, r->st_body->bm->segment_manager, true);
 	r->mf->make_done(r->mf);
 	pp_free(r->pp);
 	r->pp=NULL;

@@ -13,7 +13,6 @@ typedef struct bloom_filter_meta{
 	double real_bits_per_entry;
 	float entry_fpr;
 	uint32_t bits;
-	uint32_t contents_num;
 }bloom_filter_meta;
 
 /*
@@ -59,6 +58,8 @@ void bf_set(bloom_filter_meta *bfm, bloom_filter *bf, uint32_t lba);
  * */
 bool bf_check(bloom_filter_meta *bfm, bloom_filter *bf, uint32_t lba);
 
+double get_number_of_bits(double target_fpr);
+double get_target_each_fpr(uint32_t member_num, float block_fpr);
 /*
 uint32_t bf_bit_per_entry(bloom_filter_meta *bfm, 
 		float fpr, uint32_t bit_for_psa);

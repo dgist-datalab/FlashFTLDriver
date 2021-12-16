@@ -247,7 +247,7 @@ struct blockmanager{
 	int (*bit_set)		(struct blockmanager*, uint32_t piece_ppa);
 	int (*bit_unset)	(struct blockmanager*, uint32_t piece_ppa);
 	bool (*bit_query)		(struct blockmanager *, uint32_t piece_ppa);
-	bool (*is_invalid_piece) (struct blockmanager *, uint32_t piece_pa);
+	bool (*is_invalid_piece) (struct blockmanager *, uint32_t piece_ppa);
 
 	void (*set_oob) (struct blockmanager *, char* data, int len, uint32_t ppa);
 	char *(*get_oob)(struct blockmanager *, uint32_t ppa);

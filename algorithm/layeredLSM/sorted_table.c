@@ -1,4 +1,5 @@
 #include "sorted_table.h"
+#include "./piece_ppa.h"
 #include <map>
 
 typedef struct sorted_table_manager{
@@ -18,11 +19,11 @@ st_array *st_array_init(uint32_t max_sector_num, L2P_bm *bm){
 	res->sid=STM->now_sid++;
 	*/
 	res->bm=bm;
-	res->max_STE_num=CEILING(max_sector_num, MAX_SECTOR_IN_RC);
-	res->pba_array=(STE*)malloc(res->max_STE_num * sizeof(STE));
-	memset(res->pba_array, -1, res->max_STE_num);
+	res->max_STE_num=CEIL(max_sector_num, MAX_SECTOR_IN_RC);
+	res->pba_array=(STE*)malloc((res->max_STE_num+1) * (sizeof(STE)));
+	memset(res->pba_array, -1, (res->max_STE_num+1)*sizeof(STE));
 
-	res->sp_meta=(summary_page_meta*)calloc(res->max_STE_num, sizeof(summary_page_meta));
+	res->sp_meta=(summary_page_meta*)calloc(res->max_STE_num+1, sizeof(summary_page_meta));
 	res->sp_idx=0;
 	return res;
 }
@@ -40,7 +41,14 @@ void st_array_free(st_array *sa){
 		STM=NULL;
 	}
 	*/
+
 	EPRINT("sp_meta should be invalidate", false);
+	for(uint32_t i=0; i<sa->now_STE_num; i++){
+		if(invalidate_ppa(sa->bm->segment_manager, sa->sp_meta[i].ppa, true)
+				==BIT_ERROR){
+			EPRINT("invalidate map error!", true);
+		}
+	}
 	free(sa->sp_meta);
 	free(sa->pba_array);
 	free(sa);
@@ -56,8 +64,7 @@ uint32_t st_array_summary_translation(st_array *sa, bool force){
 	if(!sa->summary_write_alert && !force){
 		EPRINT("it is not write_summary_order", true);
 	}
-	uint32_t physical_page_addr=sa->pba_array[(sa->write_pointer-1)/MAX_SECTOR_IN_RC].PBA;
-	return ((physical_page_addr+_PPB-1)*L2PGAP);
+	return L2PBm_get_map_ppa(sa->bm)*L2PGAP;
 }
 
 uint32_t st_array_write_translation(st_array *sa){
@@ -86,6 +93,7 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 	if(sa->sp_meta[sa->sp_idx].pr_type==NO_PR){
 		sa->sp_meta[sa->sp_idx].private_data=(void *)sp_init();
 		sa->sp_meta[sa->sp_idx].pr_type=WRITE_PR;
+		sa->sp_meta[sa->sp_idx].lba=lba;
 	}
 	else if(sa->sp_meta[sa->sp_idx].pr_type==READ_PR){
 		EPRINT("not allowed", true);
@@ -115,8 +123,11 @@ summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
 	summary_write_param *swp=(summary_write_param*)malloc(sizeof(summary_write_param));
 	swp->idx=sa->sp_idx;
 	swp->sa=sa;
+	swp->spm=&sa->sp_meta[sa->sp_idx];
 	swp->value=sp_get_data((summary_page*)(sa->sp_meta[sa->sp_idx++].private_data));
-
+	if(force){
+		sa->now_STE_num++;
+	}
 	return swp;
 }
 

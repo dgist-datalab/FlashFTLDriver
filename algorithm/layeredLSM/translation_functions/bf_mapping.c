@@ -15,17 +15,18 @@ map_function *bf_map_init(uint32_t contents_num, float fpr){
 	map->bfm=bf_parameter_setting(contents_num, fpr);
 	map->set_of_bf=(bloom_filter*)malloc(sizeof(bloom_filter) * contents_num);
 	map->write_pointer=0;
-	
 	res->private_data=(void*)map;
 	return res;
 }
 
-void bf_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
+uint32_t bf_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
 	extract_map(map, mf);
-	if(map->bfm->contents_num < map->write_pointer){
+	if(map_full_check(mf)){
 		EPRINT("data overflow", true);
 	}
 	bf_set(map->bfm, &map->set_of_bf[map->write_pointer++], lba);
+	map_increase_contents_num(mf);
+	return INSERT_SUCCESS;
 }
 
 uint32_t bf_map_query(map_function *mf, request *req, map_read_param **param){

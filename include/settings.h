@@ -15,7 +15,7 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 4L
+#define GIGAUNIT 6L
 #ifndef OP
 #define OP 85
 #endif
@@ -43,6 +43,7 @@
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)<(b)?(b):(a))
+#define CEIL(a,b) ((a)/(b) + ((a)%(b)?1:0))
 
 #define OOB_SIZE 128
 #define LPAGESIZE 4096
@@ -65,6 +66,7 @@
 #define QSIZE		(128) 
 #define LOWQDEPTH	(128)
 #define QDEPTH		(128)
+#define DEV_QDEPTH (128)
 
 #define THPOOL
 #define NUM_THREAD 4

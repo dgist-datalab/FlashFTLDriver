@@ -2,6 +2,7 @@
 #define SUMMARY_PAGE
 #include "../../include/settings.h"
 #include "../../interface/interface.h"
+#include "../../include/sem_lock.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -15,7 +16,7 @@ enum{
 
 typedef struct summary_pair{
 	uint32_t lba;
-	uint32_t psa;
+	uint32_t intra_offset;
 }summary_pair;
 
 typedef struct summary_page{
@@ -24,18 +25,21 @@ typedef struct summary_page{
 	char *body;
 }summary_page;
 
-typedef struct summary_page_iterator{
-	uint32_t read_pointer;
-	summary_page *sp;
-	value_set *value;
-	char *body;
-}summary_page_iter;
-
 typedef struct summary_page_meta{
+	uint32_t lba;
 	uint32_t ppa;
 	uint32_t pr_type;
 	void *private_data;
 }summary_page_meta;
+
+typedef struct summary_page_iterator{
+	uint32_t read_pointer;
+	summary_page_meta *spm;
+	value_set *value;
+	char *body;
+	fdriver_lock_t read_done;
+	bool read_flag;
+}summary_page_iter;
 
 #define for_each_sp_pair(sp, idx, p)\
 	for(idx=0; idx<MAX_CUR_POINTER &&\
@@ -71,9 +75,9 @@ void sp_reinit(summary_page *sp);
 		return true when it is full after inserting
 	sp:
 	lba: lba
-	psa: psa
+	intra_offset: intra_offset
  */
-bool sp_insert(summary_page *sp, uint32_t lba, uint32_t psa);
+bool sp_insert(summary_page *sp, uint32_t lba, uint32_t intra_offset);
 
 /*
 	Function: sp_insert_pair
@@ -116,7 +120,7 @@ void sp_print_all(summary_page *sp);
 		return summary_page_iterator from summary_page
 	sp: iterating target 
  */
-summary_page_iter* spi_init(summary_page *sp);
+summary_page_iter* spi_init(summary_page_meta *sp);
 
 /*
 	Function: spi_init_by_data
@@ -158,6 +162,4 @@ void spi_move_backward(summary_page_iter*);
 	spi:
  */
 void spi_free(summary_page_iter*);
-
-
 #endif
