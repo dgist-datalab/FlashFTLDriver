@@ -7,9 +7,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+enum{
+	RUN_NORMAL, RUN_PINNING
+};
+
 typedef struct run{
 	uint32_t max_entry_num;
 	uint32_t now_entry_num;
+	uint32_t type;
 	struct shortcut_info *info;
 	struct map_function *mf;
 
@@ -29,18 +34,9 @@ typedef struct run{
  * entry_num: number of entry in the run
  * fpr: target fpr of mapping function
  * bm: blockmanager for st_array
+ * type: type of run, pinning run have psa in memory
  * */
-static inline run *run_init(uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm){
-	run *res=(run*)malloc(sizeof(run));
-	res->max_entry_num=entry_num;
-	res->now_entry_num=0;
-	res->mf=map_function_factory(map_type, entry_num, fpr, 48);
-	res->pp=NULL;
-	res->st_body=st_array_init(entry_num, bm);
-	res->info=NULL;
-	res->validate_piece_num=res->invalidate_piece_num=0;
-	return res;
-}
+run *run_factory(uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm, uint32_t type);
 
 /*
  * Function: run_free
@@ -49,14 +45,7 @@ static inline run *run_init(uint32_t map_type, uint32_t entry_num, float fpr, L2
  *
  * r:target run
  * */
-static inline void run_free(run *r){
-	if(r->pp){
-		EPRINT("what happened?", true);
-	}
-	r->mf->free(r->mf);
-	st_array_free(r->st_body);
-	free(r);
-}
+void run_free(run *r,struct shortcut_master *sc);
 
 /*
  * Function: run_is_full
@@ -93,17 +82,20 @@ static run *run_extract_target(request *req){
  *
  * r: target run to be inserted
  * lba: target lba
+ * psa: target psa, it is valid when the run type is RUN_PINNING
  * data: target data
+ * merge_insert: flag is set when the function is called in run_merge
  * */
-bool run_insert(run *r, uint32_t lba, char *data);
+bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_insert);
 
 /*
  * Fucntion: run_insert_done
  * -------------------
  *		finishing the insert operation
  * r
+ * merge_insert: flag is set when the function is called in run_merge
  * */
-void run_insert_done(run *r);
+void run_insert_done(run *r, bool merge_insert);
 //#################################### run_insert.c done
 
 //#################################### run_query.c
@@ -143,9 +135,8 @@ uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset);
 //#################################### run_query.c done
 
 //#################################### run_util.c
-void run_print(run *r);
+void run_print(run *r, bool content);
 //#################################### run_util.c done
-//
 
 //################################### run_merge.c 
 /*
@@ -157,7 +148,7 @@ void run_print(run *r);
  * rset: set of run which is sorted by version
  *
  * */
-run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_bm *bm);
+run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_bm *bm, uint32_t run_type);
 //################################### run_merge.c done
 
 #endif

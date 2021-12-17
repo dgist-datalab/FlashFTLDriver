@@ -9,6 +9,8 @@
 
 #define MAX_CUR_POINTER (PAGESIZE/sizeof(summary_pair))
 #define MAX_IDX_SP (MAX_CUR_POINTER-1)
+#define NORMAL_CUR_END_PTR (_PPB*L2PGAP)
+#define NORMAP_CUR_END_IDX (_PPB*L2PGAP-1)
 
 enum{
 	NO_PR, WRITE_PR, READ_PR,
@@ -39,6 +41,7 @@ typedef struct summary_page_iterator{
 	char *body;
 	fdriver_lock_t read_done;
 	bool read_flag;
+	bool iter_done_flag;
 }summary_page_iter;
 
 #define for_each_sp_pair(sp, idx, p)\

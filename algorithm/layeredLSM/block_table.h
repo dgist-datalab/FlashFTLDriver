@@ -81,6 +81,17 @@ void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid);
  * Function:L2PBm_get_map_ppa
  * -------------------------
  *		return ppa for summary page
+ *
+ *	sid: managed sorted_array
  * */
 uint32_t L2PBm_get_map_ppa(L2P_bm *bm);
+
+/*
+ * Function:L2PBm_get_map_ppa
+ * -------------------------
+ *		return ppa for summary page
+ *
+ *	sid: managed sorted_array
+ * */
+uint32_t L2PBm_get_map_rppa(L2P_bm *bm);
 #endif

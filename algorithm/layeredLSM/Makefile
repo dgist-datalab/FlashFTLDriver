@@ -7,12 +7,14 @@ SRCS +=\
 	   ./summary_page_iter.c\
 	   ./summary_page_set.c\
 	   ./mapping_function.c\
+	   ./run.c\
 	   ./run_query.c\
 	   ./run_insert.c\
 	   ./run_merge.c\
 	   ./run_util.c\
 	   ./shortcut.c\
 	   ./compaction.c\
+	   ./gc.c\
 
 
 OBJS :=\

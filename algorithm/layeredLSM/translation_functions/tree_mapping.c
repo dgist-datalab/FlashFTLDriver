@@ -11,6 +11,11 @@ map_function*	tree_map_init(uint32_t contents_num, float fpr){
 	res->free=tree_free;
 	res->show_info=NULL;
 
+	res->iter_init=tree_iter_init;
+	res->iter_pick=tree_iter_pick;
+	res->iter_move=tree_iter_move;
+	res->iter_free=tree_iter_free;
+
 	tree_map *tr_map=(tree_map*)malloc(sizeof(tree_map));
 	tr_map->body=new std::map<uint32_t, uint32_t>();
 
@@ -95,4 +100,42 @@ void			tree_free(map_function *m){
 	delete tr_map->body;
 	free(tr_map);
 	free(m);
+}
+
+#define iter_extract_tree(iter) extract_tree((iter->m))
+
+map_iter *		tree_iter_init(map_function *m){
+	tree_map *tr_map=extract_tree(m);
+	map_iter *res=(map_iter*)malloc(sizeof(map_iter));
+	res->read_pointer=0;
+	res->m=m;
+	res->private_data=malloc(sizeof(std::map<uint32_t, uint32_t>::iterator));
+	res->iter_done_flag=false;
+	*(tree_iter*)res->private_data=tr_map->body->begin();
+	return res;
+}
+
+summary_pair	tree_iter_pick(map_iter *miter){
+	tree_map *tr_map=iter_extract_tree(miter);
+	static summary_pair temp_pair={UINT32_MAX, UINT32_MAX};
+	tree_iter iter=*(tree_iter*)miter->private_data;
+	if(iter==tr_map->body->end()){
+		miter->iter_done_flag=true;
+		return temp_pair;
+	}
+	else{
+		return {iter->first, iter->second};
+	}
+}
+
+void			tree_iter_move(map_iter *miter){
+	tree_iter iter=*(tree_iter*)miter->private_data;
+	miter->read_pointer++;
+	iter++;
+	*(tree_iter*)miter->private_data=iter;
+}
+
+void			tree_iter_free(map_iter *miter){
+	free(miter->private_data);
+	free(miter);
 }

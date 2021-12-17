@@ -36,6 +36,8 @@ summary_page_iter* spi_init(summary_page_meta *spm){
 	spm->private_data=(void*)res;
 	spm->pr_type=READ_PR;
 
+	res->iter_done_flag=false;
+
 	__spi_issue_read(res);
 	return res;
 }
@@ -54,17 +56,22 @@ summary_pair spi_pick_pair(summary_page_iter *spi){
 		fdriver_destroy(&spi->read_done);
 	}
 	static summary_pair end_of_pair={UINT32_MAX, UINT32_MAX};
-	if(spi->read_pointer==MAX_CUR_POINTER){
+	if(spi->read_pointer==NORMAL_CUR_END_PTR){
+		spi->iter_done_flag=true;
 		return end_of_pair;
 	}
 	else{
-		return (((summary_pair*)spi->body)[spi->read_pointer * sizeof(summary_pair)]);
+		summary_pair res=(((summary_pair*)spi->body)[spi->read_pointer * sizeof(summary_pair)]);
+		if(res.lba==UINT32_MAX){
+			spi->iter_done_flag=true;
+		}
+		return res; 	
 	}
 }
 
 void spi_move_forward(summary_page_iter* spi){
 	spi->read_pointer++;
-	if(spi->read_pointer==MAX_CUR_POINTER){
+	if(spi->read_pointer==NORMAL_CUR_END_PTR){
 		inf_free_valueset(spi->value, FS_MALLOC_R);
 	}
 }

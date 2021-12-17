@@ -38,7 +38,7 @@ run* compaction_test(sc_master *sc, uint32_t merge_num, uint32_t map_type,
 	// sort merged_set
 	for(uint32_t i=0; i<merge_num-1; i++){
 		for(uint32_t j=i+1; j<merge_num; j++){
-			if(merged_set[i]->info->idx > merged_set[j]->info->idx){
+			if(merged_set[i]->info->recency < merged_set[j]->info->recency){
 				run *temp=merged_set[i];
 				merged_set[i]=merged_set[j];
 				merged_set[j]=temp;
@@ -46,15 +46,20 @@ run* compaction_test(sc_master *sc, uint32_t merge_num, uint32_t map_type,
 		}
 	}
 	
-	run *res=run_merge(merge_num, merged_set, TREE_MAP, fpr, bm);
+	printf("\n");
+	for(uint32_t i=0; i<merge_num; i++){
+		run_print(merged_set[i], false);
+	}
 
+	run *res=run_merge(merge_num, merged_set, GUARD_BF, fpr, bm, RUN_PINNING);
+	
 	for(uint32_t i=0; i<merge_num; i++){
 		for(uint32_t j=0; j<run_num; j++){
 			if(run_array[j]==merged_set[i]){
 				run_array[j]=NULL;
 			}
 		}
-		run_free(merged_set[i]);
+		run_free(merged_set[i],sc);
 	}
 	free(merged_set);
 	return res;

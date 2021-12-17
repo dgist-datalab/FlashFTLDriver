@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <map>
 
 #include "../../include/container.h"
 #include "../../include/settings.h"
@@ -10,6 +11,10 @@
 #include "./summary_page.h"
 #define MAX_SECTOR_IN_RC ((_PPB)*L2PGAP)
 //#define EXTRACT_PPA(PSA) (PSA/L2PGAP)
+enum{
+	ST_NORMAL, ST_PINNING
+};
+
 typedef struct sorted_table_entry{
 	uint32_t PBA; //mapping for RCI to PBA
 }STE;
@@ -19,10 +24,13 @@ typedef struct sorted_table_array{
 	uint32_t max_STE_num;
 	uint32_t now_STE_num;
 	uint32_t write_pointer; //physical_page granuality
+	uint32_t type;
 
 	L2P_bm *bm;
 	bool summary_write_alert; //for letting run know when it should issue summary block
 	STE *pba_array;
+
+	uint32_t *pinning_data;
 
 	uint32_t sp_idx;
 	summary_page_meta *sp_meta;
@@ -32,8 +40,26 @@ typedef struct summary_write_param{
 	uint32_t idx;
 	st_array *sa;
 	value_set *value;
+	uint32_t oob[L2PGAP];
 	summary_page_meta *spm;
 }summary_write_param;
+
+typedef struct sid_info{
+	uint32_t sid;
+	st_array *sa;
+	struct run *r;
+}sid_info;
+
+typedef struct sorted_array_master{
+	std::map<uint32_t, sid_info> sid_map;
+	uint32_t now_sid_info;
+}sa_master;
+
+void sorted_array_master_init();
+
+void sorted_array_master_free();
+
+sid_info sorted_array_master_get_info(uint32_t sidx);
 
 /*
 	Function: st_array_init
@@ -42,12 +68,14 @@ typedef struct summary_write_param{
 			assigns memory for STE
 			set max number of RCIs in returning SA(st_array)
 			initializes ETC
-
+	
+	r: run which have this st_array;
 	max_sector_num: the amount of sectors in the target run
 	bm: it is necessary to assign new empty RC to returned SA when it needs space to write.
 	store_summary_page_flag: if it is true, st_array store inserted data in summary_page
+	pinning: if it is set to true, all the PSA in the st are all pinned.
  */
-st_array *st_array_init(uint32_t max_sector_num, L2P_bm *bm );
+st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinning);
 
 /*
 	Function: st_array_free

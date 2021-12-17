@@ -9,6 +9,12 @@
 enum{
 	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP
 };
+typedef struct map_iter{
+	uint32_t read_pointer;
+	bool iter_done_flag;
+	struct map_function *m;
+	void *private_data;
+}map_iter;
 
 typedef struct map_read_param{
 	struct request *p_req;
@@ -90,6 +96,13 @@ typedef struct map_function{
  *
  * */
 	void (*free)(struct map_function *m);
+
+	map_iter *(*iter_init)(struct map_function *m);
+	summary_pair (*iter_pick)(map_iter *);
+	void (*iter_move)(map_iter*);
+	void (*iter_free)(map_iter*);
+
+
 	void *private_data;
 
 	uint32_t type;

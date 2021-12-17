@@ -11,7 +11,7 @@ static inline void find_sub_member_num(float fpr, uint32_t member, uint32_t lba_
 //		uint32_t member_set_num=member/i;
 		float target_each_fpr=get_target_each_fpr(i, fpr);
 		uint32_t bit=get_number_of_bits(target_each_fpr);
-
+		if(bit==0) continue;
 		float avg_bit=(float)(bit*i+lba_bit_num)/i;
 		if(target_avg_bit==0){
 			target_avg_bit=avg_bit;

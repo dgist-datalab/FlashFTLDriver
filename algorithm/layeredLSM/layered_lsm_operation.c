@@ -51,7 +51,7 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	entry_per_run=RANGE/run_num;
 	entry_num_last_run=(RANGE%run_num?RANGE%run_num:entry_per_run);
 	run_array=(run**)calloc(run_num, sizeof(run *));
-	shortcut=shortcut_init(run_num/2, (uint32_t)RANGE);
+	shortcut=shortcut_init(run_num/2-2, (uint32_t)RANGE);
 	/*
 	for(uint32_t i=0; i<run_num; i++){
 		run_array[i]=run_init(TREE_MAP, i==run_num-1?entry_num_last_run:entry_per_run, 0.1, bm);
@@ -61,14 +61,14 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 }
 
 void destroy_temp(lower_info *, struct algorithm *){
-	L2PBm_free(bm);
 	for(uint32_t i=0; i<run_num; i++){
 		if(run_array[i]){
-			run_free(run_array[i]);
+			run_free(run_array[i], shortcut);
 		}
 	}
 	shortcut_free(shortcut);
 	free(run_array);
+	L2PBm_free(bm);
 }
 
 static inline uint32_t empty_space(){
@@ -85,7 +85,7 @@ uint32_t write_temp(request *const req){
 	
 	if(now_run==NULL){
 		uint32_t idx=empty_space();
-		run_array[idx]=run_init(TREE_MAP, entry_per_run, 0.1, bm);
+		run_array[idx]=run_factory(TREE_MAP, entry_per_run, 0.1, bm, RUN_NORMAL);
 		now_run=run_array[idx];
 	}
 
@@ -93,13 +93,12 @@ uint32_t write_temp(request *const req){
 		shortcut_add_run(shortcut, now_run);
 	}
 
-	shortcut_link_lba(shortcut, now_run, req->key);
-	run_insert(now_run, req->key, req->value->value);
+	run_insert(now_run, req->key, UINT32_MAX, req->value->value, false);
 	
 	if(run_is_full(now_run)){
-		run_insert_done(now_run);
+		run_insert_done(now_run, false);
 		if(shortcut_compaction_trigger(shortcut)){
-			run *res=compaction_test(shortcut, 2, TREE_MAP, 0.1, bm);
+			run *res=compaction_test(shortcut, 2, GUARD_BF, 0.1, bm);
 			uint32_t idx=empty_space();
 			run_array[idx]=res;
 		}

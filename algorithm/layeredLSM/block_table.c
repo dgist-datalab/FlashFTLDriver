@@ -89,3 +89,11 @@ uint32_t L2PBm_get_map_ppa(L2P_bm *bm){
 
 	return bm->segment_manager->get_page_addr(bm->now_summary_seg);
 }
+
+uint32_t L2PBm_get_map_rppa(L2P_bm *bm){
+	blockmanager *sm=bm->segment_manager;
+	if(sm->check_full(bm->now_summary_seg)){
+		EPRINT("reserve full error", true);
+	}
+	return bm->segment_manager->get_page_addr(bm->reserve_summary_seg);
+}

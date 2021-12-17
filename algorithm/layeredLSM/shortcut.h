@@ -7,6 +7,7 @@
 #define NOT_ASSIGNED_SC UINT8_MAX
 typedef struct shortcut_info{
 	uint8_t idx;
+	uint32_t recency;
 	uint32_t linked_lba_num;
 	uint32_t unlinked_lba_num;
 	run *r;
@@ -18,6 +19,7 @@ typedef struct shortcut_master{
 	uint8_t *sc_map;
 	sc_info *info_set;
 	uint32_t max_shortcut_num;
+	uint32_t now_recency;
 }shortcut_master;
 
 typedef shortcut_master sc_master;
@@ -41,6 +43,31 @@ sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range);
  *	r:
  * */
 void shortcut_add_run(sc_master *sc, run *r);
+
+/*
+ * Function: shortcut_add_run
+ * -------------------------
+ *		assign new shortcut idx to run in merge
+ *		the recency of sc_info will be set the biggest recency in rset
+ *
+ *	sc:
+ *	r: target run
+ *	rset: target merged set 
+ *	merge_num: the number of merged set
+ * */
+void shortcut_add_run_merge(sc_master *sc, run *r, run **rset, uint32_t merge_num);
+
+
+/*
+ * Function: shortcut_validity_check_lba
+ * ------------------------------------
+ *			checking lba of run validity
+ *
+ *	sc:
+ *	r: the run has lba
+ *	lba: target lba
+ * */
+bool shortcut_validity_check_lba(sc_master *sc, run *r, uint32_t lba);
 
 /*
  * Function: shortcut_link_lba

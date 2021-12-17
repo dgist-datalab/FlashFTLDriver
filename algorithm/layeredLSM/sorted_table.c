@@ -1,60 +1,81 @@
 #include "sorted_table.h"
 #include "./piece_ppa.h"
-#include <map>
 
-typedef struct sorted_table_manager{
-	uint64_t now_sid; //next sid to be assigned
-	std::map<uint64_t, st_array*> *map_info;//mapping for fast finding when it processes GC
-}st_manager;
+typedef std::map<uint32_t, sid_info>::iterator sid_info_iter;
 
-//static st_manager *STM;
+sa_master *sa_m;
 
-st_array *st_array_init(uint32_t max_sector_num, L2P_bm *bm){
-	st_array *res=(st_array*)calloc(1, sizeof(st_array));
-	/*
-	if(!STM){
-		STM=(st_manager*)calloc(1, sizeof(st_manager));
-		STM->map_info=new std::map<uint64_t, st_array*>();
+void sorted_array_master_init(){
+	sa_m=(sa_master*)malloc(sizeof(sa_master));
+	sa_m->now_sid_info=0;
+}
+
+void sorted_array_master_free(){
+	free(sa_m);
+}
+
+static inline sid_info_iter __find_sid_info_iter(uint32_t sid){
+	sid_info_iter iter=sa_m->sid_map.find(sid);
+	if(sa_m->sid_map.end()==iter){
+		EPRINT("invalid sid error", true);
 	}
-	res->sid=STM->now_sid++;
-	*/
+	return iter;
+}
+
+sid_info sorted_array_master_get_info(uint32_t sid){
+	sid_info_iter iter=__find_sid_info_iter(sid);
+	return iter->second;
+}
+
+st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinning){
+	st_array *res=(st_array*)calloc(1, sizeof(st_array));
 	res->bm=bm;
 	res->max_STE_num=CEIL(max_sector_num, MAX_SECTOR_IN_RC);
 	res->pba_array=(STE*)malloc((res->max_STE_num+1) * (sizeof(STE)));
 	memset(res->pba_array, -1, (res->max_STE_num+1)*sizeof(STE));
 
+	res->sid=sa_m->now_sid_info++;
 	res->sp_meta=(summary_page_meta*)calloc(res->max_STE_num+1, sizeof(summary_page_meta));
 	res->sp_idx=0;
+	res->type=pinning?ST_PINNING: ST_NORMAL;
+	if(res->type==ST_PINNING){
+		res->pinning_data=(uint32_t *)malloc(max_sector_num * sizeof(uint32_t));
+	}
+	else{
+		res->pinning_data=NULL;
+	}
+
+	sid_info temp; temp.sid=res->sid; temp.sa=res; temp.r=r;
+	sa_m->sid_map.insert(std::pair<uint32_t, sid_info>(res->sid, temp));
+
 	return res;
 }
 
 void st_array_free(st_array *sa){
-	/*
-	std::map<uint64_t, st_array*>::iterator iter=STM->map_info->find(sa->sid);
-	if(iter==STM->map_info->end()){
-		EPRINT("cannot find target sid in map", true);
-	}
-	STM->map_info->erase(iter);
-	if(STM->map_info->size()==0){
-		delete STM->map_info;
-		free(STM);
-		STM=NULL;
-	}
-	*/
-
 	EPRINT("sp_meta should be invalidate", false);
 	for(uint32_t i=0; i<sa->now_STE_num; i++){
+		if(sa->sp_meta[i].ppa==0){
+			GDB_MAKE_BREAKPOINT;
+		}
 		if(invalidate_ppa(sa->bm->segment_manager, sa->sp_meta[i].ppa, true)
 				==BIT_ERROR){
 			EPRINT("invalidate map error!", true);
 		}
 	}
+
+	sid_info_iter iter=__find_sid_info_iter(sa->sid);
+	sa_m->sid_map.erase(iter);
+
+	free(sa->pinning_data);
 	free(sa->sp_meta);
 	free(sa->pba_array);
 	free(sa);
 }
 
 uint32_t st_array_read_translation(st_array *sa, uint32_t intra_idx){
+	if(sa->type==ST_PINNING){
+		return sa->pinning_data[intra_idx];
+	}
 	uint32_t run_chunk_idx=intra_idx/MAX_SECTOR_IN_RC;
 	uint32_t physical_page_addr=sa->pba_array[run_chunk_idx].PBA;
 	return physical_page_addr*L2PGAP+intra_idx%MAX_SECTOR_IN_RC;
@@ -68,6 +89,9 @@ uint32_t st_array_summary_translation(st_array *sa, bool force){
 }
 
 uint32_t st_array_write_translation(st_array *sa){
+	if(sa->type==ST_PINNING){
+		EPRINT("not allowed in ST_PINNING", true);
+	}
 	if(sa->summary_write_alert){
 		EPRINT("it is write_summary_order", true);
 	}
@@ -101,6 +125,9 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 
 	summary_page *sp=(summary_page*)sa->sp_meta[sa->sp_idx].private_data;
 	sp_insert(sp, lba, psa);
+	if(sa->type==ST_PINNING){
+		sa->pinning_data[sa->write_pointer]=psa;
+	}
 
 	sa->write_pointer++;
 	if(sa->write_pointer%MAX_SECTOR_IN_RC==0){
@@ -124,10 +151,9 @@ summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
 	swp->idx=sa->sp_idx;
 	swp->sa=sa;
 	swp->spm=&sa->sp_meta[sa->sp_idx];
+	swp->oob[0]=sa->sid;
+	swp->oob[1]=sa->sp_idx;
 	swp->value=sp_get_data((summary_page*)(sa->sp_meta[sa->sp_idx++].private_data));
-	if(force){
-		sa->now_STE_num++;
-	}
 	return swp;
 }
 

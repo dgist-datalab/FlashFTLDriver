@@ -24,7 +24,7 @@ static inline double newton(double init_value, uint32_t member, float target_fpr
 		}
 		else break;
 
-		if(cnt>100000)break;
+		if(cnt>100)break;
 	}while(1);
 
 	return 1-res;
