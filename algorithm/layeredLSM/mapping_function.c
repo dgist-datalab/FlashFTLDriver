@@ -5,6 +5,12 @@
 #include "./translation_functions/bf_guard_mapping.h"
 #include "./translation_functions/tree_mapping.c"
 
+uint32_t map_query_by_req(struct map_function *m, request *req, map_read_param **param){
+	uint32_t res=m->query(m, req->key, param);
+	(*param)->p_req=req;
+	return res;
+}
+
 map_function *map_function_factory(uint32_t type, uint32_t contents_num, float fpr, uint32_t lba_bit_num){
 	map_function *res=NULL;
 	switch(type){
@@ -25,5 +31,6 @@ map_function *map_function_factory(uint32_t type, uint32_t contents_num, float f
 			break;
 	}
 	map_init(res, type, contents_num, lba_bit_num);
+	res->query_by_req=map_query_by_req;
 	return res;
 }

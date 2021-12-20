@@ -4,8 +4,8 @@
 
 L2P_bm *L2PBm_init(blockmanager *sm){
 	L2P_bm *res=(L2P_bm*)calloc(1, sizeof(L2P_bm));
-	res->PBA_map=(uint32_t*)malloc(_NOB * sizeof(uint32_t));
-	memset(res->PBA_map, -1, _NOB*sizeof(uint32_t));
+	res->PBA_map=(block_info*)malloc(_NOB * sizeof(block_info));
+	memset(res->PBA_map, -1, _NOB*sizeof(block_info));
 
 	res->now_seg_idx=NO_SEG;
 	res->total_seg_num=_NOS;
@@ -17,6 +17,7 @@ L2P_bm *L2PBm_init(blockmanager *sm){
 	res->segment_manager=sm;
 
 	res->reserve_seg=sm->get_segment(sm, BLOCK_RESERVE);
+	res->reserve_block_idx=0;
 	res->reserve_summary_seg=sm->get_segment(sm, BLOCK_RESERVE);
 	res->now_summary_seg=sm->get_segment(sm, BLOCK_ACTIVE);
 	return res;
@@ -39,7 +40,7 @@ void L2PBm_invalidate_PBA(L2P_bm *bm, uint32_t PBA){
 	bitmap_set(bm->seg_block_bit[seg_idx], intra_offset);
 	bm->seg_trimed_block_num++;
 
-	bm->PBA_map[PBA/_PPB]=NO_MAP;
+	bm->PBA_map[PBA/_PPB].sid=NO_MAP;
 
 	if(bm->seg_trimed_block_num[seg_idx]==BPS){
 		/*
@@ -70,13 +71,29 @@ uint32_t L2PBm_pick_empty_PBA(L2P_bm *bm){
 	return res;
 }
 
-void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid){
-	if(bm->PBA_map[PBA/_PPB]!=NO_MAP){
-		EPRINT("the mapping should be empty", true);
+uint32_t L2PBm_pick_empty_RPBA(L2P_bm *bm){
+	if(bm->reserve_block_idx==BPS){
+		EPRINT("block over flow error", true);
 	}
-	bm->PBA_map[PBA/_PPB]=sid;
+	return bm->reserve_seg->seg_idx *_PPS+
+		(bm->reserve_block_idx++)*_PPB;
 }
 
+void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
+		uint32_t intra_idx){
+	if(bm->PBA_map[PBA/_PPB].sid!=NO_MAP){
+		EPRINT("the mapping should be empty", true);
+	}
+	bm->PBA_map[PBA/_PPB].sid=sid;
+	bm->PBA_map[PBA/_PPB].intra_idx=intra_idx;
+	bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_NORMAL;
+}
+
+void L2PBm_block_fragment(L2P_bm *bm, uint32_t PBA){
+	bm->PBA_map[PBA/_PPB].sid=NO_MAP;
+	bm->PBA_map[PBA/_PPB].intra_idx=NO_MAP;
+	bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_FRAGMENT;
+}
 
 uint32_t L2PBm_get_map_ppa(L2P_bm *bm){
 	blockmanager *sm=bm->segment_manager;

@@ -43,7 +43,7 @@ uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset){
 uint32_t run_query(run *r, request *req){
 	req->retry=true;
 	map_read_param *param;
-	uint32_t intra_offset=r->mf->query(r->mf, req, &param);
+	uint32_t intra_offset=r->mf->query_by_req(r->mf, req, &param);
 	uint32_t psa=run_translate_intra_offset(r, intra_offset);
 	if(psa==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
@@ -71,4 +71,28 @@ uint32_t run_query_retry(run *r, request *req){
 	req->param=(void*)param;
 	__run_issue_read(req, psa/L2PGAP, req->value, param, true);
 	return 0;
+}
+
+
+run *run_find_include_address(sc_master *sc, uint32_t lba, uint32_t psa, uint32_t *_intra_offset){
+	run *r=shortcut_query(sc, lba);
+	if(r->type==RUN_NORMAL){
+		return NULL;
+	}
+	map_read_param *param;
+	uint32_t intra_offset=r->mf->query(r->mf, lba, &param);
+	uint32_t t_psa=st_array_read_translation(r->st_body, intra_offset);
+	if(psa==t_psa) goto end;
+	while(t_psa!=psa){
+		intra_offset=r->mf->query_retry(r->mf, param);
+		if(intra_offset==NOT_FOUND){
+			r=NULL;
+			break;
+		}
+		t_psa=st_array_read_translation(r->st_body, intra_offset);
+	}
+end:
+	*_intra_offset=intra_offset;
+	free(param);
+	return r;
 }

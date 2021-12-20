@@ -33,16 +33,16 @@ uint32_t exact_insert(map_function *m, uint32_t lba, uint32_t offset){
 	return INSERT_SUCCESS;
 }
 
-uint32_t exact_query(map_function *m, request *req, map_read_param **param){
+uint32_t exact_query(map_function *m, uint32_t lba, map_read_param **param){
 	exact_map *ex_map=(exact_map*)m->private_data;
 	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
-	res_param->p_req=req;
+	res_param->lba=lba;
 	res_param->mf=m;
 	res_param->prev_offset=0;
 	res_param->oob_set=NULL;
 	res_param->private_data=NULL;
 	*param=res_param;
-	uint32_t target_offset=req->key%m->max_contents_num;
+	uint32_t target_offset=lba%m->max_contents_num;
 	if(ex_map->map[target_offset]==UINT32_MAX){
 		return NOT_FOUND;
 	}
@@ -51,7 +51,7 @@ uint32_t exact_query(map_function *m, request *req, map_read_param **param){
 
 uint32_t exact_query_retry(map_function *m, map_read_param *param){
 	exact_map *ex_map=(exact_map*)m->private_data;
-	uint32_t target_offset=param->p_req->key%m->max_contents_num;
+	uint32_t target_offset=param->lba%m->max_contents_num;
 	if(ex_map->map[target_offset]==UINT32_MAX){
 		return NOT_FOUND;
 	}

@@ -29,9 +29,9 @@ uint32_t bf_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
 	return INSERT_SUCCESS;
 }
 
-uint32_t bf_map_query(map_function *mf, request *req, map_read_param **param){
+uint32_t bf_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
-	res_param->p_req=req;
+	res_param->lba=lba;
 	res_param->mf=mf;
 	res_param->oob_set=NULL;
 	res_param->private_data=NULL;
@@ -39,18 +39,17 @@ uint32_t bf_map_query(map_function *mf, request *req, map_read_param **param){
 
 	extract_map(map, mf);
 	for(uint32_t i=0; i<map->write_pointer; i++){
-		if(bf_check(map->bfm, &map->set_of_bf[i], req->key)){
+		if(bf_check(map->bfm, &map->set_of_bf[i], lba)){
 			res_param->prev_offset=i;
 			return i;
 		}
 	}
-
 	return NOT_FOUND;
 }
 
 uint32_t bf_map_query_retry(map_function *mf, map_read_param *param){
 	extract_map(map, mf);
-	uint32_t lba=param->p_req->key;
+	uint32_t lba=param->lba;
 	for(uint32_t i=param->prev_offset+1; i<map->write_pointer; i++){
 		if(bf_check(map->bfm, &map->set_of_bf[i], lba)){
 			param->prev_offset=i;

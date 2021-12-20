@@ -10,8 +10,18 @@
 #include "../../include/settings.h"
 #include "../../include/debug_utils.h"
 
+enum{
+	LSM_BLOCK_NORMAL, LSM_BLOCK_FRAGMENT
+};
+
+typedef struct block_info{
+	uint32_t sid;
+	uint32_t intra_idx;
+	uint32_t type;
+}block_info;
+
 typedef struct L2P_block_manager{
-	uint32_t *PBA_map;				//run_chunk_id to physical block address 
+	block_info *PBA_map;				//run_chunk_id to physical block address 
 
 	uint32_t total_seg_num;			//max number of segemnt in Flash
 	uint32_t *seg_trimed_block_num;	//the number of trimed block in a segment
@@ -23,6 +33,7 @@ typedef struct L2P_block_manager{
 	__segment* reserve_seg;
 	__segment* reserve_summary_seg;
 	__segment* now_summary_seg;
+	uint32_t reserve_block_idx;
 	uint32_t now_block_idx;
 	uint32_t now_seg_idx;
 	blockmanager *segment_manager; 
@@ -67,6 +78,15 @@ void L2PBm_invalidate_PBA(L2P_bm *bm, uint32_t PBa);
 uint32_t L2PBm_pick_empty_PBA(L2P_bm *bm);
 
 /*
+	Function: L2PBm_pick_empty_RPBA
+	--------------------
+		returns empty reserve physical block address
+	
+	bm: L2PBg
+ */
+uint32_t L2PBm_pick_empty_RPBA(L2P_bm *bm);
+
+/*
 	Function: L2PBm_make_map
 	------------------------
 		make mapping inforamtion between PBA -> sid
@@ -74,8 +94,19 @@ uint32_t L2PBm_pick_empty_PBA(L2P_bm *bm);
 	bm:
 	PBA: target PBA
 	sid: id of st_array which has PBA
+	intra_idx: the index of PBA in PBA list
  */
-void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid);
+void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
+		uint32_t intra_idx);
+
+/* 
+ * Function: L2PBm_block_fragment
+ * ------------------------------
+ *		change lsm block type to LSM_BLOCK_FRAGMENT
+ *	bm:
+ *	PBA:
+ * */
+void L2PBm_block_fragment(L2P_bm *bm, uint32_t PBA);
 
 /*
  * Function:L2PBm_get_map_ppa

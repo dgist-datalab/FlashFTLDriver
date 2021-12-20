@@ -20,6 +20,7 @@ typedef struct map_read_param{
 	struct request *p_req;
 	struct run *r;
 	struct map_function *mf;
+	uint32_t lba;
 	bool retry_flag;
 	uint8_t intra_offset;
 	uint32_t prev_offset;
@@ -48,10 +49,20 @@ typedef struct map_function{
  *		return psa which has probability of storing the target data.
  * 
  * m: 
- * request: target request for quering
+ * lba:
  * param: it is assigned by this function to process read
  * */
-	uint32_t (*query)(struct map_function *m, request *req, map_read_param **param_assigned);
+	uint32_t (*query)(struct map_function *m, uint32_t lba, map_read_param **param_assigned);
+/*
+ * Function: map_query_by_req
+ * --------------------- 
+ *		return psa which has probability of storing the target data.
+ * 
+ * m: 
+ * lba:
+ * param: it is assigned by this function to process read
+ * */
+	uint32_t (*query_by_req)(struct map_function *m, request *req, map_read_param **param_assigned);
 	uint32_t (*oob_check)(struct map_function *m, map_read_param *param);
 /*
  * Function: map_query_retry

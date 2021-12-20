@@ -29,27 +29,27 @@ uint32_t plr_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
 	return INSERT_SUCCESS;
 }
 
-uint32_t plr_map_query(map_function *mf, request *req, map_read_param **param){
+uint32_t plr_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	plr_map *pmap=extract_plr(mf);
 	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
-	res_param->p_req=req;
+	res_param->lba=lba;
 	res_param->mf=mf;
 	res_param->oob_set=NULL;
 	res_param->private_data=NULL;
 	res_param->retry_flag=false;
 	*param=res_param;
 
-	uint32_t res=pmap->plr_body->get(req->key);
+	uint32_t res=pmap->plr_body->get(lba);
 	res_param->prev_offset=res;
 	return res;
 }
 
 uint32_t plr_oob_check(map_function *mf, map_read_param *param){
-	if(param->oob_set[param->intra_offset]==param->p_req->key){
+	if(param->oob_set[param->intra_offset]==param->lba){
 		return param->intra_offset;
 	}else{
 		for(uint32_t i=0; i<L2PGAP; i++){
-			if(param->oob_set[i]==param->p_req->key){
+			if(param->oob_set[i]==param->lba){
 				return i;
 			}
 		}
@@ -61,11 +61,11 @@ uint32_t plr_map_query_retry(map_function *mf, map_read_param *param){
 	if(param->retry_flag){
 		return NOT_FOUND;
 	}
-	request *req=param->p_req;
-	if(req->key< param->oob_set[0]){
+	uint32_t lba=param->lba;
+	if(lba< param->oob_set[0]){
 		param->prev_offset=(param->prev_offset/L2PGAP)*L2PGAP-1;
 	}
-	else if(req->key > param->oob_set[L2PGAP]){
+	else if(lba > param->oob_set[L2PGAP]){
 		param->prev_offset=(param->prev_offset/L2PGAP+1)*L2PGAP;
 	}
 	param->retry_flag=true;

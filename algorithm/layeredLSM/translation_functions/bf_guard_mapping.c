@@ -76,9 +76,10 @@ uint32_t			bfg_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
 
 
 int bfg_cmp(uint32_t b, uint32_t target){return b-target;}
-uint32_t		bfg_map_query(map_function *mf, request *req, map_read_param **param){
+
+uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
-	res_param->p_req=req;
+	res_param->lba=lba;
 	res_param->mf=mf;
 	res_param->oob_set=NULL;
 	res_param->private_data=NULL;
@@ -86,16 +87,16 @@ uint32_t		bfg_map_query(map_function *mf, request *req, map_read_param **param){
 
 	uint32_t target_set_idx;
 	bfg_map *map=extract_bfg_map(mf);
-	bs_lower_bound(map->guard_set, 0, CEIL(map->write_pointer, __target_member)-1, req->key, bfg_cmp, target_set_idx);
+	bs_lower_bound(map->guard_set, 0, CEIL(map->write_pointer, __target_member)-1, lba, bfg_cmp, target_set_idx);
 
-	if(map->guard_set[target_set_idx] > req->key){
+	if(map->guard_set[target_set_idx] > lba){
 		target_set_idx--;
 	}
 
 	res_param->prev_offset=target_set_idx*__target_member;
 	bf_map *t_map=&map->bf_set[target_set_idx];
 	for(uint32_t i=0; i<t_map->write_pointer; i++){
-		if(bf_check(__global_bfm, &t_map->set_of_bf[i], req->key)){
+		if(bf_check(__global_bfm, &t_map->set_of_bf[i], lba)){
 			res_param->prev_offset+=i;
 			return res_param->prev_offset;
 		}
@@ -105,7 +106,7 @@ uint32_t		bfg_map_query(map_function *mf, request *req, map_read_param **param){
 
 uint32_t		bfg_map_query_retry(map_function *mf, map_read_param *param){
 	bfg_map *map=extract_bfg_map(mf);
-	uint32_t lba=param->p_req->key;
+	uint32_t lba=param->lba;
 	uint32_t target_set_idx=param->prev_offset/__target_member;
 	bf_map *t_map=&map->bf_set[target_set_idx];
 	param->prev_offset++;

@@ -30,7 +30,7 @@ sid_info sorted_array_master_get_info(uint32_t sid){
 st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinning){
 	st_array *res=(st_array*)calloc(1, sizeof(st_array));
 	res->bm=bm;
-	res->max_STE_num=CEIL(max_sector_num, MAX_SECTOR_IN_RC);
+	res->max_STE_num=CEIL(max_sector_num, MAX_SECTOR_IN_BLOCK);
 	res->pba_array=(STE*)malloc((res->max_STE_num+1) * (sizeof(STE)));
 	memset(res->pba_array, -1, (res->max_STE_num+1)*sizeof(STE));
 
@@ -40,6 +40,7 @@ st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinnin
 	res->type=pinning?ST_PINNING: ST_NORMAL;
 	if(res->type==ST_PINNING){
 		res->pinning_data=(uint32_t *)malloc(max_sector_num * sizeof(uint32_t));
+		res->gced_unlink_data=bitmap_init(max_sector_num);
 	}
 	else{
 		res->pinning_data=NULL;
@@ -76,9 +77,9 @@ uint32_t st_array_read_translation(st_array *sa, uint32_t intra_idx){
 	if(sa->type==ST_PINNING){
 		return sa->pinning_data[intra_idx];
 	}
-	uint32_t run_chunk_idx=intra_idx/MAX_SECTOR_IN_RC;
+	uint32_t run_chunk_idx=intra_idx/MAX_SECTOR_IN_BLOCK;
 	uint32_t physical_page_addr=sa->pba_array[run_chunk_idx].PBA;
-	return physical_page_addr*L2PGAP+intra_idx%MAX_SECTOR_IN_RC;
+	return physical_page_addr*L2PGAP+intra_idx%MAX_SECTOR_IN_BLOCK;
 }
 
 uint32_t st_array_summary_translation(st_array *sa, bool force){
@@ -96,16 +97,17 @@ uint32_t st_array_write_translation(st_array *sa){
 		EPRINT("it is write_summary_order", true);
 	}
 
-	if(sa->write_pointer%MAX_SECTOR_IN_RC==0){
+	if(sa->write_pointer%MAX_SECTOR_IN_BLOCK==0){
 		sa->pba_array[sa->now_STE_num].PBA=L2PBm_pick_empty_PBA(sa->bm);
-		L2PBm_make_map(sa->bm, sa->pba_array[sa->now_STE_num].PBA, sa->sid);
+		L2PBm_make_map(sa->bm, sa->pba_array[sa->now_STE_num].PBA, sa->sid, 
+				sa->now_STE_num);
 		sa->now_STE_num++;
 	}
 
-	uint32_t run_chunk_idx=sa->write_pointer/MAX_SECTOR_IN_RC;
+	uint32_t run_chunk_idx=sa->write_pointer/MAX_SECTOR_IN_BLOCK;
 	uint32_t physical_page_addr=sa->pba_array[run_chunk_idx].PBA;
 
-	uint32_t res=physical_page_addr*L2PGAP+sa->write_pointer%MAX_SECTOR_IN_RC;
+	uint32_t res=physical_page_addr*L2PGAP+sa->write_pointer%MAX_SECTOR_IN_BLOCK;
 	return res;
 }
 
@@ -124,16 +126,25 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 	}
 
 	summary_page *sp=(summary_page*)sa->sp_meta[sa->sp_idx].private_data;
-	sp_insert(sp, lba, psa);
+	sp_insert(sp, lba, sa->write_pointer);
 	if(sa->type==ST_PINNING){
 		sa->pinning_data[sa->write_pointer]=psa;
+		L2PBm_block_fragment(sa->bm, psa/MAX_SECTOR_IN_BLOCK);
 	}
 
 	sa->write_pointer++;
-	if(sa->write_pointer%MAX_SECTOR_IN_RC==0){
+	if(sa->write_pointer%MAX_SECTOR_IN_BLOCK==0){
 		sa->summary_write_alert=true;
 	}
 	return 0;
+}
+
+void st_array_update_pinned_info(st_array *sa, uint32_t intra_offset, uint32_t new_psa){
+	if(sa->type!=ST_PINNING){
+		EPRINT("this function only called in pinned SA", true);
+	}
+	sa->pinning_data[intra_offset]=new_psa;
+	L2PBm_block_fragment(sa->bm, new_psa/MAX_SECTOR_IN_BLOCK);
 }
 
 summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t ppa, bool force){

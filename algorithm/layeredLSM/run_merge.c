@@ -33,8 +33,15 @@ static inline uint32_t __set_read_flag(mm_container *mm_set, uint32_t run_num, u
 	return res;
 } 
 
+static inline void __invalidate_target(run *r, uint32_t intra_offset){
+	uint32_t original_psa=run_translate_intra_offset(r, intra_offset);
+	if(invalidate_piece_ppa(r->st_body->bm->segment_manager, original_psa, true)==BIT_ERROR){
+		EPRINT("BIT ERROR", true);
+	}
+}
+
 static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint32_t lba,
-		uint32_t read_flag){
+		uint32_t read_flag, uint32_t ridx){
 	summary_pair res;
 	for(uint32_t i=0; i<run_num; i++){
 		if(mm_set[i].done) continue;
@@ -51,6 +58,10 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 					mm_set[i].done=true;
 				}
 			}
+
+			if(i!=ridx){
+				__invalidate_target(mm_set[i].r, res.intra_offset);
+			}
 		}
 	}
 	return read_flag;
@@ -59,6 +70,8 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 static inline summary_pair __pick_smallest_pair(mm_container *mm_set, uint32_t run_num, uint32_t *ridx){
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 	summary_pair now;
+	uint32_t t_idx;
+retry:
 	for(uint32_t i=0; i<run_num; i++){
 		if(mm_set[i].done) continue;
 		if(i==0 || res.lba==UINT32_MAX){
@@ -71,6 +84,18 @@ static inline summary_pair __pick_smallest_pair(mm_container *mm_set, uint32_t r
 			res=now;
 			*ridx=i;
 		}
+	}
+
+	t_idx=*ridx;
+	/*check validataion whether old or not*/
+	if(!shortcut_validity_check_lba(shortcut, mm_set[t_idx].r, res.lba)){
+		__invalidate_target(mm_set[t_idx].r, res.intra_offset);
+		sp_set_iter_move(mm_set[t_idx].ssi);
+		mm_set[t_idx].now_proc_block_idx++;
+		if(mm_set[t_idx].now_proc_block_idx==mm_set[t_idx].max_proc_block_num){
+			mm_set[t_idx].done=true;
+		}
+		goto retry;
 	}
 	return res;
 }
@@ -103,13 +128,12 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	if(r->type==RUN_PINNING){ return;}
 	std::list<__sorted_pair>::iterator iter=sorted_list->begin();
 	for(uint32_t i=0; i<DEV_QDEPTH*L2PGAP && iter!=sorted_list->end(); 
-			i++, iter++){
+			i++){
 		__sorted_pair *t_pair=&(*iter);
+
 		t_pair->original_psa=run_translate_intra_offset(t_pair->r, t_pair->pair.intra_offset);
 		__merge_issue_req(t_pair);
-		if(invalidate_piece_ppa(sm, t_pair->original_psa, true)==BIT_ERROR){
-			EPRINT("BIT ERROR", true);
-		}
+		iter++;
 	}
 }
 
@@ -125,6 +149,7 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 		else{
 			fdriver_lock(&t_pair->lock);
 			fdriver_destroy(&t_pair->lock);
+			__invalidate_target(t_pair->r, t_pair->pair.intra_offset);
 			run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true);
 		}
 		sorted_list->erase(iter++);
@@ -170,9 +195,7 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 			summary_pair target=__pick_smallest_pair(mm_set, run_num, &ridx);
 			target_sorted_pair.pair=target;
 			target_sorted_pair.r=rset[ridx];
-
-			if(target.lba!=UINT32_MAX && 
-					shortcut_validity_check_lba(shortcut, rset[ridx], target.lba)){
+			if(target.lba!=UINT32_MAX){
 				sorted_arr.push_back(target_sorted_pair);
 				/*checking sorting data*/
 				if(target.lba!=0 && prev_lba>target.lba){
@@ -180,7 +203,7 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 				}
 				prev_lba=target.lba;
 			}
-			read_flag=__move_iter(mm_set, run_num, target.lba, read_flag);
+			read_flag=__move_iter(mm_set, run_num, target.lba, read_flag, ridx);
 		}while(read_flag!=((1<<run_num)-1));
 
 		//read data

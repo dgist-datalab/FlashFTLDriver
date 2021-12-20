@@ -40,16 +40,16 @@ uint32_t			tree_insert(map_function *m, uint32_t lba, uint32_t offset){
 	}
 }
 
-uint32_t		tree_query(map_function *m, request *req, map_read_param ** param){
+uint32_t		tree_query(map_function *m, uint32_t lba, map_read_param ** param){
 	tree_map *tr_map=extract_tree(m);
 	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
-	res_param->p_req=req;
+	res_param->lba=lba;
 	res_param->mf=m;
 	res_param->prev_offset=0;
 	res_param->oob_set=NULL;
 	res_param->private_data=NULL;
 	*param=res_param;
-	tree_iter it=tr_map->body->find(req->key);
+	tree_iter it=tr_map->body->find(lba);
 	if(it!=tr_map->body->end()){
 		return it->second;
 	}
@@ -60,7 +60,7 @@ uint32_t		tree_query(map_function *m, request *req, map_read_param ** param){
 
 uint32_t		tree_query_retry(map_function *m, map_read_param *param){
 	tree_map *tr_map=extract_tree(m);
-	tree_iter it=tr_map->body->find(param->p_req->key);
+	tree_iter it=tr_map->body->find(param->lba);
 	if(it!=tr_map->body->end()){
 		return it->second;
 	}

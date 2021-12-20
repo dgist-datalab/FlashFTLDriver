@@ -132,6 +132,19 @@ uint32_t run_query_retry(run *r, request *req);
  * */
 uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset);
 
+
+/*
+ * Function: run_find_include_address
+ *------------------------------------
+ *		return run which includes target lba and psa
+ *
+ *sc: shortcut for fast finding
+ *lba:
+ *psa:
+ *intra_offset:
+ * */
+run *run_find_include_address(struct shortcut_master *sc, uint32_t lba, uint32_t psa, uint32_t *intra_offset);
+
 //#################################### run_query.c done
 
 //#################################### run_util.c

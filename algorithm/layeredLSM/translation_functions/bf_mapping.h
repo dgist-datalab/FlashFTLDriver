@@ -28,7 +28,7 @@ typedef struct bloom_filter_map{
  * */
 map_function *bf_map_init(uint32_t contents_num, float fpr);
 uint32_t bf_map_insert(map_function *mf, uint32_t lba, uint32_t offset);
-uint32_t bf_map_query(map_function *mf, request *req, map_read_param **param);
+uint32_t bf_map_query(map_function *mf, uint32_t lba, map_read_param **param);
 uint32_t bf_map_query_retry(map_function *mf, map_read_param *param);
 void bf_map_make_done(map_function *mf);
 void bf_map_free(map_function *mf);

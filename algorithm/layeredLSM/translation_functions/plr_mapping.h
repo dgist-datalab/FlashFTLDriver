@@ -30,7 +30,7 @@ typedef struct plr_map{
 map_function *plr_map_init(uint32_t contents_num, float fpr);
 uint32_t plr_map_insert(map_function *mf, uint32_t lba, uint32_t offset);
 uint32_t plr_oob_check(map_function *mf, map_read_param *param);
-uint32_t plr_map_query(map_function *mf, request *req, map_read_param **param);
+uint32_t plr_map_query(map_function *mf, uint32_t lba, map_read_param **param);
 uint32_t plr_map_query_retry(map_function *mf, map_read_param *param);
 void plr_map_make_done(map_function *mf);
 void plr_map_free(map_function *mf);

@@ -9,7 +9,9 @@
 #include "../../include/settings.h"
 #include "./block_table.h"
 #include "./summary_page.h"
-#define MAX_SECTOR_IN_RC ((_PPB)*L2PGAP)
+#include "../../include/data_struct/bitmap.h"
+
+#define MAX_SECTOR_IN_BLOCK ((_PPB)*L2PGAP)
 //#define EXTRACT_PPA(PSA) (PSA/L2PGAP)
 enum{
 	ST_NORMAL, ST_PINNING
@@ -31,6 +33,7 @@ typedef struct sorted_table_array{
 	STE *pba_array;
 
 	uint32_t *pinning_data;
+	bitmap *gced_unlink_data;
 
 	uint32_t sp_idx;
 	summary_page_meta *sp_meta;
@@ -129,6 +132,17 @@ uint32_t st_array_write_translation(st_array *sa);
 uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa);
 
 /*
+ * Function: st_array_update_pinned_info
+ * --------------------- 
+ *		update pinned psa at intra_offset to new_psa
+ *
+ * sa: 
+ * intra_offset: pointer for updating target
+ * new_psa: new psa
+ * */
+void st_array_update_pinned_info(st_array *sa, uint32_t intra_offset, uint32_t new_psa);
+
+/*
  * Function: st_array_block_lock
  * --------------------- 
  *		prevent block from GC
@@ -137,6 +151,8 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa);
  * idx: index of block to lock
  * */
 void st_array_block_lock(st_array *sa, uint32_t idx);
+
+
 /*
  * Function: st_array_get_summary_param
  * --------------------- 
@@ -158,6 +174,7 @@ summary_write_param *st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
  * sp_idx: target sp meta idx
  * */
 void st_array_summary_write_done(summary_write_param *swp);
+
 
 /*
 	Function: __st_update_map
