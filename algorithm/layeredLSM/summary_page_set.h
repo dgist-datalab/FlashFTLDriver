@@ -23,6 +23,7 @@ sp_set_iter *sp_set_iter_init_mf(map_function *mf);
 
 summary_pair sp_set_iter_pick(sp_set_iter *ssi);
 bool sp_set_iter_move(sp_set_iter *ssi);
+bool sp_set_iter_done_check(sp_set_iter *ssi);
 void sp_set_iter_free(sp_set_iter *ssi);
 
 #endif

@@ -2,8 +2,10 @@
 
 extern lower_info *g_li;
 void run_print(run *r, bool content){
-	printf("%u:%u (v:i) %u:%u:%u (recency:link:unlink)\n", r->validate_piece_num, r->invalidate_piece_num,
-			r->info->recency, r->info->linked_lba_num, r->info->unlinked_lba_num);
+	printf("%u:%u (v:i)\t%u:%u:%u (recency:link:unlink)\t%u:%u (ste->now:ste->max)\n", 
+			r->validate_piece_num, r->invalidate_piece_num,
+			r->info->recency, r->info->linked_lba_num, r->info->unlinked_lba_num,
+			r->st_body->now_STE_num, r->st_body->max_STE_num);
 	if(content){
 		st_array *sa=r->st_body;
 		char data[PAGESIZE];

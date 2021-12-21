@@ -39,6 +39,7 @@ typedef struct summary_page_iterator{
 	summary_page_meta *spm;
 	value_set *value;
 	char *body;
+	bool lock_deallocate;
 	fdriver_lock_t read_done;
 	bool read_flag;
 	bool iter_done_flag;
@@ -146,9 +147,10 @@ summary_pair spi_pick_pair(summary_page_iter *spi);
 	Function: spi_move_forward
 	--------------------
 		move read pointer forward
+		return true, if the iterator is end
 	spi:
  */
-void spi_move_forward(summary_page_iter*);
+bool spi_move_forward(summary_page_iter*);
 
 /*
 	Function: spi_move_backward

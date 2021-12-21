@@ -52,11 +52,8 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	entry_num_last_run=(RANGE%run_num?RANGE%run_num:entry_per_run);
 	run_array=(run**)calloc(run_num, sizeof(run *));
 	shortcut=shortcut_init(run_num/2-2, (uint32_t)RANGE);
-	/*
-	for(uint32_t i=0; i<run_num; i++){
-		run_array[i]=run_init(TREE_MAP, i==run_num-1?entry_num_last_run:entry_per_run, 0.1, bm);
-	}
-	*/
+
+	sorted_array_master_init();
 	return 1;
 }
 
@@ -66,6 +63,7 @@ void destroy_temp(lower_info *, struct algorithm *){
 			run_free(run_array[i], shortcut);
 		}
 	}
+	sorted_array_master_free();
 	shortcut_free(shortcut);
 	free(run_array);
 	L2PBm_free(bm);

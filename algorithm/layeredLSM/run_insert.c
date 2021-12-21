@@ -4,6 +4,7 @@
 extern sc_master *shortcut;
 extern lower_info *g_li;
 extern uint32_t test_key;
+extern uint32_t target_recency;
 
 static void* __run_write_end_req(algo_req *req){
 	if(req->type!=DATAW && req->type!=COMPACTIONDATAW){
@@ -47,27 +48,30 @@ static inline void __run_insert_mf(run *r, blockmanager *sm, uint32_t lba, uint3
 static void __run_write_buffer(run *r, blockmanager *sm, bool force, 
 		bool merge_insert){
 	uint32_t target_ppa, psa, intra_offset;
+	uint32_t psa_list[L2PGAP];
 	for(uint32_t i=0; i<r->pp->buffered_num; i++){
 		intra_offset=r->st_body->write_pointer;
 		psa=st_array_write_translation(r->st_body);
+		psa_list[i]=psa;
 		uint32_t lba=r->pp->LBA[i];
-		if(i==0) target_ppa=psa/L2PGAP;
 
-		if(validate_piece_ppa(sm, psa, true)!=BIT_SUCCESS){
+		if(i==0){
+			target_ppa=psa/L2PGAP;
+#ifdef LSM_DEBUG
+			sm->set_oob(sm, (char*)r->pp->LBA, sizeof(uint32_t) * L2PGAP, target_ppa);
+#endif
+		}
+
+		if(validate_piece_ppa(sm, psa_list[i], true)!=BIT_SUCCESS){
 			EPRINT("double insert error", true);
 		}
 		r->validate_piece_num++;
-		
-		if(lba==test_key){
-			printf("insert %u -> %u\n", test_key, psa);
-		}
 
 		__run_insert_mf(r, sm, lba, intra_offset);
 		st_array_insert_pair(r->st_body, lba, intra_offset);
 	}
 	__run_issue_write(target_ppa, pp_get_write_target(r->pp, force), (char*)r->pp->LBA, 
 			sm, NULL, merge_insert);
-
 }
 
 static void __run_write_meta(run *r, blockmanager *sm, bool force){
@@ -88,11 +92,18 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_inser
 		return false;
 	}
 
+	if(r->info->recency==target_recency){
+		printf("lba:%u\n", lba);
+		if(lba==test_key){
+			printf("[read debug for %u]\n", test_key);
+			run_print(r, false);
+		}
+	}
+
 	if(r->type==RUN_PINNING){
 		if(data){
 			EPRINT("not allowed in RUN_PINNING", true);
 		}
-
 		__run_insert_mf(r, r->st_body->bm->segment_manager, lba, r->st_body->write_pointer);
 		st_array_insert_pair(r->st_body, lba, psa);
 	}
@@ -116,8 +127,6 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_inser
 	r->now_entry_num++;
 	return true;
 }
-
-
 
 void run_insert_done(run *r, bool merge_insert){
 	if(r->pp && r->pp->buffered_num!=0){

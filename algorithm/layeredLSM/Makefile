@@ -15,6 +15,7 @@ SRCS +=\
 	   ./shortcut.c\
 	   ./compaction.c\
 	   ./gc.c\
+	   ./debug.c\
 
 
 OBJS :=\

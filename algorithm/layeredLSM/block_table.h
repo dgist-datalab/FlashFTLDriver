@@ -14,6 +14,11 @@ enum{
 	LSM_BLOCK_NORMAL, LSM_BLOCK_FRAGMENT
 };
 
+
+enum{
+	EMPTY_SEG, SUMMARY_SEG, DATA_SEG
+};
+
 typedef struct block_info{
 	uint32_t sid;
 	uint32_t intra_idx;
@@ -37,6 +42,7 @@ typedef struct L2P_block_manager{
 	uint32_t now_block_idx;
 	uint32_t now_seg_idx;
 	blockmanager *segment_manager; 
+	uint32_t *seg_type;
 }L2P_bm;
 
 

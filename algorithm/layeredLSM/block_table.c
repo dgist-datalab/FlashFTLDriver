@@ -1,6 +1,11 @@
 #include "block_table.h"
+#include "./gc.h"
 #define NO_MAP UINT32_MAX
 #define NO_SEG UINT32_MAX
+
+static inline void __set_seg_type(L2P_bm *bm,uint32_t seg_idx, uint32_t type){
+	bm->seg_type[seg_idx]=type;
+}
 
 L2P_bm *L2PBm_init(blockmanager *sm){
 	L2P_bm *res=(L2P_bm*)calloc(1, sizeof(L2P_bm));
@@ -15,11 +20,15 @@ L2P_bm *L2PBm_init(blockmanager *sm){
 		res->seg_block_bit[i]=bitmap_init(BPS);
 	}
 	res->segment_manager=sm;
+	res->seg_type=(uint32_t*)calloc(_NOS, sizeof(uint32_t));
 
 	res->reserve_seg=sm->get_segment(sm, BLOCK_RESERVE);
+	__set_seg_type(res, res->reserve_seg->seg_idx, DATA_SEG);
 	res->reserve_block_idx=0;
 	res->reserve_summary_seg=sm->get_segment(sm, BLOCK_RESERVE);
+	__set_seg_type(res, res->reserve_summary_seg->seg_idx, SUMMARY_SEG);
 	res->now_summary_seg=sm->get_segment(sm, BLOCK_ACTIVE);
+	__set_seg_type(res, res->now_summary_seg->seg_idx, SUMMARY_SEG);
 	return res;
 }
 
@@ -43,10 +52,6 @@ void L2PBm_invalidate_PBA(L2P_bm *bm, uint32_t PBA){
 	bm->PBA_map[PBA/_PPB].sid=NO_MAP;
 
 	if(bm->seg_trimed_block_num[seg_idx]==BPS){
-		/*
-		__segment *target_seg=bm->segment_manager->retrieve_segment(bm->segment_manager, seg_idx);
-		bm->segment_manager->trim_segment_force(bm->segment_manager, target_seg, bm->segment_manager->li);
-		*/
 		bitmap_reinit(bm->seg_block_bit[seg_idx], BPS);
 		bm->seg_trimed_block_num=0;
 	}
@@ -55,11 +60,12 @@ void L2PBm_invalidate_PBA(L2P_bm *bm, uint32_t PBA){
 
 uint32_t L2PBm_pick_empty_PBA(L2P_bm *bm){
 	if(bm->now_seg_idx==NO_SEG){
-		//DEBUG_CNT_PRINT(test, 2, __FUNCTION__, __LINE__);
-		__segment *seg=bm->segment_manager->get_segment(bm->segment_manager, BLOCK_ACTIVE);
-		if(seg==NULL){
-			EPRINT("gc not implemented!", true);
+		blockmanager *sm=bm->segment_manager;
+		if(sm->is_gc_needed(sm)){
+			gc(bm, DATA_SEG);
 		}
+		__segment *seg=bm->segment_manager->get_segment(bm->segment_manager, BLOCK_ACTIVE);
+		__set_seg_type(bm, seg->seg_idx, DATA_SEG);
 		bm->now_seg_idx=seg->seg_idx;
 		bm->now_block_idx=0;
 	}
@@ -99,9 +105,10 @@ uint32_t L2PBm_get_map_ppa(L2P_bm *bm){
 	blockmanager *sm=bm->segment_manager;
 	if(sm->check_full(bm->now_summary_seg)){
 		if(sm->is_gc_needed(sm)){
-			EPRINT("GC NEED", false);
+			gc(bm, SUMMARY_SEG);
 		}
 		bm->now_summary_seg=sm->get_segment(sm, BLOCK_ACTIVE);
+		__set_seg_type(bm, bm->now_summary_seg->seg_idx, SUMMARY_SEG);
 	}
 
 	return bm->segment_manager->get_page_addr(bm->now_summary_seg);

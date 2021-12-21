@@ -35,7 +35,6 @@ typedef struct sorted_table_array{
 	uint32_t *pinning_data;
 	bitmap *gced_unlink_data;
 
-	uint32_t sp_idx;
 	summary_page_meta *sp_meta;
 }st_array;
 
@@ -54,7 +53,7 @@ typedef struct sid_info{
 }sid_info;
 
 typedef struct sorted_array_master{
-	std::map<uint32_t, sid_info> sid_map;
+	std::map<uint32_t, sid_info> *sid_map;
 	uint32_t now_sid_info;
 }sa_master;
 

@@ -21,6 +21,6 @@ void			tree_free(map_function *m);
 
 map_iter *		tree_iter_init(map_function *m);
 summary_pair	tree_iter_pick(map_iter *miter);
-void			tree_iter_move(map_iter *miter);
+bool			tree_iter_move(map_iter *miter);
 void			tree_iter_free(map_iter *miter);
 #endif

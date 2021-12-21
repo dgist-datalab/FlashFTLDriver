@@ -44,14 +44,15 @@ void shortcut_add_run_merge(sc_master *sc, run *r, run **rset,
 		EPRINT("already assigned info", true);
 	}
 	sc->free_q->pop_front();
-
+	/*
 	uint32_t target_recency=0;
 	for(uint32_t i=0; i<merge_num; i++){
 		if(rset[i]->info->recency > target_recency){
 			target_recency=rset[i]->info->recency;
 		}
 	}
-	t_info->recency=target_recency;
+	*/
+	t_info->recency=sc->now_recency++;
 
 	r->info=t_info;
 	t_info->r=r;
@@ -71,6 +72,7 @@ void shortcut_unlink_lba(sc_master *sc, run *r, uint32_t lba){
 	if(sc->sc_map[lba]==NOT_ASSIGNED_SC){
 		return;
 	}
+
 	sc_info *t_info=r->info;
 	if(!t_info){
 		EPRINT("no sc in run", true);
@@ -105,6 +107,7 @@ void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba){
 	if(__get_recency_lba(sc, lba) > r->info->recency){
 		EPRINT("most recent value should be added", true);
 	}
+
 	run *old_r=shortcut_query(sc, lba);
 	if(old_r){
 		shortcut_unlink_lba(sc, old_r, lba);

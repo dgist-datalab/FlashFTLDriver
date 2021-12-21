@@ -5,12 +5,13 @@
 #include "./piece_ppa.h"
 extern sc_master* shortcut;
 extern lower_info *g_li;
+bool debug_flag=false;
+uint32_t target_recency=9;
 
 typedef struct merge_meta_container{
 	run *r;
 	sp_set_iter *ssi;
 	uint32_t now_proc_block_idx;
-	uint32_t max_proc_block_num;
 	bool done;
 }mm_container;
 
@@ -36,8 +37,19 @@ static inline uint32_t __set_read_flag(mm_container *mm_set, uint32_t run_num, u
 static inline void __invalidate_target(run *r, uint32_t intra_offset){
 	uint32_t original_psa=run_translate_intra_offset(r, intra_offset);
 	if(invalidate_piece_ppa(r->st_body->bm->segment_manager, original_psa, true)==BIT_ERROR){
-		EPRINT("BIT ERROR", true);
+		EPRINT("BIT ERROR piece_ppa: %u", true, original_psa);
 	}
+}
+
+static inline bool __move_iter_target(mm_container *mm_set, uint32_t idx){
+	bool res=sp_set_iter_move(mm_set[idx].ssi);
+	if(res){
+		mm_set[idx].now_proc_block_idx++;
+		if(sp_set_iter_done_check(mm_set[idx].ssi)){
+			mm_set[idx].done=true;
+		}
+	}
+	return res;
 }
 
 static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint32_t lba,
@@ -47,18 +59,17 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 		if(mm_set[i].done) continue;
 		res=sp_set_iter_pick(mm_set[i].ssi);
 		if(res.lba==UINT32_MAX){
-			read_flag|=(1<<i);
-			mm_set[i].done=true;
+			GDB_MAKE_BREAKPOINT;
 		}
-		else if(res.lba==lba){
-			if(sp_set_iter_move(mm_set[i].ssi)){
+		if(res.lba==UINT32_MAX && __move_iter_target(mm_set, i)){
+			read_flag|=(1<<i);
+			continue;
+		}
+		if(res.lba==lba){
+			if(__move_iter_target(mm_set, i)){
 				read_flag|=(1<<i);
-				mm_set[i].now_proc_block_idx++;
-				if(mm_set[i].now_proc_block_idx==mm_set[i].max_proc_block_num){
-					mm_set[i].done=true;
-				}
 			}
-
+	
 			if(i!=ridx){
 				__invalidate_target(mm_set[i].r, res.intra_offset);
 			}
@@ -71,6 +82,10 @@ static inline summary_pair __pick_smallest_pair(mm_container *mm_set, uint32_t r
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 	summary_pair now;
 	uint32_t t_idx;
+
+	if(debug_flag){
+	}
+
 retry:
 	for(uint32_t i=0; i<run_num; i++){
 		if(mm_set[i].done) continue;
@@ -79,6 +94,8 @@ retry:
 			res=sp_set_iter_pick(mm_set[i].ssi);
 			continue;
 		}
+
+		//DEBUG_CNT_PRINT(temp, 371522, __FUNCTION__, __LINE__);
 		now=sp_set_iter_pick(mm_set[i].ssi);
 		if(res.lba > now.lba){
 			res=now;
@@ -87,14 +104,24 @@ retry:
 	}
 
 	t_idx=*ridx;
-	/*check validataion whether old or not*/
-	if(!shortcut_validity_check_lba(shortcut, mm_set[t_idx].r, res.lba)){
-		__invalidate_target(mm_set[t_idx].r, res.intra_offset);
-		sp_set_iter_move(mm_set[t_idx].ssi);
-		mm_set[t_idx].now_proc_block_idx++;
-		if(mm_set[t_idx].now_proc_block_idx==mm_set[t_idx].max_proc_block_num){
-			mm_set[t_idx].done=true;
+
+	if(mm_set[t_idx].r->info->recency==target_recency){
+		printf("%u:%u\n", res.lba, res.intra_offset);
+		if(res.lba==730022){
+			debug_flag=true;
+			GDB_MAKE_BREAKPOINT;
 		}
+	}
+
+	if(res.lba==UINT32_MAX){
+		__move_iter_target(mm_set, t_idx);
+	}
+	/*check validataion whether old or not*/
+	else if(!shortcut_validity_check_lba(shortcut, mm_set[t_idx].r, res.lba)){
+		__invalidate_target(mm_set[t_idx].r, res.intra_offset);
+		__move_iter_target(mm_set, t_idx);
+		res.lba=UINT32_MAX;
+		res.intra_offset=UINT32_MAX;
 		goto retry;
 	}
 	return res;
@@ -142,6 +169,7 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 	for(uint32_t i=0; i<DEV_QDEPTH*L2PGAP && iter!=sorted_list->end(); 
 			i++){
 		__sorted_pair *t_pair=&(*iter);
+
 		if(r->type==RUN_PINNING){
 			t_pair->original_psa=run_translate_intra_offset(t_pair->r, t_pair->pair.intra_offset);
 			run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true);
@@ -157,6 +185,7 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 }
 
 run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_bm *bm, uint32_t run_type){
+	DEBUG_CNT_PRINT(run_cnt, 6, __FUNCTION__, __LINE__);
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
@@ -171,7 +200,6 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 			mm_set[i].ssi=sp_set_iter_init(rset[i]->st_body->now_STE_num, rset[i]->st_body->sp_meta,
 					prefetch_num);
 		}
-		mm_set[i].max_proc_block_num=rset[i]->st_body->now_STE_num;
 		mm_set[i].now_proc_block_idx=0;
 		mm_set[i].done=false;
 	}
@@ -195,11 +223,12 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 			summary_pair target=__pick_smallest_pair(mm_set, run_num, &ridx);
 			target_sorted_pair.pair=target;
 			target_sorted_pair.r=rset[ridx];
+
 			if(target.lba!=UINT32_MAX){
 				sorted_arr.push_back(target_sorted_pair);
 				/*checking sorting data*/
-				if(target.lba!=0 && prev_lba>target.lba){
-					EPRINT("sorting error!", true);
+				if(target.lba!=0 && prev_lba>=target.lba){
+					EPRINT("sorting error! prev_lba:%u, target.lba:%u", true, prev_lba, target.lba);
 				}
 				prev_lba=target.lba;
 			}
@@ -228,5 +257,7 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 	}
 
 	run_insert_done(res, true);
+	printf("result\n");
+	run_print(res,false);
 	return res;
 }

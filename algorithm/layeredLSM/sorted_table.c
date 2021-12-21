@@ -3,20 +3,23 @@
 
 typedef std::map<uint32_t, sid_info>::iterator sid_info_iter;
 
+extern bool debug_flag;
 sa_master *sa_m;
 
 void sorted_array_master_init(){
 	sa_m=(sa_master*)malloc(sizeof(sa_master));
 	sa_m->now_sid_info=0;
+	sa_m->sid_map=new std::map<uint32_t, sid_info> ();
 }
 
 void sorted_array_master_free(){
+	delete sa_m->sid_map;
 	free(sa_m);
 }
 
 static inline sid_info_iter __find_sid_info_iter(uint32_t sid){
-	sid_info_iter iter=sa_m->sid_map.find(sid);
-	if(sa_m->sid_map.end()==iter){
+	sid_info_iter iter=sa_m->sid_map->find(sid);
+	if(sa_m->sid_map->end()==iter){
 		EPRINT("invalid sid error", true);
 	}
 	return iter;
@@ -36,7 +39,7 @@ st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinnin
 
 	res->sid=sa_m->now_sid_info++;
 	res->sp_meta=(summary_page_meta*)calloc(res->max_STE_num+1, sizeof(summary_page_meta));
-	res->sp_idx=0;
+	res->now_STE_num=0;
 	res->type=pinning?ST_PINNING: ST_NORMAL;
 	if(res->type==ST_PINNING){
 		res->pinning_data=(uint32_t *)malloc(max_sector_num * sizeof(uint32_t));
@@ -47,7 +50,7 @@ st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinnin
 	}
 
 	sid_info temp; temp.sid=res->sid; temp.sa=res; temp.r=r;
-	sa_m->sid_map.insert(std::pair<uint32_t, sid_info>(res->sid, temp));
+	sa_m->sid_map->insert(std::pair<uint32_t, sid_info>(res->sid, temp));
 
 	return res;
 }
@@ -65,7 +68,7 @@ void st_array_free(st_array *sa){
 	}
 
 	sid_info_iter iter=__find_sid_info_iter(sa->sid);
-	sa_m->sid_map.erase(iter);
+	sa_m->sid_map->erase(iter);
 
 	free(sa->pinning_data);
 	free(sa->sp_meta);
@@ -101,7 +104,7 @@ uint32_t st_array_write_translation(st_array *sa){
 		sa->pba_array[sa->now_STE_num].PBA=L2PBm_pick_empty_PBA(sa->bm);
 		L2PBm_make_map(sa->bm, sa->pba_array[sa->now_STE_num].PBA, sa->sid, 
 				sa->now_STE_num);
-		sa->now_STE_num++;
+		//sa->now_STE_num++;
 	}
 
 	uint32_t run_chunk_idx=sa->write_pointer/MAX_SECTOR_IN_BLOCK;
@@ -112,20 +115,20 @@ uint32_t st_array_write_translation(st_array *sa){
 }
 
 uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
-	if(sa->sp_idx >= sa->max_STE_num){
+	if(sa->now_STE_num >= sa->max_STE_num){
 		EPRINT("sorted_table is full!", true);
 	}
 
-	if(sa->sp_meta[sa->sp_idx].pr_type==NO_PR){
-		sa->sp_meta[sa->sp_idx].private_data=(void *)sp_init();
-		sa->sp_meta[sa->sp_idx].pr_type=WRITE_PR;
-		sa->sp_meta[sa->sp_idx].lba=lba;
+	if(sa->sp_meta[sa->now_STE_num].pr_type==NO_PR){
+		sa->sp_meta[sa->now_STE_num].private_data=(void *)sp_init();
+		sa->sp_meta[sa->now_STE_num].pr_type=WRITE_PR;
+		sa->sp_meta[sa->now_STE_num].lba=lba;
 	}
-	else if(sa->sp_meta[sa->sp_idx].pr_type==READ_PR){
+	else if(sa->sp_meta[sa->now_STE_num].pr_type==READ_PR){
 		EPRINT("not allowed", true);
 	}
 
-	summary_page *sp=(summary_page*)sa->sp_meta[sa->sp_idx].private_data;
+	summary_page *sp=(summary_page*)sa->sp_meta[sa->now_STE_num].private_data;
 	sp_insert(sp, lba, sa->write_pointer);
 	if(sa->type==ST_PINNING){
 		sa->pinning_data[sa->write_pointer]=psa;
@@ -152,19 +155,19 @@ summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
 		EPRINT("it is not write_summary_order", true);
 	}
 
-	if(sa->sp_meta[sa->sp_idx].pr_type==NO_PR){
+	if(sa->sp_meta[sa->now_STE_num].pr_type==NO_PR){
 		return NULL;
 	}
-	sa->sp_meta[sa->sp_idx].ppa=ppa;
+	sa->sp_meta[sa->now_STE_num].ppa=ppa;
 	sa->summary_write_alert=false;
 
 	summary_write_param *swp=(summary_write_param*)malloc(sizeof(summary_write_param));
-	swp->idx=sa->sp_idx;
+	swp->idx=sa->now_STE_num;
 	swp->sa=sa;
-	swp->spm=&sa->sp_meta[sa->sp_idx];
+	swp->spm=&sa->sp_meta[sa->now_STE_num];
 	swp->oob[0]=sa->sid;
-	swp->oob[1]=sa->sp_idx;
-	swp->value=sp_get_data((summary_page*)(sa->sp_meta[sa->sp_idx++].private_data));
+	swp->oob[1]=sa->now_STE_num;
+	swp->value=sp_get_data((summary_page*)(sa->sp_meta[sa->now_STE_num++].private_data));
 	return swp;
 }
 

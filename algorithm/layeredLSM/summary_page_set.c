@@ -46,8 +46,7 @@ bool sp_set_iter_move(sp_set_iter *ssi){
 	if(ssi->type==SPI_SET){
 		summary_page_meta *spm=&ssi->spm_set[ssi->now_STE_num];
 		summary_page_iter *spi=extract_spi(spm);
-		spi_move_forward(spi);
-		if(spi->read_pointer==NORMAL_CUR_END_PTR){
+		if(spi->iter_done_flag || spi_move_forward(spi)){
 			ssi->now_STE_num++;
 			if(ssi->read_STE_num < ssi->max_STE_num){
 				spi_init(&ssi->spm_set[ssi->read_STE_num++]);
@@ -57,12 +56,26 @@ bool sp_set_iter_move(sp_set_iter *ssi){
 		return false;
 	}
 	else{
-		ssi->mf->iter_move(ssi->miter);
-		if(ssi->miter->read_pointer % NORMAL_CUR_END_PTR==0){
+		if(ssi->miter->iter_done_flag||
+				ssi->mf->iter_move(ssi->miter) || ssi->miter->read_pointer % NORMAL_CUR_END_PTR==0){
 			ssi->now_STE_num++;
 			return true;
 		}
 		return false;
+	}
+}
+
+bool sp_set_iter_done_check(sp_set_iter *ssi){
+	if(ssi->type==SPI_SET){
+		if(ssi->now_STE_num==ssi->max_STE_num){
+			return true;
+		}
+		summary_page_meta *spm=&ssi->spm_set[ssi->now_STE_num];
+		summary_page_iter *spi=extract_spi(spm);
+		return spi->iter_done_flag;
+	}
+	else{
+		return ssi->miter->iter_done_flag;
 	}
 }
 

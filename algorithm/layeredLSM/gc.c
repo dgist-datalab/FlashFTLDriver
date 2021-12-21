@@ -58,6 +58,7 @@ static inline void __gc_read_check(gc_value* g_value){
 }
 
 void gc_summary_segment(L2P_bm *bm, __gsegment *target){
+	GDB_MAKE_BREAKPOINT;
 	blockmanager *sm=bm->segment_manager;
 	list *temp_list=list_init();
 	uint32_t page, bidx, pidx;
@@ -288,6 +289,7 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 }
 
 void gc_data_segment(L2P_bm *bm, __gsegment *target){
+	GDB_MAKE_BREAKPOINT;
 	blockmanager *sm=bm->segment_manager;
 	list *normal_list=list_init();
 	list *frag_list=list_init();
@@ -319,3 +321,42 @@ void gc_data_segment(L2P_bm *bm, __gsegment *target){
 	bm->reserve_block_idx=0;
 	bm->reserve_seg=sm->get_segment(sm, BLOCK_RESERVE);
 }
+
+void gc(L2P_bm *bm, uint32_t type){
+	GDB_MAKE_BREAKPOINT;
+	blockmanager *sm=bm->segment_manager;
+	__gsegment *target=sm->get_gc_target(sm);
+	bool full_invalid=target->invalidate_piece_num==target->validate_piece_num;
+	if(full_invalid){
+		sm->trim_segment(sm, target);
+		return;
+	}
+	
+	std::queue<uint32_t> temp_seg_q;
+	while(bm->seg_type[target->seg_idx]!=type){
+		temp_seg_q.push(target->seg_idx);
+		target=sm->get_gc_target(sm);
+		if(target==NULL){
+			EPRINT("dev full", true);
+		}
+	}
+
+	switch(type){
+		case SUMMARY_SEG:
+			gc_summary_segment(bm, target);
+			break;
+		case DATA_SEG:
+			gc_data_segment(bm, target);
+			break;
+	}
+
+	while(temp_seg_q.size()){
+		uint32_t seg_idx=temp_seg_q.front();
+		sm->insert_gc_target(sm, seg_idx);
+		temp_seg_q.pop();
+	}
+}
+
+
+
+

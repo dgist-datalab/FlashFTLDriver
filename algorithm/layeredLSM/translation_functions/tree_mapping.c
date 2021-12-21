@@ -128,11 +128,19 @@ summary_pair	tree_iter_pick(map_iter *miter){
 	}
 }
 
-void			tree_iter_move(map_iter *miter){
+bool			tree_iter_move(map_iter *miter){
+	tree_map *tr_map=iter_extract_tree(miter);
 	tree_iter iter=*(tree_iter*)miter->private_data;
 	miter->read_pointer++;
 	iter++;
 	*(tree_iter*)miter->private_data=iter;
+	if(iter==tr_map->body->end()){
+		miter->iter_done_flag=true;
+		return true;
+	}
+	else{
+		return false;
+	}
 }
 
 void			tree_iter_free(map_iter *miter){

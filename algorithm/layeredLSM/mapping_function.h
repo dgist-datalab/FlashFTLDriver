@@ -110,7 +110,7 @@ typedef struct map_function{
 
 	map_iter *(*iter_init)(struct map_function *m);
 	summary_pair (*iter_pick)(map_iter *);
-	void (*iter_move)(map_iter*);
+	bool (*iter_move)(map_iter*);
 	void (*iter_free)(map_iter*);
 
 
