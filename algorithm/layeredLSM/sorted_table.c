@@ -1,35 +1,32 @@
 #include "sorted_table.h"
+#include "./mapping_function.h"
 #include "./piece_ppa.h"
 
-typedef std::map<uint32_t, sid_info>::iterator sid_info_iter;
 
 extern bool debug_flag;
 sa_master *sa_m;
 
-void sorted_array_master_init(){
+void sorted_array_master_init(uint32_t total_run_num){
 	sa_m=(sa_master*)malloc(sizeof(sa_master));
 	sa_m->now_sid_info=0;
-	sa_m->sid_map=new std::map<uint32_t, sid_info> ();
+	sa_m->sid_map=(sid_info*)calloc(total_run_num, sizeof(sid_info));
+	sa_m->total_run_num=total_run_num;
 }
 
 void sorted_array_master_free(){
-	delete sa_m->sid_map;
+	free(sa_m->sid_map);
 	free(sa_m);
 }
 
-static inline sid_info_iter __find_sid_info_iter(uint32_t sid){
-	sid_info_iter iter=sa_m->sid_map->find(sid);
-	if(sa_m->sid_map->end()==iter){
-		EPRINT("invalid sid error", true);
-	}
-	return iter;
+static sid_info* __find_sid_info_iter(uint32_t sid){
+	return &sa_m->sid_map[sid];
 }
 
-sid_info sorted_array_master_get_info(uint32_t sid){
-	sid_info_iter iter=__find_sid_info_iter(sid);
-	return iter->second;
+sid_info* sorted_array_master_get_info(uint32_t sid){
+	return __find_sid_info_iter(sid);
 }
 
+static uint32_t cnt=0;
 st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinning){
 	st_array *res=(st_array*)calloc(1, sizeof(st_array));
 	res->bm=bm;
@@ -38,6 +35,7 @@ st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinnin
 	memset(res->pba_array, -1, (res->max_STE_num+1)*sizeof(STE));
 
 	res->sid=sa_m->now_sid_info++;
+	sa_m->now_sid_info%=sa_m->total_run_num;
 	res->sp_meta=(summary_page_meta*)calloc(res->max_STE_num+1, sizeof(summary_page_meta));
 	res->now_STE_num=0;
 	res->type=pinning?ST_PINNING: ST_NORMAL;
@@ -49,14 +47,16 @@ st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinnin
 		res->pinning_data=NULL;
 	}
 
-	sid_info temp; temp.sid=res->sid; temp.sa=res; temp.r=r;
-	sa_m->sid_map->insert(std::pair<uint32_t, sid_info>(res->sid, temp));
+	sid_info* temp=&sa_m->sid_map[res->sid]; 	
+	if(temp->sid!=0){
+		EPRINT("alread assigned sid_info", true);
+	}
+	temp->sid=res->sid; temp->sa=res; temp->r=r;
 
 	return res;
 }
 
 void st_array_free(st_array *sa){
-	EPRINT("sp_meta should be invalidate", false);
 	for(uint32_t i=0; i<sa->now_STE_num; i++){
 		if(sa->sp_meta[i].ppa==0){
 			GDB_MAKE_BREAKPOINT;
@@ -67,10 +67,14 @@ void st_array_free(st_array *sa){
 		}
 	}
 
-	sid_info_iter iter=__find_sid_info_iter(sa->sid);
-	sa_m->sid_map->erase(iter);
+	sid_info* temp_sid_info=&sa_m->sid_map[sa->sid];
+	memset(temp_sid_info, 0, sizeof(sid_info));
 
-	free(sa->pinning_data);
+	if(sa->type==ST_PINNING){
+		free(sa->pinning_data);
+		bitmap_free(sa->gced_unlink_data);
+	}
+
 	free(sa->sp_meta);
 	free(sa->pba_array);
 	free(sa);
@@ -78,6 +82,9 @@ void st_array_free(st_array *sa){
 
 uint32_t st_array_read_translation(st_array *sa, uint32_t intra_idx){
 	if(sa->type==ST_PINNING){
+		if(bitmap_is_set(sa->gced_unlink_data, intra_idx)){
+			return UNLINKED_PSA;
+		}
 		return sa->pinning_data[intra_idx];
 	}
 	uint32_t run_chunk_idx=intra_idx/MAX_SECTOR_IN_BLOCK;
@@ -93,9 +100,6 @@ uint32_t st_array_summary_translation(st_array *sa, bool force){
 }
 
 uint32_t st_array_write_translation(st_array *sa){
-	if(sa->type==ST_PINNING){
-		EPRINT("not allowed in ST_PINNING", true);
-	}
 	if(sa->summary_write_alert){
 		EPRINT("it is write_summary_order", true);
 	}
@@ -130,9 +134,9 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 
 	summary_page *sp=(summary_page*)sa->sp_meta[sa->now_STE_num].private_data;
 	sp_insert(sp, lba, sa->write_pointer);
-	if(sa->type==ST_PINNING){
+	if(sa->type==ST_PINNING){	
 		sa->pinning_data[sa->write_pointer]=psa;
-		L2PBm_block_fragment(sa->bm, psa/MAX_SECTOR_IN_BLOCK);
+		L2PBm_block_fragment(sa->bm, psa/L2PGAP, sa->sid);
 	}
 
 	sa->write_pointer++;
@@ -142,12 +146,26 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 	return 0;
 }
 
-void st_array_update_pinned_info(st_array *sa, uint32_t intra_offset, uint32_t new_psa){
+void st_array_update_pinned_info(st_array *sa, uint32_t intra_offset, uint32_t new_psa, uint32_t old_psa){
 	if(sa->type!=ST_PINNING){
 		EPRINT("this function only called in pinned SA", true);
 	}
+	if(sa->pinning_data[intra_offset]!=old_psa){
+		EPRINT("different psa inserted", true);
+	}
 	sa->pinning_data[intra_offset]=new_psa;
-	L2PBm_block_fragment(sa->bm, new_psa/MAX_SECTOR_IN_BLOCK);
+	L2PBm_block_fragment(sa->bm, new_psa/L2PGAP, sa->sid);
+}
+
+void st_array_unlink_bit_set(st_array *sa, uint32_t intra_offset, uint32_t old_psa){
+	if(sa->type!=ST_PINNING){
+		EPRINT("this function only called in pinned SA", true);
+	}
+	if(sa->pinning_data[intra_offset]!=old_psa){
+		EPRINT("different psa inserted", true);
+	}
+	bitmap_set(sa->gced_unlink_data, intra_offset);
+	return;
 }
 
 summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t ppa, bool force){

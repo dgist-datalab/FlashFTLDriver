@@ -354,8 +354,9 @@ void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const
 		abort();
 	}
 
-	collect_io_type(req->type, &my_posix);
-	data_copy_to(PPA, value->value);
+	if(collect_io_type(req->type, &my_posix)){
+		data_copy_to(PPA, value->value);
+	}
 
 	req->end_req(req);
 	return NULL;
@@ -380,36 +381,39 @@ void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, algo_req *const
 		abort();
 	}
 
-	collect_io_type(req->type, &my_posix);
-	data_copy_from(PPA, value->value);
+	if(collect_io_type(req->type, &my_posix)){
+		data_copy_from(PPA, value->value);
+	}
 
 	req->end_req(req);
 	return NULL;
 }
 
 void *posix_write_sync(uint32_t type, uint32_t ppa, char *data){
-	collect_io_type(type, &my_posix);
+	if(collect_io_type(type, &my_posix)){
 #ifdef LASYNC
-	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_W, PPA, NULL, data, false, req);
-	posix_async_make_req(p_req);
-	fdriver_lock(&p_req->lock);
-	free(p_req);
+		posix_request *p_req=posix_get_preq_for_async(FS_LOWER_W, PPA, NULL, data, false, req);
+		posix_async_make_req(p_req);
+		fdriver_lock(&p_req->lock);
+		free(p_req);
 #else
-	data_copy_to(ppa, data);
+		data_copy_to(ppa, data);
 #endif
+	}
 	return NULL;
 }
 
 void *posix_read_sync(uint32_t type, uint32_t ppa, char *data){
-	collect_io_type(type, &my_posix);
+	if(collect_io_type(type, &my_posix)){
 #ifdef LASYNC
-	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_R, PPA, NULL, data, false, req);
-	posix_async_make_req(p_req);
-	fdriver_lock(&p_req->lock);
-	free(p_req);
+		posix_request *p_req=posix_get_preq_for_async(FS_LOWER_R, PPA, NULL, data, false, req);
+		posix_async_make_req(p_req);
+		fdriver_lock(&p_req->lock);
+		free(p_req);
 #else
-	data_copy_from(ppa, data);
+		data_copy_from(ppa, data);
 #endif
+	}
 	return NULL;
 }
 

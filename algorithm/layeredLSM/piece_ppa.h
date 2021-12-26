@@ -2,6 +2,7 @@
 #define PIECE_PPA_H
 #include "../../include/container.h"
 #include "../../include/debug_utils.h"
+#include "./block_table.h"
 #include "./debug.h"
 
 enum{BIT_ERROR, BIT_SUCCESS};
@@ -11,7 +12,8 @@ static inline void __debug_check(blockmanager *bm, uint32_t piece_ppa,
 		bool valid){
 	if(test_piece_ppa==UINT32_MAX) return;
 	if(test_piece_ppa==piece_ppa){
-		printf("target lba:%u\n", print_lba_from_piece_ppa(bm, piece_ppa));
+		static int cnt=0;
+		printf("%u lba=%u:",++cnt, print_lba_from_piece_ppa(bm, piece_ppa));
 		valid?printf("valid-"):printf("invalid-");
 		print_stacktrace(8);
 	}

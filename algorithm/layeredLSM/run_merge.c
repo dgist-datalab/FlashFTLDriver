@@ -36,12 +36,14 @@ static inline uint32_t __set_read_flag(mm_container *mm_set, uint32_t run_num, u
 
 static inline void __invalidate_target(run *r, uint32_t intra_offset){
 	uint32_t original_psa=run_translate_intra_offset(r, intra_offset);
+	if(original_psa==UNLINKED_PSA) return;
 	if(invalidate_piece_ppa(r->st_body->bm->segment_manager, original_psa, true)==BIT_ERROR){
 		EPRINT("BIT ERROR piece_ppa: %u", true, original_psa);
 	}
 }
 
 static inline bool __move_iter_target(mm_container *mm_set, uint32_t idx){
+	if(mm_set[idx].done) return true;
 	bool res=sp_set_iter_move(mm_set[idx].ssi);
 	if(res){
 		mm_set[idx].now_proc_block_idx++;
@@ -83,9 +85,6 @@ static inline summary_pair __pick_smallest_pair(mm_container *mm_set, uint32_t r
 	summary_pair now;
 	uint32_t t_idx;
 
-	if(debug_flag){
-	}
-
 retry:
 	for(uint32_t i=0; i<run_num; i++){
 		if(mm_set[i].done) continue;
@@ -104,14 +103,6 @@ retry:
 	}
 
 	t_idx=*ridx;
-
-	if(mm_set[t_idx].r->info->recency==target_recency){
-		printf("%u:%u\n", res.lba, res.intra_offset);
-		if(res.lba==730022){
-			debug_flag=true;
-			GDB_MAKE_BREAKPOINT;
-		}
-	}
 
 	if(res.lba==UINT32_MAX){
 		__move_iter_target(mm_set, t_idx);
@@ -134,6 +125,7 @@ static inline void *__merge_end_req(algo_req* req){
 
 	__sorted_pair *t_pair=(__sorted_pair*)req->param;
 	fdriver_unlock(&t_pair->lock);
+	free(req);
 	return NULL;
 }
 
@@ -154,20 +146,26 @@ static inline void __merge_issue_req(__sorted_pair *sort_pair){
 static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_list, blockmanager *sm){
 	if(r->type==RUN_PINNING){ return;}
 	std::list<__sorted_pair>::iterator iter=sorted_list->begin();
-	for(uint32_t i=0; i<DEV_QDEPTH*L2PGAP && iter!=sorted_list->end(); 
-			i++){
+	for(; iter!=sorted_list->end(); iter++){
 		__sorted_pair *t_pair=&(*iter);
-
 		t_pair->original_psa=run_translate_intra_offset(t_pair->r, t_pair->pair.intra_offset);
 		__merge_issue_req(t_pair);
-		iter++;
 	}
 }
 
 static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_list){
 	std::list<__sorted_pair>::iterator iter=sorted_list->begin();
-	for(uint32_t i=0; i<DEV_QDEPTH*L2PGAP && iter!=sorted_list->end(); 
-			i++){
+	if(r->type==RUN_NORMAL){
+		for(; iter!=sorted_list->end();iter++){
+			__sorted_pair *t_pair=&(*iter);
+			fdriver_lock(&t_pair->lock);
+			fdriver_destroy(&t_pair->lock);
+			__invalidate_target(t_pair->r, t_pair->pair.intra_offset);
+		}
+	}
+
+	iter=sorted_list->begin();
+	for(; iter!=sorted_list->end(); ){
 		__sorted_pair *t_pair=&(*iter);
 
 		if(r->type==RUN_PINNING){
@@ -175,17 +173,15 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true);
 		}
 		else{
-			fdriver_lock(&t_pair->lock);
-			fdriver_destroy(&t_pair->lock);
-			__invalidate_target(t_pair->r, t_pair->pair.intra_offset);
 			run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true);
+			inf_free_valueset(t_pair->value, FS_MALLOC_R);
 		}
 		sorted_list->erase(iter++);
 	}
 }
 
 run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_bm *bm, uint32_t run_type){
-	DEBUG_CNT_PRINT(run_cnt, 6, __FUNCTION__, __LINE__);
+	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
@@ -213,6 +209,7 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 	uint32_t prev_lba=0;
 	while(1){
 		target_round++;
+		//uint32_t limited_lba=UINT32_MAX;
 		//sort meta
 		do{
 			read_flag=__set_read_flag(mm_set, run_num, target_round);
@@ -234,7 +231,7 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 			}
 			read_flag=__move_iter(mm_set, run_num, target.lba, read_flag, ridx);
 		}while(read_flag!=((1<<run_num)-1));
-
+		
 		//read data
 		__read_merged_data(res, &sorted_arr, bm->segment_manager);
 		//write data
@@ -255,6 +252,11 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 		//write data
 		__write_merged_data(res, &sorted_arr);
 	}
+
+	for(uint32_t i=0; i<run_num; i++){
+		sp_set_iter_free(mm_set[i].ssi);
+	}
+	free(mm_set);
 
 	run_insert_done(res, true);
 	printf("result\n");

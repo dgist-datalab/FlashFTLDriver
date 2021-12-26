@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 enum{
-	RUN_NORMAL, RUN_PINNING
+	RUN_NORMAL, RUN_PINNING, RUN_LOG,
 };
 
 typedef struct run{
@@ -145,10 +145,23 @@ uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset);
  * */
 run *run_find_include_address(struct shortcut_master *sc, uint32_t lba, uint32_t psa, uint32_t *intra_offset);
 
+/*
+ * Function: run_find_include_address_byself
+ *------------------------------------
+ *		return intra_offset of target lba and psa
+ *
+ *r: 
+ *lba:
+ *psa:
+ * */
+uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa);
+
 //#################################### run_query.c done
 
 //#################################### run_util.c
 void run_print(run *r, bool content);
+void run_print_invalidate_piece_ppa(run *r, blockmanager *sm);
+void run_check(run *r, blockmanager *sm);
 //#################################### run_util.c done
 
 //################################### run_merge.c 

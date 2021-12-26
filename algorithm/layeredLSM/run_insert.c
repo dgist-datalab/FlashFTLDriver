@@ -5,12 +5,24 @@ extern sc_master *shortcut;
 extern lower_info *g_li;
 extern uint32_t test_key;
 extern uint32_t target_recency;
+extern uint32_t test_piece_ppa;
+
+static inline void __check_debug(run *r, uint32_t lba, uint32_t psa){
+#ifdef LSM_DEBUG
+	if(lba==test_key || psa==test_piece_ppa){
+		if(psa==1535426){
+			printf("break!\n");
+		}
+		if(lba==test_key && psa==test_piece_ppa){
+			printf("break2\n");
+		}
+		printf("target insert (%u:%u, %u:%u):",test_key,lba, test_piece_ppa, psa);
+		run_print(r, false);
+	}
+#endif
+}
 
 static void* __run_write_end_req(algo_req *req){
-	if(req->type!=DATAW && req->type!=COMPACTIONDATAW){
-		EPRINT("not allowed type", true);
-	}
-
 	if(req->param){//for summary_write
 		st_array_summary_write_done((summary_write_param*)req->param);
 	}
@@ -21,9 +33,9 @@ static void* __run_write_end_req(algo_req *req){
 	return NULL;
 }
 
-static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blockmanager *sm, void *param, bool merge_insert){
+static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blockmanager *sm, void *param, uint32_t  type){
 	algo_req *res=(algo_req*)malloc(sizeof(algo_req));
-	res->type=merge_insert?COMPACTIONDATAW:DATAW;
+	res->type=type;
 	res->ppa=ppa;
 	res->value=value;
 	res->end_req=__run_write_end_req;
@@ -46,7 +58,7 @@ static inline void __run_insert_mf(run *r, blockmanager *sm, uint32_t lba, uint3
 }
 
 static void __run_write_buffer(run *r, blockmanager *sm, bool force, 
-		bool merge_insert){
+		uint32_t type){
 	uint32_t target_ppa, psa, intra_offset;
 	uint32_t psa_list[L2PGAP];
 	for(uint32_t i=0; i<r->pp->buffered_num; i++){
@@ -66,12 +78,19 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 			EPRINT("double insert error", true);
 		}
 		r->validate_piece_num++;
+		
+		__check_debug(r, lba, psa);
 
 		__run_insert_mf(r, sm, lba, intra_offset);
-		st_array_insert_pair(r->st_body, lba, intra_offset);
+		if(r->type==RUN_LOG){
+			st_array_insert_pair(r->st_body, lba, psa);
+		}
+		else{
+			st_array_insert_pair(r->st_body, lba, intra_offset);
+		}
 	}
 	__run_issue_write(target_ppa, pp_get_write_target(r->pp, force), (char*)r->pp->LBA, 
-			sm, NULL, merge_insert);
+			sm, NULL, type);
 }
 
 static void __run_write_meta(run *r, blockmanager *sm, bool force){
@@ -84,7 +103,7 @@ static void __run_write_meta(run *r, blockmanager *sm, bool force){
 	}
 
 	__run_issue_write(target_ppa, swp->value, (char*)swp->oob, 
-			r->st_body->bm->segment_manager, (void*)swp, true);
+			r->st_body->bm->segment_manager, (void*)swp, MAPPINGW);
 }
 
 bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_insert){
@@ -92,18 +111,13 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_inser
 		return false;
 	}
 
-	if(r->info->recency==target_recency){
-		printf("lba:%u\n", lba);
-		if(lba==test_key){
-			printf("[read debug for %u]\n", test_key);
-			run_print(r, false);
-		}
-	}
-
 	if(r->type==RUN_PINNING){
 		if(data){
 			EPRINT("not allowed in RUN_PINNING", true);
 		}
+
+		__check_debug(r, lba, psa);
+
 		__run_insert_mf(r, r->st_body->bm->segment_manager, lba, r->st_body->write_pointer);
 		st_array_insert_pair(r->st_body, lba, psa);
 	}
@@ -115,7 +129,7 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_inser
 			r->pp=pp_init();
 		}
 		if(pp_insert_value(r->pp, lba, data)){
-			__run_write_buffer(r, r->st_body->bm->segment_manager, false, merge_insert);
+			__run_write_buffer(r, r->st_body->bm->segment_manager, false, merge_insert?COMPACTIONDATAW:DATAW);
 			pp_reinit_buffer(r->pp);
 		}
 	}
@@ -130,7 +144,7 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_inser
 
 void run_insert_done(run *r, bool merge_insert){
 	if(r->pp && r->pp->buffered_num!=0){
-		__run_write_buffer(r, r->st_body->bm->segment_manager,true, merge_insert);
+		__run_write_buffer(r, r->st_body->bm->segment_manager,true, merge_insert?COMPACTIONDATAW:DATAW);
 	}
 	__run_write_meta(r, r->st_body->bm->segment_manager, true);
 	r->mf->make_done(r->mf);

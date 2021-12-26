@@ -18,6 +18,7 @@ run *run_factory(uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm, u
 		case RUN_NORMAL:
 			res->st_body=st_array_init(res, entry_num, bm, false);
 			break;
+		case RUN_LOG:
 		case RUN_PINNING:
 			if(map_type==PLR_MAP){
 				EPRINT("PLR_MAP is not enable on RUN_PINNING type", true);

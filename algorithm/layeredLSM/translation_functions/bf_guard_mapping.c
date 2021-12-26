@@ -125,7 +125,7 @@ void			bfg_map_make_done(map_function *mf){
 
 void			bfg_map_free(map_function *mf){
 	bfg_map *map=extract_bfg_map(mf);
-	for(uint32_t i=0; i<CEIL(map->write_pointer, __target_member); i++){
+	for(uint32_t i=0; i<CEIL(mf->max_contents_num, __target_member); i++){
 		free(map->bf_set[i].set_of_bf);
 	}
 	free(map->guard_set);

@@ -11,6 +11,7 @@
 #include "./summary_page.h"
 #include "../../include/data_struct/bitmap.h"
 
+#define UNLINKED_PSA (UINT32_MAX-1)
 #define MAX_SECTOR_IN_BLOCK ((_PPB)*L2PGAP)
 //#define EXTRACT_PPA(PSA) (PSA/L2PGAP)
 enum{
@@ -22,7 +23,7 @@ typedef struct sorted_table_entry{
 }STE;
 
 typedef struct sorted_table_array{
-	uint64_t sid;
+	uint32_t sid;
 	uint32_t max_STE_num;
 	uint32_t now_STE_num;
 	uint32_t write_pointer; //physical_page granuality
@@ -53,15 +54,16 @@ typedef struct sid_info{
 }sid_info;
 
 typedef struct sorted_array_master{
-	std::map<uint32_t, sid_info> *sid_map;
+	sid_info *sid_map;
 	uint32_t now_sid_info;
+	uint32_t total_run_num;
 }sa_master;
 
-void sorted_array_master_init();
+void sorted_array_master_init(uint32_t total_run_num);
 
 void sorted_array_master_free();
 
-sid_info sorted_array_master_get_info(uint32_t sidx);
+sid_info* sorted_array_master_get_info(uint32_t sidx);
 
 /*
 	Function: st_array_init
@@ -138,8 +140,21 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa);
  * sa: 
  * intra_offset: pointer for updating target
  * new_psa: new psa
+ * old_psa: for debugging
  * */
-void st_array_update_pinned_info(st_array *sa, uint32_t intra_offset, uint32_t new_psa);
+void st_array_update_pinned_info(st_array *sa, uint32_t intra_offset, uint32_t new_psa, uint32_t old_psa);
+
+/*
+	Function:st_array_unlink_bit_set
+	--------------------------------
+		set bitmap of unlinked intra offset from gc
+
+	sa:
+	intra_offset:
+	old_psa: for debugging
+ */
+
+void st_array_unlink_bit_set(st_array *sa, uint32_t intra_offset, uint32_t old_psa);
 
 /*
  * Function: st_array_block_lock
@@ -173,17 +188,5 @@ summary_write_param *st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
  * sp_idx: target sp meta idx
  * */
 void st_array_summary_write_done(summary_write_param *swp);
-
-
-/*
-	Function: __st_update_map
-	-------------------------
-		update RCI<->PBA mapping while it processes GC
-
-	sid: sid where it has the 'from_pba'
-	from_pba: GCed physical block
-	to_pba: newly allocated physical block
- */
-void __st_update_map(uint32_t sid, uint32_t from_pba, uint32_t to_pba);
 
 #endif

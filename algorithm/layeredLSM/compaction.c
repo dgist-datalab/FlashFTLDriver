@@ -51,7 +51,7 @@ run* compaction_test(sc_master *sc, uint32_t merge_num, uint32_t map_type,
 		run_print(merged_set[i], false);
 	}
 
-	run *res=run_merge(merge_num, merged_set, GUARD_BF, fpr, bm, RUN_PINNING);
+	run *res=run_merge(merge_num, merged_set, GUARD_BF, fpr, bm, RUN_NORMAL);
 	
 	for(uint32_t i=0; i<merge_num; i++){
 		for(uint32_t j=0; j<run_num; j++){

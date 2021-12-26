@@ -44,6 +44,8 @@ summary_page_iter* spi_init(summary_page_meta *spm){
 	return res;
 }
 
+
+
 summary_page_iter* spi_init_by_data(char *data){
 	summary_page_iter *res=(summary_page_iter*)malloc(sizeof(summary_page_iter));
 	res->body=data;

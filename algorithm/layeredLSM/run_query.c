@@ -74,25 +74,37 @@ uint32_t run_query_retry(run *r, request *req){
 }
 
 
-run *run_find_include_address(sc_master *sc, uint32_t lba, uint32_t psa, uint32_t *_intra_offset){
-	run *r=shortcut_query(sc, lba);
+static inline uint32_t __find_target_in_run(run *r, uint32_t lba, uint32_t psa){
 	if(r->type==RUN_NORMAL){
-		return NULL;
+		return NOT_FOUND;
 	}
 	map_read_param *param;
 	uint32_t intra_offset=r->mf->query(r->mf, lba, &param);
 	uint32_t t_psa=st_array_read_translation(r->st_body, intra_offset);
-	if(psa==t_psa) goto end;
+	if(r->type==RUN_LOG && t_psa!=psa){
+		return NOT_FOUND;
+	}
 	while(t_psa!=psa){
 		intra_offset=r->mf->query_retry(r->mf, param);
 		if(intra_offset==NOT_FOUND){
-			r=NULL;
 			break;
 		}
 		t_psa=st_array_read_translation(r->st_body, intra_offset);
 	}
-end:
-	*_intra_offset=intra_offset;
 	free(param);
+	return intra_offset;
+}
+
+run *run_find_include_address(sc_master *sc, uint32_t lba, uint32_t psa, uint32_t *_intra_offset){
+	run *r=shortcut_query(sc, lba);
+	uint32_t intra_offset=__find_target_in_run(r, lba, psa);
+	*_intra_offset=intra_offset;
+	if(intra_offset==NOT_FOUND){
+		return NULL;
+	}
 	return r;
+}
+
+uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa){
+	return __find_target_in_run(r, lba, psa);
 }

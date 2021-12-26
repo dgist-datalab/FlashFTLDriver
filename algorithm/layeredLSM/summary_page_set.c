@@ -38,7 +38,6 @@ summary_pair sp_set_iter_pick(sp_set_iter *ssi){
 	else{
 		res=ssi->mf->iter_pick(ssi->miter);
 	}
-
 	return res;
 }
 
@@ -46,6 +45,9 @@ bool sp_set_iter_move(sp_set_iter *ssi){
 	if(ssi->type==SPI_SET){
 		summary_page_meta *spm=&ssi->spm_set[ssi->now_STE_num];
 		summary_page_iter *spi=extract_spi(spm);
+		if(spi==NULL){
+			GDB_MAKE_BREAKPOINT;
+		}
 		if(spi->iter_done_flag || spi_move_forward(spi)){
 			ssi->now_STE_num++;
 			if(ssi->read_STE_num < ssi->max_STE_num){

@@ -31,6 +31,7 @@ export COMMONFLAGS+=\
 			-Wno-unused-but-set-variable\
 			-DPARALLEL_MANAGER\
 			-DLSM_DEBUG\
+#			-DMETAONLY\
 #-O3 -march=native -mtune=native -flto=20 \
 #			-DREAL_BENCH_MODE\
 #-DTRACE_COLLECT\

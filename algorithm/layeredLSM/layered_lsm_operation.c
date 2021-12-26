@@ -44,7 +44,7 @@ char all_set_data[PAGESIZE];
 
 uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	page_aligner=pp_init();
-	bm=L2PBm_init(sm);
+	bm=L2PBm_init(sm, run_num);
 	g_li=li;
 
 	memset(all_set_data, -1, PAGESIZE);
@@ -53,7 +53,7 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	run_array=(run**)calloc(run_num, sizeof(run *));
 	shortcut=shortcut_init(run_num/2-2, (uint32_t)RANGE);
 
-	sorted_array_master_init();
+	sorted_array_master_init(run_num);
 	return 1;
 }
 
@@ -83,7 +83,7 @@ uint32_t write_temp(request *const req){
 	
 	if(now_run==NULL){
 		uint32_t idx=empty_space();
-		run_array[idx]=run_factory(TREE_MAP, entry_per_run, 0.1, bm, RUN_NORMAL);
+		run_array[idx]=run_factory(TREE_MAP, entry_per_run, 0.1, bm, RUN_LOG);
 		now_run=run_array[idx];
 	}
 
@@ -94,6 +94,7 @@ uint32_t write_temp(request *const req){
 	run_insert(now_run, req->key, UINT32_MAX, req->value->value, false);
 	
 	if(run_is_full(now_run)){
+		run_check(now_run, bm->segment_manager);
 		run_insert_done(now_run, false);
 		if(shortcut_compaction_trigger(shortcut)){
 			run *res=compaction_test(shortcut, 2, GUARD_BF, 0.1, bm);

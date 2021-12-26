@@ -169,10 +169,27 @@ struct lower_info {
 	//anything
 };
 
-static void collect_io_type(uint32_t type, lower_info *li){
+static bool collect_io_type(uint32_t type, lower_info *li){
 	if(type < LREQ_TYPE_NUM){
 		li->req_type_cnt[type]++;
+	
+#ifdef METAONLY
+		switch(type){
+			case GCDR:
+			case GCDW:
+			case DATAR:
+			case DATAW:
+			case COMPACTIONDATAR:
+			case COMPACTIONDATAW:
+				return false;
+			default:
+				return true;
+		}
+#else
+		return true;
+#endif
 	}
+	return false;
 }
 
 struct algorithm{
@@ -203,8 +220,8 @@ typedef struct masterblock{
 	uint16_t now_assigned_pptr;
 	uint8_t bitset[_PPB*L2PGAP/8];
 	__OOB oob_list[_PPB];
-	//uint16_t invalidate_piece_num;
-	//uint16_t validate_piece_num;
+	uint16_t invalidate_piece_num;
+	uint16_t validate_piece_num;
 	uint32_t punit_num;
 //	uint32_t seg_idx;
 //	void *hptr;

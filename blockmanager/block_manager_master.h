@@ -83,12 +83,14 @@ static inline void block_reinit(__block *b){
  *
  * */
 static inline void block_bit_set(__block *b, uint32_t intra_offset){
+	b->validate_piece_num++;
 	b->bitset[intra_offset/8]|=(1<<(intra_offset%8));
 }
 static inline bool block_bit_query(__block *b, uint32_t intra_offset){
 	return b->bitset[intra_offset/8]&(1<<(intra_offset%8));
 }
 static inline void block_bit_unset(__block *b, uint32_t intra_offset){
+	b->invalidate_piece_num++;
 	b->bitset[intra_offset/8]&=~(1<<(intra_offset%8));
 }
 

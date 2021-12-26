@@ -43,6 +43,7 @@
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)<(b)?(b):(a))
+#define ABS(a) ((a)<0?-(a):(a))
 #define CEIL(a,b) ((a)/(b) + ((a)%(b)?1:0))
 
 #define OOB_SIZE 128

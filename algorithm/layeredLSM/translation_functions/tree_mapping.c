@@ -31,6 +31,7 @@ uint32_t			tree_insert(map_function *m, uint32_t lba, uint32_t offset){
 	tree_iter it=tr_map->body->find(lba);
 	if(it==tr_map->body->end()){
 		tr_map->body->insert(std::pair<uint32_t, uint32_t>(lba, offset));
+		map_increase_contents_num(m);
 		return INSERT_SUCCESS;
 	}
 	else{
