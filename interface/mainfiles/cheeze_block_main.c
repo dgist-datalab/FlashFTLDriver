@@ -68,15 +68,16 @@ int main(int argc,char* argv[]){
 //	printf("Using MS_TIME_SL of %d\n", MS_TIME_SL);
 
 
-	inf_init(1,0, argc, argv, false);
-
+	inf_init(1,0, argc, argv);
+	init_cheeze(0);
+/*
 	if(argc<2){
 		init_cheeze(0);
 	}
 	else{
 		init_cheeze(atoll(argv[1]));
 	}
-
+*/
 	pthread_create(&thr, NULL, thread_test, NULL);
 	pthread_join(thr, NULL);
 

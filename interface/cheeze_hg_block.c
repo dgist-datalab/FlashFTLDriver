@@ -5,6 +5,7 @@
 #include "../bench/bench.h"
 #include "vectored_interface.h"
 #include "../include/utils/crc32.h"
+#include "../include/debug_utils.h"
 #include <pthread.h>
 
 extern master_processor mp;
@@ -208,7 +209,6 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		temp->parents=res;
 		temp->type=type;
 		temp->end_req=cheeze_end_req;
-		temp->isAsync=ASYNC;
 		temp->seq=i;
 		temp->type_ftl=0;
 		temp->type_lower=0;
@@ -315,7 +315,6 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 			crc_buffer[i]=crc32(temp->value->value, LPAGESIZE);
 		}
 #endif
-		DPRINTF("[START] REQ-TYPE:%s INFO(%d:%d) LBA: %u\n", type_to_str(temp->type),creq->id, i, temp->key);
 	}
 
 	res->req_array[(res->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
@@ -445,7 +444,7 @@ bool cheeze_end_req(request *const req){
 	switch(req->type){
 		case FS_NOTFOUND_T:
 			bench_reap_data(req, mp.li);
-			DPRINTF("%u not found!\n",req->key);
+			//EPRINT("%u not found!\n", false, req->key);
 #ifdef TRACE_REPLAY
 			if(req->crc_value && req->crc_value!=*(uint32_t*)req->value->value){
 				printf("not_found lba:%u data faile abort!\n", req->key);
@@ -502,7 +501,6 @@ bool cheeze_end_req(request *const req){
 
 #ifdef DEBUG
 	cheeze_ureq *creq=(cheeze_ureq*)preq->origin_req;
-	DPRINTF("[END]REQ-TYPE:%s INFO(%d:%d) LBA: %u -> preq-done:%u/%u\n", type_to_str(req->type),creq->id, req->seq, req->key, preq->done_cnt, preq->size);
 #endif
 
 	release_each_req(req);

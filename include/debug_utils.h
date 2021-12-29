@@ -102,4 +102,5 @@ static inline void print_stacktrace(uint32_t max)
     dwfl_end(dwfl);
 	printf("%s\n", ss.str().c_str());
 }
+
 #endif

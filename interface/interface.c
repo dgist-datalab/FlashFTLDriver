@@ -33,7 +33,7 @@ tag_manager *tm;
 
 bool sync_apps;
 void *p_main(void*);
-
+char* dump_file_name;
 
 #ifdef BUSE_MEASURE
 MeasureTime infTime;
@@ -358,8 +358,8 @@ bool inf_make_req_fromApp(char _type, KEYT _key,uint32_t offset, uint32_t len,ch
 
 void inf_parsing(int *argc, char **argv){
 	struct option options[]={
-		{"data-load", 0, 0, 0},
-		{"data-dump", 0, 0, 0},
+		{"data-load", 1, 0, 0},
+		{"data-dump", 1, 0, 0},
 		{"data-check", 0, 0, 0},
 		{0,0,0,0}
 	};
@@ -384,9 +384,13 @@ void inf_parsing(int *argc, char **argv){
 			case 0:
 				switch(index){
 					case 0: //data-load
+						dump_file_name=optarg;
+						printf("load_file_name:%s\n", dump_file_name);
 						mp.data_load=true;
 						break;
 					case 1: //data-dump
+						dump_file_name=optarg;
+						printf("dump_file_name:%s\n", dump_file_name);
 						mp.data_dump=true;
 						break;
 					case 2: //data-check
@@ -440,7 +444,7 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv){
 		__checking_data_init();
 	}
 	if(mp.data_load){
-		inf_load("test.dump");
+		inf_load(dump_file_name);
 	}
 }
 
@@ -707,7 +711,7 @@ void inf_free(){
 #endif
 
 	if(mp.data_dump){
-		inf_dump("test.dump");
+		inf_dump(dump_file_name);
 	}
 
 	mp.algo->destroy(mp.li,mp.algo);
