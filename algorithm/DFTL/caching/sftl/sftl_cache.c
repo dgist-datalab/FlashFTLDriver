@@ -333,7 +333,7 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		}
 		if(etr->private_data==NULL){
 			printf("insert translation page before cache update! %s:%d\n",__FILE__, __LINE__);
-			print_stacktrace();
+			//print_stacktrace();
 			abort();
 		}
 		ln=(lru_node*)etr->private_data;

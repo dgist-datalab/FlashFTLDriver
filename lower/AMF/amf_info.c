@@ -66,7 +66,7 @@ static inline void __amf_info_create_body(){
 	printf("buffer_block wirte on lower_info");
 	p_bbuf_init();
 #else
-	printf("normal wirte on lower_info");
+	printf("normal wirte on lower_info\n");
 	normal_write_init();
 #endif
 	mem_pool=(char**)malloc(sizeof(char*)*_NOP);
@@ -128,9 +128,9 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,algo_req * co
 
 	memcpy(mem_pool[ppa], value->value, PAGESIZE);
 #if BPS!=AMF_PUNIT
-	p_bbuf_issue(LOWER_WRITE, ppa, value->value, req);
+	p_bbuf_issue(LOWER_WRITE, ppa, temp_mem_buf, req);
 #else
-	normal_write_issue(LOWER_WRITE, ppa, value->value, req);
+	normal_write_issue(LOWER_WRITE, ppa, temp_mem_buf, req);
 #endif
 	return NULL;
 }
@@ -144,9 +144,9 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,algo_req * con
 
 	memcpy(value->value, mem_pool[ppa], PAGESIZE);
 #if BPS!=AMF_PUNIT
-	p_bbuf_issue(LOWER_READ, ppa, value->value, req);
+	p_bbuf_issue(LOWER_READ, ppa, temp_mem_buf, req);
 #else
-	normal_write_issue(LOWER_READ, ppa, value->value, req);
+	normal_write_issue(LOWER_READ, ppa, temp_mem_buf, req);
 #endif
 
 	return NULL;
@@ -165,7 +165,7 @@ void* amf_info_trim_block(uint32_t ppa){
 #else
 	if((ppa*R2PGAP)%PAGES_PER_SEGMENT){
 		printf("not aligned! %u\n", ppa);
-		print_stacktrace();
+		//print_stacktrace();
 		abort();
 	}
 	normal_write_issue(LOWER_TRIM, ppa, NULL, NULL);
@@ -198,21 +198,21 @@ void *amf_info_write_sync(uint32_t type, uint32_t ppa, char *data){
 	collect_io_type(type, &amf_info);
 	memcpy(mem_pool[ppa], data, PAGESIZE);
 #if BPS!=AMF_PUNIT
-	p_bbuf_sync_issue(LOWER_WRITE, ppa, data);
+	p_bbuf_sync_issue(LOWER_WRITE, ppa, temp_mem_buf);
 #else
-	normal_write_sync_issue(LOWER_WRITE, ppa, data);
+	normal_write_sync_issue(LOWER_WRITE, ppa, temp_mem_buf);
 #endif
 	return NULL;
 }
 
 void *amf_info_read_sync(uint32_t type, uint32_t ppa, char *data){
 	collect_io_type(type, &amf_info);
-	memcpy(data, mem_pool[ppa], PAGESIZE);
 #if BPS!=AMF_PUNIT
-	p_bbuf_sync_issue(LOWER_READ, ppa, data);
+	p_bbuf_sync_issue(LOWER_READ, ppa, temp_mem_buf);
 #else
-	normal_write_sync_issue(LOWER_READ, ppa, data);
+	normal_write_sync_issue(LOWER_READ, ppa, temp_mem_buf);
 #endif
+	memcpy(data, mem_pool[ppa], PAGESIZE);
 	return NULL;
 }
 

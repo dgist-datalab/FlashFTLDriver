@@ -79,7 +79,6 @@ static inline void __issue(uint32_t type, char *data, amf_wrapper *temp_req){
 						(void *)temp_req);
 				break;
 			case LOWER_TRIM:
-				AmfErase(am,temp_req->ppa*R2PGAP+i, NULL);
 				break;
 
 #else
@@ -96,12 +95,17 @@ static inline void __issue(uint32_t type, char *data, amf_wrapper *temp_req){
 }
 
 void normal_write_issue(uint32_t type, uint32_t ppa, char *data,  algo_req *req){
-	amf_wrapper *temp_req=NULL;
 	if(type!=LOWER_TRIM){
+		amf_wrapper *temp_req=NULL;
 		temp_req=get_amf_wrapper(ppa, false);
 		temp_req->req=req;
+		__issue(type, data, temp_req);
 	}
-	__issue(type, data, temp_req);
+	else{
+		for(uint32_t i=0; i<128; i++){
+			AmfErase(am, ppa*R2PGAP+i, NULL);
+		}
+	}
 }
 
 void normal_write_sync_issue(uint32_t type, uint32_t ppa, char *data){
