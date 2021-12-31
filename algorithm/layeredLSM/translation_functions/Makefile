@@ -1,15 +1,15 @@
 SRCS +=\
-	exact_mapping.c\
-	bf.c\
-	bf_mapping.c\
-	./plr_mapping.c\
-	plr/plr.c\
-	./bf_guard_mapping.c\
-	./tree_mapping.c\
+	exact_mapping.cpp\
+	bf.cpp\
+	bf_mapping.cpp\
+	./plr_mapping.cpp\
+	plr/plr.cpp\
+	./bf_guard_mapping.cpp\
+	./tree_mapping.cpp\
 
 
 OBJS :=\
-	$(patsubst %.c,%.o,$(SRCS))\
+	$(patsubst %.cpp,%.o,$(SRCS))\
 
 TARGETOBJ:=\
 	$(addprefix ../../../object/,$(OBJS))\
@@ -20,10 +20,10 @@ all: $(OBJS)
 libnom.a : $(TARGETOBJ)
 	$(AR) r $(@) $(TARGETOBJ)
 
-%.o :%.c
+%.o :%.cpp
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
 
-../../../object/%.o:%.c
+../../../object/%.o:%.cpp
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
 
 plr/plr.o: ./plr/plr.cpp

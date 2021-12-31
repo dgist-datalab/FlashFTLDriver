@@ -3,7 +3,8 @@
 #include "./summary_page_set.h"
 #include "../../include/sem_lock.h"
 #include "./piece_ppa.h"
-extern sc_master* shortcut;
+#include "./lsmtree.h"
+#include "./merge_helper.h"
 extern lower_info *g_li;
 bool debug_flag=false;
 uint32_t target_recency=9;
@@ -27,7 +28,7 @@ typedef struct __sorted_pair{
 static inline uint32_t __set_read_flag(mm_container *mm_set, uint32_t run_num, uint32_t round){
 	uint32_t res=0;
 	for(uint32_t i=0; i<run_num; i++){
-		if(mm_set[i].done || mm_set[i].now_proc_block_idx==round){
+		if(mm_set[i].done || mm_set[i].now_proc_block_idx>=round){
 			res|=(1<<i);
 		}
 	}
@@ -44,14 +45,12 @@ static inline void __invalidate_target(run *r, uint32_t intra_offset){
 
 static inline bool __move_iter_target(mm_container *mm_set, uint32_t idx){
 	if(mm_set[idx].done) return true;
-	bool res=sp_set_iter_move(mm_set[idx].ssi);
-	if(res){
-		mm_set[idx].now_proc_block_idx++;
-		if(sp_set_iter_done_check(mm_set[idx].ssi)){
-			mm_set[idx].done=true;
-		}
+	uint32_t prev_now=mm_set[idx].now_proc_block_idx;
+	mm_set[idx].now_proc_block_idx=sp_set_iter_move(mm_set[idx].ssi);
+	if (sp_set_iter_done_check(mm_set[idx].ssi)){
+			mm_set[idx].done = true;
 	}
-	return res;
+	return mm_set[idx].now_proc_block_idx!=prev_now;
 }
 
 static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint32_t lba,
@@ -60,9 +59,6 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 	for(uint32_t i=0; i<run_num; i++){
 		if(mm_set[i].done) continue;
 		res=sp_set_iter_pick(mm_set[i].ssi);
-		if(res.lba==UINT32_MAX){
-			GDB_MAKE_BREAKPOINT;
-		}
 		if(res.lba==UINT32_MAX && __move_iter_target(mm_set, i)){
 			read_flag|=(1<<i);
 			continue;
@@ -80,7 +76,8 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 	return read_flag;
 }
 
-static inline summary_pair __pick_smallest_pair(mm_container *mm_set, uint32_t run_num, uint32_t *ridx){
+static inline summary_pair __pick_smallest_pair(mm_container *mm_set, uint32_t run_num, uint32_t *ridx,
+sc_master *shortcut){
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 	summary_pair now;
 	uint32_t t_idx;
@@ -143,7 +140,8 @@ static inline void __merge_issue_req(__sorted_pair *sort_pair){
 	g_li->read(sort_pair->original_psa/L2PGAP, PAGESIZE, req->value, req);
 }
 
-static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_list, blockmanager *sm){
+static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_list,
+ blockmanager *sm){
 	if(r->type==RUN_PINNING){ return;}
 	std::list<__sorted_pair>::iterator iter=sorted_list->begin();
 	for(; iter!=sorted_list->end(); iter++){
@@ -153,7 +151,8 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	}
 }
 
-static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_list){
+static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_list, 
+	sc_master *shortcut){
 	std::list<__sorted_pair>::iterator iter=sorted_list->begin();
 	if(r->type==RUN_NORMAL){
 		for(; iter!=sorted_list->end();iter++){
@@ -170,43 +169,128 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 
 		if(r->type==RUN_PINNING){
 			t_pair->original_psa=run_translate_intra_offset(t_pair->r, t_pair->pair.intra_offset);
-			run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true);
+			run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true, shortcut);
 		}
 		else{
-			run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true);
+			run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true, shortcut);
 			inf_free_valueset(t_pair->value, FS_MALLOC_R);
 		}
 		sorted_list->erase(iter++);
 	}
 }
 
-run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_bm *bm, uint32_t run_type){
+static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_container *mm_set){
+	uint32_t *spm_idx=(uint32_t*)calloc(run_num, sizeof(uint32_t));
+	bool **disjoint_check=(bool **)malloc(run_num * sizeof(bool*));
+	for(uint32_t i=0; i<run_num; i++){
+		disjoint_check[i]=(bool *)malloc(rset[i]->st_body->now_STE_num* sizeof(bool));
+		memset(disjoint_check[i], true, rset[i]->st_body->now_STE_num *sizeof(bool));
+	}
+
+	for(uint32_t i=0; i<run_num; i++){
+		run *r=rset[i];
+		for(uint32_t j=0; j<r->st_body->now_STE_num; j++){
+			if(rset[i]->st_body->pba_array[j].PBA==UINT32_MAX){
+				disjoint_check[i][j]=false;
+				continue;
+			}
+			if(disjoint_check[i][j]==false) continue;
+			summary_page_meta *temp=&rset[i]->st_body->sp_meta[j];
+			uint32_t check_start_idx=rset[i]->type==RUN_NORMAL?i+1:i;
+
+			for(uint32_t k=check_start_idx; k<run_num; k++){
+				uint32_t set_idx;
+				if(rset[k]->type==RUN_NORMAL){
+					set_idx = spm_joint_check(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
+				}
+				else{
+					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
+				}
+				if(set_idx==UINT32_MAX || (k==i && j==set_idx)){
+					continue;
+				}
+				else{
+					disjoint_check[i][j]=false;
+					disjoint_check[k][set_idx]=false;
+					break;
+				}
+			}
+
+			if(disjoint_check[i][j]){
+				sp_set_iter_skip_lba(mm_set[i].ssi, rset[i]->st_body->sp_meta[j].start_lba,
+					rset[i]->st_body->sp_meta[j].end_lba);
+			}
+		}
+	}
+
+	for(uint32_t i=0; i<run_num; i++){
+		free(disjoint_check[i]);
+	}
+	free(disjoint_check);
+	free(spm_idx);
+}
+extern uint32_t test_key;
+uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, uint32_t prev_lba, uint32_t end_lba){
+	//aligning insert dummy lba until the without link shortcut
+	//insert the intra offset as UINT32_MAX
+	//update PBA
+	//return last_lba of this ssi
+
+	run_padding_current_block(r);
+	bool isfirst=true;
+	while(1){
+		summary_pair res=sp_set_iter_pick(mm->ssi);
+		prev_lba=res.lba;
+
+		uint32_t psa = run_translate_intra_offset(mm->r, res.intra_offset);
+		if(isfirst){
+			run_trivial_move_start(r, psa/L2PGAP);
+			isfirst=false;
+		}
+		run_trivial_move_insert(r, shortcut, res.lba, psa);
+		//DEBUG_CNT_PRINT(test, 16896, __FUNCTION__, __LINE__);
+		__move_iter_target(mm,0);
+		if(prev_lba==end_lba){
+			run_trivial_move_finish(r);
+			break;
+		}
+	}
+	return prev_lba;
+}
+
+void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
+
+	bool trivial_move_flag=true;
+
 	for(uint32_t i=0; i<run_num; i++){
 		now_entry_num+=rset[i]->now_entry_num;
 
 		mm_set[i].r=rset[i];
 		if(rset[i]->mf->type==TREE_MAP){
-			mm_set[i].ssi=sp_set_iter_init_mf(rset[i]->mf);
+			mm_set[i].ssi=sp_set_iter_init_mf(rset[i]->st_body->now_STE_num, rset[i]->st_body->sp_meta, rset[i]->mf);
 		}
 		else{
-			mm_set[i].ssi=sp_set_iter_init(rset[i]->st_body->now_STE_num, rset[i]->st_body->sp_meta,
-					prefetch_num);
+			mm_set[i].ssi=sp_set_iter_init(rset[i]->st_body->now_STE_num, rset[i]->st_body->sp_meta, prefetch_num);
 		}
 		mm_set[i].now_proc_block_idx=0;
 		mm_set[i].done=false;
 	}
 
-	run *res=run_factory(map_type, now_entry_num, fpr, bm, run_type);
-	shortcut_add_run_merge(shortcut, res, rset, run_num);
-	
+	if(trivial_move_flag){
+		__check_disjoint_spm(rset,run_num, mm_set);
+	}
+
 	uint32_t target_round=0, read_flag;
 	std::list<__sorted_pair> sorted_arr;
 	__sorted_pair target_sorted_pair;
-	uint32_t prev_lba=0;
+	uint32_t prev_lba=UINT32_MAX;
+
+	bool isstart=true;
+	run *res=target_run;
 	while(1){
 		target_round++;
 		//uint32_t limited_lba=UINT32_MAX;
@@ -217,25 +301,38 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 				break;
 			}
 			uint32_t ridx;
-			summary_pair target=__pick_smallest_pair(mm_set, run_num, &ridx);
+			summary_pair target=__pick_smallest_pair(mm_set, run_num, &ridx, lsm->shortcut);
 			target_sorted_pair.pair=target;
 			target_sorted_pair.r=rset[ridx];
-
 			if(target.lba!=UINT32_MAX){
+				uint32_t end_lba;
+				if(trivial_move_flag && sp_set_noncopy_check(mm_set[ridx].ssi, target.lba, &end_lba)){
+					prev_lba=trivial_move(res, lsm->shortcut, &mm_set[ridx], prev_lba, end_lba);
+					continue;
+				}
+				GDB_MAKE_BREAKPOINT;
 				sorted_arr.push_back(target_sorted_pair);
+
 				/*checking sorting data*/
-				if(target.lba!=0 && prev_lba>=target.lba){
+				if(!isstart && prev_lba>=target.lba){
 					EPRINT("sorting error! prev_lba:%u, target.lba:%u", true, prev_lba, target.lba);
 				}
+				else if(isstart){
+					isstart=false;
+				}
 				prev_lba=target.lba;
+				read_flag=__move_iter(mm_set, run_num, target.lba, read_flag, ridx);
 			}
-			read_flag=__move_iter(mm_set, run_num, target.lba, read_flag, ridx);
+
+
 		}while(read_flag!=((1<<run_num)-1));
 		
-		//read data
-		__read_merged_data(res, &sorted_arr, bm->segment_manager);
-		//write data
-		__write_merged_data(res, &sorted_arr);
+		if(sorted_arr.size()){
+			//read data
+			__read_merged_data(res, &sorted_arr, lsm->bm->segment_manager);
+			//write data
+			__write_merged_data(res, &sorted_arr, lsm->shortcut);
+		}
 
 		bool done_flag=true;
 		for(uint32_t i=0; i<run_num; i++){
@@ -248,18 +345,18 @@ run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_b
 
 	while(sorted_arr.size()){
 		//read data
-		__read_merged_data(res, &sorted_arr, bm->segment_manager);
+		__read_merged_data(res, &sorted_arr, lsm->bm->segment_manager);
 		//write data
-		__write_merged_data(res, &sorted_arr);
+		__write_merged_data(res, &sorted_arr, lsm->shortcut);
 	}
 
 	for(uint32_t i=0; i<run_num; i++){
 		sp_set_iter_free(mm_set[i].ssi);
 	}
 	free(mm_set);
-
 	run_insert_done(res, true);
-	printf("result\n");
-	run_print(res,false);
-	return res;
+}
+
+void run_recontstruct(lsmtree *lsm, run *src, run *des){
+	run_merge(1, &src, des, lsm);
 }

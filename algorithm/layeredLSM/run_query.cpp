@@ -1,9 +1,9 @@
 #include "run.h"
 #include "../../interface/interface.h"
-
+#include "./lsmtree.h"
+extern uint32_t test_key;
 extern lower_info *g_li;
-extern L2P_bm *bm;
-
+extern lsmtree *LSM;
 static void *__run_read_end_req(algo_req *req){
 	if(req->type!=DATAR  && req->type!=MISSDATAR){
 		EPRINT("not allowed type", true);
@@ -11,7 +11,7 @@ static void *__run_read_end_req(algo_req *req){
 
 	request *p_req=req->parents;
 	map_read_param *param=(map_read_param*)req->param;
-	param->oob_set=(uint32_t*)bm->segment_manager->get_oob(bm->segment_manager, req->ppa);
+	param->oob_set=(uint32_t*)LSM->bm->segment_manager->get_oob(LSM->bm->segment_manager, req->ppa);
 	uint32_t intra_offset=param->mf->oob_check(param->mf, param);
 	if(intra_offset!=NOT_FOUND){
 		memmove(&p_req->value->value[0], &p_req->value->value[intra_offset*LPAGESIZE], LPAGESIZE);
@@ -35,38 +35,50 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 	g_li->read(ppa, PAGESIZE, value, res);
 }
 
-
 uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset){
 	return st_array_read_translation(r->st_body, intra_offset);
 }
 
 uint32_t run_query(run *r, request *req){
+	if(r->pp){
+		char *res=pp_find_value(r->pp, req->key);
+		memcpy(req->value->value, res, LPAGESIZE);
+		req->end_req(req);
+		return READ_DONE;
+	}
+
 	req->retry=true;
 	map_read_param *param;
 	uint32_t intra_offset=r->mf->query_by_req(r->mf, req, &param);
-	uint32_t psa=run_translate_intra_offset(r, intra_offset);
-	if(psa==NOT_FOUND){
+	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
-		return NOT_FOUND;
+		return READ_NOT_FOUND;
 	}
-
+	uint32_t psa=run_translate_intra_offset(r, intra_offset);
+	if(psa==UNLINKED_PSA){
+		EPRINT("shortcut error", true);
+	}
 	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 
 	param->intra_offset=psa%L2PGAP;
 	param->r=r;
 	req->param=(void*)param;
 	__run_issue_read(req, psa/L2PGAP, req->value, param, false);
-	return 0;
+	return READ_DONE;
 }
 
 uint32_t run_query_retry(run *r, request *req){
 	map_read_param *param=(map_read_param*)req->param;
 	uint32_t intra_offset=r->mf->query_retry(r->mf, param);
-	uint32_t psa=st_array_read_translation(r->st_body, intra_offset);
-	if(psa==NOT_FOUND){
+	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
 		return NOT_FOUND;
 	}
+	uint32_t psa=st_array_read_translation(r->st_body, intra_offset);
+	if(psa==UNLINKED_PSA){
+		EPRINT("shortcut error", true);
+	}
+
 	param->intra_offset=psa%L2PGAP;
 	req->param=(void*)param;
 	__run_issue_read(req, psa/L2PGAP, req->value, param, true);

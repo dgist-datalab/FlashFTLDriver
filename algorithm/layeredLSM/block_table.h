@@ -111,6 +111,9 @@ uint32_t L2PBm_pick_empty_RPBA(L2P_bm *bm);
 void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
 		uint32_t intra_idx);
 
+void L2PBm_move_owner(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
+uint32_t intra_idx);
+
 /* 
  * Function: L2PBm_block_fragment
  * ------------------------------
@@ -163,6 +166,10 @@ static inline void L2PBm_clear_block_info(L2P_bm *bm, uint32_t bidx){
 	bm->PBA_map[bidx].intra_idx=UINT32_MAX;
 	bm->PBA_map[bidx].type=LSM_BLOCK_EMPTY;
 	bm->PBA_map[bidx].frag_info=0;
+}
+
+static inline bool L2PBm_is_nomral_block(L2P_bm *bm, uint32_t PBA){
+	return bm->PBA_map[PBA/_PPB].type==LSM_BLOCK_NORMAL;
 }
 
 #endif

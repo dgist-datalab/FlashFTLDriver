@@ -3,10 +3,12 @@
 #include "../../include/data_struct/list.h"
 #include "./shortcut.h"
 #include "./page_aligner.h"
+#include "./lsmtree.h"
 extern uint32_t test_piece_ppa;
 extern sc_master *shortcut;
 extern lower_info *g_li;
 extern bool debug_flag;
+extern lsmtree *LSM;
 static void *__gc_end_req(algo_req *req){
 	gc_value *g_value=(gc_value*)req->param;
 	switch(req->type){
@@ -120,7 +122,6 @@ typedef struct gc_block{
 
 static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 	if(blk_list->size==0) return;
-	//GDB_MAKE_BREAKPOINT;
 	li_node *now, *nxt, *p_now, *p_nxt;
 	blockmanager *sm=bm->segment_manager;
 	list *temp_list=list_init();
@@ -282,7 +283,7 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 					uint32_t psa=g_value->ppa*L2PGAP+j;
 					uint32_t intra_offset;
 
-					run *r=run_find_include_address(shortcut, lba, psa, &intra_offset);
+					run *r=run_find_include_address(LSM->shortcut, lba, psa, &intra_offset);
 					if(r==NULL){ //unlinked ppa;
 						bool processed=false;
 						block_info *binfo=g_blk->b_info;

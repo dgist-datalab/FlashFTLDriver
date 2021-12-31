@@ -10,8 +10,11 @@
 #include "./block_table.h"
 #include "./summary_page.h"
 #include "../../include/data_struct/bitmap.h"
+#include "./mapping_function.h"
+#include "./run.h"
 
 #define UNLINKED_PSA (UINT32_MAX-1)
+#define NOT_POPULATE_PSA (UINT32_MAX-2)
 #define MAX_SECTOR_IN_BLOCK ((_PPB)*L2PGAP)
 //#define EXTRACT_PPA(PSA) (PSA/L2PGAP)
 enum{
@@ -20,13 +23,21 @@ enum{
 
 typedef struct sorted_table_entry{
 	uint32_t PBA; //mapping for RCI to PBA
+	uint32_t max_offset;
+	uint32_t start_write_pointer;
+	map_function *mf;
 }STE;
 
 typedef struct sorted_table_array{
+	bool internal_fragmented;
+	bool now_trivial_ste_copy;
+	map_param param;
+
 	uint32_t sid;
 	uint32_t max_STE_num;
 	uint32_t now_STE_num;
-	uint32_t write_pointer; //physical_page granuality
+	uint32_t inblock_write_pointer;
+	uint32_t global_write_pointer; //physical_page granuality
 	uint32_t type;
 
 	L2P_bm *bm;
@@ -55,6 +66,7 @@ typedef struct sid_info{
 
 typedef struct sorted_array_master{
 	sid_info *sid_map;
+	std::queue<uint32_t> *sid_queue;
 	uint32_t now_sid_info;
 	uint32_t total_run_num;
 }sa_master;
@@ -79,7 +91,7 @@ sid_info* sorted_array_master_get_info(uint32_t sidx);
 	store_summary_page_flag: if it is true, st_array store inserted data in summary_page
 	pinning: if it is set to true, all the PSA in the st are all pinned.
  */
-st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinning);
+st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinning, map_param param);
 
 /*
 	Function: st_array_free
@@ -100,6 +112,8 @@ void st_array_free(st_array *sa);
 	intra_idx: target idx in the run
 */
 uint32_t st_array_read_translation(st_array *sa, uint32_t intra_idx);
+
+map_function *st_array_get_target_STE(st_array *sa, uint32_t lba);
 
 /*
 	Function: st_array_summary_translation
@@ -131,6 +145,18 @@ uint32_t st_array_write_translation(st_array *sa);
  * psa: target_psa
  * */
 uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa);
+
+uint32_t st_array_force_skip_block(st_array *sa);
+
+void st_array_set_now_PBA(st_array *sa, uint32_t PBA, bool is_trivial_copy);
+
+static inline void st_array_finish_now_PBA(st_array *sa){
+	sa->pba_array[sa->now_STE_num].max_offset=sa->inblock_write_pointer-1;
+	if(sa->pba_array[sa->now_STE_num].max_offset!=(MAX_SECTOR_IN_BLOCK-1)){
+		sa->internal_fragmented=true;
+	}
+	sa->inblock_write_pointer=0;
+}
 
 /*
  * Function: st_array_update_pinned_info

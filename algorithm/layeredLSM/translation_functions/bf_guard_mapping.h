@@ -20,4 +20,6 @@ uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param);
 uint32_t		bfg_map_query_retry(map_function *mf, map_read_param *param);
 void			bfg_map_make_done(map_function *mf);
 void			bfg_map_free(map_function *mf);
+uint64_t 		bfg_get_memory_usage(map_function *mf, uint32_t target_bit);
+float find_sub_member_num(float fpr, uint32_t member, uint32_t lba_bit_num);
 #endif

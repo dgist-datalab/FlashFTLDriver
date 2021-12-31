@@ -78,8 +78,8 @@ summary_pair spi_pick_pair(summary_page_iter *spi){
 bool spi_move_forward(summary_page_iter* spi){
 	spi->read_pointer++;
 	if(spi->read_pointer==NORMAL_CUR_END_PTR){
-		inf_free_valueset(spi->value, FS_MALLOC_R);
 		spi->iter_done_flag=true;
+		inf_free_valueset(spi->value, FS_MALLOC_R);
 		return true;
 	}
 	if(spi_pick_pair(spi).lba==UINT32_MAX){

@@ -9,6 +9,11 @@
 enum{
 	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP
 };
+
+enum{
+	NOT_RETRY, NORMAL_RETRY, FORCE_RETRY,
+};
+
 typedef struct map_iter{
 	uint32_t read_pointer;
 	bool iter_done_flag;
@@ -18,15 +23,22 @@ typedef struct map_iter{
 
 typedef struct map_read_param{
 	struct request *p_req;
-	struct run *r;
+	//struct run *r;
+	struct sorted_table_entry *ste;
 	struct map_function *mf;
 	uint32_t lba;
-	bool retry_flag;
+	uint32_t retry_flag;
 	uint8_t intra_offset;
 	uint32_t prev_offset;
 	uint32_t *oob_set;
 	void *private_data;
 } map_read_param;
+
+typedef struct {
+	uint32_t map_type;
+	uint32_t lba_bit;
+	float fpr; 
+}map_param;
 
 typedef struct map_function{
 /*
@@ -97,6 +109,14 @@ typedef struct map_function{
  * 
 	void (*make_summary)(struct map_function *m, char *data, uint32_t *start_lba, bool first);
 	*/
+	/*
+		Function:map_get_memory_usage
+		-----------------------------
+			return the memory usage bit of map_function 
+		m:
+		target_bit: the lba bit of ftl
+	*/
+	uint64_t (*get_memory_usage) (struct map_function *m, uint32_t target_bit);
 	void (*show_info)(struct map_function *m);
 /*
  * Function: bf_map_free
@@ -111,6 +131,7 @@ typedef struct map_function{
 	map_iter *(*iter_init)(struct map_function *m);
 	summary_pair (*iter_pick)(map_iter *);
 	bool (*iter_move)(map_iter*);
+	void (*iter_adjust)(map_iter *, uint32_t lba);
 	void (*iter_free)(map_iter*);
 
 
@@ -132,7 +153,9 @@ typedef struct map_function{
 	contents_num: the max number of entries in the map_function
 	fpr: the target error rate for map_function
  */
-map_function *map_function_factory(uint32_t type, uint32_t contents_num, float fpr, uint32_t lba_bit_num);
+map_function *map_function_factory(map_param param, uint32_t contents_num);
+
+uint64_t map_memory_per_ent(uint32_t type, uint32_t target_bit, float fpr);
 
 /*
  * Function: map_default_oob_check

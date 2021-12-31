@@ -44,6 +44,7 @@ void L2PBm_free(L2P_bm *bm){
 	for(uint32_t i=0; i<_NOS; i++){
 		bitmap_free(bm->seg_block_bit[i]);
 	}
+	free(bm->seg_type);
 	free(bm->seg_block_bit);
 	free(bm);
 }
@@ -106,6 +107,21 @@ void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid,
 	bm->PBA_map[PBA/_PPB].intra_idx=intra_idx;
 	bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_NORMAL;
 }
+
+void L2PBm_move_owner(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
+uint32_t intra_idx){
+	if(bm->PBA_map[PBA/_PPB].sid==NO_MAP){
+		EPRINT("the mapping should be assigned", true);
+	}
+	if(bm->PBA_map[PBA/_PPB].type!=LSM_BLOCK_NORMAL){
+		EPRINT("this block should be normal block", true);
+	}
+	bm->PBA_map[PBA/_PPB].sid=sid;
+	bm->PBA_map[PBA/_PPB].intra_idx=intra_idx;
+	bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_NORMAL;
+}
+
+
 
 void L2PBm_block_fragment(L2P_bm *bm, uint32_t PBA, uint32_t sid){
 	uint32_t bidx=PBA/_PPB;

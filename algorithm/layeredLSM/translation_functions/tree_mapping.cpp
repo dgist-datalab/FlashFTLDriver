@@ -10,10 +10,12 @@ map_function*	tree_map_init(uint32_t contents_num, float fpr){
 	res->make_done=tree_make_done;
 	res->free=tree_free;
 	res->show_info=NULL;
+	res->get_memory_usage=tree_get_memory_usage;
 
 	res->iter_init=tree_iter_init;
 	res->iter_pick=tree_iter_pick;
 	res->iter_move=tree_iter_move;
+	res->iter_adjust=tree_iter_adjust;
 	res->iter_free=tree_iter_free;
 
 	tree_map *tr_map=(tree_map*)malloc(sizeof(tree_map));
@@ -39,6 +41,9 @@ uint32_t			tree_insert(map_function *m, uint32_t lba, uint32_t offset){
 		it->second=offset;
 		return old_offset;
 	}
+}
+uint64_t 		tree_get_memory_usage(map_function *m, uint32_t target_bit){
+	return (uint64_t)(target_bit*2+PTR_BIT) * m->now_contents_num;
 }
 
 uint32_t		tree_query(map_function *m, uint32_t lba, map_read_param ** param){
@@ -142,6 +147,16 @@ bool			tree_iter_move(map_iter *miter){
 	else{
 		return false;
 	}
+}
+
+void 			tree_iter_adjust(map_iter *miter, uint32_t lba){
+	tree_map *tr_map=iter_extract_tree(miter);
+	tree_iter iter=*(tree_iter*)miter->private_data;
+	tree_iter temp_iter=tr_map->body->find(lba);
+	if(temp_iter==tr_map->body->end()){
+		EPRINT("not found lba", true);
+	}
+	iter=temp_iter;
 }
 
 void			tree_iter_free(map_iter *miter){

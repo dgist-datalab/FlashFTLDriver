@@ -8,6 +8,7 @@ map_function *plr_map_init(uint32_t contents_num, float fpr){
 	res->query_retry=plr_map_query_retry;
 	res->query_done=map_default_query_done;
 	res->make_done=plr_map_make_done;
+	res->get_memory_usage=plr_get_memory_usage;
 	res->show_info=NULL;
 	res->free=plr_map_free;
 
@@ -29,6 +30,11 @@ uint32_t plr_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
 	return INSERT_SUCCESS;
 }
 
+uint64_t plr_get_memory_usage(map_function *mf, uint32_t target_bit){
+	plr_map *pmap=extract_plr(mf);
+	return pmap->plr_body->memory_usage(target_bit);
+}
+
 uint32_t plr_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	plr_map *pmap=extract_plr(mf);
 	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
@@ -36,7 +42,7 @@ uint32_t plr_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	res_param->mf=mf;
 	res_param->oob_set=NULL;
 	res_param->private_data=NULL;
-	res_param->retry_flag=false;
+	res_param->retry_flag=NOT_RETRY;
 	*param=res_param;
 
 	uint32_t res=pmap->plr_body->get(lba);
@@ -58,17 +64,24 @@ uint32_t plr_oob_check(map_function *mf, map_read_param *param){
 }
 
 uint32_t plr_map_query_retry(map_function *mf, map_read_param *param){
-	if(param->retry_flag){
+	if(param->retry_flag==NORMAL_RETRY){
 		return NOT_FOUND;
 	}
-	uint32_t lba=param->lba;
-	if(lba< param->oob_set[0]){
+	if(param->retry_flag==FORCE_RETRY){
 		param->prev_offset=(param->prev_offset/L2PGAP)*L2PGAP-1;
 	}
-	else if(lba > param->oob_set[L2PGAP]){
-		param->prev_offset=(param->prev_offset/L2PGAP+1)*L2PGAP;
+	else{
+		uint32_t lba = param->lba;
+		if (lba < param->oob_set[param->intra_offset])
+		{
+			param->prev_offset = (param->prev_offset / L2PGAP) * L2PGAP - 1;
+		}
+		else if (lba > param->oob_set[param->intra_offset])
+		{
+			param->prev_offset = (param->prev_offset / L2PGAP + 1) * L2PGAP;
+		}
 	}
-	param->retry_flag=true;
+	param->retry_flag = NORMAL_RETRY;
 
 	return param->prev_offset;
 }
@@ -80,6 +93,8 @@ void plr_map_make_done(map_function *mf){
 
 void plr_map_free(map_function *mf){
 	plr_map *pmap=extract_plr(mf);
+	pmap->plr_body->clear();
 	delete pmap->plr_body;
+	free(pmap);
 	free(mf);
 }

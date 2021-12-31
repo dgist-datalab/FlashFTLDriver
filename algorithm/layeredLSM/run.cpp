@@ -1,7 +1,9 @@
 #include "run.h"
 
-static inline run *__run_init(uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm){
+static inline run *__run_init(uint32_t run_idx, 
+		uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm){
 	run *res=(run*)malloc(sizeof(run));
+	res->run_idx=run_idx;
 	res->max_entry_num=entry_num;
 	res->now_entry_num=0;
 	res->mf=map_function_factory(map_type, entry_num, fpr, 48);
@@ -11,8 +13,9 @@ static inline run *__run_init(uint32_t map_type, uint32_t entry_num, float fpr, 
 	return res;
 }
 
-run *run_factory(uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm, uint32_t type){
-	run *res=__run_init(map_type, entry_num, fpr, bm);
+run *run_factory(uint32_t run_idx, uint32_t map_type, 
+	uint32_t entry_num, float fpr, L2P_bm *bm, uint32_t type, lsmtree *lsm){
+	run *res=__run_init(run_idx, map_type, entry_num, fpr, bm);
 	res->type=type;
 	switch(type){
 		case RUN_NORMAL:
@@ -26,6 +29,7 @@ run *run_factory(uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm, u
 			res->st_body=st_array_init(res, entry_num, bm, true);
 			break;
 	}
+	res->lsm=lsm;
 	return res;
 }
 
@@ -34,6 +38,7 @@ void run_free(run *r ,struct shortcut_master *sc){
 		EPRINT("what happened?", true);
 	}
 	shortcut_release_sc_info(sc, r->info->idx);
+	__lsm_calculate_memory_usage(r->lsm, -1 * r->mf->get_memory_usage(r->mf, r->lsm->param.target_bit));
 	r->mf->free(r->mf);
 	st_array_free(r->st_body);
 	free(r);
