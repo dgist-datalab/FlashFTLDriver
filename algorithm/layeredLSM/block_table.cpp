@@ -1,4 +1,5 @@
 #include "block_table.h"
+#include "compaction.h"
 #include "./gc.h"
 #define NO_MAP UINT32_MAX
 #define NO_SEG UINT32_MAX
@@ -64,13 +65,19 @@ void L2PBm_invalidate_PBA(L2P_bm *bm, uint32_t PBA){
 
 }
 
+extern lsmtree *LSM;
 uint32_t L2PBm_pick_empty_PBA(L2P_bm *bm){
+retry:
 	if(bm->now_seg_idx==NO_SEG){
 		blockmanager *sm=bm->segment_manager;
 		if(sm->is_gc_needed(sm)){
 			if(gc(bm, DATA_SEG)){
 				if(bm->now_block_idx==BPS){
+					lsmtree_print_log(LSM);
 					EPRINT("gc not effective", true);
+					bm->now_seg_idx=NO_SEG;
+					//compaction_clean_last_level(LSM);
+					goto retry;
 				}
 				goto out;
 			}
@@ -90,6 +97,14 @@ out:
 	return res;
 }
 
+
+uint32_t L2PBm_get_free_block_num(L2P_bm *bm){
+	uint32_t total_free_page_num=bm->segment_manager->total_free_page_num(bm->segment_manager, NULL);
+	uint32_t total_free_block_num=total_free_page_num/BPS;
+	total_free_block_num+=BPS-(bm->now_block_idx==NO_SEG?BPS:bm->now_block_idx);
+	return total_free_block_num;
+}
+
 uint32_t L2PBm_pick_empty_RPBA(L2P_bm *bm){
 	if(bm->reserve_block_idx==BPS){
 		EPRINT("block over flow error", true);
@@ -98,10 +113,20 @@ uint32_t L2PBm_pick_empty_RPBA(L2P_bm *bm){
 		(bm->reserve_block_idx++)*_PPB;
 }
 
+
+
+uint32_t target_PBA=UINT32_MAX;
+extern bool debug_flag;
 void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
 		uint32_t intra_idx){
 	if(bm->PBA_map[PBA/_PPB].sid!=NO_MAP){
 		EPRINT("the mapping should be empty", true);
+	}
+	if(PBA==target_PBA){
+		printf("target insert into %u:%u\n", sid, intra_idx);
+		if(sid==25 && intra_idx==0){
+			//debug_flag=true;
+		}
 	}
 	bm->PBA_map[PBA/_PPB].sid=sid;
 	bm->PBA_map[PBA/_PPB].intra_idx=intra_idx;
@@ -116,6 +141,9 @@ uint32_t intra_idx){
 	if(bm->PBA_map[PBA/_PPB].type!=LSM_BLOCK_NORMAL){
 		EPRINT("this block should be normal block", true);
 	}
+	if(PBA==target_PBA){
+		printf("move %u:%u -> %u:%u\n", bm->PBA_map[PBA/_PPB].sid, bm->PBA_map[PBA/_PPB].intra_idx, sid, intra_idx);
+	}
 	bm->PBA_map[PBA/_PPB].sid=sid;
 	bm->PBA_map[PBA/_PPB].intra_idx=intra_idx;
 	bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_NORMAL;
@@ -125,6 +153,9 @@ uint32_t intra_idx){
 
 void L2PBm_block_fragment(L2P_bm *bm, uint32_t PBA, uint32_t sid){
 	uint32_t bidx=PBA/_PPB;
+	if(PBA==target_PBA){
+		printf("target fragmented!\n");
+	}
 	bm->PBA_map[bidx].sid=NO_MAP;
 	bm->PBA_map[bidx].intra_idx=NO_MAP;
 	bm->PBA_map[bidx].type=LSM_BLOCK_FRAGMENT;
@@ -182,5 +213,3 @@ void L2PBm_gc_lock(L2P_bm *bm, uint32_t bidx){
 void L2PBm_gc_unlock(L2P_bm *bm, uint32_t bidx){
 	bm->gc_lock[bidx]=false;
 }
-
-

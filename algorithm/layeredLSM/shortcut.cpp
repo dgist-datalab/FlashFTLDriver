@@ -6,16 +6,19 @@ sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range){
 	memset(res->sc_map, NOT_ASSIGNED_SC, sizeof(uint8_t) * lba_range);
 	res->max_shortcut_num=max_shortcut_num;
 	res->info_set=(shortcut_info*)calloc(max_shortcut_num, sizeof(shortcut_info));
+
 	res->now_recency=0;
 
 	for(uint32_t i=0; i< max_shortcut_num; i++){
 		res->info_set[i].idx=i;
 		res->free_q->push_back(i);
 	}
+
+	fdriver_mutex_init(&res->lock);
 	return res;
 }
 
-void shortcut_add_run(sc_master *sc, run *r){
+void shortcut_add_run(sc_master *sc, run *r, uint32_t level_num){
 	uint32_t sc_info_idx=sc->free_q->front();
 	if(r->info){
 		EPRINT("already assigned run", true);
@@ -27,6 +30,7 @@ void shortcut_add_run(sc_master *sc, run *r){
 	}
 	sc->free_q->pop_front();
 	t_info->recency=sc->now_recency++;
+	t_info->level_idx=level_num;
 
 	r->info=t_info;
 	t_info->r=r;
@@ -82,30 +86,45 @@ void shortcut_unlink_lba(sc_master *sc, run *r, uint32_t lba){
 }
 
 run* shortcut_query(sc_master *sc, uint32_t lba){
+	fdriver_lock(&sc->lock);
 	uint32_t sc_info_idx=sc->sc_map[lba];
 	if(sc_info_idx==NOT_ASSIGNED_SC){
 	//	EPRINT("not assigned lba", true);
 		return NULL;
 	}
-	return sc->info_set[sc_info_idx].r;
+	run *res=sc->info_set[sc_info_idx].r;
+	fdriver_unlock(&sc->lock);
+	return res;
 }
 
-static inline uint32_t __get_recency_lba(sc_master *sc, uint32_t lba){
-	uint32_t sc_info_idx=sc->sc_map[lba];
-	if(sc_info_idx==NOT_ASSIGNED_SC){
-		return 0;
+static inline int32_t __get_recency_cmp(sc_info *a, sc_info *b){
+	if(a->level_idx < b->level_idx){
+		return 1;
 	}
-	return sc->info_set[sc_info_idx].recency;
+	else if(a->level_idx > b->level_idx){
+		return -1;
+	}	
+	return a->recency-b->recency;
 }
 
 bool shortcut_validity_check_lba(sc_master *sc, run *r, uint32_t lba){
-	uint32_t recency_value=__get_recency_lba(sc, lba);
-	return recency_value <= r->info->recency;
+	fdriver_lock(&sc->lock);
+	uint32_t info_idx=sc->sc_map[lba];
+	if(info_idx==NOT_ASSIGNED_SC){
+		return true;
+	}
+	bool res=__get_recency_cmp(&sc->info_set[info_idx], r->info)<=0;
+	fdriver_unlock(&sc->lock);
+	return res;
 }
 
 void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba){
-	if(__get_recency_lba(sc, lba) > r->info->recency){
-		EPRINT("most recent value should be added", true);
+	fdriver_lock(&sc->lock);
+	uint32_t info_idx=sc->sc_map[lba];
+	if(info_idx!=NOT_ASSIGNED_SC){
+		if(sc->info_set[info_idx].now_compaction==false &&__get_recency_cmp(&sc->info_set[info_idx], r->info) > 0){
+			EPRINT("most recent value should be added", true);
+		}
 	}
 
 	run *old_r=shortcut_query(sc, lba);
@@ -113,8 +132,8 @@ void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba){
 		shortcut_unlink_lba(sc, old_r, lba);
 	}
 	shortcut_link_lba(sc, r, lba);
+	fdriver_unlock(&sc->lock);
 }
-
 
 void shortcut_release_sc_info(sc_master *sc, uint32_t idx){
 	sc_info *t_info=&sc->info_set[idx];
@@ -128,4 +147,20 @@ void shortcut_free(sc_master *sc){
 	free(sc->sc_map);
 	free(sc->info_set);
 	free(sc);
+}
+
+bool shortcut_validity_check_and_link(sc_master* sc, run *r, uint32_t lba){
+	fdriver_lock(&sc->lock);
+	uint32_t info_idx=sc->sc_map[lba];
+	bool res=info_idx==NOT_ASSIGNED_SC? true: (sc->info_set[info_idx].now_compaction? true:(&sc->info_set[info_idx], r->info)<=0);
+	if(res){
+		run *old_r = sc->info_set[sc->sc_map[lba]].r;
+		if (old_r)
+		{
+			shortcut_unlink_lba(sc, old_r, lba);
+		}
+		shortcut_link_lba(sc, r, lba);
+	}
+	fdriver_unlock(&sc->lock);
+	return res;
 }

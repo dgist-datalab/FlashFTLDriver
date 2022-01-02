@@ -32,6 +32,8 @@ map_function *map_function_factory(map_param param, uint32_t contents_num){
 	}
 	map_init(res, param.map_type, contents_num, param.lba_bit);
 	res->query_by_req=map_query_by_req;
+	res->moved=false;
+	res->memory_usage_bit=0;
 	return res;
 }
 
@@ -44,4 +46,15 @@ uint64_t map_memory_per_ent(uint32_t type, uint32_t target_bit, float fpr){
 			break;
 	}
 	return 48;
+}
+
+void emptry_free(map_function *mf){
+	free(mf);
+}
+
+map_function *map_empty_copy(uint64_t _memory_usage_bit){
+	map_function *res=(map_function*)calloc(1,sizeof(map_function));
+	res->memory_usage_bit=_memory_usage_bit;
+	res->free=emptry_free;
+	return res;
 }

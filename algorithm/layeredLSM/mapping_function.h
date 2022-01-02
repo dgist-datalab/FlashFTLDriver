@@ -7,7 +7,7 @@
 #define NOT_FOUND UINT32_MAX
 #define INSERT_SUCCESS UINT32_MAX
 enum{
-	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP
+	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP, EMPTY_MAP,
 };
 
 enum{
@@ -23,8 +23,8 @@ typedef struct map_iter{
 
 typedef struct map_read_param{
 	struct request *p_req;
-	//struct run *r;
-	struct sorted_table_entry *ste;
+	struct run *r;
+	uint32_t ste_num;
 	struct map_function *mf;
 	uint32_t lba;
 	uint32_t retry_flag;
@@ -137,10 +137,12 @@ typedef struct map_function{
 
 	void *private_data;
 
+	bool moved;
 	uint32_t type;
 	uint32_t lba_bit_num;
 	uint32_t now_contents_num;
 	uint32_t max_contents_num;
+	uint32_t memory_usage_bit;
 	//uint32_t make_summary_lba;
 }map_function;
 
@@ -154,6 +156,8 @@ typedef struct map_function{
 	fpr: the target error rate for map_function
  */
 map_function *map_function_factory(map_param param, uint32_t contents_num);
+
+map_function *map_empty_copy(uint64_t memory_usage_bit);
 
 uint64_t map_memory_per_ent(uint32_t type, uint32_t target_bit, float fpr);
 
@@ -199,6 +203,22 @@ static inline bool map_full_check(map_function *mf){
 
 static inline void map_increase_contents_num(map_function *mf){
 	mf->now_contents_num++;
+}
+
+static inline char *map_type_to_string(uint32_t map_type){
+	switch(map_type){
+		case EXACT:
+		return "EXACT"; break;
+		case BF:
+		return "BF"; break;
+		case GUARD_BF:
+		return "GUARD_BF"; break;
+		case PLR_MAP:
+		return "PLR_MAP"; break;
+		case TREE_MAP:
+		return "TREE_MAP"; break;
+	}
+	return NULL;
 }
 
 #endif

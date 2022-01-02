@@ -85,6 +85,14 @@ void posix_traffic_print(lower_info *li){
 	for(int i=0; i<LREQ_TYPE_NUM;i++){
 		printf("%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
 	}
+	printf("WAF: %lf\n\n",
+		   (double)(li->req_type_cnt[MAPPINGW] +
+					li->req_type_cnt[DATAW] +
+					li->req_type_cnt[GCDW] +
+					li->req_type_cnt[GCMW_DGC] +
+					li->req_type_cnt[GCMW] +
+					li->req_type_cnt[COMPACTIONDATAW]) /
+			   li->req_type_cnt[DATAW]);
 	printf("end\n");
 }
 
@@ -313,9 +321,7 @@ void *posix_refresh(lower_info *li){
 }
 
 void *posix_destroy(lower_info *li){
-	for(int i=0; i<LREQ_TYPE_NUM;i++){
-		fprintf(stderr,"%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
-	}
+	posix_traffic_print(li);
 	for(uint32_t i = 0; i < li->NOP; i++){
 		free(seg_table[i].storage);
 	}
@@ -335,7 +341,6 @@ inline uint32_t convert_ppa(uint32_t PPA){
 	return PPA;
 }
 void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const req){
-	uint8_t test_type;
 	uint32_t PPA=convert_ppa(_PPA);
 	if(PPA==lower_test_ppa){
 		printf("%u (piece:%u) target write\n", lower_test_ppa, lower_test_ppa*2);

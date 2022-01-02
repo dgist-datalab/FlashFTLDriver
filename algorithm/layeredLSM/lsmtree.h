@@ -5,9 +5,11 @@
 #include "./run.h"
 #include "./shortcut.h"
 #include "../../include/container.h"
+#include "../../include/utils/thpool.h"
 #include <queue>
 #include <stdlib.h>
 #define MEMTABLE_NUM 2
+//#define THREAD_COMPACTION
 
 typedef struct range{
 	uint32_t start;
@@ -40,7 +42,15 @@ typedef struct lsmtree_parameter{
 
 typedef struct lsmtree_monitor{
 	uint64_t now_memory_usage;
-	uint32_t compaction_cnt;
+
+	uint64_t plr_memory_ent;
+	uint64_t plr_memory_usage;
+	uint64_t bf_memory_ent;
+	uint64_t bf_memory_usage;
+
+	uint32_t compaction_cnt[10];
+	uint64_t compaction_input_entry_num[10];
+	uint64_t compaction_output_entry_num[10];
 }lsmtree_monitor;
 
 typedef struct lsmtree{
@@ -50,7 +60,9 @@ typedef struct lsmtree{
 	uint32_t now_memtable_idx;
 	run *memtable[MEMTABLE_NUM];
 	struct level **disk;
-
+#ifdef THREAD_COMPACTION
+	threadpool tp;
+#endif
 	lsmtree_monitor monitor;
 	lsmtree_parameter param;
 }lsmtree;
@@ -83,10 +95,11 @@ void lsmtree_free(lsmtree *lsm);
 
 uint32_t lsmtree_insert(lsmtree *lsm, request *req);
 uint32_t lsmtree_read(lsmtree *lsm, request *req);
+uint32_t lsmtree_print_log(lsmtree *lsm);
 
-struct run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, uint32_t entry_num);
+struct run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, uint32_t entry_num, uint32_t level_num);
 void __lsm_free_run(lsmtree *lsm, run *r);
-void __lsm_calculate_memory_usage(lsmtree *lsm, int32_t memory_usage_bit);
+void __lsm_calculate_memory_usage(lsmtree *lsm,uint64_t entry_num, int32_t memory_usage_bit, uint32_t map_type, bool pinning);
 bool __lsm_pinning_enable(lsmtree *lsm, uint32_t entry_num);
 
 static inline uint32_t bit_calculate(uint32_t lba_range){

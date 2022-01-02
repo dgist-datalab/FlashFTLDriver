@@ -3,7 +3,7 @@
 #include "./lsmtree.h"
 
 uint32_t operation_temp(request *const ){return 1;}
-uint32_t print_log_temp(){return 1;}
+uint32_t print_log_temp();
 
 uint32_t create_temp(lower_info *,blockmanager *, struct algorithm *);
 void destroy_temp(lower_info *, struct algorithm *);
@@ -43,7 +43,13 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 
 void destroy_temp(lower_info *, struct algorithm *){
 	free(target_param);
+	lsmtree_print_log(LSM);
 	lsmtree_free(LSM);
+}
+
+uint32_t print_log_temp(){
+	lsmtree_print_log(LSM);
+	return 1;
 }
 
 uint32_t write_temp(request *const req){
@@ -135,10 +141,28 @@ static uint32_t *blending_array(uint32_t start_lba, uint32_t max_num){
 	}
 	return arr;
 }
+
+uint32_t test_function2(){
+	uint32_t target_entry_num=10000;
+	run *a=__lsm_populate_new_run(LSM, GUARD_BF, RUN_LOG, target_entry_num, 0);
+	for(uint32_t i=0; i<target_entry_num; i++){
+		request *req=__make_dummy_request(i,false);
+		run_insert(a, req->key,UINT32_MAX, req->value->value, false, LSM->shortcut);
+		req->end_req(req);
+	}
+	run_insert_done(a, false);
+
+	for(uint32_t i=0; i<target_entry_num; i++){
+		request *req=__make_dummy_request(i, true);
+		lsmtree_read(LSM, req);
+	}
+	return 1;
+}
+
 uint32_t test_function(){ //random+sequential+normal 
 	uint32_t target_entry_num=_PPB*L2PGAP*4+_PPB*L2PGAP/2;
-	run *a=__lsm_populate_new_run(LSM, TREE_MAP, RUN_LOG, target_entry_num);
-	run *b=__lsm_populate_new_run(LSM, TREE_MAP, RUN_LOG, target_entry_num);
+	run *a=__lsm_populate_new_run(LSM, TREE_MAP, RUN_LOG, target_entry_num, 0);
+	run *b=__lsm_populate_new_run(LSM, TREE_MAP, RUN_LOG, target_entry_num, 0);
 
 	uint32_t total_entry_num=_PPB*L2PGAP*9;
 	uint32_t first_set_num=_PPB*L2PGAP*4;
@@ -159,17 +183,20 @@ uint32_t test_function(){ //random+sequential+normal
 			else{
 				run_insert(b, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
 			}
+			req->end_req(req);
 		}
 	}
 
 	for(uint32_t i=first_set_num; i<first_set_num+_PPB*L2PGAP; i++){
 		request *req=__make_dummy_request(i,false);
 		run_insert(a, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
+		req->end_req(req);
 	}
 
 	for(uint32_t i=first_set_num+_PPB*L2PGAP; i<first_set_num+_PPB*L2PGAP*2; i++){
 		request *req=__make_dummy_request(i,false);
 		run_insert(b, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
+		req->end_req(req);
 	}
 
 	uint32_t second_set_idx=0;
@@ -182,6 +209,7 @@ uint32_t test_function(){ //random+sequential+normal
 			else{
 				run_insert(b, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
 			}
+			req->end_req(req);
 		}
 	}
 	//printf("max insert lba:%u\n", temp_lba-1);
@@ -192,7 +220,7 @@ uint32_t test_function(){ //random+sequential+normal
 	run *merge_set[2];
 	merge_set[0]=a;
 	merge_set[1]=b;
-	run *target=__lsm_populate_new_run(LSM, EXACT, RUN_NORMAL, target_entry_num*2);
+	run *target=__lsm_populate_new_run(LSM, EXACT, RUN_NORMAL, target_entry_num*2, 1);
 	run_merge(2,merge_set, target, LSM);
 
 

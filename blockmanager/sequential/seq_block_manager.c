@@ -187,7 +187,7 @@ __gsegment* sbm_get_gc_target(blockmanager* bm){
 	if(res->validate_piece_num==0){
 		EPRINT("the gc target should have valid piece", true);
 	}
-
+	
 	printf("gc_target :%u (%u:%u~%u:%u), invalidate_piece_num:%u\n", 
 			res->seg_idx, 
 			res->seg_idx*_PPS, res->seg_idx*_PPS/_PPB,

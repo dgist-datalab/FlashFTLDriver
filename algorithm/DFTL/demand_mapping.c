@@ -91,13 +91,6 @@ uint32_t demand_print_log(){
 	}
 	demand_cache_log();
 	lower_info *li=demand_ftl.li;
-	printf("WAF: %lf\n\n",
-			(double)(li->req_type_cnt[MAPPINGW] +
-				li->req_type_cnt[DATAW]+
-				li->req_type_cnt[GCDW]+
-				li->req_type_cnt[GCMW_DGC]+
-				li->req_type_cnt[GCMW]+
-				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	if(demand_ftl.li->print_traffic){
 		demand_ftl.li->print_traffic(demand_ftl.li);
 	}

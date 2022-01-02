@@ -8,6 +8,7 @@ summary_page *sp_init(){
 	res->write_pointer=0;
 	res->value=inf_get_valueset(all_set_data, FS_MALLOC_W, PAGESIZE);
 	res->body=res->value->value;
+	res->sorted=true;
 	return res;
 }
 
@@ -19,12 +20,25 @@ void sp_free(summary_page *sp){
 void sp_reinit(summary_page *sp){
 	memset(sp->body, -1, PAGESIZE);
 	sp->write_pointer=0;
+	sp->sorted=true;
+}
+
+static inline summary_pair * __get_sp_idx(summary_page *sp, uint32_t idx){
+	return &((summary_pair*)sp->body)[idx];
 }
 
 bool sp_insert(summary_page *sp, uint32_t lba, uint32_t intra_offset){
-	summary_pair* p=(summary_pair*)(&sp->body[sp->write_pointer*sizeof(summary_pair)]);
+	summary_pair* p=__get_sp_idx(sp, sp->write_pointer);
 	p->lba=lba;
 	p->intra_offset=intra_offset;
+
+	if(sp->write_pointer!=0 && sp->sorted){
+		summary_pair *prev_p=__get_sp_idx(sp, sp->write_pointer-1);
+		if(prev_p->lba > p->lba){
+			sp->sorted=false;
+		}
+	}
+
 	sp->write_pointer++;
 	if(sp->write_pointer==MAX_CUR_POINTER) return true;
 	else return false;

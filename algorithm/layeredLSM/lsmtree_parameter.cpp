@@ -9,6 +9,7 @@ void lsmtree_print_param(lsmtree_parameter param){
 	printf("# of runs:%u - spare run:%u\n", param.total_run_num, param.spare_run_num);
 	printf("target fpr:%.2f\n", param.fpr);
 	printf("size factor:%.2f\n", param.size_factor);
+	printf("mem per ent:%.2f, %u\n", (double)param.max_memory_usage_bit/RANGE, param.target_bit);
 	printf("memtable entry:%u\n", param.memtable_entry_num);
 	printf("memory usage:%.2f\n", (double)param.max_memory_usage_bit/(RANGE*param.target_bit));
 	printf("\t usage:absolute, vs page, breakdown\n");

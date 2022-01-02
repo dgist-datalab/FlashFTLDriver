@@ -21,6 +21,14 @@ enum{
 	ST_NORMAL, ST_PINNING
 };
 
+enum{
+	NORAML_PBA, EMPTY_PBA, TRIVIAL_MOVE_PBA, FRAGMENT_PBA
+};
+
+enum{
+	INSERT_NORMAL, INSERT_FRAGMENT
+};
+
 typedef struct sorted_table_entry{
 	uint32_t PBA; //mapping for RCI to PBA
 	uint32_t max_offset;
@@ -30,7 +38,6 @@ typedef struct sorted_table_entry{
 
 typedef struct sorted_table_array{
 	bool internal_fragmented;
-	bool now_trivial_ste_copy;
 	map_param param;
 
 	uint32_t sid;
@@ -111,9 +118,11 @@ void st_array_free(st_array *sa);
 	sa: target sa
 	intra_idx: target idx in the run
 */
-uint32_t st_array_read_translation(st_array *sa, uint32_t intra_idx);
+uint32_t st_array_read_translation(st_array *sa, uint32_t ste_num,uint32_t intra_idx);
 
-map_function *st_array_get_target_STE(st_array *sa, uint32_t lba);
+uint32_t st_array_get_target_STE(st_array *sa, uint32_t lba);
+uint32_t st_array_convert_global_offset_to_psa(st_array *sa, uint32_t global_offset);
+void st_array_copy_STE(st_array *sa, STE *ste, summary_page_meta *spm, struct map_function* mf, bool unlinked_data_copy);
 
 /*
 	Function: st_array_summary_translation
@@ -148,7 +157,7 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa);
 
 uint32_t st_array_force_skip_block(st_array *sa);
 
-void st_array_set_now_PBA(st_array *sa, uint32_t PBA, bool is_trivial_copy);
+void st_array_set_now_PBA(st_array *sa, uint32_t PBA, uint32_t set_type);
 
 static inline void st_array_finish_now_PBA(st_array *sa){
 	sa->pba_array[sa->now_STE_num].max_offset=sa->inblock_write_pointer-1;
@@ -168,7 +177,7 @@ static inline void st_array_finish_now_PBA(st_array *sa){
  * new_psa: new psa
  * old_psa: for debugging
  * */
-void st_array_update_pinned_info(st_array *sa, uint32_t intra_offset, uint32_t new_psa, uint32_t old_psa);
+void st_array_update_pinned_info(st_array *sa, uint32_t ste_num, uint32_t intra_offset, uint32_t new_psa, uint32_t old_psa);
 
 /*
 	Function:st_array_unlink_bit_set
@@ -180,7 +189,7 @@ void st_array_update_pinned_info(st_array *sa, uint32_t intra_offset, uint32_t n
 	old_psa: for debugging
  */
 
-void st_array_unlink_bit_set(st_array *sa, uint32_t intra_offset, uint32_t old_psa);
+void st_array_unlink_bit_set(st_array *sa, uint32_t ste_num, uint32_t intra_offset, uint32_t old_psa);
 
 /*
  * Function: st_array_block_lock

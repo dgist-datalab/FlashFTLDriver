@@ -17,6 +17,7 @@ static void *__run_read_end_req(algo_req *req){
 		memmove(&p_req->value->value[0], &p_req->value->value[intra_offset*LPAGESIZE], LPAGESIZE);
 		p_req->end_req(p_req);
 		param->mf->query_done(param->mf, param);
+		fdriver_unlock(&param->r->lock);
 	}
 	else{
 		inf_assign_try(p_req);
@@ -35,32 +36,74 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 	g_li->read(ppa, PAGESIZE, value, res);
 }
 
-uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset){
-	return st_array_read_translation(r->st_body, intra_offset);
+uint32_t run_translate_intra_offset(run *r, uint32_t ste_num, uint32_t intra_offset){
+	if(r->type==RUN_LOG){
+		//when the r type is log, the intra_offset counts the place over the STE.
+		return st_array_read_translation(r->st_body, intra_offset/MAX_SECTOR_IN_BLOCK, intra_offset%MAX_SECTOR_IN_BLOCK);
+	}
+	else{
+		return st_array_read_translation(r->st_body, ste_num, intra_offset);
+	}
 }
 
 uint32_t run_query(run *r, request *req){
+	fdriver_lock(&r->lock);
 	if(r->pp){
 		char *res=pp_find_value(r->pp, req->key);
-		memcpy(req->value->value, res, LPAGESIZE);
-		req->end_req(req);
-		return READ_DONE;
+		if (res){
+			memcpy(req->value->value, res, LPAGESIZE);
+			req->end_req(req);
+			return READ_DONE;
+		}
 	}
 
 	req->retry=true;
+
+	uint32_t ste_num;
 	map_read_param *param;
-	uint32_t intra_offset=r->mf->query_by_req(r->mf, req, &param);
-	if(intra_offset==NOT_FOUND){
-		param->mf->query_done(param->mf, param);
-		return READ_NOT_FOUND;
+	map_function *mf;
+	uint32_t psa;
+
+	//printf("req->key:%u\n", req->key);
+	if(r->type==RUN_LOG){
+		mf=r->run_log_mf;
+		uint32_t global_intra_offset=mf->query_by_req(mf, req, &param);
+		if(global_intra_offset==NOT_FOUND){
+			param->mf->query_done(param->mf, param);
+			fdriver_unlock(&param->r->lock);
+			return READ_NOT_FOUND;
+		}
+		else{
+			ste_num=global_intra_offset;
+			psa=run_translate_intra_offset(r, UINT32_MAX, global_intra_offset);
+		}
 	}
-	uint32_t psa=run_translate_intra_offset(r, intra_offset);
-	if(psa==UNLINKED_PSA){
-		EPRINT("shortcut error", true);
+	else{
+		ste_num = st_array_get_target_STE(r->st_body, req->key);
+		if (ste_num == UINT32_MAX)
+		{
+			fdriver_unlock(&r->lock);
+			return READ_NOT_FOUND;
+		}
+		req->retry = true;
+		mf = r->st_body->pba_array[ste_num].mf;
+		uint32_t intra_offset = mf->query_by_req(mf, req, &param);
+		if (intra_offset == NOT_FOUND)
+		{
+			param->mf->query_done(param->mf, param);
+			fdriver_unlock(&r->lock);
+			return READ_NOT_FOUND;
+		}
+		psa = run_translate_intra_offset(r, ste_num, intra_offset);
+		if (psa == UNLINKED_PSA)
+		{
+			EPRINT("shortcut error", true);
+		}
 	}
 	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 
 	param->intra_offset=psa%L2PGAP;
+	param->ste_num=ste_num;
 	param->r=r;
 	req->param=(void*)param;
 	__run_issue_read(req, psa/L2PGAP, req->value, param, false);
@@ -68,13 +111,19 @@ uint32_t run_query(run *r, request *req){
 }
 
 uint32_t run_query_retry(run *r, request *req){
+	if(r->type==RUN_LOG){
+		return READ_NOT_FOUND;
+	}
 	map_read_param *param=(map_read_param*)req->param;
-	uint32_t intra_offset=r->mf->query_retry(r->mf, param);
+	uint32_t ste_num=param->ste_num;
+	map_function *mf=r->st_body->pba_array[ste_num].mf;
+	uint32_t intra_offset=mf->query_retry(mf, param);
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
-		return NOT_FOUND;
+		fdriver_unlock(&param->r->lock);
+		return READ_NOT_FOUND;
 	}
-	uint32_t psa=st_array_read_translation(r->st_body, intra_offset);
+	uint32_t psa=st_array_read_translation(r->st_body, ste_num, intra_offset);
 	if(psa==UNLINKED_PSA){
 		EPRINT("shortcut error", true);
 	}
@@ -86,30 +135,41 @@ uint32_t run_query_retry(run *r, request *req){
 }
 
 
-static inline uint32_t __find_target_in_run(run *r, uint32_t lba, uint32_t psa){
+static inline uint32_t __find_target_in_run(run *r, uint32_t lba, uint32_t psa, uint32_t *_ste_num){
 	if(r->type==RUN_NORMAL){
 		return NOT_FOUND;
 	}
+
+	uint32_t ste_num=st_array_get_target_STE(r->st_body, lba);
+	if(ste_num==UINT32_MAX){
+		return NOT_FOUND;
+	}
+	*_ste_num=ste_num;
+	map_function *mf=r->st_body->pba_array[ste_num].mf;
 	map_read_param *param;
-	uint32_t intra_offset=r->mf->query(r->mf, lba, &param);
-	uint32_t t_psa=st_array_read_translation(r->st_body, intra_offset);
+	uint32_t intra_offset=mf->query(mf, lba, &param);
+	if(intra_offset==UINT32_MAX){
+		return NOT_FOUND;
+	}
+	uint32_t t_psa=st_array_read_translation(r->st_body, ste_num, intra_offset);
 	if(r->type==RUN_LOG && t_psa!=psa){
 		return NOT_FOUND;
 	}
 	while(t_psa!=psa){
-		intra_offset=r->mf->query_retry(r->mf, param);
+		intra_offset=mf->query_retry(mf, param);
 		if(intra_offset==NOT_FOUND){
 			break;
 		}
-		t_psa=st_array_read_translation(r->st_body, intra_offset);
+		t_psa=st_array_read_translation(r->st_body, ste_num, intra_offset);
 	}
 	free(param);
 	return intra_offset;
 }
 
-run *run_find_include_address(sc_master *sc, uint32_t lba, uint32_t psa, uint32_t *_intra_offset){
+run *run_find_include_address(sc_master *sc, uint32_t lba, uint32_t psa,
+uint32_t *_ste_num, uint32_t *_intra_offset){
 	run *r=shortcut_query(sc, lba);
-	uint32_t intra_offset=__find_target_in_run(r, lba, psa);
+	uint32_t intra_offset=__find_target_in_run(r, lba, psa, _ste_num);
 	*_intra_offset=intra_offset;
 	if(intra_offset==NOT_FOUND){
 		return NULL;
@@ -117,6 +177,6 @@ run *run_find_include_address(sc_master *sc, uint32_t lba, uint32_t psa, uint32_
 	return r;
 }
 
-uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa){
-	return __find_target_in_run(r, lba, psa);
+uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa, uint32_t *_ste_num){
+	return __find_target_in_run(r, lba, psa, _ste_num);
 }

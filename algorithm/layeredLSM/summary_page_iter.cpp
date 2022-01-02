@@ -80,11 +80,13 @@ bool spi_move_forward(summary_page_iter* spi){
 	if(spi->read_pointer==NORMAL_CUR_END_PTR){
 		spi->iter_done_flag=true;
 		inf_free_valueset(spi->value, FS_MALLOC_R);
+		spi->value=NULL;
 		return true;
 	}
 	if(spi_pick_pair(spi).lba==UINT32_MAX){
 		spi->iter_done_flag=true;
 		inf_free_valueset(spi->value, FS_MALLOC_R);
+		spi->value=NULL;
 		return true;
 	}
 	return false;
@@ -98,6 +100,9 @@ void spi_move_backward(summary_page_iter* spi){
 }
 
 void spi_free(summary_page_iter* spi){
+	if(spi->value){
+		inf_free_valueset(spi->value, FS_MALLOC_R);
+	}
 	spi->spm->pr_type=NO_PR;
 	spi->spm->private_data=NULL;
 	free(spi);

@@ -25,7 +25,7 @@ uint32_t plr_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
 	if(map_full_check(mf)){
 		EPRINT("over flow", true);
 	}
-	pmap->plr_body->insert(lba, offset);
+	pmap->plr_body->insert(lba, offset/L2PGAP);
 	map_increase_contents_num(mf);
 	return INSERT_SUCCESS;
 }
@@ -45,7 +45,7 @@ uint32_t plr_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	res_param->retry_flag=NOT_RETRY;
 	*param=res_param;
 
-	uint32_t res=pmap->plr_body->get(lba);
+	uint32_t res=pmap->plr_body->get(lba) * L2PGAP;
 	res_param->prev_offset=res;
 	return res;
 }
@@ -72,11 +72,11 @@ uint32_t plr_map_query_retry(map_function *mf, map_read_param *param){
 	}
 	else{
 		uint32_t lba = param->lba;
-		if (lba < param->oob_set[param->intra_offset])
+		if (lba < param->oob_set[0])
 		{
 			param->prev_offset = (param->prev_offset / L2PGAP) * L2PGAP - 1;
 		}
-		else if (lba > param->oob_set[param->intra_offset])
+		else if (lba > param->oob_set[L2PGAP-1])
 		{
 			param->prev_offset = (param->prev_offset / L2PGAP + 1) * L2PGAP;
 		}

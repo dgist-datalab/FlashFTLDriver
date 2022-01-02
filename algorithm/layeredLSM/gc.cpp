@@ -120,6 +120,7 @@ typedef struct gc_block{
 	__block *blk;
 }gc_block;
 
+extern uint32_t target_PBA;
 static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 	if(blk_list->size==0) return;
 	li_node *now, *nxt, *p_now, *p_nxt;
@@ -127,10 +128,16 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 	list *temp_list=list_init();
 	gc_value *g_value;
 	for_each_list_node_safe(blk_list, now, nxt){
+	//	DEBUG_CNT_PRINT(gc_cnt, 29, __FUNCTION__, __LINE__);
 		gc_block *g_blk=(gc_block*)now->data;
 		uint32_t bidx=g_blk->blk->block_idx;
 		sid_info* info=sorted_array_master_get_info(g_blk->b_info->sid);
-		uint32_t invalidte_piece_num=0, validate_piece_num=0;
+		if(info->sa==NULL){
+			EPRINT("not found info at sid:%u", false, g_blk->b_info->sid);
+			GDB_MAKE_BREAKPOINT;
+			info=sorted_array_master_get_info(g_blk->b_info->sid);
+		}
+		uint32_t invalidate_piece_num=0, validate_piece_num=0;
 
 		/*read all page*/
 		for(uint32_t i=0; i<_PPB; i++){
@@ -138,7 +145,7 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 			bool read_flag=false;
 			for(uint32_t j=0; j<L2PGAP; j++){
 				if(sm->is_invalid_piece(sm, page*L2PGAP+j)){
-					invalidte_piece_num++;
+					invalidate_piece_num++;
 					continue;
 				}
 				validate_piece_num++;
@@ -150,6 +157,10 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 				g_value=__gc_issue_read(page, sm, GCDR);
 				list_insert(temp_list, (void*)g_value);
 			}
+		}
+
+		if(bidx*_PPB==target_PBA){
+			printf("%u inv:v %u:%u\n", target_PBA, invalidate_piece_num, validate_piece_num);
 		}
 
 		uint32_t new_pba=L2PBm_pick_empty_RPBA(bm);
@@ -200,10 +211,11 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 		
 		/*update block mapping*/
 		if(info->sa->pba_array[idx].PBA!=bidx*_PPB){
-			EPRINT("inaccurate block!", true);
+			EPRINT("inaccurate block! target:%u, sid_pba:%u", true, bidx*_PPB, info->sa->pba_array[idx].PBA);
 		}
 		info->sa->pba_array[idx].PBA=new_pba;
 
+		free(g_blk);
 		list_delete_node(blk_list, now);
 	}
 
@@ -223,6 +235,7 @@ typedef struct pinned_info{
 	run *r;
 	uint32_t intra_offset;
 	uint32_t old_psa;
+	uint32_t ste_num;
 }pinned_info;
 
 static inline void __update_pinning(uint32_t *lba_set, pinned_info *pset, uint32_t ppa,
@@ -232,7 +245,7 @@ static inline void __update_pinning(uint32_t *lba_set, pinned_info *pset, uint32
 		if(validate_piece_ppa(bm, ppa*L2PGAP+i, true)==BIT_ERROR){
 			EPRINT("validate piece ppa error in frag blk copy", true);
 		}
-		st_array_update_pinned_info(r->st_body, pset[i].intra_offset, ppa*L2PGAP+i, pset[i].old_psa);
+		st_array_update_pinned_info(r->st_body, pset[i].ste_num, pset[i].intra_offset, ppa*L2PGAP+i, pset[i].old_psa);
 	}
 }
 
@@ -282,8 +295,8 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 					uint32_t lba=g_value->oob[j];
 					uint32_t psa=g_value->ppa*L2PGAP+j;
 					uint32_t intra_offset;
-
-					run *r=run_find_include_address(LSM->shortcut, lba, psa, &intra_offset);
+					uint32_t ste_num;
+					run *r=run_find_include_address(LSM->shortcut, lba, psa, &ste_num, &intra_offset);
 					if(r==NULL){ //unlinked ppa;
 						bool processed=false;
 						block_info *binfo=g_blk->b_info;
@@ -293,10 +306,10 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 							sid_info* temp_sid=sorted_array_master_get_info(k);
 							if(temp_sid->r==NULL) continue;
 
-							intra_offset=run_find_include_address_byself(temp_sid->r, lba, psa);
+							intra_offset=run_find_include_address_byself(temp_sid->r, lba, psa, &ste_num);
 							if(intra_offset==NOT_FOUND) continue;
 
-							st_array_unlink_bit_set(temp_sid->sa, intra_offset, psa);
+							st_array_unlink_bit_set(temp_sid->sa, ste_num, intra_offset, psa);
 							processed=true;
 							break;
 						}
@@ -309,6 +322,7 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 						pset[buffer->buffered_num].r=r;
 						pset[buffer->buffered_num].intra_offset=intra_offset;
 						pset[buffer->buffered_num].old_psa=psa;
+						pset[buffer->buffered_num].ste_num=ste_num;
 					}
 
 					if(invalidate_piece_ppa(sm, psa,true)==BIT_ERROR){
@@ -336,7 +350,7 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 				list_delete_node(temp_list, p_now);
 			}
 		}
-
+		free(g_blk);
 		list_delete_node(frag_list, now);
 	}
 	list_free(temp_list);
@@ -390,6 +404,9 @@ void gc_data_segment(L2P_bm *bm, __gsegment *target){
 				if(__normal_block_valid_check(sm, blk->block_idx)){
 					list_insert(normal_list, (void*)temp);
 				}
+				else{
+					free(temp);
+				}
 				break;
 			case LSM_BLOCK_FRAGMENT:
 				list_insert(frag_list, (void*)temp);
@@ -428,6 +445,7 @@ bool gc(L2P_bm *bm, uint32_t type){
 	std::queue<uint32_t> temp_seg_q;
 	while(bm->seg_type[target->seg_idx]!=type){
 		temp_seg_q.push(target->seg_idx);
+		free(target);
 		target=sm->get_gc_target(sm);
 		if(target==NULL){
 			EPRINT("dev full", true);

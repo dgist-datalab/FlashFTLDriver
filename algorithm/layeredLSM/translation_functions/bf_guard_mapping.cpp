@@ -104,6 +104,9 @@ uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 		target_set_idx--;
 	}
 
+	if(target_set_idx==UINT32_MAX){
+		return NOT_FOUND;
+	}
 	res_param->prev_offset=target_set_idx*__target_member;
 	bf_map *t_map=&map->bf_set[target_set_idx];
 	for(uint32_t i=0; i<t_map->write_pointer; i++){

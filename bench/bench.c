@@ -191,6 +191,7 @@ void bench_add(bench_type type, uint32_t start, uint32_t end, uint64_t number){
 }
 
 void bench_free(){
+	if(_master==NULL) return;
 	free(_master->m);
 	free(_master->meta);
 	free(_master->datas);
@@ -322,6 +323,7 @@ void bench_print_cdf(){
 }
 
 void bench_print(){
+	if(_master==NULL) return;
 	bench_data *bdata=NULL;
 	monitor *_m=NULL;
 	for(int i=0; i<_master->m_num; i++){

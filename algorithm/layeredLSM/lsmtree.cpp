@@ -19,24 +19,51 @@ static inline void __rm_free_ridx(run_manager *rm, uint32_t ridx){
 	rm->ridx_queue->push(ridx);
 }
 
-run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, uint32_t entry_num){
+run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, uint32_t entry_num, uint32_t level_num){
 	uint32_t ridx=__rm_get_ridx(lsm->rm);
 	run *r=run_factory(ridx, map_type, entry_num, lsm->param.fpr, lsm->bm, run_type, lsm);
 	__rm_insert_run(lsm->rm, ridx, r);
-	shortcut_add_run(lsm->shortcut, r);
+	shortcut_add_run(lsm->shortcut, r, level_num);
 	return r;
 }
 
 bool __lsm_pinning_enable(lsmtree *lsm, uint32_t entry_num){
-	uint64_t need_memory_bit=map_memory_per_ent(GUARD_BF, lsm->param.target_bit, lsm->param.fpr);
+	uint64_t need_memory_bit=map_memory_per_ent(GUARD_BF, lsm->param.target_bit, lsm->param.fpr) *entry_num;
+	need_memory_bit+=lsm->param.target_bit * entry_num;
 	if(need_memory_bit+lsm->monitor.now_memory_usage <=lsm->param.max_memory_usage_bit){
 		return true;
 	}
 	return false;
 }
 
-void __lsm_calculate_memory_usage(lsmtree *lsm, int32_t memory_usage_bit){
+void __lsm_calculate_memory_usage(lsmtree *lsm, uint64_t entry_num, int32_t memory_usage_bit, uint32_t map_type, bool pinning){
+	if(memory_usage_bit>=0){
+		switch(map_type){
+			case GUARD_BF:
+				lsm->monitor.bf_memory_ent+=entry_num;
+				lsm->monitor.bf_memory_usage+=memory_usage_bit-(pinning?lsm->param.target_bit*entry_num:0);
+				break;
+			case PLR_MAP:
+				lsm->monitor.plr_memory_ent+=entry_num;
+				lsm->monitor.plr_memory_usage+=memory_usage_bit;
+				break;
+		}
+	}
+	//if(memory_usage_bit)
 	lsm->monitor.now_memory_usage+=memory_usage_bit;
+	double mem_per_ent;
+	if(memory_usage_bit<0){
+		mem_per_ent=(double)memory_usage_bit/entry_num+(pinning?lsm->param.target_bit:0);
+	}
+	else{
+		mem_per_ent=(double)memory_usage_bit/entry_num-(pinning?lsm->param.target_bit:0);
+	}
+	//printf("now_usage_bit:%lf %lf %s:%lf\n", (double)lsm->monitor.now_memory_usage/RANGE, (double)lsm->param.max_memory_usage_bit/RANGE, map_type_to_string(map_type), mem_per_ent);
+	/*
+	if(lsm->monitor.now_memory_usage > lsm->param.max_memory_usage_bit){
+		//GDB_MAKE_BREAKPOINT;
+		//lsmtree_print_log(lsm);
+	}*/
 }
 
 void __lsm_free_run(lsmtree *lsm, run *r){
@@ -63,9 +90,8 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 
 	param.spare_run_num-=MEMTABLE_NUM;
 	param.memtable_entry_num=param.memtable_entry_num < _PPS*L2PGAP ? param.memtable_entry_num:param.memtable_entry_num/(_PPS*L2PGAP)*(_PPS*L2PGAP);
-	for(uint32_t i=0; i<MEMTABLE_NUM; i++){
-		res->memtable[i]=__lsm_populate_new_run(res, TREE_MAP, RUN_LOG, param.memtable_entry_num);
-	}
+	res->memtable[0] = __lsm_populate_new_run(res, param.BF_level_range.start == 1 ? GUARD_BF : PLR_MAP,RUN_LOG, param.memtable_entry_num, 0);
+	res->memtable[1]=NULL;
 
 	param.spare_run_num-=1; //spare_run for compaction_target
 	res->disk=(level **)calloc(param.total_level_num, sizeof(level*));
@@ -80,7 +106,9 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 	}
 
 	res->monitor.now_memory_usage+=res->param.shortcut_bit;
-
+#ifdef THREAD_COMPACTION
+	res->tp=thpool_init(1);
+#endif
 	return res;
 }
 
@@ -105,16 +133,29 @@ void lsmtree_free(lsmtree *lsm){
 	free(lsm);
 }
 
+
+
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	run *r=lsm->memtable[lsm->now_memtable_idx];
 	run_insert(r, req->key, UINT32_MAX, req->value->value, false, 
 		lsm->shortcut);
+	if(req->key==85472){
+		printf("%u inserted!\n", req->key);
+	}
 
 	if(run_is_full(r)){
 		run_insert_done(r, false);
-		lsm->now_memtable_idx=(lsm->now_memtable_idx+1)%MEMTABLE_NUM;
+#ifdef THREAD_COMPACTION
+		if(thpool_num_threads_working(lsm->tp)==1){
+			thpool_wait(lsm->tp);
+		}
+		thpool_add_work(lsm->tp,compaction_thread_run, (void*)r);
+#else
 		compaction_flush(lsm, r);
-		lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=__lsm_populate_new_run(lsm, TREE_MAP, RUN_LOG, lsm->param.memtable_entry_num);
+#endif
+		lsm->now_memtable_idx=(lsm->now_memtable_idx+1)%MEMTABLE_NUM;
+		lsm->memtable[lsm->now_memtable_idx]=__lsm_populate_new_run(lsm, lsm->param.BF_level_range.start==1?GUARD_BF:PLR_MAP, RUN_LOG, lsm->param.memtable_entry_num, 0);
+		lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=NULL;
 	}
 	return 0;
 }
@@ -122,12 +163,65 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res;
 	run *r=shortcut_query(lsm->shortcut, req->key);
+	if(r==NULL){
+		printf("req->key :%u not found\n", req->key);
+		req->end_req(req);
+		return READ_NOT_FOUND;
+	}
 	if(!req->retry){
 		res=run_query(r, req);
 	}
 	else{
+		req->type_ftl++;
 		res=run_query_retry(r, req);
 	}
-
+	if(res==READ_NOT_FOUND){
+		printf("req->key :%u not found\n", req->key);
+		req->end_req(req);
+	}
 	return res;
+}
+
+uint32_t lsmtree_print_log(lsmtree *lsm){
+	printf("shortcut memory:%.2lf\n", (double)lsm->param.shortcut_bit/(RANGE*lsm->param.target_bit));
+	printf("now_memory usage:%.2lf\n",(double)lsm->monitor.now_memory_usage/lsm->param.max_memory_usage_bit);
+	printf("level memory:\n");
+	uint64_t pftl_memory=lsm->param.target_bit*RANGE;
+	uint64_t memtable_memory=0;
+	for(uint32_t i=0; i<MEMTABLE_NUM; i++){
+		memtable_memory+=run_memory_usage(lsm->memtable[i], lsm->param.target_bit);
+	}
+	printf("\tmemtable -> %.2lf\n",(double)memtable_memory/(pftl_memory));
+
+	for(uint32_t i=0; i<lsm->param.total_level_num; i++){
+		level *target_level=lsm->disk[i];
+		uint64_t memory_usage_per_level=0;
+		uint32_t pinning_run_num=0;
+		for(uint32_t j=0; j<target_level->now_run_num; j++){
+			run *target_run=target_level->run_array[j];
+			if(target_run->type==RUN_PINNING){
+				pinning_run_num++;
+			}
+			memory_usage_per_level+=run_memory_usage(target_run, lsm->param.target_bit);
+		}
+		printf("\t%u:%s %u(%u):%u -> %.2lf\n", i,
+		map_type_to_string(target_level->map_type), target_level->now_run_num,
+		pinning_run_num, target_level->max_run_num,
+		(double)memory_usage_per_level/(pftl_memory));
+	}
+
+	printf("BF mem per ent: %.2lf\n",(double)lsm->monitor.bf_memory_usage/lsm->monitor.bf_memory_ent);
+	printf("PLR mem per ent: %.2lf\n",(double)lsm->monitor.plr_memory_usage/lsm->monitor.plr_memory_ent);
+
+	printf("compaction log\n");
+	for(uint32_t i=0; i<=lsm->param.total_level_num; i++){
+		if(i==0){
+			printf("\tmem -> %u : %u,%.2lf (cnt,eff)\n",i, lsm->monitor.compaction_cnt[i], (double)lsm->monitor.compaction_input_entry_num[i]/lsm->monitor.compaction_output_entry_num[i]);
+		}
+		else{
+			printf("\t%u -> %u : %u,%.2lf (cnt,eff)\n",i-1, i, lsm->monitor.compaction_cnt[i-1], (double)lsm->monitor.compaction_input_entry_num[i-1]/lsm->monitor.compaction_output_entry_num[i-1]);		
+		}
+	}
+
+	return 1;
 }

@@ -24,6 +24,8 @@ typedef struct level{
  * */
 level *level_init(uint32_t level_idx, uint32_t max_run_num, uint32_t map_type);
 
+run *level_get_max_unlinked_run(level *lev);
+
 /*
  * Function:level_is_full
  * ----------------------

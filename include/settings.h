@@ -15,7 +15,7 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 6L
+#define GIGAUNIT 64L
 #ifndef OP
 #define OP 85
 #endif
@@ -63,6 +63,7 @@
 #define ppa_t uint32_t
 #define KEYT uint32_t
 #define BLOCKT uint32_t
+#define PTR_BIT 32
 
 #define QSIZE		(128) 
 #define LOWQDEPTH	(128)

@@ -24,6 +24,7 @@ typedef struct summary_pair{
 typedef struct summary_page{
 	uint32_t write_pointer;
 	value_set *value;
+	bool sorted;
 	char *body;
 }summary_page;
 
@@ -32,6 +33,8 @@ typedef struct summary_page_meta{
 	uint32_t end_lba;
 	uint32_t ppa;
 	uint32_t pr_type;
+	bool sorted;
+	bool unlinked_data_copy;
 	bool copied;
 	void *private_data;
 }summary_page_meta;
@@ -57,9 +60,29 @@ static summary_pair sp_get_pair(summary_page *sp, uint32_t idx){
 	return *p;
 }
 
+static inline uint32_t spm_find_target_idx(summary_page_meta *spm, uint32_t spm_num, uint32_t lba){
+	int32_t s=0, e=spm_num-1, mid;
+	while(s<=e){
+		mid=(s+e)/2;
+		if(spm[mid].start_lba==lba){
+			return mid;
+		}
+		else if(spm[mid].start_lba > lba){
+			e=mid-1;
+		}
+		else if(spm[mid].end_lba >= lba){
+			return mid;
+		}
+		else{
+			s=mid+1;
+		}
+	}
+	return UINT32_MAX;
+}
+
 static inline uint32_t spm_joint_check(summary_page_meta *spm, uint32_t spm_num, summary_page_meta *target){
 	int32_t s=0, e=spm_num-1, mid;
-	while(s<e){
+	while(s<=e){
 		mid=(s+e)/2;
 		if(spm[mid].start_lba==target->start_lba){
 			return mid;

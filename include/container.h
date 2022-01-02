@@ -288,7 +288,7 @@ struct blockmanager{
 
 
 #define for_each_block(segs,block,idx)\
-	for(idx=0,block=segs->blocks[idx];idx<BPS; block=++idx>BPS?segs->blocks[idx-1]:segs->blocks[idx])
+	for(idx=0,block=segs->blocks[idx];idx<BPS; ++idx, block=segs->blocks[idx!=BPS?idx:BPS-1])
 
 #ifdef sequential
 	#define PPAMAKER(bl,idx) ((bl)->block_idx*_PPB+idx)

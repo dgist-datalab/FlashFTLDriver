@@ -141,6 +141,8 @@ uint32_t L2PBm_get_map_ppa(L2P_bm *bm);
  * */
 uint32_t L2PBm_get_map_rppa(L2P_bm *bm);
 
+uint32_t L2PBm_get_free_block_num(L2P_bm *bm);
+
 void L2PBm_gc_lock(L2P_bm *bm, uint32_t bidx);
 void L2PBm_gc_unlock(L2P_bm *bm, uint32_t bidx);
 
@@ -170,6 +172,9 @@ static inline void L2PBm_clear_block_info(L2P_bm *bm, uint32_t bidx){
 
 static inline bool L2PBm_is_nomral_block(L2P_bm *bm, uint32_t PBA){
 	return bm->PBA_map[PBA/_PPB].type==LSM_BLOCK_NORMAL;
+}
+static inline bool L2PBm_is_frag_block(L2P_bm *bm, uint32_t PBA){
+	return bm->PBA_map[PBA/_PPB].type==LSM_BLOCK_FRAGMENT;
 }
 
 #endif

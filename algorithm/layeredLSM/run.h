@@ -21,14 +21,12 @@ typedef struct run{
 	uint32_t now_entry_num;
 	uint32_t type;
 	struct shortcut_info *info;
-	struct map_function *mf;
 
-	uint32_t validate_piece_num;
-	uint32_t invalidate_piece_num;
-
+	map_function *run_log_mf;
 	pp_buffer *pp;
 	struct sorted_table_array *st_body;
 	struct lsmtree *lsm;
+	fdriver_lock_t lock;
 }run;
 
 /*
@@ -106,10 +104,16 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 void run_insert_done(run *r, bool merge_insert);
 
 void run_padding_current_block(run *r);
-
+/*
 void run_trivial_move_start(run *r, uint32_t PBA);
 void run_trivial_move_insert(run *r, struct shortcut_master *shortcut, uint32_t lba, uint32_t psa_for_pinning);
 void run_trivial_move_finish(run *r);
+*/
+
+void run_copy_ste_to(run *r, struct sorted_table_entry *ste, struct summary_page_meta *spm, map_function *mf, bool unlinked_data_copy);
+
+void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag);
+
 //#################################### run_insert.c done
 
 //#################################### run_query.c
@@ -144,7 +148,7 @@ uint32_t run_query_retry(run *r, request *req);
  *r:
  *intra_offset:
  * */
-uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset);
+uint32_t run_translate_intra_offset(run *r, uint32_t ste_num, uint32_t intra_offset);
 
 
 /*
@@ -157,7 +161,8 @@ uint32_t run_translate_intra_offset(run *r, uint32_t intra_offset);
  *psa:
  *intra_offset:
  * */
-run *run_find_include_address(struct shortcut_master *sc, uint32_t lba, uint32_t psa, uint32_t *intra_offset);
+run *run_find_include_address(struct shortcut_master *sc, uint32_t lba, uint32_t psa, uint32_t *_ste_num, 
+uint32_t *intra_offset);
 
 /*
  * Function: run_find_include_address_byself
@@ -168,14 +173,14 @@ run *run_find_include_address(struct shortcut_master *sc, uint32_t lba, uint32_t
  *lba:
  *psa:
  * */
-uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa);
+uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa, uint32_t *ste_num);
 
 //#################################### run_query.c done
 
 //#################################### run_util.c
 void run_print(run *r, bool content);
-void run_print_invalidate_piece_ppa(run *r, blockmanager *sm);
-void run_check(run *r, blockmanager *sm);
+uint64_t run_memory_usage(run *r, uint32_t target_bit);
+
 //#################################### run_util.c done
 
 //################################### run_merge.c 
@@ -200,5 +205,4 @@ void run_merge(uint32_t run_num, run **rset,  run *target_run, struct lsmtree *l
  * */
 void run_recontstruct(struct lsmtree *lsm, run *src, run *des);	
 //################################### run_merge.c done
-
 #endif

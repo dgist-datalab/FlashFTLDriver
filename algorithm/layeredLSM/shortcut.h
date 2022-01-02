@@ -1,15 +1,18 @@
 #ifndef SHORTCUT_H_
 #define SHORTCUT_H_
 #include "./run.h"
+#include "../../include/sem_lock.h"
 #include "../../include/debug_utils.h"
 #include <list>
 #include <stdlib.h>
 #define NOT_ASSIGNED_SC UINT8_MAX
 typedef struct shortcut_info{
 	uint8_t idx;
+	uint32_t level_idx;
 	uint32_t recency;
 	uint32_t linked_lba_num;
 	uint32_t unlinked_lba_num;
+	bool now_compaction;
 	run *r;
 }shortcut_info;
 typedef struct shortcut_info sc_info;
@@ -20,6 +23,7 @@ typedef struct shortcut_master{
 	sc_info *info_set;
 	uint32_t max_shortcut_num;
 	uint32_t now_recency;
+	fdriver_lock_t lock;
 }shortcut_master;
 
 typedef shortcut_master sc_master;
@@ -42,10 +46,10 @@ sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range);
  *	sc:
  *	r:
  * */
-void shortcut_add_run(sc_master *sc, run *r);
+void shortcut_add_run(sc_master *sc, run *r, uint32_t level_num);
 
 /*
- * Function: shortcut_add_run
+ * Function: __shortcut_add_run
  * -------------------------
  *		assign new shortcut idx to run in merge
  *		the recency of sc_info will be set the biggest recency in rset
@@ -59,7 +63,7 @@ void shortcut_add_run_merge(sc_master *sc, run *r, run **rset, uint32_t merge_nu
 
 
 /*
- * Function: shortcut_validity_check_lba
+ * Function: __shortcut_validity_check_lba
  * ------------------------------------
  *			checking lba of run validity
  *
@@ -108,6 +112,7 @@ run* shortcut_query(sc_master *sc, uint32_t lba);
  * */
 void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba);
 
+bool shortcut_validity_check_and_link(sc_master*sc, run *r, uint32_t lba);
 /*
  * Function: shortcut_release_sc_info
  * ---------------------------------
@@ -123,6 +128,10 @@ void shortcut_release_sc_info(sc_master *sc, uint32_t idx);
  *  sc:
  * */
 void shortcut_free(sc_master *sc);
+
+static inline void shortcut_set_compaction_flag(shortcut_info *info, bool compaction_flag){
+	info->now_compaction=compaction_flag;
+}
 
 /* 
  * Function: shortcut_is_full
