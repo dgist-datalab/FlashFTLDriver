@@ -34,3 +34,4 @@ test_sh/
 last_level_dump
 *-result
 *.dump
+.vscode/

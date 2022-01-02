@@ -9,6 +9,7 @@ map_function* exact_map_init(uint32_t contents_num, float fpr){
 	res->query_retry=exact_query_retry;
 	res->query_done=map_default_query_done;
 	res->make_done=exact_make_done;
+	res->get_memory_usage=exact_get_memory_usage;
 	res->show_info=NULL;
 	res->free=exact_free;
 
@@ -49,6 +50,9 @@ uint32_t exact_query(map_function *m, uint32_t lba, map_read_param **param){
 	return ex_map->map[target_offset];
 }
 
+uint64_t exact_get_memory_usage(map_function *m, uint32_t target_bit){
+	return (uint64_t)target_bit * m->now_contents_num;	
+}
 uint32_t exact_query_retry(map_function *m, map_read_param *param){
 	exact_map *ex_map=(exact_map*)m->private_data;
 	uint32_t target_offset=param->lba%m->max_contents_num;

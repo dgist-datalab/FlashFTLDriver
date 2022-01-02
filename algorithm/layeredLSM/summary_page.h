@@ -28,9 +28,11 @@ typedef struct summary_page{
 }summary_page;
 
 typedef struct summary_page_meta{
-	uint32_t lba;
+	uint32_t start_lba;
+	uint32_t end_lba;
 	uint32_t ppa;
 	uint32_t pr_type;
+	bool copied;
 	void *private_data;
 }summary_page_meta;
 
@@ -49,6 +51,48 @@ typedef struct summary_page_iterator{
 	for(idx=0; idx<MAX_CUR_POINTER &&\
 			(p=((summary_pair*)sp->body)[idx]).lba!=UINT32_MAX; ++idx)
 
+
+static summary_pair sp_get_pair(summary_page *sp, uint32_t idx){
+	summary_pair *p=(summary_pair*)(&sp->body[idx*sizeof(summary_pair)]);
+	return *p;
+}
+
+static inline uint32_t spm_joint_check(summary_page_meta *spm, uint32_t spm_num, summary_page_meta *target){
+	int32_t s=0, e=spm_num-1, mid;
+	while(s<e){
+		mid=(s+e)/2;
+		if(spm[mid].start_lba==target->start_lba){
+			return mid;
+		}
+		else if(spm[mid].start_lba < target->start_lba){
+			if(spm[mid].end_lba >=target->start_lba){
+				return mid;
+			}
+			s=mid+1;
+		}
+		else if(spm[mid].start_lba > target->start_lba){
+			if(spm[mid].start_lba <=target->end_lba){
+				return mid;
+			}
+			e=mid-1;
+		}
+	}	
+	return UINT32_MAX;
+}
+
+
+static inline uint32_t spm_joint_check_debug(summary_page_meta *spm, uint32_t spm_num, summary_page_meta *target){
+	for(uint32_t i=0; i<spm_num; i++){
+		if(target->start_lba > spm[i].end_lba){
+			continue;
+		}
+		if(target->end_lba < spm[i].start_lba){
+			break;
+		}
+		return i;
+	}
+	return UINT32_MAX;
+}
 /*
 	Function: sp_init
 	----------------

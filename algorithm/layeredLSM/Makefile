@@ -1,25 +1,28 @@
 SRCS +=\
-	   ./block_table.c\
-	   ./sorted_table.c\
-	   ./page_aligner.c\
-	   ./layered_lsm_operation.c\
-	   ./summary_page.c\
-	   ./summary_page_iter.c\
-	   ./summary_page_set.c\
-	   ./mapping_function.c\
-	   ./run.c\
-	   ./run_query.c\
-	   ./run_insert.c\
-	   ./run_merge.c\
-	   ./run_util.c\
-	   ./shortcut.c\
-	   ./compaction.c\
-	   ./gc.c\
-	   ./debug.c\
+	   ./block_table.cpp\
+	   ./sorted_table.cpp\
+	   ./page_aligner.cpp\
+	   ./layered_lsm_operation.cpp\
+	   ./summary_page.cpp\
+	   ./summary_page_iter.cpp\
+	   ./summary_page_set.cpp\
+	   ./mapping_function.cpp\
+	   ./run.cpp\
+	   ./run_query.cpp\
+	   ./run_insert.cpp\
+	   ./run_merge.cpp\
+	   ./run_util.cpp\
+	   ./shortcut.cpp\
+	   ./compaction.cpp\
+	   ./level.cpp\
+	   ./gc.cpp\
+	   ./debug.cpp\
+	   ./lsmtree_parameter.cpp\
+	   ./lsmtree.cpp\
 
 
 OBJS :=\
-	$(patsubst %.c,%.o,$(SRCS))\
+	$(patsubst %.cpp,%.o,$(SRCS))\
 
 TARGETOBJ:=\
 	$(addprefix ../../object/,$(OBJS))\
@@ -29,14 +32,16 @@ all: $(TARGETOBJ)
 	cd ./translation_functions && make
 	mv ./translation_functions/*.o ../../object/
 	mv ./translation_functions/plr/*.o ../../object/
+	cd design_knob && make 
+	mv design_knob/*.o ../../object/
 
 libnom.a : $(TARGETOBJ)
 	$(AR) r $(@) $(TARGETOBJ)
 
-%.o :%.c
+%.o :%.cpp
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
 
-../../object/%.o:%.c
+../../object/%.o:%.cpp
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
 
 clean : 

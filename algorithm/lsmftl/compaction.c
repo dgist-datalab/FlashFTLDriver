@@ -11,7 +11,7 @@ extern lsmtree LSM;
 compaction_master *_cm;
 extern uint32_t test_key;
 //uint32_t debug_lba=3967;
-uint32_t debug_lba=test_key;
+const uint32_t debug_lba=test_key;
 
 extern uint32_t debug_piece_ppa;
 

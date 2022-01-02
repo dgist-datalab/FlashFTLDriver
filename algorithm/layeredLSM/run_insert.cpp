@@ -1,7 +1,6 @@
 #include "run.h"
 #include "piece_ppa.h"
 
-extern sc_master *shortcut;
 extern lower_info *g_li;
 extern uint32_t test_key;
 extern uint32_t target_recency;
@@ -48,12 +47,15 @@ static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blo
 
 static inline void __run_insert_mf(run *r, blockmanager *sm, uint32_t lba, uint32_t intra_offset){
 	uint32_t res=r->mf->insert(r->mf, lba, intra_offset);
-	if(res!=INSERT_SUCCESS){
+	if(r->type==RUN_LOG && res!=INSERT_SUCCESS){
 		res=run_translate_intra_offset(r, res);
 		if(invalidate_piece_ppa(sm, res, true)!=BIT_SUCCESS){
 			EPRINT("double delete error", true);
 		}
 		r->invalidate_piece_num++;
+	}
+	else if(r->type!=RUN_LOG && res!=INSERT_SUCCESS){
+		EPRINT("same lba insert to run\n", true);
 	}
 }
 
@@ -62,11 +64,10 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 	uint32_t target_ppa, psa, intra_offset;
 	uint32_t psa_list[L2PGAP];
 	for(uint32_t i=0; i<r->pp->buffered_num; i++){
-		intra_offset=r->st_body->write_pointer;
+		intra_offset=r->st_body->global_write_pointer;
 		psa=st_array_write_translation(r->st_body);
 		psa_list[i]=psa;
 		uint32_t lba=r->pp->LBA[i];
-
 		if(i==0){
 			target_ppa=psa/L2PGAP;
 #ifdef LSM_DEBUG
@@ -106,7 +107,8 @@ static void __run_write_meta(run *r, blockmanager *sm, bool force){
 			r->st_body->bm->segment_manager, (void*)swp, MAPPINGW);
 }
 
-bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_insert){
+bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, 
+	bool merge_insert,	sc_master *shortcut){
 	if(r->max_entry_num < r->now_entry_num){
 		return false;
 	}
@@ -118,7 +120,7 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_inser
 
 		__check_debug(r, lba, psa);
 
-		__run_insert_mf(r, r->st_body->bm->segment_manager, lba, r->st_body->write_pointer);
+		__run_insert_mf(r, r->st_body->bm->segment_manager, lba, r->st_body->global_write_pointer);
 		st_array_insert_pair(r->st_body, lba, psa);
 	}
 	else{
@@ -142,6 +144,45 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_inser
 	return true;
 }
 
+void run_padding_current_block(run *r){
+	if(st_array_force_skip_block(r->st_body)==0){
+		return;
+	}
+	if(r->st_body->summary_write_alert){
+		__run_write_meta(r, r->st_body->bm->segment_manager, false);
+	}
+	else{
+		EPRINT("not allowed", true);
+	}
+}
+
+void run_trivial_move_start(run *r, uint32_t PBA){
+	r->st_body->now_trivial_ste_copy=true;
+	st_array_set_now_PBA(r->st_body, PBA, true);
+}
+
+void run_trivial_move_insert(run *r, sc_master *shortcut, uint32_t lba, uint32_t psa_for_pinning){
+	__run_insert_mf(r, r->st_body->bm->segment_manager, lba, r->st_body->global_write_pointer);
+	if(r->st_body->type==ST_PINNING){
+		st_array_insert_pair(r->st_body, lba, psa_for_pinning);
+	}
+	else{
+		st_array_insert_pair(r->st_body, lba, r->st_body->global_write_pointer);
+	}
+	shortcut_unlink_and_link_lba(shortcut, r, lba);
+	r->now_entry_num++;
+}
+
+void run_trivial_move_finish(run *r){
+	if(r->st_body->summary_write_alert){
+		__run_write_meta(r, r->st_body->bm->segment_manager, false);
+	}
+	else{
+		run_padding_current_block(r);
+	}
+	r->st_body->now_trivial_ste_copy=false;
+}
+
 void run_insert_done(run *r, bool merge_insert){
 	if(r->pp && r->pp->buffered_num!=0){
 		__run_write_buffer(r, r->st_body->bm->segment_manager,true, merge_insert?COMPACTIONDATAW:DATAW);
@@ -152,4 +193,5 @@ void run_insert_done(run *r, bool merge_insert){
 		pp_free(r->pp);
 	}
 	r->pp=NULL;
+	__lsm_calculate_memory_usage(r->lsm, r->mf->get_memory_usage(r->mf, r->lsm->param.target_bit));
 }

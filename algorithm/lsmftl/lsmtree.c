@@ -565,7 +565,6 @@ static void notfound_processing(request *const req){
 			for(uint32_t i=0; i<L2PGAP; i++){
 				printf("oob %u:%u-%u\n", i, oob->lba[i], oob->version[i]);
 			}
-			print_stacktrace();
 		}
 	}
 

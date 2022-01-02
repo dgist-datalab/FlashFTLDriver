@@ -4,6 +4,7 @@
 #include "./mapping_function.h"
 #include "./page_aligner.h"
 #include "./shortcut.h"
+#include "lsmtree.h"
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -11,7 +12,11 @@ enum{
 	RUN_NORMAL, RUN_PINNING, RUN_LOG,
 };
 
+enum{
+	READ_DONE, READ_RETRY, READ_NOT_FOUND
+};
 typedef struct run{
+	uint32_t run_idx;
 	uint32_t max_entry_num;
 	uint32_t now_entry_num;
 	uint32_t type;
@@ -22,7 +27,8 @@ typedef struct run{
 	uint32_t invalidate_piece_num;
 
 	pp_buffer *pp;
-	st_array *st_body;
+	struct sorted_table_array *st_body;
+	struct lsmtree *lsm;
 }run;
 
 /*
@@ -30,13 +36,14 @@ typedef struct run{
  * ------------------
  *		return new run 
  *
+ * run_idx: idx of the run
  * map_type: type of mapping_function
  * entry_num: number of entry in the run
  * fpr: target fpr of mapping function
  * bm: blockmanager for st_array
  * type: type of run, pinning run have psa in memory
  * */
-run *run_factory(uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm, uint32_t type);
+run *run_factory(uint32_t run_idx, uint32_t map_type, uint32_t entry_num, float fpr, L2P_bm *bm, uint32_t type, struct lsmtree *lsm);
 
 /*
  * Function: run_free
@@ -86,7 +93,8 @@ static run *run_extract_target(request *req){
  * data: target data
  * merge_insert: flag is set when the function is called in run_merge
  * */
-bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_insert);
+bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
+ 	bool merge_insert, struct shortcut_master *shortcut);
 
 /*
  * Fucntion: run_insert_done
@@ -96,6 +104,12 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, bool merge_inser
  * merge_insert: flag is set when the function is called in run_merge
  * */
 void run_insert_done(run *r, bool merge_insert);
+
+void run_padding_current_block(run *r);
+
+void run_trivial_move_start(run *r, uint32_t PBA);
+void run_trivial_move_insert(run *r, struct shortcut_master *shortcut, uint32_t lba, uint32_t psa_for_pinning);
+void run_trivial_move_finish(run *r);
 //#################################### run_insert.c done
 
 //#################################### run_query.c
@@ -174,7 +188,17 @@ void run_check(run *r, blockmanager *sm);
  * rset: set of run which is sorted by version
  *
  * */
-run *run_merge(uint32_t run_num, run **rset, uint32_t map_type, float fpr, L2P_bm *bm, uint32_t run_type);
+void run_merge(uint32_t run_num, run **rset,  run *target_run, struct lsmtree *lsm);
+
+/*
+ * Function: run_recontstruct
+ * ------------------
+ *		reconstruct run
+ *
+ * src:	
+ * des:
+ * */
+void run_recontstruct(struct lsmtree *lsm, run *src, run *des);	
 //################################### run_merge.c done
 
 #endif

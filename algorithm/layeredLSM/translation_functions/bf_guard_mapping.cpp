@@ -1,12 +1,13 @@
 #include "bf_guard_mapping.h"
 #include "../../../include/search_template.h"
 
-static float __target_fpr;
-static uint32_t __target_member;
+float __target_fpr;
+uint32_t __target_member;
 static bloom_filter_meta * __global_bfm;
 
-static inline void find_sub_member_num(float fpr, uint32_t member, uint32_t lba_bit_num){
+float find_sub_member_num(float fpr, uint32_t member, uint32_t lba_bit_num){
 	static float target_avg_bit=0;
+	if(target_avg_bit) return target_avg_bit;
 	for(uint32_t i=2; i<member/2; i++){
 //		uint32_t member_set_num=member/i;
 		float target_each_fpr=get_target_each_fpr(i, fpr);
@@ -23,12 +24,13 @@ static inline void find_sub_member_num(float fpr, uint32_t member, uint32_t lba_
 			printf("%u -> %.2f\n", __target_member, target_avg_bit);
 		}
 	}
+	__global_bfm=bf_parameter_setting(__target_member, fpr);
+	return target_avg_bit;
 }
 
 map_function *	bfg_map_init(uint32_t contents_num, float fpr, uint32_t bit){
 	if(__target_fpr==0){
 		find_sub_member_num(fpr, contents_num, bit);
-		__global_bfm=bf_parameter_setting(__target_member, fpr);
 	}
 	map_function *res=(map_function*)calloc(1, sizeof(map_function));
 
@@ -39,6 +41,7 @@ map_function *	bfg_map_init(uint32_t contents_num, float fpr, uint32_t bit){
 	res->query_done=map_default_query_done;
 	res->make_done=bfg_map_make_done;
 	res->show_info=NULL;
+	res->get_memory_usage=bfg_get_memory_usage;
 	res->free=bfg_map_free;
 
 	uint32_t set_num=(contents_num/__target_member)+(contents_num%__target_member?1:0);
@@ -74,6 +77,14 @@ uint32_t			bfg_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
 	return INSERT_SUCCESS;
 }
 
+uint64_t 		bfg_get_memory_usage(map_function *mf, uint32_t target_bit){
+	uint64_t res=0;
+	bfg_map *map=extract_bfg_map(mf);
+	uint32_t now_write_set_ptr=map->write_pointer/__target_member;
+	res+=__global_bfm->bits*mf->now_contents_num;
+	res+=target_bit * now_write_set_ptr;
+	return res;
+}
 
 int bfg_cmp(uint32_t b, uint32_t target){return b-target;}
 
@@ -104,6 +115,7 @@ uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	return NOT_FOUND;
 }
 
+
 uint32_t		bfg_map_query_retry(map_function *mf, map_read_param *param){
 	bfg_map *map=extract_bfg_map(mf);
 	uint32_t lba=param->lba;
@@ -133,3 +145,4 @@ void			bfg_map_free(map_function *mf){
 	free(map);
 	free(mf);
 }
+

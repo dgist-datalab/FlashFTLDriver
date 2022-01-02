@@ -33,5 +33,6 @@ uint32_t plr_oob_check(map_function *mf, map_read_param *param);
 uint32_t plr_map_query(map_function *mf, uint32_t lba, map_read_param **param);
 uint32_t plr_map_query_retry(map_function *mf, map_read_param *param);
 void plr_map_make_done(map_function *mf);
+uint64_t plr_get_memory_usage(map_function *mf, uint32_t target_bit);
 void plr_map_free(map_function *mf);
 #endif
