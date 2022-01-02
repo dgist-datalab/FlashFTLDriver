@@ -17,8 +17,7 @@ PPWD=$(pwd)
 DEBUGFLAGS=\
 			-Wno-pointer-arith\
 			-g\
-			-export-dynamic\
--fsanitize=address\
+#-fsanitize=address\
 
 export COMMONFLAGS+=\
 			-Wno-write-strings\
@@ -31,13 +30,13 @@ export COMMONFLAGS+=\
 			-Wno-unused-but-set-variable\
 			-DPARALLEL_MANAGER\
 			-DLSM_DEBUG\
+			-DPROGRESS\
+			-O3\
 #			-DMETAONLY\
-#-O3 -march=native -mtune=native -flto=20 \
 #			-DREAL_BENCH_MODE\
 #-DTRACE_COLLECT\
 #			-DTRACE_REPLAY\
 #-DDFTL_DEBUG\
-			-DPROGRESS\
 
 
 COMMONFLAGS+=$(DEBUGFLAGS)\
@@ -48,14 +47,12 @@ export CFLAGS_ALGO=\
 			 -fPIC\
 			 -Wall\
 			 -D$(TARGET_LOWER)\
-			 -rdynamic\
 
 export CFLAGS_LOWER=\
 		     -fPIC\
 			 -lpthread\
 			 -Wall\
 			 -D_FILE_OFFSET_BITS=64\
-			 -rdynamic\
 #			 -DLOWER_MEM_DEV\
 
 export priority="false"
@@ -145,7 +142,6 @@ LIBS +=\
 		-lpthread\
 		-lm\
 		-ljemalloc\
-		-ldl\
 		-ldw\
 #	-laio\
 
