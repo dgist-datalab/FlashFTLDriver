@@ -7,8 +7,8 @@ export CC=g++
 export CXX=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=posix_memory
-export TARGET_ALGO=layeredLSM
+export TARGET_LOWER=AMF
+export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -18,7 +18,7 @@ DEBUGFLAGS=\
 			-Wno-pointer-arith\
 			-g\
 			-export-dynamic\
--fsanitize=address\
+#-fsanitize=address\
 
 export COMMONFLAGS+=\
 			-Wno-write-strings\
@@ -29,15 +29,15 @@ export COMMONFLAGS+=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-DPARALLEL_MANAGER\
-			-DLSM_DEBUG\
+			-O3\
+#			-DLSM_DEBUG\
 #			-DMETAONLY\
-#-O3 -march=native -mtune=native -flto=20 \
 #			-DREAL_BENCH_MODE\
 #-DTRACE_COLLECT\
 #			-DTRACE_REPLAY\
 #-DDFTL_DEBUG\
 			-DPROGRESS\
+			-DPARALLEL_MANAGER\
 
 
 COMMONFLAGS+=$(DEBUGFLAGS)\

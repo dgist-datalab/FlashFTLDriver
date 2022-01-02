@@ -52,13 +52,18 @@ void amf_traffic_print(lower_info *li){
 	}
 }
 
-static inline void __amf_info_create_body(){
+static inline void __amf_info_create_body(bool load){
 #ifndef TESTING
-	if (access("aftl.bin", F_OK)!=-1){
-		am=AmfOpen(1);
+	if(load==false){
+		if (access("aftl.bin", F_OK)!=-1){
+			am=AmfOpen(1);
+		}
+		else{
+			am=AmfOpen(2);
+		}
 	}
 	else{
-		am=AmfOpen(2);
+		am=AmfOpen(0);
 	}
 #endif
 
@@ -74,7 +79,7 @@ static inline void __amf_info_create_body(){
 }
 
 uint32_t amf_info_create(lower_info *li, blockmanager *bm){
-	__amf_info_create_body();
+	__amf_info_create_body(false);
 
 #ifdef LOWER_MEM_DEV
 	printf("lower mem dev  mode\n");
@@ -231,7 +236,7 @@ uint32_t amf_info_dump(lower_info*li, FILE *fp){
 }
 
 uint32_t amf_info_load(lower_info *li, FILE *fp){
-	__amf_info_create_body();
+	__amf_info_create_body(true);
 	uint64_t now_NOP;
 	fread(&now_NOP, sizeof(uint64_t), 1, fp);
 	if(now_NOP!=_NOP){
