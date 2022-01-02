@@ -174,7 +174,7 @@ uint32_t page_flush(request *const req){
 
 extern struct algorithm demand_ftl;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
-inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
+void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);

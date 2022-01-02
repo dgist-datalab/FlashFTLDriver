@@ -17,6 +17,7 @@ PPWD=$(pwd)
 DEBUGFLAGS=\
 			-Wno-pointer-arith\
 			-g\
+			-export-dynamic\
 #-fsanitize=address\
 
 export COMMONFLAGS+=\
@@ -32,11 +33,13 @@ export COMMONFLAGS+=\
 			-DLSM_DEBUG\
 			-DPROGRESS\
 			-O3\
+#			-DLSM_DEBUG\
 #			-DMETAONLY\
 #			-DREAL_BENCH_MODE\
 #-DTRACE_COLLECT\
 #			-DTRACE_REPLAY\
 #-DDFTL_DEBUG\
+
 
 
 COMMONFLAGS+=$(DEBUGFLAGS)\

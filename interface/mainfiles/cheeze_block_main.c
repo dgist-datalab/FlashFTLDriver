@@ -26,7 +26,28 @@ void log_print(int sig){
 	exit(1);
 }
 
+void log_lower_print(int sig){
+    printf("-------------lower print!!!!-------------\n");
+    inf_lower_log_print();
+    printf("-------------lower print end-------------\n");
+}
+
+//int MS_TIME_SL;
+void print_temp_log(int sig){
+	printf("%d\n", pthread_self());
+	request_print_log();
+	request_memset_print_log();
+	inf_print_log();
+}
+
 void * thread_test(void *){
+	sigset_t tSigSetMask;
+	int nSigNum;
+	int nErrno;
+	sigemptyset(&tSigSetMask);
+	sigaddset(&tSigSetMask, SIGUSR1);
+	pthread_sigmask(SIG_SETMASK, &tSigSetMask, NULL);
+
 	vec_request **req_arr=NULL;
 	while((req_arr=get_vectored_request_arr())){
 		for(int i=0; req_arr[i]!=NULL; i++){
@@ -37,18 +58,6 @@ void * thread_test(void *){
 	return NULL;
 }
 
-void log_lower_print(int sig){
-    printf("-------------lower print!!!!-------------\n");
-    inf_lower_log_print();
-    printf("-------------lower print end-------------\n");
-}
-
-//int MS_TIME_SL;
-void print_temp_log(int sig){
-	request_print_log();
-	request_memset_print_log();
-	inf_print_log();
-}
 
 pthread_t thr; 
 int main(int argc,char* argv[]){
@@ -57,6 +66,10 @@ int main(int argc,char* argv[]){
 	setbuf(stderr, NULL);
 	sa.sa_handler = log_print;
 	sigaction(SIGINT, &sa, NULL);
+
+	sigset_t tSigSetMask;
+	sigdelset(&tSigSetMask, SIGINT);
+	pthread_sigmask(SIG_SETMASK, &tSigSetMask, NULL);
 
 	struct sigaction sa2;
 	sa2.sa_handler = print_temp_log;
