@@ -15,7 +15,7 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 6L
+#define GIGAUNIT 64L
 #ifndef OP
 #define OP 85
 #endif
