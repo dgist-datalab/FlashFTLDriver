@@ -164,6 +164,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res;
 	run *r=shortcut_query(lsm->shortcut, req->key);
 	if(r==NULL){
+		req->type=FS_NOTFOUND_T;
 		printf("req->key :%u not found\n", req->key);
 		req->end_req(req);
 		return READ_NOT_FOUND;
@@ -176,6 +177,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 		res=run_query_retry(r, req);
 	}
 	if(res==READ_NOT_FOUND){
+		req->type=FS_NOTFOUND_T;
 		printf("req->key :%u not found\n", req->key);
 		req->end_req(req);
 	}

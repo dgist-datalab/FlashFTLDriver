@@ -90,6 +90,7 @@ run* shortcut_query(sc_master *sc, uint32_t lba){
 	uint32_t sc_info_idx=sc->sc_map[lba];
 	if(sc_info_idx==NOT_ASSIGNED_SC){
 	//	EPRINT("not assigned lba", true);
+		fdriver_unlock(&sc->lock);
 		return NULL;
 	}
 	run *res=sc->info_set[sc_info_idx].r;

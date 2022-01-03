@@ -55,7 +55,7 @@ int main(int argc,char* argv[]){
 	sa2.sa_handler = print_temp_log;
 	sigaction(SIGUSR1, &sa2, NULL);
 
-	inf_init(1,0,argc,argv, false);
+	inf_init(1,0,argc,argv);
 
 	init_trace_cheeze();
 
