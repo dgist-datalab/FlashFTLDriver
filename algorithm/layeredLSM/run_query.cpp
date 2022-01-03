@@ -59,7 +59,7 @@ uint32_t run_query(run *r, request *req){
 	}
 
 	if(req->key==test_key){
-		GDB_MAKE_BREAKPOINT;
+		//GDB_MAKE_BREAKPOINT;
 	}
 
 	req->retry=true;

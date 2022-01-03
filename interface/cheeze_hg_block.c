@@ -440,6 +440,7 @@ extern volatile vectored_request *now_processing;
 
 bool cheeze_end_req(request *const req){
 	vectored_request *preq=req->parents;
+	//printf("req end_req:%u\n", req->key);
 	uint32_t temp_crc;
 	switch(req->type){
 		case FS_NOTFOUND_T:
