@@ -116,6 +116,7 @@ bool shortcut_validity_check_lba(sc_master *sc, run *r, uint32_t lba){
 	fdriver_lock(&sc->lock);
 	uint32_t info_idx=sc->sc_map[lba];
 	if(info_idx==NOT_ASSIGNED_SC){
+		fdriver_unlock(&sc->lock);
 		return true;
 	}
 	bool res=__get_recency_cmp(&sc->info_set[info_idx], r->info)<=0;
@@ -167,10 +168,13 @@ bool shortcut_validity_check_and_link(sc_master* sc, run *r, uint32_t lba){
 		}
 	}
 	if(res){
-		run *old_r = sc->info_set[sc->sc_map[lba]].r;
-		if (old_r)
+		if (info_idx != NOT_ASSIGNED_SC)
 		{
-			shortcut_unlink_lba(sc, old_r, lba);
+			run *old_r = sc->info_set[sc->sc_map[lba]].r;
+			if (old_r)
+			{
+				shortcut_unlink_lba(sc, old_r, lba);
+			}
 		}
 		shortcut_link_lba(sc, r, lba);
 	}

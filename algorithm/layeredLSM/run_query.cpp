@@ -16,8 +16,8 @@ static void *__run_read_end_req(algo_req *req){
 	if(intra_offset!=NOT_FOUND){
 		memmove(&p_req->value->value[0], &p_req->value->value[intra_offset*LPAGESIZE], LPAGESIZE);
 		p_req->end_req(p_req);
+	//	fdriver_unlock(&param->r->lock);
 		param->mf->query_done(param->mf, param);
-		fdriver_unlock(&param->r->lock);
 	}
 	else{
 		inf_assign_try(p_req);
@@ -47,15 +47,19 @@ uint32_t run_translate_intra_offset(run *r, uint32_t ste_num, uint32_t intra_off
 }
 
 uint32_t run_query(run *r, request *req){
-	fdriver_lock(&r->lock);
+	//fdriver_lock(&r->lock);
 	if(r->pp){
 		char *res=pp_find_value(r->pp, req->key);
 		if (res){
 			memcpy(req->value->value, res, LPAGESIZE);
-			fdriver_unlock(&r->lock);
+			//fdriver_unlock(&r->lock);
 			req->end_req(req);
 			return READ_DONE;
 		}
+	}
+
+	if(req->key==test_key){
+		GDB_MAKE_BREAKPOINT;
 	}
 
 	req->retry=true;
@@ -71,7 +75,7 @@ uint32_t run_query(run *r, request *req){
 		uint32_t global_intra_offset=mf->query_by_req(mf, req, &param);
 		if(global_intra_offset==NOT_FOUND){
 			param->mf->query_done(param->mf, param);
-			fdriver_unlock(&param->r->lock);
+			//fdriver_unlock(&param->r->lock);
 			return READ_NOT_FOUND;
 		}
 		else{
@@ -83,7 +87,7 @@ uint32_t run_query(run *r, request *req){
 		ste_num = st_array_get_target_STE(r->st_body, req->key);
 		if (ste_num == UINT32_MAX)
 		{
-			fdriver_unlock(&r->lock);
+			//fdriver_unlock(&r->lock);
 			return READ_NOT_FOUND;
 		}
 		req->retry = true;
@@ -92,7 +96,7 @@ uint32_t run_query(run *r, request *req){
 		if (intra_offset == NOT_FOUND)
 		{
 			param->mf->query_done(param->mf, param);
-			fdriver_unlock(&r->lock);
+			//fdriver_unlock(&r->lock);
 			return READ_NOT_FOUND;
 		}
 		psa = run_translate_intra_offset(r, ste_num, intra_offset);
@@ -121,7 +125,7 @@ uint32_t run_query_retry(run *r, request *req){
 	uint32_t intra_offset=mf->query_retry(mf, param);
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
-		fdriver_unlock(&param->r->lock);
+		//fdriver_unlock(&param->r->lock);
 		return READ_NOT_FOUND;
 	}
 	uint32_t psa=st_array_read_translation(r->st_body, ste_num, intra_offset);

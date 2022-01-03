@@ -104,13 +104,19 @@ static inline uint32_t spm_joint_check(summary_page_meta *spm, uint32_t spm_num,
 }
 
 
-static inline uint32_t spm_joint_check_debug(summary_page_meta *spm, uint32_t spm_num, summary_page_meta *target){
+static inline uint32_t spm_joint_check_debug(summary_page_meta *spm, uint32_t spm_num, summary_page_meta *target, uint32_t skip_idx){
 	for(uint32_t i=0; i<spm_num; i++){
+		if(i==skip_idx) continue;
 		if(target->start_lba > spm[i].end_lba){
 			continue;
 		}
 		if(target->end_lba < spm[i].start_lba){
-			break;
+			if(skip_idx==UINT32_MAX){
+				break;
+			}
+			else{
+				continue;
+			}
 		}
 		return i;
 	}

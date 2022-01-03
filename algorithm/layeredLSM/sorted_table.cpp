@@ -326,6 +326,7 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 	if (sa->pba_array[sa->now_STE_num].mf == NULL){
 		sa->pba_array[sa->now_STE_num].mf=map_function_factory(sa->param, MAX_SECTOR_IN_BLOCK);
 	}
+
 	__st_insert_mf(sa, sa->bm->segment_manager, sa->now_STE_num, lba, sa->inblock_write_pointer);
 
 	if(sa->type==ST_PINNING){	

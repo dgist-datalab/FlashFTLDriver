@@ -56,7 +56,7 @@ summary_page_iter* spi_init_by_data(char *data){
 
 summary_pair spi_pick_pair(summary_page_iter *spi){
 	if(!spi->read_flag){
-		fdriver_unlock(&spi->read_done);
+		fdriver_lock(&spi->read_done);
 	}
 	if(spi->lock_deallocate==false){
 		fdriver_destroy(&spi->read_done);

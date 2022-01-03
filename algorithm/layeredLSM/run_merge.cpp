@@ -212,29 +212,34 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 				disjoint_check[i][j]=false;
 				continue;
 			}
-			if(!rset[i]->st_body->sp_meta[j].unlinked_data_copy){
+			if(rset[i]->st_body->sp_meta[j].unlinked_data_copy){
 				disjoint_check[i][j]=false;
 				continue;
 			}		
 
 			if(disjoint_check[i][j]==false) continue;
 			summary_page_meta *temp=&rset[i]->st_body->sp_meta[j];
-			uint32_t check_start_idx=rset[i]->type==RUN_NORMAL?i+1:i;
+			bool check_self=rset[i]->type==RUN_NORMAL?false:true;
 
-			for(uint32_t k=check_start_idx; k<run_num; k++){
+			for(uint32_t k=0; k<run_num; k++){
 				uint32_t set_idx;
-				if(rset[k]->type==RUN_NORMAL){
+				if(check_self==false && k==i){
+					continue;
+				}
+				if(check_self==false && rset[k]->type==RUN_NORMAL){
 					set_idx = spm_joint_check(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
 					
+					/*
 					uint32_t set_idx_debug = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
 					if(set_idx!=set_idx_debug){
 						EPRINT("joint error",false);
 						GDB_MAKE_BREAKPOINT; //not be commented
 						set_idx = spm_joint_check(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
 					}
+					*/
 				}
 				else{
-					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
+					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp, check_self?j:UINT32_MAX);
 				}
 				if(set_idx==UINT32_MAX || (k==i && j==set_idx)){
 					continue;
@@ -286,6 +291,9 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 		if(!shortcut_validity_check_and_link(shortcut,r,target.lba)){
 			unlinked_data_copy=true;
 			r->info->unlinked_lba_num++;
+		}
+
+		if(target.lba==test_key){
 		}
 	/*
 		if(shortcut_validity_check_lba(shortcut, mm->r, target.lba)){
@@ -372,7 +380,6 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
 			target_sorted_pair.pair=target;
 			target_sorted_pair.r=rset[ridx];
 			target_sorted_pair.ste_num=sp_set_get_ste_num(mm_set[ridx].ssi, target.intra_offset);
-	//		printf("lba:%u %u\n", target.lba, ridx);
 			if(target.lba!=UINT32_MAX){
 				uint32_t end_lba;
 				if(trivial_move_flag && sp_set_noncopy_check(mm_set[ridx].ssi, target.lba, &end_lba)){

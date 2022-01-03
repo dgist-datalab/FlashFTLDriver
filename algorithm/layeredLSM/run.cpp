@@ -54,6 +54,9 @@ void run_free(run *r ,struct shortcut_master *sc){
 	uint32_t map_type=r->type==RUN_LOG?r->run_log_mf->type:r->st_body->param.map_type;
 	__lsm_calculate_memory_usage(r->lsm, r->now_entry_num, -1 * memory_usage_bit, map_type, r->type==RUN_PINNING);
 	st_array_free(r->st_body);
+	if(r->type==RUN_LOG){
+		r->run_log_mf->free(r->run_log_mf);
+	}
 	fdriver_unlock(&r->lock);
 	free(r);
 }

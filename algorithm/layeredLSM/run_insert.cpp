@@ -87,6 +87,7 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 	if(!shortcut_validity_check_and_link(shortcut, r, lba)){
 		return false;
 	}
+
 	if(r->type==RUN_PINNING){
 		if(data){
 			EPRINT("not allowed in RUN_PINNING", true);
