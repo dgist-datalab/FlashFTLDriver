@@ -8,7 +8,7 @@
 #include <sstream>
 #include <iostream>
 #include <cxxabi.h> // __cxa_demangle
-#include <elfutils/libdwfl.h> // Dwfl*
+//#include <elfutils/libdwfl.h> // Dwfl*
 #include <execinfo.h> // backtrace
 #include <unistd.h> // getpid
 #include <cassert>
@@ -37,7 +37,7 @@
 
 #define GDB_MAKE_BREAKPOINT\
 	do{std::raise(SIGINT);}while(0)
-
+/*
 static std::string demangle(const char* name) {
     int status = -4;
     std::unique_ptr<char, void(*)(void*)> res {
@@ -66,10 +66,12 @@ static std::string debug_info(Dwfl* dwfl, void* ip) {
     ss << std::endl;
     return ss.str();
 }
-
+*/
 static inline void print_stacktrace(uint32_t max)
 {
-
+#if 1
+	return;
+#else
 	    Dwfl* dwfl = nullptr;
     {
         Dwfl_Callbacks callbacks = {};
@@ -101,6 +103,7 @@ static inline void print_stacktrace(uint32_t max)
     }
     dwfl_end(dwfl);
 	printf("%s\n", ss.str().c_str());
+#endif
 }
 
 #endif
