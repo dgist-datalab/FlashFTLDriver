@@ -8,6 +8,7 @@
 extern lower_info *g_li;
 bool debug_flag=false;
 extern uint32_t target_PBA;
+extern uint32_t test_key;
 typedef struct merge_meta_container{
 	run *r;
 	sp_set_iter *ssi;
@@ -104,7 +105,9 @@ retry:
 	}
 
 	t_idx=*ridx;
-
+	if(res.lba==test_key){
+		//EPRINT_CNT(test, 3, "picked", false);
+	}
 	if(res.lba==UINT32_MAX){
 		__move_iter_target(mm_set, t_idx);
 	}
@@ -151,6 +154,9 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	for(; iter!=sorted_list->end(); iter++){
 		__sorted_pair *t_pair=&(*iter);
 		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
+		if(t_pair->pair.lba==test_key){
+			EPRINT("target_read psa:%u", false, t_pair->original_psa);
+		}
 		__merge_issue_req(t_pair);
 	}
 }
@@ -175,9 +181,6 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			t_pair->original_psa=run_translate_intra_offset(t_pair->r, t_pair->ste_num, 
 			t_pair->pair.intra_offset);
 			
-		//	if(debug_flag && t_pair->original_psa/L2PGAP/_PPB *_PPB == target_PBA){
-		//		debug_flag=false;
-		//	}
 			if(!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true, shortcut)){
 				__invalidate_target(t_pair->r, t_pair->ste_num, t_pair->pair.intra_offset);
 			}
@@ -267,7 +270,7 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 
 extern uint32_t test_key;
 uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
-	//DEBUG_CNT_PRINT(test, 1089, __FUNCTION__, __LINE__);
+	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 	run_padding_current_block(r);
 	uint32_t i=0;
 	map_function *mf=NULL;
@@ -332,7 +335,11 @@ static inline void __sorted_array_flush(run *res, std::list<__sorted_pair> *sort
 }
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
-	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
+	//DEBUG_CNT_PRINT(run_cnt, 429, __FUNCTION__ , __LINE__);
+	static int cnt=0;
+	if(++cnt==429){
+		debug_flag=true;
+	}
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;

@@ -72,7 +72,7 @@ void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 	t_info->linked_lba_num++;
 	sc->sc_map[lba]=t_info->idx;
 	if(lba==test_key){
-		printf("\ttarget map to %u\n",t_info->idx);
+		printf("\t %u target map to info:%u,level:%u,run:%u\n",lba, t_info->idx,t_info->level_idx, r->run_idx);
 	}
 }
 

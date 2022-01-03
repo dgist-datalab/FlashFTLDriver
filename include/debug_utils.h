@@ -24,6 +24,18 @@
 		if((isabort)){abort();}\
 	}while(0)
 
+#define EPRINT_CNT(cnt, target_cnt, error, isabort, ... )\
+	do{\
+        static int cnt=0;\
+		printf("[%s:%d:%u]-",__FILE__, __LINE__,++cnt);\
+		printf(error, ##__VA_ARGS__);\
+		printf("\n");\
+		if((isabort)){abort();}\
+        if(target_cnt!=-1 && cnt==target_cnt){\
+            std::raise(SIGINT);\
+        }\
+	}while(0)
+
 #define DEBUG_CNT_PRINT(cnt_variable, target_cnt, function_name, function_line)\
 	do{\
 		static int cnt_variable=0;\
