@@ -3,7 +3,7 @@
 #include "../../include/container.h"
 #include "../../include/sem_lock.h"
 
-//#define LASYNC
+#define LASYNC
 #define FS_LOWER_W 1
 #define FS_LOWER_R 2
 #define FS_LOWER_T 3

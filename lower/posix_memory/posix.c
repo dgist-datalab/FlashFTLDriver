@@ -139,13 +139,13 @@ void *l_main(void *__input){
 		if(inf_req->isAsync){
 			switch(inf_req->type){
 				case FS_LOWER_W:
-					posix_write(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
+					posix_write(inf_req->key, inf_req->size, inf_req->value, inf_req->upper_req);
 					break;
 				case FS_LOWER_R:
-					posix_read(inf_req->key, inf_req->size, inf_req->value, inf_req->isAsync, inf_req->upper_req);
+					posix_read(inf_req->key, inf_req->size, inf_req->value, inf_req->upper_req);
 					break;
 				case FS_LOWER_T:
-					posix_trim_block(inf_req->key, inf_req->isAsync);
+					posix_trim_block(inf_req->key);
 					break;
 			}
 			free(inf_req);
@@ -182,7 +182,6 @@ posix_request* posix_get_preq(FSTYPE type, uint32_t PPA, value_set *value, char 
 	p_req->key=PPA;
 	p_req->value=value;
 	p_req->upper_req=req;
-	p_req->size=size;
 	p_req->data=data;
 	p_req->isAsync=async;
 	if(!p_req->isAsync){
@@ -193,19 +192,19 @@ posix_request* posix_get_preq(FSTYPE type, uint32_t PPA, value_set *value, char 
 }
 
 void *posix_make_write(uint32_t PPA, uint32_t size, value_set* value, algo_req *const req){
-	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_W, PPA, value, NULL, true req);
+	posix_request *p_req=posix_get_preq(FS_LOWER_W, PPA, value, NULL, true, req);
 	posix_async_make_req(p_req);
 	return NULL;
 }
 
 void *posix_make_read(uint32_t PPA, uint32_t size, value_set* value, algo_req *const req){
-	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_R, PPA, value, NULL, true, req);
+	posix_request *p_req=posix_get_preq(FS_LOWER_R, PPA, value, NULL, true, req);
 	posix_async_make_req(p_req);
 	return NULL;
 }
 
 void *posix_make_trim(uint32_t PPA){
-	posix_request *p_req=posix_get_preq_for_async(FS_LOWER_T, PPA, NULL, NULL, true, NULL);
+	posix_request *p_req=posix_get_preq(FS_LOWER_T, PPA, NULL, NULL, true, NULL);
 	posix_async_make_req(p_req);
 	return NULL;
 }
@@ -397,7 +396,7 @@ void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, algo_req *const
 void *posix_write_sync(uint32_t type, uint32_t ppa, char *data){
 	if(collect_io_type(type, &my_posix)){
 #ifdef LASYNC
-		posix_request *p_req=posix_get_preq_for_async(FS_LOWER_W, PPA, NULL, data, false, req);
+		posix_request *p_req=posix_get_preq(FS_LOWER_W, ppa, NULL, data, false, NULL);
 		posix_async_make_req(p_req);
 		fdriver_lock(&p_req->lock);
 		free(p_req);
@@ -411,7 +410,7 @@ void *posix_write_sync(uint32_t type, uint32_t ppa, char *data){
 void *posix_read_sync(uint32_t type, uint32_t ppa, char *data){
 	if(collect_io_type(type, &my_posix)){
 #ifdef LASYNC
-		posix_request *p_req=posix_get_preq_for_async(FS_LOWER_R, PPA, NULL, data, false, req);
+		posix_request *p_req=posix_get_preq(FS_LOWER_R, ppa, NULL, data, false, NULL);
 		posix_async_make_req(p_req);
 		fdriver_lock(&p_req->lock);
 		free(p_req);
