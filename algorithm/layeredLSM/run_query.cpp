@@ -52,6 +52,7 @@ uint32_t run_query(run *r, request *req){
 		char *res=pp_find_value(r->pp, req->key);
 		if (res){
 			memcpy(req->value->value, res, LPAGESIZE);
+			fdriver_unlock(&r->lock);
 			req->end_req(req);
 			return READ_DONE;
 		}

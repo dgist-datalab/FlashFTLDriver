@@ -228,7 +228,8 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 					
 					uint32_t set_idx_debug = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
 					if(set_idx!=set_idx_debug){
-						GDB_MAKE_BREAKPOINT;
+						EPRINT("joint error",false);
+						GDB_MAKE_BREAKPOINT; //not be commented
 						set_idx = spm_joint_check(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
 					}
 				}

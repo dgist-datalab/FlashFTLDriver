@@ -1,6 +1,7 @@
 #include "lsmtree.h"
 #include "compaction.h"
 
+extern uint32_t test_key;
 static inline uint32_t __rm_get_ridx(run_manager *rm){
 	if(rm->ridx_queue->empty()){
 		EPRINT("empty ridx queue", true);
@@ -137,11 +138,9 @@ void lsmtree_free(lsmtree *lsm){
 
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	run *r=lsm->memtable[lsm->now_memtable_idx];
+	//printf("req->key write:%u\n", req->key);
 	run_insert(r, req->key, UINT32_MAX, req->value->value, false, 
 		lsm->shortcut);
-	if(req->key==85472){
-		printf("%u inserted!\n", req->key);
-	}
 
 	if(run_is_full(r)){
 		run_insert_done(r, false);
@@ -159,13 +158,13 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	}
 	return 0;
 }
-
 uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res;
 	run *r=shortcut_query(lsm->shortcut, req->key);
+	//printf("req->key read:%u\n", req->key);
 	if(r==NULL){
 		req->type=FS_NOTFOUND_T;
-		printf("req->key :%u not found\n", req->key);
+		//printf("req->key :%u not found\n", req->key);
 		req->end_req(req);
 		return READ_NOT_FOUND;
 	}
@@ -178,7 +177,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	}
 	if(res==READ_NOT_FOUND){
 		req->type=FS_NOTFOUND_T;
-		printf("req->key :%u not found\n", req->key);
+		//printf("req->key :%u not found\n", req->key);
 		req->end_req(req);
 	}
 	return res;

@@ -3,6 +3,7 @@
 #include "./lsmtree.h"
 
 uint32_t operation_temp(request *const ){return 1;}
+uint32_t remove_temp(request *const );
 uint32_t print_log_temp();
 
 uint32_t create_temp(lower_info *,blockmanager *, struct algorithm *);
@@ -17,7 +18,7 @@ struct algorithm layered_lsm={
 	.read=read_temp,
 	.write=write_temp,
 	.flush=operation_temp,
-	.remove=operation_temp,
+	.remove=remove_temp,
 	.test=test_function,
 	.print_log=print_log_temp,
 };
@@ -45,6 +46,11 @@ void destroy_temp(lower_info *, struct algorithm *){
 	free(target_param);
 	lsmtree_print_log(LSM);
 	lsmtree_free(LSM);
+}
+
+uint32_t remove_temp(request *const req){
+	req->end_req(req);
+	return 1;
 }
 
 uint32_t print_log_temp(){

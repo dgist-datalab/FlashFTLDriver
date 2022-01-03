@@ -13,12 +13,14 @@ extern uint32_t test_key;
 extern uint32_t test_piece_ppa;
 
 static inline void __check_debug(st_array *sa, uint32_t lba, uint32_t psa, uint32_t ste_num, uint32_t intra_offset){
-	uint32_t retrieve_psa=st_array_read_translation(sa, ste_num, intra_offset);	
-	if(psa!=retrieve_psa){
-		GDB_MAKE_BREAKPOINT;
+	uint32_t retrieve_psa=st_array_read_translation(sa, ste_num, intra_offset);
+#ifdef LSM_DEBUG
+	if (psa != retrieve_psa){
+		//	GDB_MAKE_BREAKPOINT;//not be commented
 		EPRINT("retrieve_error", false);
-		st_array_read_translation(sa, ste_num, intra_offset);	
+		st_array_read_translation(sa, ste_num, intra_offset);
 	}
+#endif
 	if(lba==test_key || psa==test_piece_ppa){
 		uint32_t recency=sa_m->sid_map[sa->sid].r->info->recency;
 		printf("target insert (%u:%u, %u:%u) sid,ste,intra (%u,%u,%u) recency:%u:\n",test_key,lba, test_piece_ppa, psa, sa->sid, ste_num, intra_offset, recency);

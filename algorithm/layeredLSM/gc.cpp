@@ -134,7 +134,7 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 		sid_info* info=sorted_array_master_get_info(g_blk->b_info->sid);
 		if(info->sa==NULL){
 			EPRINT("not found info at sid:%u", false, g_blk->b_info->sid);
-			GDB_MAKE_BREAKPOINT;
+			GDB_MAKE_BREAKPOINT; //not be commented
 			info=sorted_array_master_get_info(g_blk->b_info->sid);
 		}
 		uint32_t invalidate_piece_num=0, validate_piece_num=0;

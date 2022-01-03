@@ -1,4 +1,5 @@
 #include "./shortcut.h"
+extern uint32_t test_key;
 sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range){
 	sc_master *res=(sc_master*)calloc(1, sizeof(sc_master));
 	res->free_q=new std::list<uint32_t> ();
@@ -70,6 +71,9 @@ void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 	}
 	t_info->linked_lba_num++;
 	sc->sc_map[lba]=t_info->idx;
+	if(lba==test_key){
+		printf("\ttarget map to %u\n",t_info->idx);
+	}
 }
 
 void shortcut_unlink_lba(sc_master *sc, run *r, uint32_t lba){
@@ -153,7 +157,15 @@ void shortcut_free(sc_master *sc){
 bool shortcut_validity_check_and_link(sc_master* sc, run *r, uint32_t lba){
 	fdriver_lock(&sc->lock);
 	uint32_t info_idx=sc->sc_map[lba];
-	bool res=info_idx==NOT_ASSIGNED_SC? true: (sc->info_set[info_idx].now_compaction? true:(&sc->info_set[info_idx], r->info)<=0);
+	bool res=info_idx==NOT_ASSIGNED_SC;
+	if(!res){
+		if(sc->info_set[info_idx].now_compaction==true){
+			res=true;
+		}
+		else if(__get_recency_cmp(&sc->info_set[info_idx], r->info)<=0){
+			res=true;
+		}
+	}
 	if(res){
 		run *old_r = sc->info_set[sc->sc_map[lba]].r;
 		if (old_r)
