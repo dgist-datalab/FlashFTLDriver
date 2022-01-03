@@ -27,7 +27,7 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 			total_target_entry += merge_src[i]->now_entry_num;
 		}
 
-		run *des = __lsm_populate_new_run(lsm, lsm->disk[last_level_compaction? disk_idx : disk_idx + 1]->map_type, RUN_NORMAL, total_target_entry, disk_idx+1);
+		run *des = __lsm_populate_new_run(lsm, lsm->disk[last_level_compaction? disk_idx : disk_idx + 1]->map_type, RUN_NORMAL, total_target_entry, last_level_compaction?disk_idx+1:disk_idx+2);
 
 		run_merge(target_src_num, merge_src, des, lsm);
 

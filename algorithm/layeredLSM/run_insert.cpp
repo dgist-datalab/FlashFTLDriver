@@ -37,8 +37,12 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 	for(uint32_t i=0; i<r->pp->buffered_num; i++){
 		intra_offset=r->st_body->global_write_pointer;
 		psa=st_array_write_translation(r->st_body);
+		
 		psa_list[i]=psa;
 		uint32_t lba=r->pp->LBA[i];
+		if(lba==test_key){
+			EPRINT("%u ppa->%u", false, lba, psa);
+		}
 		if(i==0){
 			target_ppa=psa/L2PGAP;
 #ifdef LSM_DEBUG
@@ -116,6 +120,10 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 }
 
 void run_padding_current_block(run *r){
+	if(r->pp && r->pp->buffered_num!=0){
+		__run_write_buffer(r, r->st_body->bm->segment_manager,true, COMPACTIONDATAW);
+		pp_reinit_buffer(r->pp);
+	}
 	if(st_array_force_skip_block(r->st_body)==0){
 		return;
 	}
