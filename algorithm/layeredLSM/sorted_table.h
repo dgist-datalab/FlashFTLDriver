@@ -83,6 +83,7 @@ void sorted_array_master_init(uint32_t total_run_num);
 void sorted_array_master_free();
 
 sid_info* sorted_array_master_get_info(uint32_t sidx);
+sid_info* sorted_array_master_get_info_mapgc(uint32_t start_lba, uint32_t ppa, uint32_t*intra_idx);
 
 /*
 	Function: st_array_init

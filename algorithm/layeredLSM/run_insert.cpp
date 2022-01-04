@@ -88,7 +88,8 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 		EPRINT("run full!", true);
 		return false;
 	}
-	if(!shortcut_validity_check_and_link(shortcut, r, lba)){
+
+	if(!shortcut_validity_check_and_link(shortcut, r, r, lba)){
 		return false;
 	}
 

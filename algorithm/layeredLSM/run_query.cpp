@@ -59,7 +59,8 @@ uint32_t run_query(run *r, request *req){
 	}
 
 	if(req->key==test_key){
-		DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
+		//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
+		//GDB_MAKE_BREAKPOINT;
 	}
 
 	req->retry=true;

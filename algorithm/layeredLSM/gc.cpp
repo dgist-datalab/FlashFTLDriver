@@ -85,10 +85,10 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target){
 		for_each_list_node_safe(temp_list,now,nxt){
 			g_value=(gc_value*)now->data;
 			__gc_read_check(g_value);
-			uint32_t sid=g_value->oob[0];
-			uint32_t intra_idx=g_value->oob[1];
-			sid_info* info=sorted_array_master_get_info(sid);
-			if(info->sa->sp_meta[intra_idx].ppa!=g_value->ppa){
+			uint32_t start_lba=g_value->oob[0];
+			uint32_t intra_idx;
+			sid_info* info=sorted_array_master_get_info_mapgc(start_lba, g_value->ppa, &intra_idx);
+			if(info==NULL || info->sa->sp_meta[intra_idx].ppa!=g_value->ppa){
 				EPRINT("mapping error", true);
 			}
 

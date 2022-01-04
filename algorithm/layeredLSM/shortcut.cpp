@@ -155,15 +155,18 @@ void shortcut_free(sc_master *sc){
 	free(sc);
 }
 
-bool shortcut_validity_check_and_link(sc_master* sc, run *r, uint32_t lba){
+bool shortcut_validity_check_and_link(sc_master* sc, run *src_r, run* des_r, uint32_t lba){
 	fdriver_lock(&sc->lock);
+	if(src_r==NULL){
+		src_r=des_r;
+	}
 	uint32_t info_idx=sc->sc_map[lba];
 	bool res=info_idx==NOT_ASSIGNED_SC;
 	if(!res){
 		if(sc->info_set[info_idx].now_compaction==true){
 			res=true;
 		}
-		else if(__get_recency_cmp(&sc->info_set[info_idx], r->info)<=0){
+		else if(__get_recency_cmp(&sc->info_set[info_idx], src_r->info)<=0){
 			res=true;
 		}
 	}
@@ -176,7 +179,7 @@ bool shortcut_validity_check_and_link(sc_master* sc, run *r, uint32_t lba){
 				shortcut_unlink_lba(sc, old_r, lba);
 			}
 		}
-		shortcut_link_lba(sc, r, lba);
+		shortcut_link_lba(sc, des_r, lba);
 	}
 	fdriver_unlock(&sc->lock);
 	return res;
