@@ -335,11 +335,7 @@ static inline void __sorted_array_flush(run *res, std::list<__sorted_pair> *sort
 }
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
-	//DEBUG_CNT_PRINT(run_cnt, 429, __FUNCTION__ , __LINE__);
-	static int cnt=0;
-	if(++cnt==429){
-		debug_flag=true;
-	}
+	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
