@@ -207,6 +207,10 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 	for(uint32_t i=0; i<run_num; i++){
 		run *r=rset[i];
 		for(uint32_t j=0; j<r->st_body->now_STE_num; j++){
+			if (debug_flag && i == 14 && j==0)
+			{
+				//GDB_MAKE_BREAKPOINT;
+			}
 			if(rset[i]->st_body->pba_array[j].PBA==UINT32_MAX){
 				disjoint_check[i][j]=false;
 				continue;
@@ -222,7 +226,7 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 
 			if(disjoint_check[i][j]==false) continue;
 			summary_page_meta *temp=&rset[i]->st_body->sp_meta[j];
-			bool check_self=rset[i]->type==RUN_NORMAL?false:true;
+			bool check_self=rset[i]->type==RUN_LOG?true:false;
 
 			for(uint32_t k=0; k<run_num; k++){
 				uint32_t set_idx;
@@ -242,7 +246,7 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 					*/
 				}
 				else{
-					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp, check_self?j:UINT32_MAX);
+					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp, (check_self && k==i)?j:UINT32_MAX);
 				}
 				if(set_idx==UINT32_MAX || (k==i && j==set_idx)){
 					continue;
@@ -270,7 +274,7 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 
 extern uint32_t test_key;
 uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
-	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
+	//DEBUG_CNT_PRINT(test, 404, __FUNCTION__, __LINE__);
 	run_padding_current_block(r);
 	uint32_t i=0;
 	map_function *mf=NULL;
@@ -339,6 +343,13 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
+
+/*
+	static int cnt=0;
+	if(++cnt==309){
+		debug_flag=true;
+	}
+*/
 
 	bool trivial_move_flag=true;
 
