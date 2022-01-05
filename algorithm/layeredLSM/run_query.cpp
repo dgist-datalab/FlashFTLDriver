@@ -126,7 +126,7 @@ uint32_t run_query_retry(run *r, request *req){
 	uint32_t intra_offset=mf->query_retry(mf, param);
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
-		fdriver_unlock(&param->r->lock);
+		//fdriver_unlock(&param->r->lock);
 		return READ_NOT_FOUND;
 	}
 	uint32_t psa=st_array_read_translation(r->st_body, ste_num, intra_offset);
