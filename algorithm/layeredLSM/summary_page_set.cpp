@@ -181,3 +181,15 @@ void sp_set_iter_free(sp_set_iter *ssi){
 	free(ssi->noncopy_end_lba);
 	free(ssi);
 }
+
+summary_page_meta* sp_set_check_trivial_old_data(sp_set_iter *ssi){
+	if(ssi->type!=SPI_SET){
+		return NULL;
+	}
+	else{
+		if(ssi->spm_set[ssi->now_STE_num].unlinked_data_copy){
+			return &ssi->spm_set[ssi->now_STE_num];
+		}
+	}
+	return NULL;
+}

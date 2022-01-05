@@ -72,7 +72,7 @@ void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 	t_info->linked_lba_num++;
 	sc->sc_map[lba]=t_info->idx;
 	if(lba==test_key){
-		printf("\ttarget map to %u\n",t_info->idx);
+		printf("\t %u target map to info:%u,level:%u,run:%u\n",lba, t_info->idx,t_info->level_idx, r->run_idx);
 	}
 }
 
@@ -124,6 +124,25 @@ bool shortcut_validity_check_lba(sc_master *sc, run *r, uint32_t lba){
 	return res;
 }
 
+bool shortcut_validity_check_by_value(sc_master *sc, run *r, uint32_t level, uint32_t recency, uint32_t lba){
+	fdriver_lock(&sc->lock);
+	uint32_t info_idx=sc->sc_map[lba];
+	if(info_idx==NOT_ASSIGNED_SC){
+		fdriver_unlock(&sc->lock);
+		return true;
+	}
+	if(r->info->idx==info_idx){
+		fdriver_unlock(&sc->lock);
+		return true;
+	}
+	sc_info temp_info;
+	temp_info.level_idx=level;
+	temp_info.recency=recency;
+	bool res=__get_recency_cmp(&sc->info_set[info_idx], &temp_info)<=0;
+	fdriver_unlock(&sc->lock);
+	return res;
+}
+
 void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba){
 	fdriver_lock(&sc->lock);
 	uint32_t info_idx=sc->sc_map[lba];
@@ -155,15 +174,18 @@ void shortcut_free(sc_master *sc){
 	free(sc);
 }
 
-bool shortcut_validity_check_and_link(sc_master* sc, run *r, uint32_t lba){
+bool shortcut_validity_check_and_link(sc_master* sc, run *src_r, run* des_r, uint32_t lba){
 	fdriver_lock(&sc->lock);
+	if(src_r==NULL){
+		src_r=des_r;
+	}
 	uint32_t info_idx=sc->sc_map[lba];
 	bool res=info_idx==NOT_ASSIGNED_SC;
 	if(!res){
 		if(sc->info_set[info_idx].now_compaction==true){
 			res=true;
 		}
-		else if(__get_recency_cmp(&sc->info_set[info_idx], r->info)<=0){
+		else if(__get_recency_cmp(&sc->info_set[info_idx], src_r->info)<=0){
 			res=true;
 		}
 	}
@@ -176,7 +198,7 @@ bool shortcut_validity_check_and_link(sc_master* sc, run *r, uint32_t lba){
 				shortcut_unlink_lba(sc, old_r, lba);
 			}
 		}
-		shortcut_link_lba(sc, r, lba);
+		shortcut_link_lba(sc, des_r, lba);
 	}
 	fdriver_unlock(&sc->lock);
 	return res;

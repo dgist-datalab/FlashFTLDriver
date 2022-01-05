@@ -73,6 +73,8 @@ void shortcut_add_run_merge(sc_master *sc, run *r, run **rset, uint32_t merge_nu
  * */
 bool shortcut_validity_check_lba(sc_master *sc, run *r, uint32_t lba);
 
+bool shortcut_validity_check_by_value(sc_master *sc, run *r, uint32_t level, uint32_t recency, uint32_t lba);
+
 /*
  * Function: shortcut_link_lba
  * ------------------------------
@@ -112,7 +114,7 @@ run* shortcut_query(sc_master *sc, uint32_t lba);
  * */
 void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba);
 
-bool shortcut_validity_check_and_link(sc_master*sc, run *r, uint32_t lba);
+bool shortcut_validity_check_and_link(sc_master*sc, run *src_r, run* des_r, uint32_t lba);
 /*
  * Function: shortcut_release_sc_info
  * ---------------------------------

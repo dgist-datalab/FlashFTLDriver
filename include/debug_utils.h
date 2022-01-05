@@ -8,7 +8,7 @@
 #include <sstream>
 #include <iostream>
 #include <cxxabi.h> // __cxa_demangle
-#include <elfutils/libdwfl.h> // Dwfl*
+//#include <elfutils/libdwfl.h> // Dwfl*
 #include <execinfo.h> // backtrace
 #include <unistd.h> // getpid
 #include <cassert>
@@ -24,6 +24,18 @@
 		if((isabort)){abort();}\
 	}while(0)
 
+#define EPRINT_CNT(cnt, target_cnt, error, isabort, ... )\
+	do{\
+        static int cnt=0;\
+		printf("[%s:%d:%u]-",__FILE__, __LINE__,++cnt);\
+		printf(error, ##__VA_ARGS__);\
+		printf("\n");\
+		if((isabort)){abort();}\
+        if(target_cnt!=-1 && cnt==target_cnt){\
+            std::raise(SIGINT);\
+        }\
+	}while(0)
+
 #define DEBUG_CNT_PRINT(cnt_variable, target_cnt, function_name, function_line)\
 	do{\
 		static int cnt_variable=0;\
@@ -37,7 +49,7 @@
 
 #define GDB_MAKE_BREAKPOINT\
 	do{std::raise(SIGINT);}while(0)
-
+/*
 static std::string demangle(const char* name) {
     int status = -4;
     std::unique_ptr<char, void(*)(void*)> res {
@@ -66,10 +78,12 @@ static std::string debug_info(Dwfl* dwfl, void* ip) {
     ss << std::endl;
     return ss.str();
 }
-
+*/
 static inline void print_stacktrace(uint32_t max)
 {
-
+#if 1
+	return;
+#else
 	    Dwfl* dwfl = nullptr;
     {
         Dwfl_Callbacks callbacks = {};
@@ -101,6 +115,7 @@ static inline void print_stacktrace(uint32_t max)
     }
     dwfl_end(dwfl);
 	printf("%s\n", ss.str().c_str());
+#endif
 }
 
 #endif

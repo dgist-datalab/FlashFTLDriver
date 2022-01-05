@@ -64,6 +64,21 @@ sid_info* sorted_array_master_get_info(uint32_t sid){
 	return __find_sid_info_iter(sid);
 }
 
+
+sid_info* sorted_array_master_get_info_mapgc(uint32_t start_lba, uint32_t ppa, uint32_t*intra_idx){
+	for(uint32_t i=0; i<sa_m->total_run_num; i++){
+		sid_info *temp=&sa_m->sid_map[i];
+		if(!temp || !temp->sa) continue;
+		int t_intra_idx=spm_find_target_idx(temp->sa->sp_meta, temp->sa->now_STE_num, start_lba);
+		if(temp->sa->sp_meta[t_intra_idx].ppa==ppa){
+			*intra_idx=t_intra_idx;
+			return temp;
+		}
+	}
+	*intra_idx=0;
+	return NULL;
+}
+
 st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinning, map_param param){
 	st_array *res=(st_array*)calloc(1, sizeof(st_array));
 	res->bm=bm;
@@ -157,7 +172,7 @@ static inline char *__set_type_to_char(uint32_t type){
 static inline void __check_sid(st_array * sa, uint32_t now_ste, uint32_t PBA, uint32_t type){
 	if(target_sid==UINT32_MAX) return;
 	if(sa->sid==target_sid && sa->now_STE_num==target_ste_idx){
-		DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
+		//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 		target_PBA=sa->pba_array[now_ste].PBA;
 		block_info *get_info = &sa->bm->PBA_map[PBA / _PPB];
 		printf("[%s] block_info sid:%u,ste_idx:%u\n", __set_type_to_char(type),  get_info->sid, get_info->intra_idx);
@@ -445,8 +460,8 @@ summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
 	swp->idx=sa->now_STE_num;
 	swp->sa=sa;
 	swp->spm=&sa->sp_meta[sa->now_STE_num];
-	swp->oob[0]=sa->sid;
-	swp->oob[1]=sa->now_STE_num;
+	swp->oob[0]=sa->sp_meta[sa->now_STE_num].start_lba;
+	swp->oob[1]=sa->sp_meta[sa->now_STE_num].end_lba;
 	st_array_finish_now_PBA(sa);
 
 	sa->pba_array[sa->now_STE_num].mf->make_done(sa->pba_array[sa->now_STE_num].mf);

@@ -96,6 +96,7 @@ void lsmtree_free(lsmtree *lsm);
 uint32_t lsmtree_insert(lsmtree *lsm, request *req);
 uint32_t lsmtree_read(lsmtree *lsm, request *req);
 uint32_t lsmtree_print_log(lsmtree *lsm);
+void lsmtree_run_print(lsmtree* lsm);
 
 struct run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, uint32_t entry_num, uint32_t level_num);
 void __lsm_free_run(lsmtree *lsm, run *r);

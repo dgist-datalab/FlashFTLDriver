@@ -8,6 +8,7 @@
 extern lower_info *g_li;
 bool debug_flag=false;
 extern uint32_t target_PBA;
+extern uint32_t test_key;
 typedef struct merge_meta_container{
 	run *r;
 	sp_set_iter *ssi;
@@ -85,6 +86,7 @@ sc_master *shortcut){
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 	summary_pair now;
 	uint32_t t_idx;
+	summary_page_meta *spm;
 
 retry:
 	for(uint32_t i=0; i<run_num; i++){
@@ -104,7 +106,9 @@ retry:
 	}
 
 	t_idx=*ridx;
-
+	if(res.lba==test_key){
+		//EPRINT_CNT(test, 3, "picked", false);
+	}
 	if(res.lba==UINT32_MAX){
 		__move_iter_target(mm_set, t_idx);
 	}
@@ -115,6 +119,17 @@ retry:
 		res.lba=UINT32_MAX;
 		res.intra_offset=UINT32_MAX;
 		goto retry;
+	}
+	else if((spm=sp_set_check_trivial_old_data(mm_set[t_idx].ssi))!=NULL){
+		uint32_t original_level=spm->original_level;
+		uint32_t original_recency=spm->original_recency;
+		if(!shortcut_validity_check_by_value(shortcut, mm_set[t_idx].r, original_level, original_recency, res.lba)){
+			__invalidate_target(mm_set[t_idx].r, sp_set_get_ste_num(mm_set[t_idx].ssi, res.intra_offset), res.intra_offset);
+			__move_iter_target(mm_set, t_idx);
+			res.lba = UINT32_MAX;
+			res.intra_offset = UINT32_MAX;
+			goto retry;
+		}
 	}
 	return res;
 }
@@ -151,6 +166,9 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	for(; iter!=sorted_list->end(); iter++){
 		__sorted_pair *t_pair=&(*iter);
 		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
+		if(t_pair->pair.lba==test_key){
+			EPRINT("target_read psa:%u", false, t_pair->original_psa);
+		}
 		__merge_issue_req(t_pair);
 	}
 }
@@ -175,9 +193,6 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			t_pair->original_psa=run_translate_intra_offset(t_pair->r, t_pair->ste_num, 
 			t_pair->pair.intra_offset);
 			
-		//	if(debug_flag && t_pair->original_psa/L2PGAP/_PPB *_PPB == target_PBA){
-		//		debug_flag=false;
-		//	}
 			if(!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true, shortcut)){
 				__invalidate_target(t_pair->r, t_pair->ste_num, t_pair->pair.intra_offset);
 			}
@@ -204,6 +219,10 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 	for(uint32_t i=0; i<run_num; i++){
 		run *r=rset[i];
 		for(uint32_t j=0; j<r->st_body->now_STE_num; j++){
+			if (debug_flag && i == 14 && j==0)
+			{
+				//GDB_MAKE_BREAKPOINT;
+			}
 			if(rset[i]->st_body->pba_array[j].PBA==UINT32_MAX){
 				disjoint_check[i][j]=false;
 				continue;
@@ -219,7 +238,7 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 
 			if(disjoint_check[i][j]==false) continue;
 			summary_page_meta *temp=&rset[i]->st_body->sp_meta[j];
-			bool check_self=rset[i]->type==RUN_NORMAL?false:true;
+			bool check_self=rset[i]->type==RUN_LOG?true:false;
 
 			for(uint32_t k=0; k<run_num; k++){
 				uint32_t set_idx;
@@ -239,7 +258,7 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 					*/
 				}
 				else{
-					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp, check_self?j:UINT32_MAX);
+					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp, (check_self && k==i)?j:UINT32_MAX);
 				}
 				if(set_idx==UINT32_MAX || (k==i && j==set_idx)){
 					continue;
@@ -267,7 +286,7 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 
 extern uint32_t test_key;
 uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
-	//DEBUG_CNT_PRINT(test, 1089, __FUNCTION__, __LINE__);
+	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 	run_padding_current_block(r);
 	uint32_t i=0;
 	map_function *mf=NULL;
@@ -282,19 +301,31 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 	bool unlinked_data_copy=false;
 	uint32_t des_ste_num=r->st_body->now_STE_num;
 	run_copy_ste_to(r, &mm->r->st_body->pba_array[target_ste], &mm->r->st_body->sp_meta[target_ste], mf, false);
+	uint32_t original_level=mm->r->info->level_idx;
+	uint32_t original_recency=mm->r->info->recency;
 	while(1){
 		summary_pair target = sp_set_iter_pick(mm->ssi);
 		if(mf){
 			mf->insert(mf, target.lba, i++);
 		}
 
-		if(!shortcut_validity_check_and_link(shortcut,r,target.lba)){
+		if(target.lba==test_key){
+			uint32_t original_psa=run_translate_intra_offset(mm->r, target_ste, target.intra_offset);
+
+			uint32_t target_ste2=st_array_get_target_STE(r->st_body, test_key);
+			uint32_t read_psa=run_translate_intra_offset(r, target_ste2, mm->r->type==RUN_LOG?target.intra_offset%512:target.intra_offset);
+			EPRINT("trivial target move:%u, %u\n",false, original_psa, read_psa);
+			if(original_psa!=read_psa){
+				target_ste2=st_array_get_target_STE(r->st_body, test_key);
+				read_psa=run_translate_intra_offset(r, target_ste2, target.intra_offset);
+			}
+		}
+
+		if(!shortcut_validity_check_and_link(shortcut,mm->r, r ,target.lba)){
 			unlinked_data_copy=true;
 			r->info->unlinked_lba_num++;
 		}
 
-		if(target.lba==test_key){
-		}
 	/*
 		if(shortcut_validity_check_lba(shortcut, mm->r, target.lba)){
 			shortcut_unlink_and_link_lba(shortcut, r, target.lba);
@@ -314,7 +345,7 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 		}
 		__move_iter_target(mm, 0);
 	}
-	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy);
+	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy, original_level, original_recency);
 	//run_copy_ste_to(r, &mm->r->st_body->pba_array[target_ste], &mm->r->st_body->sp_meta[target_ste], mf, false);
 	sp_set_iter_move_ste(mm->ssi, target_ste, res);
 	if (sp_set_iter_done_check(mm->ssi)){
@@ -332,10 +363,17 @@ static inline void __sorted_array_flush(run *res, std::list<__sorted_pair> *sort
 }
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
-	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
+	//DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
+
+/*
+	static int cnt=0;
+	if(++cnt==309){
+		debug_flag=true;
+	}
+*/
 
 	bool trivial_move_flag=true;
 

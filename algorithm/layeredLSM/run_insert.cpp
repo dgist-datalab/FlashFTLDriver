@@ -37,8 +37,12 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 	for(uint32_t i=0; i<r->pp->buffered_num; i++){
 		intra_offset=r->st_body->global_write_pointer;
 		psa=st_array_write_translation(r->st_body);
+		
 		psa_list[i]=psa;
 		uint32_t lba=r->pp->LBA[i];
+		if(lba==test_key){
+			EPRINT("%u ppa->%u", false, lba, psa);
+		}
 		if(i==0){
 			target_ppa=psa/L2PGAP;
 #ifdef LSM_DEBUG
@@ -84,7 +88,8 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 		EPRINT("run full!", true);
 		return false;
 	}
-	if(!shortcut_validity_check_and_link(shortcut, r, lba)){
+
+	if(!shortcut_validity_check_and_link(shortcut, r, r, lba)){
 		return false;
 	}
 
@@ -116,6 +121,10 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 }
 
 void run_padding_current_block(run *r){
+	if(r->pp && r->pp->buffered_num!=0){
+		__run_write_buffer(r, r->st_body->bm->segment_manager,true, COMPACTIONDATAW);
+		pp_reinit_buffer(r->pp);
+	}
 	if(st_array_force_skip_block(r->st_body)==0){
 		return;
 	}
@@ -131,8 +140,10 @@ void run_copy_ste_to(run *r, struct sorted_table_entry *ste, summary_page_meta *
 	st_array_copy_STE(r->st_body, ste, spm, mf, unlinked_data_copy);
 }
 
-void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag){
+void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag, uint32_t original_level, uint32_t original_recency){
 	r->st_body->sp_meta[ste_num].unlinked_data_copy=flag;
+	r->st_body->sp_meta[ste_num].original_level=original_level;
+	r->st_body->sp_meta[ste_num].original_recency=original_recency;
 }
 
 void run_insert_done(run *r, bool merge_insert){
@@ -149,4 +160,20 @@ void run_insert_done(run *r, bool merge_insert){
 	uint64_t mf_memory_usage=run_memory_usage(r, r->lsm->param.target_bit);
 	uint32_t map_type=r->type==RUN_LOG?r->run_log_mf->type:r->st_body->param.map_type;
 	__lsm_calculate_memory_usage(r->lsm,r->now_entry_num, mf_memory_usage, map_type, r->type==RUN_PINNING);
+	if(r->type!=RUN_LOG){
+		uint32_t prev_end=0;
+		for (uint32_t i = 0; i < r->st_body->now_STE_num; i++){
+			if(i==0){
+				prev_end=r->st_body->sp_meta[i].end_lba;
+			}
+			else{
+				if(r->st_body->sp_meta[i].start_lba < prev_end){
+					EPRINT("sorting error!", true);
+				}
+				else{
+					prev_end=r->st_body->sp_meta[i].end_lba;
+				}
+			}
+		}
+	}
 }

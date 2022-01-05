@@ -3,6 +3,7 @@
 #include "../../include/settings.h"
 #include "../../interface/interface.h"
 #include "../../include/sem_lock.h"
+#include "../../include/data_struct/bitmap.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -33,6 +34,8 @@ typedef struct summary_page_meta{
 	uint32_t end_lba;
 	uint32_t ppa;
 	uint32_t pr_type;
+	uint32_t original_level;
+	uint32_t original_recency;
 	bool sorted;
 	bool unlinked_data_copy;
 	bool copied;
