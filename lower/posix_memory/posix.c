@@ -93,6 +93,7 @@ void posix_traffic_print(lower_info *li){
 					li->req_type_cnt[GCMW] +
 					li->req_type_cnt[COMPACTIONDATAW]) /
 			   li->req_type_cnt[DATAW]);
+	memset(li->req_type_cnt, 0,  sizeof(uint64_t)*LREQ_TYPE_NUM);
 	printf("end\n");
 }
 
