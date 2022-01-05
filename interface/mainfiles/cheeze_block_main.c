@@ -34,6 +34,10 @@ void log_lower_print(int sig){
 
 //int MS_TIME_SL;
 void print_temp_log(int sig){
+	struct sigaction sa2={0};
+	sa2.sa_handler = print_temp_log;
+	sigaction(SIGCONT, &sa2, NULL);
+
 	printf("%d\n", pthread_self());
 	request_print_log();
 	request_memset_print_log();
@@ -71,9 +75,9 @@ int main(int argc,char* argv[]){
 	sigdelset(&tSigSetMask, SIGINT);
 	pthread_sigmask(SIG_SETMASK, &tSigSetMask, NULL);
 
-	struct sigaction sa2;
+	struct sigaction sa2={0};
 	sa2.sa_handler = print_temp_log;
-	sigaction(SIGUSR1, &sa2, NULL);
+	sigaction(SIGCONT, &sa2, NULL);
 
 	printf("signal add!\n");
 

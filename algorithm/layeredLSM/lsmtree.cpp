@@ -229,6 +229,8 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 
 void lsmtree_run_print(lsmtree* lsm){
 	for(uint32_t i=0; i<lsm->rm->total_run_num; i++){
-		run_print(lsm->rm->run_array[i], false);
+		if(lsm->rm->run_array[i]){
+			run_print(lsm->rm->run_array[i], false);
+		}
 	}
 }

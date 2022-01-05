@@ -52,7 +52,7 @@ uint32_t run_query(run *r, request *req){
 		char *res=pp_find_value(r->pp, req->key);
 		if (res){
 			memcpy(req->value->value, res, LPAGESIZE);
-			//fdriver_unlock(&r->lock);
+	//		fdriver_unlock(&r->lock);
 			req->end_req(req);
 			return READ_DONE;
 		}
@@ -76,8 +76,7 @@ uint32_t run_query(run *r, request *req){
 		uint32_t global_intra_offset=mf->query_by_req(mf, req, &param);
 		if(global_intra_offset==NOT_FOUND){
 			param->mf->query_done(param->mf, param);
-			//fdriver_unlock(&param->r->lock);
-			return READ_NOT_FOUND;
+			goto not_found_end;
 		}
 		else{
 			ste_num=global_intra_offset;
@@ -88,8 +87,7 @@ uint32_t run_query(run *r, request *req){
 		ste_num = st_array_get_target_STE(r->st_body, req->key);
 		if (ste_num == UINT32_MAX)
 		{
-			//fdriver_unlock(&r->lock);
-			return READ_NOT_FOUND;
+			goto not_found_end;
 		}
 		req->retry = true;
 		mf = r->st_body->pba_array[ste_num].mf;
@@ -97,8 +95,7 @@ uint32_t run_query(run *r, request *req){
 		if (intra_offset == NOT_FOUND)
 		{
 			param->mf->query_done(param->mf, param);
-			//fdriver_unlock(&r->lock);
-			return READ_NOT_FOUND;
+			goto not_found_end;
 		}
 		psa = run_translate_intra_offset(r, ste_num, intra_offset);
 		if (psa == UNLINKED_PSA)
@@ -114,6 +111,9 @@ uint32_t run_query(run *r, request *req){
 	req->param=(void*)param;
 	__run_issue_read(req, psa/L2PGAP, req->value, param, false);
 	return READ_DONE;
+not_found_end:
+	//fdriver_unlock(&param->r->lock);
+	return READ_NOT_FOUND;
 }
 
 uint32_t run_query_retry(run *r, request *req){
@@ -126,7 +126,7 @@ uint32_t run_query_retry(run *r, request *req){
 	uint32_t intra_offset=mf->query_retry(mf, param);
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
-		//fdriver_unlock(&param->r->lock);
+		fdriver_unlock(&param->r->lock);
 		return READ_NOT_FOUND;
 	}
 	uint32_t psa=st_array_read_translation(r->st_body, ste_num, intra_offset);

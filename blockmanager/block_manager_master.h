@@ -72,6 +72,8 @@ static inline void block_reinit(__block *b){
 	b->now_assigned_pptr=0;
 	memset(b->bitset, 0, _PPB*L2PGAP/8);
 	memset(b->oob_list, 0 , sizeof(b->oob_list));
+	b->invalidate_piece_num=b->validate_piece_num=0;
+	b->is_full_invalid=false;
 }
 
 /*
@@ -93,6 +95,13 @@ static inline void block_bit_unset(__block *b, uint32_t intra_offset){
 	b->invalidate_piece_num++;
 	b->bitset[intra_offset/8]&=~(1<<(intra_offset%8));
 }
+
+static inline void blockmanager_full_invalid_check(__block *b){
+	if(b->invalidate_piece_num==b->validate_piece_num){
+		b->is_full_invalid=true;
+	}
+}
+
 
 /*
  * Function: blockmanager_master_get_block

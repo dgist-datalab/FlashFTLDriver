@@ -204,6 +204,20 @@ uint32_t L2PBm_get_map_rppa(L2P_bm *bm){
 	return res;
 }
 
+
+uint32_t L2PBm_get_map_ppa_mixed(L2P_bm *bm){
+	blockmanager *sm=bm->segment_manager;
+	uint32_t res;
+	if(sm->check_full(bm->now_summary_seg)){
+		res=sm->get_page_addr(bm->reserve_summary_seg);
+	}
+	else{
+		res=sm->get_page_addr(bm->now_summary_seg);
+	}
+	bm->PBA_map[res/_PPB].type=LSM_BLOCK_SUMMARY;
+	return res;
+}
+
 void L2PBm_gc_lock(L2P_bm *bm, uint32_t bidx){
 	bm->gc_lock[bidx]=true;
 }

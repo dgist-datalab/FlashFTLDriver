@@ -29,6 +29,16 @@ typedef struct run{
 	fdriver_lock_t lock;
 }run;
 
+typedef struct __sorted_pair{
+	run *r;
+	summary_pair pair;
+	uint32_t ste_num;
+	uint32_t original_psa;
+	char *data;
+	fdriver_lock_t lock;
+	value_set *value;
+}__sorted_pair;
+
 /*
  * Function: run_init
  * ------------------

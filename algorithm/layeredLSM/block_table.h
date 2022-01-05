@@ -141,6 +141,15 @@ uint32_t L2PBm_get_map_ppa(L2P_bm *bm);
  * */
 uint32_t L2PBm_get_map_rppa(L2P_bm *bm);
 
+/*
+ * Function:L2PBm_get_map_ppa_mixed
+ * -------------------------
+ *		return ppa for summary page
+ *
+ *	sid: managed sorted_array
+ * */
+uint32_t L2PBm_get_map_ppa_mixed(L2P_bm *bm);
+
 uint32_t L2PBm_get_free_block_num(L2P_bm *bm);
 
 void L2PBm_gc_lock(L2P_bm *bm, uint32_t bidx);

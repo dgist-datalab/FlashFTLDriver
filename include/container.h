@@ -220,6 +220,7 @@ typedef struct masterblock{
 	uint16_t now_assigned_pptr;
 	uint8_t bitset[_PPB*L2PGAP/8];
 	__OOB oob_list[_PPB];
+	bool is_full_invalid;
 	uint16_t invalidate_piece_num;
 	uint16_t validate_piece_num;
 	uint32_t punit_num;

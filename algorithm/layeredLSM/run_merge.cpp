@@ -16,16 +16,6 @@ typedef struct merge_meta_container{
 	bool done;
 }mm_container;
 
-typedef struct __sorted_pair{
-	run *r;
-	summary_pair pair;
-	uint32_t ste_num;
-	uint32_t original_psa;
-	char *data;
-	fdriver_lock_t lock;
-	value_set *value;
-}__sorted_pair;
-
 static inline uint32_t __set_read_flag(mm_container *mm_set, uint32_t run_num, uint32_t round){
 	uint32_t res=0;
 	for(uint32_t i=0; i<run_num; i++){
@@ -361,6 +351,13 @@ static inline void __sorted_array_flush(run *res, std::list<__sorted_pair> *sort
 	//write data
 	__write_merged_data(res, sorted_arr, lsm->shortcut);
 }
+
+
+void thread_sorting(void* arg, int thread_num){
+
+}
+
+
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
 	//DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);

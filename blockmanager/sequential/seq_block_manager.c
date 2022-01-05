@@ -184,16 +184,20 @@ __gsegment* sbm_get_gc_target(blockmanager* bm){
 	res->validate_piece_num=target->validate_piece_num;
 	res->all_invalid=(res->invalidate_piece_num==res->validate_piece_num);
 
+	for(uint32_t i=0; i<BPS; i++){
+		blockmanager_full_invalid_check(res->blocks[i]);	
+	}
+
 	if(res->validate_piece_num==0){
 		EPRINT("the gc target should have valid piece", true);
 	}
-	/*
+	
 	printf("gc_target :%u (%u:%u~%u:%u), invalidate_piece_num:%u\n", 
 			res->seg_idx, 
 			res->seg_idx*_PPS, res->seg_idx*_PPS/_PPB,
 			(res->seg_idx+1)*_PPS-1, (res->seg_idx+1)*_PPS/_PPB,
 			res->invalidate_piece_num);
-			*/
+
 	/*
 	for(uint32_t i=0; i<_NOS; i++){
 		printf("%u->%u heap:%p\n", pri->seg_set[i].seg_idx, pri->seg_set[i].invalidate_piece_num,
