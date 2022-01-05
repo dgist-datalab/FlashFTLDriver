@@ -86,6 +86,7 @@ sc_master *shortcut){
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 	summary_pair now;
 	uint32_t t_idx;
+	summary_page_meta *spm;
 
 retry:
 	for(uint32_t i=0; i<run_num; i++){
@@ -118,6 +119,17 @@ retry:
 		res.lba=UINT32_MAX;
 		res.intra_offset=UINT32_MAX;
 		goto retry;
+	}
+	else if((spm=sp_set_check_trivial_old_data(mm_set[t_idx].ssi))!=NULL){
+		uint32_t original_level=spm->original_level;
+		uint32_t original_recency=spm->original_recency;
+		if(!shortcut_validity_check_by_value(shortcut, mm_set[t_idx].r, original_level, original_recency, res.lba)){
+			__invalidate_target(mm_set[t_idx].r, sp_set_get_ste_num(mm_set[t_idx].ssi, res.intra_offset), res.intra_offset);
+			__move_iter_target(mm_set, t_idx);
+			res.lba = UINT32_MAX;
+			res.intra_offset = UINT32_MAX;
+			goto retry;
+		}
 	}
 	return res;
 }
@@ -274,7 +286,7 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 
 extern uint32_t test_key;
 uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
-	DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
+	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 	run_padding_current_block(r);
 	uint32_t i=0;
 	map_function *mf=NULL;
@@ -289,6 +301,8 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 	bool unlinked_data_copy=false;
 	uint32_t des_ste_num=r->st_body->now_STE_num;
 	run_copy_ste_to(r, &mm->r->st_body->pba_array[target_ste], &mm->r->st_body->sp_meta[target_ste], mf, false);
+	uint32_t original_level=mm->r->info->level_idx;
+	uint32_t original_recency=mm->r->info->recency;
 	while(1){
 		summary_pair target = sp_set_iter_pick(mm->ssi);
 		if(mf){
@@ -302,7 +316,6 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 			uint32_t read_psa=run_translate_intra_offset(r, target_ste2, mm->r->type==RUN_LOG?target.intra_offset%512:target.intra_offset);
 			EPRINT("trivial target move:%u, %u\n",false, original_psa, read_psa);
 			if(original_psa!=read_psa){
-				GDB_MAKE_BREAKPOINT;
 				target_ste2=st_array_get_target_STE(r->st_body, test_key);
 				read_psa=run_translate_intra_offset(r, target_ste2, target.intra_offset);
 			}
@@ -332,7 +345,7 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 		}
 		__move_iter_target(mm, 0);
 	}
-	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy);
+	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy, original_level, original_recency);
 	//run_copy_ste_to(r, &mm->r->st_body->pba_array[target_ste], &mm->r->st_body->sp_meta[target_ste], mf, false);
 	sp_set_iter_move_ste(mm->ssi, target_ste, res);
 	if (sp_set_iter_done_check(mm->ssi)){

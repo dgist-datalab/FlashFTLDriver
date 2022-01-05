@@ -140,8 +140,10 @@ void run_copy_ste_to(run *r, struct sorted_table_entry *ste, summary_page_meta *
 	st_array_copy_STE(r->st_body, ste, spm, mf, unlinked_data_copy);
 }
 
-void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag){
+void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag, uint32_t original_level, uint32_t original_recency){
 	r->st_body->sp_meta[ste_num].unlinked_data_copy=flag;
+	r->st_body->sp_meta[ste_num].original_level=original_level;
+	r->st_body->sp_meta[ste_num].original_recency=original_recency;
 }
 
 void run_insert_done(run *r, bool merge_insert){

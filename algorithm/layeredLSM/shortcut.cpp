@@ -124,6 +124,25 @@ bool shortcut_validity_check_lba(sc_master *sc, run *r, uint32_t lba){
 	return res;
 }
 
+bool shortcut_validity_check_by_value(sc_master *sc, run *r, uint32_t level, uint32_t recency, uint32_t lba){
+	fdriver_lock(&sc->lock);
+	uint32_t info_idx=sc->sc_map[lba];
+	if(info_idx==NOT_ASSIGNED_SC){
+		fdriver_unlock(&sc->lock);
+		return true;
+	}
+	if(r->info->idx==info_idx){
+		fdriver_unlock(&sc->lock);
+		return true;
+	}
+	sc_info temp_info;
+	temp_info.level_idx=level;
+	temp_info.recency=recency;
+	bool res=__get_recency_cmp(&sc->info_set[info_idx], &temp_info)<=0;
+	fdriver_unlock(&sc->lock);
+	return res;
+}
+
 void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba){
 	fdriver_lock(&sc->lock);
 	uint32_t info_idx=sc->sc_map[lba];

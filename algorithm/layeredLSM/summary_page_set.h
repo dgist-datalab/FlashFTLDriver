@@ -37,6 +37,7 @@ void sp_set_iter_skip_lba(sp_set_iter *ssi, uint32_t idx, uint32_t lba, uint32_t
 bool sp_set_noncopy_check(sp_set_iter *ssi, uint32_t lba, uint32_t *end_lba);
 uint32_t sp_set_iter_move(sp_set_iter *ssi);
 bool sp_set_iter_done_check(sp_set_iter *ssi);
+summary_page_meta* sp_set_check_trivial_old_data(sp_set_iter *ssi);
 void sp_set_iter_free(sp_set_iter *ssi);
 void sp_set_iter_move_ste(sp_set_iter *ssi, uint32_t ste_num, uint32_t lba);
 

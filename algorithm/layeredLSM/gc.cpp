@@ -69,7 +69,7 @@ static inline void __clear_block_and_gsegment(L2P_bm *bm, __gsegment *target){
 	sm->trim_segment(sm, target);
 }
 
-void gc_summary_segment(L2P_bm *bm, __gsegment *target){
+void gc_summary_segment(L2P_bm *bm, __gsegment *target, bool activie_assign){
 	blockmanager *sm=bm->segment_manager;
 	list *temp_list=list_init();
 	uint32_t page, bidx, pidx;
@@ -95,7 +95,13 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target){
 			if(invalidate_ppa(sm, g_value->ppa, true) ==BIT_ERROR){
 				EPRINT("invalidate map error", true);
 			}
-			uint32_t rppa=L2PBm_get_map_rppa(bm);
+			uint32_t rppa;
+			if(activie_assign){
+				rppa=L2PBm_get_map_ppa(bm);
+			}
+			else{
+				rppa=L2PBm_get_map_rppa(bm);
+			}
 			if(validate_ppa(sm, rppa, true)==BIT_ERROR){
 				EPRINT("validate map error", true);
 			}
@@ -108,10 +114,12 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target){
 	}
 
 	__clear_block_and_gsegment(bm, target);
-	bm->now_summary_seg=bm->reserve_summary_seg;
-	sm->change_reserve_to_active(sm, bm->reserve_summary_seg);
-	bm->reserve_summary_seg=sm->get_segment(sm, BLOCK_RESERVE);
-	L2PBm_set_seg_type(bm, bm->reserve_summary_seg->seg_idx, SUMMARY_SEG);
+	if(!activie_assign){
+		bm->now_summary_seg = bm->reserve_summary_seg;
+		sm->change_reserve_to_active(sm, bm->reserve_summary_seg);
+		bm->reserve_summary_seg = sm->get_segment(sm, BLOCK_RESERVE);
+		L2PBm_set_seg_type(bm, bm->reserve_summary_seg->seg_idx, SUMMARY_SEG);
+	}
 	list_free(temp_list);
 }
 
@@ -433,20 +441,31 @@ void gc_data_segment(L2P_bm *bm, __gsegment *target){
 	L2PBm_set_seg_type(bm, bm->reserve_seg->seg_idx, DATA_SEG);
 }
 
-bool gc(L2P_bm *bm, uint32_t type){
+uint32_t gc(L2P_bm *bm, uint32_t type){
 	blockmanager *sm=bm->segment_manager;
 	__gsegment *target=sm->get_gc_target(sm);
 	bool full_invalid=target->invalidate_piece_num==target->validate_piece_num;
+
+	printf("target type:%s\n", bm->seg_type[target->seg_idx]==SUMMARY_SEG?"SUMMARY":"DATA");
+
 	if(full_invalid){
 		__clear_block_and_gsegment(bm, target);
-		return false;
+		return GC_TRIM;
 	}
 	
+	if(type==DATA_SEG && bm->seg_type[target->seg_idx]==SUMMARY_SEG){
+		if(_PPS-bm->now_summary_seg->used_page_num >= (target->validate_piece_num-target->invalidate_piece_num)/L2PGAP){
+			gc_summary_segment(bm, target, true);
+			return GC_DIFF_SEG;
+		}
+	}
+
 	std::queue<uint32_t> temp_seg_q;
 	while(bm->seg_type[target->seg_idx]!=type){
 		temp_seg_q.push(target->seg_idx);
 		free(target);
 		target=sm->get_gc_target(sm);
+		printf("target type:%s\n", bm->seg_type[target->seg_idx]==SUMMARY_SEG?"SUMMARY":"DATA");
 		if(target==NULL){
 			EPRINT("dev full", true);
 		}
@@ -454,7 +473,7 @@ bool gc(L2P_bm *bm, uint32_t type){
 
 	switch(type){
 		case SUMMARY_SEG:
-			gc_summary_segment(bm, target);
+			gc_summary_segment(bm, target, false);
 			break;
 		case DATA_SEG:
 			gc_data_segment(bm, target);
@@ -466,5 +485,5 @@ bool gc(L2P_bm *bm, uint32_t type){
 		sm->insert_gc_target(sm, seg_idx);
 		temp_seg_q.pop();
 	}
-	return true;
+	return GC_COPY;
 }

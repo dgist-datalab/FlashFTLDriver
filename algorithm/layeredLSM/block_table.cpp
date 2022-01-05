@@ -71,9 +71,10 @@ retry:
 	if(bm->now_seg_idx==NO_SEG){
 		blockmanager *sm=bm->segment_manager;
 		if(sm->is_gc_needed(sm)){
-			if(gc(bm, DATA_SEG)){
+			if(gc(bm, DATA_SEG)==GC_COPY){
 				if(bm->now_block_idx==BPS){
-					lsmtree_print_log(LSM);
+					lsmtree_run_print(LSM);
+					//lsmtree_print_log(LSM);
 					EPRINT("gc not effective", true);
 					bm->now_seg_idx=NO_SEG;
 					//compaction_clean_last_level(LSM);
@@ -112,8 +113,6 @@ uint32_t L2PBm_pick_empty_RPBA(L2P_bm *bm){
 	return bm->reserve_seg->seg_idx *_PPS+
 		(bm->reserve_block_idx++)*_PPB;
 }
-
-
 
 uint32_t target_PBA=UINT32_MAX;
 extern bool debug_flag;
@@ -177,7 +176,7 @@ uint32_t L2PBm_get_map_ppa(L2P_bm *bm){
 	blockmanager *sm=bm->segment_manager;
 	if(sm->check_full(bm->now_summary_seg)){
 		if(sm->is_gc_needed(sm)){
-			if(gc(bm, SUMMARY_SEG)){
+			if(gc(bm, SUMMARY_SEG)==GC_COPY){
 				if(sm->check_full(bm->now_summary_seg)){
 					EPRINT("not effective gc on summary", true);
 				}

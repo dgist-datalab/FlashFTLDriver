@@ -121,6 +121,7 @@ uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 
 uint32_t		bfg_map_query_retry(map_function *mf, map_read_param *param){
 	bfg_map *map=extract_bfg_map(mf);
+	if(param->prev_offset >= map->write_pointer) return NOT_FOUND;
 	uint32_t lba=param->lba;
 	uint32_t target_set_idx=param->prev_offset/__target_member;
 	bf_map *t_map=&map->bf_set[target_set_idx];

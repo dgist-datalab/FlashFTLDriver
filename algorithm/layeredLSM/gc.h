@@ -9,6 +9,10 @@
 
 #include <stdlib.h>
 
+enum{
+	GC_TRIM, GC_COPY, GC_DIFF_SEG
+};
+
 typedef struct gc_value{
 	uint32_t ppa; 
 	uint32_t oob[L2PGAP];
@@ -24,6 +28,6 @@ typedef struct gc_value{
  * bm:
  * type: the type of segment (DATA_SEG or SUMMARY_SEG)
  * */
-bool gc(L2P_bm *bm, uint32_t type);
+uint32_t gc(L2P_bm *bm, uint32_t type);
 
 #endif
