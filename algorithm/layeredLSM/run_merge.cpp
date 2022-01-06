@@ -349,10 +349,6 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 
 static inline void __sorted_array_flush(run *res, std::list<__sorted_pair> *sorted_arr, lsmtree *lsm)
 {
-	if(debug_flag){
-		//GDB_MAKE_BREAKPOINT;
-		printf("sorted_array size %u\n", sorted_arr->size());
-	}
 	//read data
 	__read_merged_data(res, sorted_arr, lsm->bm->segment_manager);
 	//write data
@@ -372,7 +368,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	static int cnt=0;
 	if(++cnt==270){
-		debug_flag=true;
+		//debug_flag=true;
 	}
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));

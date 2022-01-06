@@ -90,15 +90,12 @@ void compaction_flush(lsmtree *lsm, run *r)
 	}*/
 	while(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
 		__compaction_another_level(lsm, 0, true);
-		/*
+	/*	
 		printf("\tprev free block num %u\n", L2PBm_get_free_block_num(lsm->bm));
 		compaction_clean_last_level(lsm);
 		printf("\tafter free block num %u\n", L2PBm_get_free_block_num(lsm->bm));
 		gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num / MAX_SECTOR_IN_BLOCK);
-
-		if(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
-			printf("gc_after_check:%u\n", gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK));
-		}*/
+		*/
 	}
 	__lsm_free_run(lsm, r);
 }

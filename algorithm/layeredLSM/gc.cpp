@@ -414,7 +414,7 @@ static inline bool __normal_block_valid_check(blockmanager *sm, uint32_t block_i
 }
 
 uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
-	DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
+	//DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
 	blockmanager *sm=bm->segment_manager;
 	list *normal_list=list_init();
 	list *frag_list=list_init();
@@ -478,7 +478,7 @@ uint32_t gc(L2P_bm *bm, uint32_t type){
 	__gsegment *target=sm->get_gc_target(sm);
 	bool full_invalid=target->invalidate_piece_num==target->validate_piece_num;
 
-	printf("target type:%s\n", bm->seg_type[target->seg_idx]==SUMMARY_SEG?"SUMMARY":"DATA");
+	//printf("target type:%s\n", bm->seg_type[target->seg_idx]==SUMMARY_SEG?"SUMMARY":"DATA");
 
 	if(full_invalid){
 		__clear_block_and_gsegment(bm, target);
@@ -513,9 +513,6 @@ uint32_t gc(L2P_bm *bm, uint32_t type){
 			if(target->blocks[i]->is_full_invalid){
 				all_invalid_block_num++;
 			}
-		}
-		if(all_invalid_block_num==0){
-			printf("%u invalidate_num:%u\n", target->seg_idx, target->invalidate_piece_num);
 		}
 	}
 

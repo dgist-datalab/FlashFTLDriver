@@ -153,7 +153,7 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 #else
 		compaction_flush(lsm, r);
 #endif
-		printf("free block num:%u\n", L2PBm_get_free_block_num(lsm->bm));
+		//printf("free block num:%u\n", L2PBm_get_free_block_num(lsm->bm));
 		lsm->now_memtable_idx=(lsm->now_memtable_idx+1)%MEMTABLE_NUM;
 		lsm->memtable[lsm->now_memtable_idx]=__lsm_populate_new_run(lsm, lsm->param.BF_level_range.start==1?GUARD_BF:PLR_MAP, RUN_LOG, lsm->param.memtable_entry_num, 0);
 		lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=NULL;
@@ -202,6 +202,7 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 		uint32_t pinning_run_num=0;
 		for(uint32_t j=0; j<target_level->now_run_num; j++){
 			run *target_run=target_level->run_array[j];
+			if(!target_run) continue;
 			if(target_run->type==RUN_PINNING){
 				pinning_run_num++;
 			}
