@@ -91,6 +91,9 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target, uint32_t activie_assign)
 			__gc_read_check(g_value);
 			uint32_t start_lba=g_value->oob[0];
 			uint32_t intra_idx;
+			if(g_value->ppa==1053172){
+				GDB_MAKE_BREAKPOINT;
+			}
 			sid_info* info=sorted_array_master_get_info_mapgc(start_lba, g_value->ppa, &intra_idx);
 			if(info==NULL || info->sa->sp_meta[intra_idx].ppa!=g_value->ppa){
 				EPRINT("mapping error", true);
@@ -110,6 +113,11 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target, uint32_t activie_assign)
 			case GET_MIXED:
 				rppa=L2PBm_get_map_ppa_mixed(bm);
 				break;
+			}
+
+			if (rppa == 230615)
+			{
+				printf("rpp %u map to %u,%u\n", rppa, info->sa->sid, intra_idx);
 			}
 
 			if(validate_ppa(sm, rppa, true)==BIT_ERROR){

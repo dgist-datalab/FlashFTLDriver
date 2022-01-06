@@ -74,6 +74,7 @@ sid_info* sorted_array_master_get_info_mapgc(uint32_t start_lba, uint32_t ppa, u
 			st_array *sa=temp->sa;
 			for(uint32_t j=0; j<sa->now_STE_num; j++){
 				if(sa->sp_meta[j].ppa==ppa){
+					if(sa->sp_meta[j].copied) break;
 					*intra_idx=j;
 					return temp;
 				}
@@ -81,7 +82,7 @@ sid_info* sorted_array_master_get_info_mapgc(uint32_t start_lba, uint32_t ppa, u
 		}
 		else{
 			t_intra_idx=spm_find_target_idx(temp->sa->sp_meta, temp->sa->now_STE_num, start_lba);
-			if (temp->sa->sp_meta[t_intra_idx].ppa == ppa){
+			if (temp->sa->sp_meta[t_intra_idx].ppa == ppa && temp->sa->sp_meta[t_intra_idx].copied==false){
 				*intra_idx = t_intra_idx;
 				return temp;
 			}
@@ -475,6 +476,9 @@ summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
 	swp->spm=&sa->sp_meta[sa->now_STE_num];
 	swp->oob[0]=sa->sp_meta[sa->now_STE_num].start_lba;
 	swp->oob[1]=sa->sp_meta[sa->now_STE_num].end_lba;
+	if(ppa==230615){
+		printf("%u map to %u,%u\n",ppa,sa->sid, sa->now_STE_num);
+	}
 	st_array_finish_now_PBA(sa);
 
 	sa->pba_array[sa->now_STE_num].mf->make_done(sa->pba_array[sa->now_STE_num].mf);
