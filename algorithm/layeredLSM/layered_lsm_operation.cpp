@@ -227,7 +227,7 @@ uint32_t test_function(){ //random+sequential+normal
 	merge_set[0]=a;
 	merge_set[1]=b;
 	run *target=__lsm_populate_new_run(LSM, EXACT, RUN_NORMAL, target_entry_num*2, 1);
-	run_merge(2,merge_set, target, LSM);
+	run_merge(2,merge_set, target, false, LSM);
 
 
 	for(uint32_t i=0; i<total_entry_num; i++){
