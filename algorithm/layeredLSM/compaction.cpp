@@ -1,10 +1,13 @@
 #include "./compaction.h"
 #include "../../include/debug_utils.h"
+#include "./gc.h"
+#include "./sorted_table.h"
 #include <stdlib.h>
 #include <map>
 
 extern run **run_array;
 extern uint32_t run_num;
+extern bool debug_flag;
 
 #define RUN_INVALID_DATA_NUM(r) ((r)->info->unlinked_lba_num + (r)->invalidate_piece_num)
 
@@ -71,10 +74,28 @@ void compaction_flush(lsmtree *lsm, run *r)
 	lsm->monitor.compaction_cnt[0]++;
 	lsm->monitor.compaction_input_entry_num[0]+=r->now_entry_num;
 	lsm->monitor.compaction_output_entry_num[0]+=new_run->now_entry_num;
-	__lsm_free_run(lsm, r);
 	level_insert_run(lsm->disk[0], new_run);
 
 	__compaction_another_level(lsm, 0, false);
+	/*
+	static int cnt=0;
+	printf("cp flush %u\n", ++cnt);
+	if(cnt>=255){
+		GDB_MAKE_BREAKPOINT;
+		debug_flag=true;
+	}*/
+	while(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
+
+		printf("\tprev free block num %u\n", L2PBm_get_free_block_num(lsm->bm));
+		compaction_clean_last_level(lsm);
+		printf("\tafter free block num %u\n", L2PBm_get_free_block_num(lsm->bm));
+		gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num / MAX_SECTOR_IN_BLOCK);
+
+		if(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
+			printf("gc_after_check:%u\n", gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK));
+		}
+	}
+	__lsm_free_run(lsm, r);
 }
 
 void compaction_clean_last_level(lsmtree *lsm){

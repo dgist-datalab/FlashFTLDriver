@@ -30,4 +30,6 @@ typedef struct gc_value{
  * */
 uint32_t gc(L2P_bm *bm, uint32_t type);
 
+bool gc_check_enough_space(L2P_bm *bm, uint32_t target_pba_num);
+
 #endif

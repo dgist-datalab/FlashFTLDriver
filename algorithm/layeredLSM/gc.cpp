@@ -478,24 +478,13 @@ uint32_t gc(L2P_bm *bm, uint32_t type){
 
 	std::queue<uint32_t> temp_seg_q;
 	if(type==DATA_SEG && bm->seg_type[target->seg_idx]==SUMMARY_SEG){
-		if(_PPS-bm->now_summary_seg->used_page_num >= (target->validate_piece_num-target->invalidate_piece_num)/L2PGAP){
+		if(	bm->now_summary_seg->seg_idx!=target->seg_idx &&
+			_PPS-bm->now_summary_seg->used_page_num >= (target->validate_piece_num-target->invalidate_piece_num)/L2PGAP){
 			gc_summary_segment(bm, target, GET_PPA);
 			return GC_DIFF_SEG;
 		}else{
-			printf("now remain piece_num:%u(%u), %u", _PPS-bm->now_summary_seg->used_page_num, bm->now_summary_seg->validate_piece_num-bm->now_summary_seg->invalidate_piece_num,
+			printf("now remain piece_num:%u(%u), %u\n", _PPS-bm->now_summary_seg->used_page_num, bm->now_summary_seg->validate_piece_num-bm->now_summary_seg->invalidate_piece_num,
 			target->validate_piece_num-target->invalidate_piece_num);
-			__gsegment *compact_summary_target[2];
-			compact_summary_target[0]=target;
-			target=sm->get_gc_target(sm);
-			if(bm->seg_type[target->seg_idx]==type){
-				temp_seg_q.push(compact_summary_target[0]->seg_idx);
-				free(compact_summary_target[0]);
-			}
-			else{
-				compact_summary_target[1]=target;
-				__compact_summary_block(bm, compact_summary_target, 2);
-				return GC_DIFF_SEG;				
-			}
 		}
 	}
 
@@ -524,4 +513,58 @@ uint32_t gc(L2P_bm *bm, uint32_t type){
 		temp_seg_q.pop();
 	}
 	return GC_COPY;
+}
+
+bool gc_check_enough_space(L2P_bm *bm, uint32_t target_pba_num){
+	if(L2PBm_get_free_block_num(bm) >= target_pba_num){
+		return true;
+	}
+
+	blockmanager *sm=bm->segment_manager;
+	std::queue<uint32_t> temp_seg_q;
+	bool res;
+
+	uint32_t free_block_num = 0;
+	bool diff_gc=false;
+	while (free_block_num < target_pba_num)
+	{	
+		if(debug_flag){
+			static int cnt=0;
+			DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
+			printf("\t in free_block_num:%u\n", free_block_num);
+		}
+		__gsegment *target=sm->get_gc_target(sm);
+		if(target==NULL){
+			res=false;
+			goto out;
+		}
+
+		if(diff_gc==false && bm->seg_type[target->seg_idx]==SUMMARY_SEG && 
+		_PPS-bm->now_summary_seg->used_page_num >= target->validate_piece_num-target->invalidate_piece_num){
+			diff_gc=true;
+			if(bm->now_summary_seg->seg_idx!=target->seg_idx){
+				free_block_num+=BPS;
+			}
+		}
+		else if(bm->seg_type[target->seg_idx]==DATA_SEG){
+			for (uint32_t i = 0; i < BPS; i++)
+			{
+				if (target->blocks[i]->is_full_invalid)
+				{
+					free_block_num++;
+				}
+			}
+		}
+		temp_seg_q.push(target->seg_idx);
+		free(target);
+	}
+	res=true;
+
+out:
+	while(temp_seg_q.size()){
+		uint32_t seg_idx=temp_seg_q.front();
+		sm->insert_gc_target(sm, seg_idx);
+		temp_seg_q.pop();
+	}
+	return res;
 }

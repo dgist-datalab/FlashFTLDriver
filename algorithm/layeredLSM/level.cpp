@@ -105,7 +105,7 @@ void level_free(level* lev){
 	free(lev);
 }
 
-run * level_get_max_unlinked_run(level *lev){
+static inline uint32_t __max_invalidata_run_idx(level *lev){
 	float target_ratio=-1.0f;
 	uint32_t target_idx=0;
 	for (uint32_t i = 0; i < lev->now_run_num; i++){
@@ -117,6 +117,11 @@ run * level_get_max_unlinked_run(level *lev){
 			target_idx=i;
 		}
 	}
+	return target_idx;
+}
+
+run * level_get_max_unlinked_run(level *lev){
+	uint32_t target_idx=__max_invalidata_run_idx(lev);
 	run *res=lev->run_array[target_idx];
 	std::list<uint32_t>::iterator iter=lev->recency_pointer->begin();
 	for(;iter!=lev->recency_pointer->end(); iter++){
@@ -128,4 +133,10 @@ run * level_get_max_unlinked_run(level *lev){
 		}
 	}
 	return res;
+}
+
+uint32_t level_pick_max_unlinked_num(level *lev){
+	uint32_t target_idx=__max_invalidata_run_idx(lev);
+	run *res=lev->run_array[target_idx];
+	return res->info->unlinked_lba_num;
 }

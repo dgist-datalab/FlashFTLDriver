@@ -19,7 +19,7 @@ typedef struct max_heap{
 	int (*get_cnt)(void *a);
 }mh;
 
-void mh_init(mh**, int bn, void (*swap_hptr)(void*,void*), void(*aassign_hptr)(void *, void *),int (*get_cnt)(void *a));
+void mh_init(mh**, int bn, void (*swap_hptr)(void*,void*), void(*aassign_hptr)(void *, void *), int (*get_cnt)(void *a));
 void mh_free(mh*);
 void mh_insert(mh*, void *data, int number);
 void mh_insert_append(mh *, void *data);

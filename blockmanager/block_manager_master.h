@@ -97,7 +97,7 @@ static inline void block_bit_unset(__block *b, uint32_t intra_offset){
 }
 
 static inline void blockmanager_full_invalid_check(__block *b){
-	if(b->invalidate_piece_num==b->validate_piece_num){
+	if(b->invalidate_piece_num && b->invalidate_piece_num==b->validate_piece_num){
 		b->is_full_invalid=true;
 	}
 }

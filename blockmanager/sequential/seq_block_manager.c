@@ -2,7 +2,7 @@
 #include "../../include/debug_utils.h"
 typedef struct blockmanager blockmanager;
 extern blockmanager_master BMM;
-
+#define INIT_INVALID_BLOCK_NUM (BPS+1)
 
 static inline void __mh_swap_hptr(void *a, void *b){
 	__segment *aa=(__segment*)a;
@@ -20,7 +20,11 @@ static inline void  __mh_assign_hptr(void *a, void *hn){
 
 static inline int __mh_get_cnt(void *a){
 	__segment *aa=(__segment*)a;
+#ifdef layeredLSB
+	return aa->invalid_block_num*_PPS*L2PGAP+aa->invalidate_piece_num;
+#else
 	return aa->invalidate_piece_num;
+#endif
 }
 
 static inline void __set_function(blockmanager *bm){
@@ -61,6 +65,7 @@ blockmanager*  sbm_create (lower_info *li){
 	for(uint32_t i=0; i<_NOS; i++){
 		target=&pri->seg_set[i];
 		target->seg_idx=i;
+		target->invalid_block_num=0;
 		q_enqueue((void *)target, pri->free_segment_q);
 		for(uint32_t j=0; j<BPS; j++){
 			target->blocks[j]=BMM.h_block_group[j].block_set[i];
@@ -177,6 +182,9 @@ __gsegment* sbm_get_gc_target(blockmanager* bm){
 
 	mh_construct(pri->max_heap);
 	__segment *target=(__segment *)mh_get_max(pri->max_heap);
+	if(target==NULL){
+		return NULL;
+	}
 
 	memcpy(res->blocks, target->blocks, sizeof(__block*)*BPS);
 	res->seg_idx=target->seg_idx;
@@ -191,12 +199,12 @@ __gsegment* sbm_get_gc_target(blockmanager* bm){
 	if(res->validate_piece_num==0){
 		EPRINT("the gc target should have valid piece", true);
 	}
-	
+	/*
 	printf("gc_target :%u (%u:%u~%u:%u), invalidate_piece_num:%u\n", 
 			res->seg_idx, 
 			res->seg_idx*_PPS, res->seg_idx*_PPS/_PPB,
 			(res->seg_idx+1)*_PPS-1, (res->seg_idx+1)*_PPS/_PPB,
-			res->invalidate_piece_num);
+			res->invalidate_piece_num);*/
 
 	/*
 	for(uint32_t i=0; i<_NOS; i++){
@@ -217,6 +225,7 @@ void sbm_trim_segment(blockmanager *bm, __gsegment *gs){
 	s->used_page_num=0;
 	s->validate_piece_num=s->invalidate_piece_num=0;
 	s->private_data=NULL;
+	s->invalid_block_num=0;
 	
 	q_enqueue((void*)s, pri->free_segment_q);
 	bm->li->trim_block(s->seg_idx * _PPS);
@@ -234,6 +243,11 @@ int sbm_bit_set(struct blockmanager* bm, uint32_t piece_ppa){
 	int res=block_bit_query(&BMM.total_block_set[bid], EXTRACT_INTRA_PPIDX(piece_ppa, true))?0:1;
 
 	block_bit_set(&BMM.total_block_set[bid], EXTRACT_INTRA_PPIDX(piece_ppa, true));
+	if (BMM.total_block_set[bid].is_full_invalid && BMM.total_block_set[bid].invalidate_piece_num != BMM.total_block_set[bid].validate_piece_num)
+	{
+		BMM.total_block_set[bid].is_full_invalid = false;
+		pri->seg_set[sid].invalid_block_num--;
+	}
 	pri->seg_set[sid].validate_piece_num++;
 	return res;
 }
@@ -246,6 +260,14 @@ int sbm_bit_unset(struct blockmanager*bm, uint32_t piece_ppa){
 	int res=block_bit_query(&BMM.total_block_set[bid], EXTRACT_INTRA_PPIDX(piece_ppa, true))?1:0;
 
 	block_bit_unset(&BMM.total_block_set[bid], EXTRACT_INTRA_PPIDX(piece_ppa, true));
+
+	if (BMM.total_block_set[bid].is_full_invalid==false && 
+		BMM.total_block_set[bid].invalidate_piece_num == BMM.total_block_set[bid].validate_piece_num)
+	{
+		BMM.total_block_set[bid].is_full_invalid = true;
+		pri->seg_set[sid].invalid_block_num++;
+	}
+
 	pri->seg_set[sid].invalidate_piece_num++;
 	return res;
 }

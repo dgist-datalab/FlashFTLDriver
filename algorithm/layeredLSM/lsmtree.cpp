@@ -142,6 +142,7 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	run_insert(r, req->key, UINT32_MAX, req->value->value, false, 
 		lsm->shortcut);
 
+
 	if(run_is_full(r)){
 		run_insert_done(r, false);
 #ifdef THREAD_COMPACTION
@@ -152,6 +153,7 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 #else
 		compaction_flush(lsm, r);
 #endif
+		printf("free block num:%u\n", L2PBm_get_free_block_num(lsm->bm));
 		lsm->now_memtable_idx=(lsm->now_memtable_idx+1)%MEMTABLE_NUM;
 		lsm->memtable[lsm->now_memtable_idx]=__lsm_populate_new_run(lsm, lsm->param.BF_level_range.start==1?GUARD_BF:PLR_MAP, RUN_LOG, lsm->param.memtable_entry_num, 0);
 		lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=NULL;

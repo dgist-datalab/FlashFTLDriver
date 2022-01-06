@@ -69,11 +69,24 @@ sid_info* sorted_array_master_get_info_mapgc(uint32_t start_lba, uint32_t ppa, u
 	for(uint32_t i=0; i<sa_m->total_run_num; i++){
 		sid_info *temp=&sa_m->sid_map[i];
 		if(!temp || !temp->sa) continue;
-		int t_intra_idx=spm_find_target_idx(temp->sa->sp_meta, temp->sa->now_STE_num, start_lba);
-		if(temp->sa->sp_meta[t_intra_idx].ppa==ppa){
-			*intra_idx=t_intra_idx;
-			return temp;
+		int t_intra_idx;
+		if(temp->r->type==RUN_LOG){
+			st_array *sa=temp->sa;
+			for(uint32_t j=0; j<sa->now_STE_num; j++){
+				if(sa->sp_meta[j].ppa==ppa){
+					*intra_idx=j;
+					return temp;
+				}
+			}
 		}
+		else{
+			t_intra_idx=spm_find_target_idx(temp->sa->sp_meta, temp->sa->now_STE_num, start_lba);
+			if (temp->sa->sp_meta[t_intra_idx].ppa == ppa){
+				*intra_idx = t_intra_idx;
+				return temp;
+			}
+		}
+
 	}
 	*intra_idx=0;
 	return NULL;

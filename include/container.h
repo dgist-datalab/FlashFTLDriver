@@ -236,6 +236,7 @@ typedef struct mastersegment{
 	uint32_t used_page_num;
 	uint32_t validate_piece_num;
 	uint32_t invalidate_piece_num;
+	uint32_t invalid_block_num;
 	void *private_data;
 }__segment;
 
