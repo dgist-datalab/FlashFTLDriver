@@ -14,6 +14,10 @@ extern bool debug_flag;
 void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 	uint32_t disk_idx = start_idx;
 	while ((force || level_is_full(lsm->disk[disk_idx])) && disk_idx != lsm->param.total_level_num){
+		if(force && lsm->disk[disk_idx]->now_run_num==0){
+			disk_idx++;
+			continue;
+		}
 		bool last_level_compaction = (disk_idx == lsm->param.total_level_num - 1);
 		uint32_t des_disk_idx = last_level_compaction ? disk_idx : disk_idx + 1;
 
@@ -85,7 +89,8 @@ void compaction_flush(lsmtree *lsm, run *r)
 		debug_flag=true;
 	}*/
 	while(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
-
+		__compaction_another_level(lsm, 0, true);
+		/*
 		printf("\tprev free block num %u\n", L2PBm_get_free_block_num(lsm->bm));
 		compaction_clean_last_level(lsm);
 		printf("\tafter free block num %u\n", L2PBm_get_free_block_num(lsm->bm));
@@ -93,7 +98,7 @@ void compaction_flush(lsmtree *lsm, run *r)
 
 		if(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
 			printf("gc_after_check:%u\n", gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK));
-		}
+		}*/
 	}
 	__lsm_free_run(lsm, r);
 }

@@ -405,7 +405,7 @@ static inline bool __normal_block_valid_check(blockmanager *sm, uint32_t block_i
 	return invalidate_cnt!=L2PGAP *_PPB;
 }
 
-void gc_data_segment(L2P_bm *bm, __gsegment *target){
+uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
 	DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
 	blockmanager *sm=bm->segment_manager;
 	list *normal_list=list_init();
@@ -442,13 +442,14 @@ void gc_data_segment(L2P_bm *bm, __gsegment *target){
 
 	list_free(normal_list);
 	list_free(frag_list);
-
+	uint32_t res=BPS-bm->reserve_block_idx;
 	bm->now_seg_idx=bm->reserve_seg->seg_idx;
 	bm->now_block_idx=bm->reserve_block_idx;
 	sm->change_reserve_to_active(sm, bm->reserve_seg);
 	bm->reserve_block_idx=0;
 	bm->reserve_seg=sm->get_segment(sm, BLOCK_RESERVE);
 	L2PBm_set_seg_type(bm, bm->reserve_seg->seg_idx, DATA_SEG);
+	return res;
 }
 
 void __compact_summary_block(L2P_bm * bm, __gsegment **target, uint32_t target_num){
@@ -498,12 +499,27 @@ uint32_t gc(L2P_bm *bm, uint32_t type){
 		}
 	}
 
+	if(type==DATA_SEG){
+		uint32_t all_invalid_block_num=0;
+		for(uint32_t i=0; i<BPS; i++){
+			if(target->blocks[i]->is_full_invalid){
+				all_invalid_block_num++;
+			}
+		}
+		if(all_invalid_block_num==0){
+			printf("%u invalidate_num:%u\n", target->seg_idx, target->invalidate_piece_num);
+		}
+	}
+
+	uint32_t target_idx=0;
+	uint32_t free_block=0;
 	switch(type){
 		case SUMMARY_SEG:
 			gc_summary_segment(bm, target, GET_RPPA);
 			break;
 		case DATA_SEG:
-			gc_data_segment(bm, target);
+			target_idx=target->seg_idx;
+			free_block=gc_data_segment(bm, target);
 			break;
 	}
 
@@ -528,11 +544,6 @@ bool gc_check_enough_space(L2P_bm *bm, uint32_t target_pba_num){
 	bool diff_gc=false;
 	while (free_block_num < target_pba_num)
 	{	
-		if(debug_flag){
-			static int cnt=0;
-			DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
-			printf("\t in free_block_num:%u\n", free_block_num);
-		}
 		__gsegment *target=sm->get_gc_target(sm);
 		if(target==NULL){
 			res=false;
@@ -559,6 +570,50 @@ bool gc_check_enough_space(L2P_bm *bm, uint32_t target_pba_num){
 		free(target);
 	}
 	res=true;
+
+out:
+	while(temp_seg_q.size()){
+		uint32_t seg_idx=temp_seg_q.front();
+		sm->insert_gc_target(sm, seg_idx);
+		temp_seg_q.pop();
+	}
+	return res;
+}
+
+uint32_t gc_check_free_enable_space(L2P_bm *bm){
+	blockmanager *sm=bm->segment_manager;
+	std::queue<uint32_t> temp_seg_q;
+	uint32_t res;
+
+	uint32_t free_block_num = 0;
+	bool diff_gc=false;
+	while (1)
+	{	
+		__gsegment *target=sm->get_gc_target(sm);
+		if(target==NULL){
+			res=free_block_num;
+			goto out;
+		}
+
+		if(diff_gc==false && bm->seg_type[target->seg_idx]==SUMMARY_SEG && 
+		_PPS-bm->now_summary_seg->used_page_num >= target->validate_piece_num-target->invalidate_piece_num){
+			diff_gc=true;
+			if(bm->now_summary_seg->seg_idx!=target->seg_idx){
+				free_block_num+=BPS;
+			}
+		}
+		else if(bm->seg_type[target->seg_idx]==DATA_SEG){
+			for (uint32_t i = 0; i < BPS; i++)
+			{
+				if (target->blocks[i]->is_full_invalid)
+				{
+					free_block_num++;
+				}
+			}
+		}
+		temp_seg_q.push(target->seg_idx);
+		free(target);
+	}
 
 out:
 	while(temp_seg_q.size()){

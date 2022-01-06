@@ -115,6 +115,7 @@ static inline uint32_t __max_invalidata_run_idx(level *lev){
 		float invalid_ratio = (float)(temp_scinfo->unlinked_lba_num) / temp_run->now_entry_num;
 		if(target_ratio < invalid_ratio){
 			target_idx=i;
+			target_ratio=invalid_ratio;
 		}
 	}
 	return target_idx;

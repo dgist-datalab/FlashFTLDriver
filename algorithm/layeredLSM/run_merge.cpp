@@ -5,6 +5,7 @@
 #include "./piece_ppa.h"
 #include "./lsmtree.h"
 #include "./merge_helper.h"
+#include "./gc.h"
 extern lower_info *g_li;
 bool debug_flag=false;
 extern uint32_t target_PBA;
@@ -163,6 +164,7 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	}
 }
 
+extern lsmtree *LSM;
 static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_list, 
 	sc_master *shortcut){
 	std::list<__sorted_pair>::iterator iter=sorted_list->begin();
@@ -173,6 +175,11 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			fdriver_destroy(&t_pair->lock);
 			__invalidate_target(t_pair->r, t_pair->ste_num, t_pair->pair.intra_offset);
 		}
+	}
+
+	if (debug_flag)
+	{
+		printf("free_block_num:%u\n", gc_check_free_enable_space(LSM->bm));
 	}
 
 	iter=sorted_list->begin();
@@ -209,10 +216,6 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 	for(uint32_t i=0; i<run_num; i++){
 		run *r=rset[i];
 		for(uint32_t j=0; j<r->st_body->now_STE_num; j++){
-			if (debug_flag && i == 14 && j==0)
-			{
-				//GDB_MAKE_BREAKPOINT;
-			}
 			if(rset[i]->st_body->pba_array[j].PBA==UINT32_MAX){
 				disjoint_check[i][j]=false;
 				continue;
@@ -346,31 +349,34 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 
 static inline void __sorted_array_flush(run *res, std::list<__sorted_pair> *sorted_arr, lsmtree *lsm)
 {
+	if(debug_flag){
+		//GDB_MAKE_BREAKPOINT;
+		printf("sorted_array size %u\n", sorted_arr->size());
+	}
 	//read data
 	__read_merged_data(res, sorted_arr, lsm->bm->segment_manager);
 	//write data
 	__write_merged_data(res, sorted_arr, lsm->shortcut);
 }
 
+typedef struct thread_req{
+	fdriver_lock_t lock;
+	std::list<__sorted_pair> sroted_list;
+}thread_req;
 
 void thread_sorting(void* arg, int thread_num){
 
 }
 
-
-
 void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
+	static int cnt=0;
+	if(++cnt==270){
+		debug_flag=true;
+	}
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
-
-/*
-	static int cnt=0;
-	if(++cnt==309){
-		debug_flag=true;
-	}
-*/
 
 	bool trivial_move_flag=!force;
 
@@ -402,7 +408,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	bool isstart=true;
 	run *res=target_run;
 	while(1){
-		target_round+=4*BPS/run_num;
+		target_round+=force?rset[0]->st_body->now_STE_num:4*BPS/run_num;
 		//uint32_t limited_lba=UINT32_MAX;
 		//sort meta
 		do{
