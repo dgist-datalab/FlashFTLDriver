@@ -203,7 +203,7 @@ uint64_t run_memory_usage(run *r, uint32_t target_bit);
  * rset: set of run which is sorted by version
  *
  * */
-void run_merge(uint32_t run_num, run **rset,  run *target_run, struct lsmtree *lsm);
+void run_merge(uint32_t run_num, run **rset,  run *target_run, bool force, struct lsmtree *lsm);
 
 /*
  * Function: run_recontstruct
@@ -213,6 +213,6 @@ void run_merge(uint32_t run_num, run **rset,  run *target_run, struct lsmtree *l
  * src:	
  * des:
  * */
-void run_recontstruct(struct lsmtree *lsm, run *src, run *des);	
+void run_recontstruct(struct lsmtree *lsm, run *src, run *des, bool force);	
 //################################### run_merge.c done
 #endif

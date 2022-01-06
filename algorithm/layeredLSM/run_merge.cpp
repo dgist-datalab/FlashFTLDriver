@@ -359,7 +359,7 @@ void thread_sorting(void* arg, int thread_num){
 
 
 
-void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
+void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
@@ -372,7 +372,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
 	}
 */
 
-	bool trivial_move_flag=true;
+	bool trivial_move_flag=!force;
 
 	for(uint32_t i=0; i<run_num; i++){
 		now_entry_num+=rset[i]->now_entry_num;
@@ -463,6 +463,6 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, lsmtree *lsm){
 	run_insert_done(res, true);
 }
 
-void run_recontstruct(lsmtree *lsm, run *src, run *des){
-	run_merge(1, &src, des, lsm);
+void run_recontstruct(lsmtree *lsm, run *src, run *des, bool force){
+	run_merge(1, &src, des, force, lsm);
 }

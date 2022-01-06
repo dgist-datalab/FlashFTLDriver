@@ -32,7 +32,7 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 
 		run *des = __lsm_populate_new_run(lsm, lsm->disk[last_level_compaction? disk_idx : disk_idx + 1]->map_type, RUN_NORMAL, total_target_entry, last_level_compaction?disk_idx+1:disk_idx+2);
 
-		run_merge(target_src_num, merge_src, des, lsm);
+		run_merge(target_src_num, merge_src, des, false, lsm);
 
 		lsm->monitor.compaction_cnt[disk_idx+1]++;
 		lsm->monitor.compaction_input_entry_num[disk_idx+1] += total_target_entry;
@@ -69,7 +69,7 @@ void compaction_flush(lsmtree *lsm, run *r)
 	bool pinning_enable = __lsm_pinning_enable(lsm, r->now_entry_num);
 	run *new_run = __lsm_populate_new_run(lsm, lsm->disk[0]->map_type, pinning_enable ? RUN_PINNING : RUN_NORMAL, r->now_entry_num, 1);
 
-	run_recontstruct(lsm, r, new_run);
+	run_recontstruct(lsm, r, new_run, false);
 
 	lsm->monitor.compaction_cnt[0]++;
 	lsm->monitor.compaction_input_entry_num[0]+=r->now_entry_num;
@@ -102,7 +102,7 @@ void compaction_clean_last_level(lsmtree *lsm){
 	uint32_t last_level_idx=lsm->param.total_level_num-1;
 	run *max_unlinked_run = level_get_max_unlinked_run(lsm->disk[last_level_idx]);
 	run *temp_new_run = __lsm_populate_new_run(lsm, lsm->disk[last_level_idx]->map_type, RUN_NORMAL, max_unlinked_run->now_entry_num, last_level_idx);
-	run_recontstruct(lsm, max_unlinked_run, temp_new_run);
+	run_recontstruct(lsm, max_unlinked_run, temp_new_run, true);
 	__lsm_free_run(lsm, max_unlinked_run);
 	level_insert_run(lsm->disk[last_level_idx], temp_new_run);
 }
