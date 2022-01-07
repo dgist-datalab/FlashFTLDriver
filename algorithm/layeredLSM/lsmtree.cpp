@@ -220,10 +220,10 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 	printf("compaction log\n");
 	for(uint32_t i=0; i<=lsm->param.total_level_num; i++){
 		if(i==0){
-			printf("\tmem -> %u : %u,%.2lf (cnt,eff)\n",i, lsm->monitor.compaction_cnt[i], (double)lsm->monitor.compaction_input_entry_num[i]/lsm->monitor.compaction_output_entry_num[i]);
+			printf("\tmem -> %u : %u,%.2lf (cnt,eff)\n",i, lsm->monitor.compaction_cnt[i], (double)lsm->monitor.compaction_output_entry_num[i]/lsm->monitor.compaction_input_entry_num[i]);
 		}
 		else{
-			printf("\t%u -> %u : %u,%.2lf (cnt,eff)\n",i-1, i, lsm->monitor.compaction_cnt[i-1], (double)lsm->monitor.compaction_input_entry_num[i-1]/lsm->monitor.compaction_output_entry_num[i-1]);		
+			printf("\t%u -> %u : %u,%.2lf (cnt,eff)\n",i-1, i, lsm->monitor.compaction_cnt[i-1], (double)lsm->monitor.compaction_output_entry_num[i-1]/lsm->monitor.compaction_input_entry_num[i-1]);		
 		}
 	}
 

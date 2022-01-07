@@ -361,7 +361,8 @@ typedef struct thread_req{
 }thread_req;
 
 void thread_sorting(void* arg, int thread_num){
-
+	thread_req *req=(thread_req*)arg;
+	
 }
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
