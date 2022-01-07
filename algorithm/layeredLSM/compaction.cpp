@@ -89,6 +89,7 @@ void compaction_flush(lsmtree *lsm, run *r)
 		debug_flag=true;
 	}*/
 	while(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
+		lsm->monitor.force_compaction_cnt++;
 		__compaction_another_level(lsm, 0, true);
 	}
 	__lsm_free_run(lsm, r);

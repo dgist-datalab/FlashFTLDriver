@@ -226,6 +226,7 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 			printf("\t%u -> %u : %u,%.2lf (cnt,eff)\n",i-1, i, lsm->monitor.compaction_cnt[i-1], (double)lsm->monitor.compaction_output_entry_num[i-1]/lsm->monitor.compaction_input_entry_num[i-1]);		
 		}
 	}
+	printf("\t force_compaction_cnt:%u\n", lsm->monitor.force_compaction_cnt);
 
 	return 1;
 }
