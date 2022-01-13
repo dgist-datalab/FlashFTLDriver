@@ -82,13 +82,13 @@ static inline void __amf_info_create_body(bool load){
 	printf("normal wirte on lower_info\n");
 	normal_write_init();
 #endif
+
 	mem_pool=(char**)malloc(sizeof(char*)*_NOP);
 	temp_mem_buf=(char*)malloc(PAGESIZE);
 }
 
 uint32_t amf_info_create(lower_info *li, blockmanager *bm){
 	__amf_info_create_body(false);
-
 #ifdef LOWER_MEM_DEV
 	printf("lower mem dev  mode\n");
 	for(uint32_t i=0; i<_NOP; i++){
@@ -229,25 +229,33 @@ void *amf_info_read_sync(uint32_t type, uint32_t ppa, char *data){
 
 uint32_t amf_info_dump(lower_info*li, FILE *fp){
 	uint64_t temp_NOP=_NOP;
+	printf("1. ftell:%ld\n", ftell(fp));
 	fwrite(&temp_NOP,sizeof(uint64_t), 1, fp);
+	printf("2. ftell:%ld\n", ftell(fp));
 
 #ifdef LOWER_MEM_DEV
 	for(uint32_t i=0; i<_NOP; i++){
 		fwrite(mem_pool[i], 1, PAGESIZE, fp);
 	}
 #endif
+	printf("3. ftell:%ld\n", ftell(fp));
 
 	fwrite(li->req_type_cnt, sizeof(uint64_t), LREQ_TYPE_NUM, fp);
+	printf("4. ftell:%ld\n", ftell(fp));
 	return 1;
 }
 
 uint32_t amf_info_load(lower_info *li, FILE *fp){
+	uint64_t prev_fp=ftell(fp);
 	__amf_info_create_body(true);
+	fseek(fp, prev_fp, SEEK_SET);
+	printf("1. ftell:%ld\n", ftell(fp));
 	uint64_t now_NOP;
 	fread(&now_NOP, sizeof(uint64_t), 1, fp);
 	if(now_NOP!=_NOP){
 		EPRINT("device setting is differ", true);
 	}
+	printf("2. ftell:%ld\n", ftell(fp));
 
 #ifdef LOWER_MEM_DEV
 	for(uint32_t i=0; i<_NOP; i++){
@@ -255,8 +263,10 @@ uint32_t amf_info_load(lower_info *li, FILE *fp){
 		fread(mem_pool[i], 1, PAGESIZE, fp);
 	}
 #endif
+	printf("3. ftell:%ld\n", ftell(fp));
 
 	fread(li->req_type_cnt, sizeof(uint64_t), LREQ_TYPE_NUM, fp);
+	printf("4. ftell:%ld\n", ftell(fp));
 	return 1;
 }
 
