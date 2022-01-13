@@ -326,6 +326,7 @@ uint32_t sbm_invalidate_seg_num(blockmanager *bm){
 uint32_t sbm_dump(struct blockmanager *bm, FILE *fp){
 	sbm_pri *p=(sbm_pri *)bm->private_data;
 	blockmanager_master_dump(fp);
+	printf("bm 1. ftell :%u\n", ftell(fp));
 	for(uint32_t i=0; i<_NOS; i++){
 		fwrite(&p->seg_set[i], sizeof(__segment), 1, fp);
 		for(uint32_t j=0; j<BPS; j++){
@@ -339,6 +340,7 @@ uint32_t sbm_dump(struct blockmanager *bm, FILE *fp){
 			printf("[dump]%u -> not assigned\n", i);
 		}
 	}
+	printf("bm 2. ftell :%u\n", ftell(fp));
 	return 1;
 }
 
@@ -349,6 +351,7 @@ uint32_t sbm_load(blockmanager *bm, FILE *fp){
 	q_init(&p->free_segment_q, _NOS);
 	p->num_free_seg=0;
 
+	printf("bm 1. ftell :%u\n", ftell(fp));
 	__segment temp_segment;
 	for(uint32_t i=0; i<_NOS; i++){
 		fread(&temp_segment, sizeof(temp_segment), 1, fp);
@@ -375,5 +378,6 @@ uint32_t sbm_load(blockmanager *bm, FILE *fp){
 			printf("[load]%u -> not assigned\n", i);
 		}
 	}
+	printf("bm 2. ftell :%u\n", ftell(fp));
 	return 1;
 }

@@ -108,5 +108,6 @@ vec_request **get_vectored_request_arr();
 vec_request *get_trace_vectored_request();
 void request_print_log();
 void request_memset_print_log(); 
+void request_done_wait();
 
 #endif

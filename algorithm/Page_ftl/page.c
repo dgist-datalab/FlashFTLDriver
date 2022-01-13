@@ -209,6 +209,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		ppa_t ppa=page_map_assign(a_buffer.key, a_buffer.idx);
 		value_set *value=inf_get_valueset(NULL,  FS_MALLOC_W, PAGESIZE);
 		for(uint32_t i=0; i<L2PGAP; i++){
+			if(a_buffer.key[i]==0){
+				printf("target key:%u->%u\n", 0,ppa*L2PGAP+i);
+			}
 			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
