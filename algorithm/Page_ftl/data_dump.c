@@ -33,6 +33,7 @@ uint32_t page_dump(FILE *fp){
 	}
 
 	/*write mapping data*/
+	printf("dump 0 -> %u\n", p->mapping[0]);
 	fwrite(p->mapping, sizeof(uint32_t), _NOP*L2PGAP, fp);
 
 	return 1;
@@ -73,6 +74,8 @@ uint32_t page_load(lower_info *li, blockmanager *bm, algorithm *algo, FILE *fp){
 
 	p->mapping=(uint32_t*)malloc(sizeof(uint32_t)*_NOP*L2PGAP);
 	fread(p->mapping, sizeof(uint32_t), _NOP * L2PGAP, fp);
+
+	printf("load 0 -> %u\n", p->mapping[0]);
 	page_ftl.algo_body=(void*)p;
 	return 1;
 }

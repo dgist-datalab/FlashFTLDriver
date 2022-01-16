@@ -61,6 +61,7 @@ int main(int argc,char* argv[]){
 
 	pthread_create(&thr, NULL, thread_test, NULL);
 	pthread_join(thr, NULL);
+	request_done_wait();
 
 	free_trace_cheeze();
 	sleep(10);

@@ -694,6 +694,7 @@ bool sftl_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 	uint32_t ppa_array_idx=0;
 	uint32_t offset=0;
 	uint32_t total_head=0;
+	
 
 	for_each_bitmap_forward(sc->map, offset, target, max){	
 		if(target){
@@ -702,6 +703,10 @@ bool sftl_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 		}
 		else{
 			ppa_array[ppa_array_idx++]=++last_ppa;
+		}
+
+		if(etr->idx==4095){
+			printf("%u %u %u\n",ppa_array_idx-1, ppa_array[ppa_array_idx-1], sc->head_array[head_idx-1]);
 		}
 	}
 
@@ -718,6 +723,9 @@ bool sftl_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 void sftl_load_specialized_meta(struct my_cache *cache, GTD_entry *etr, char *data){
 	uint32_t *ppa_list=(uint32_t*)data;
 	uint32_t head_num=1;
+	if(etr->idx==4095){
+		printf("break!\n");
+	}
 	for(uint32_t i=1; i<PAGESIZE/sizeof(uint32_t); i++){
 		if(ppa_list[i]==ppa_list[i-1]+1){
 		}

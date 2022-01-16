@@ -24,6 +24,8 @@ static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
 static uint64_t seq = 0;
 static int trace_fd = 0;
 extern uint32_t test_key;
+static volatile uint64_t issue_req_num=0;
+static volatile uint64_t end_req_num=0;
 //static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
 //static uint32_t trace_crc_buf[CRC_BUFSIZE];
 
@@ -404,7 +406,6 @@ vec_request **get_vectored_request_arr()
 vec_request *get_trace_vectored_request(){
 	static bool isstart=false;
 	unsigned int crc_len;
-
 	
 	if(!isstart){
 		isstart=true;
@@ -430,9 +431,11 @@ vec_request *get_trace_vectored_request(){
 		if(cnt%10000==0){
 			printf("%u\n",cnt);
 		}
+		issue_req_num++;
 		return res;
 	}
 
+	issue_req_num++;
 	return res;
 }
 
@@ -506,6 +509,7 @@ bool cheeze_end_req(request *const req){
 
 	release_each_req(req);
 	if(preq->size==preq->done_cnt){
+		end_req_num++;
 #ifdef TRACE_REPLAY
 
 #else
@@ -538,3 +542,8 @@ void free_trace_cheeze(){
 	return;
 }
 
+void request_done_wait(){
+	while(issue_req_num!=end_req_num){
+		sleep(1);
+	}
+}
