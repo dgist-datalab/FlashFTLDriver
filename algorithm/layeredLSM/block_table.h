@@ -9,6 +9,7 @@
 #include "../../include/container.h"
 #include "../../include/settings.h"
 #include "../../include/debug_utils.h"
+#include "../../include/sem_lock.h"
 
 #define MAX_RUN_NUM_FOR_FRAG 64 
 
@@ -48,6 +49,8 @@ typedef struct L2P_block_manager{
 	uint32_t now_seg_idx;
 	blockmanager *segment_manager; 
 	uint32_t *seg_type;
+
+	fdriver_lock_t lock;
 }L2P_bm;
 
 

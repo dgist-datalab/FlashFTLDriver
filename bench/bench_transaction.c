@@ -1,4 +1,5 @@
 #include "bench.h"
+#include "../interface/interface.h"
 #include "../include/settings.h"
 extern master *_master;
 
@@ -31,7 +32,6 @@ char *get_vectored_bench(uint32_t *mark){
 		while(!bench_is_finish_n(_master->n_num)){}
 		printf("\rtesting...... [100%%] done!\n");
 		printf("\n");
-
 		if(_master->n_num==_master->m_num) return NULL;
 
 		m=&_master->m[_master->n_num];

@@ -35,11 +35,11 @@ static void demand_cache_log(){
 
 	printf("\tread miss num: %u\n", DMI.read_miss_num);
 	printf("\t\tread_cold_miss_num:%u\n", DMI.read_cold_miss_num);
-	printf("\t\tread_capacity_miss_num:%u\n", DMI.read_cold_miss_num-DMI.read_cold_miss_num);
+	printf("\t\tread_capacity_miss_num:%u\n", DMI.read_miss_num-DMI.read_cold_miss_num);
 
 	printf("\twrite miss num: %u\n", DMI.write_miss_num);
 	printf("\t\twrite_cold_miss_num:%u\n", DMI.write_cold_miss_num);
-	printf("\t\twrite_capacity_miss_num:%u\n", DMI.write_cold_miss_num-DMI.write_cold_miss_num);
+	printf("\t\twrite_capacity_miss_num:%u\n", DMI.write_miss_num-DMI.write_cold_miss_num);
 
 	printf("Cache hit num: %u\n",DMI.hit_num);
 	printf("\tread hit num: %u\n", DMI.read_hit_num);
@@ -90,10 +90,6 @@ uint32_t demand_print_log(){
 		dmm.cache->print_log(dmm.cache);
 	}
 	demand_cache_log();
-	lower_info *li=demand_ftl.li;
-	if(demand_ftl.li->print_traffic){
-		demand_ftl.li->print_traffic(demand_ftl.li);
-	}
 	printf("FTL-LOG-END\n");
 	return 1;
 }
@@ -406,12 +402,11 @@ static inline void dp_initialize(demand_param *dp){
 }
 
 enum{
-	EVICTION_READ, COLD_MISS_READ, /*CAP_MISS_READ,*/ AFTER_EVICTION
+	EVICTION_READ, COLD_MISS_READ, CAP_MISS_READ, AFTER_EVICTION
 };
 
 uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_param *param, 
 		uint32_t target_data_lba, uint32_t type){
-	req->type_ftl++;
 	param->flying_map_read_key=target_data_lba;
 	if(req->type==FS_GET_T){
 		if(etr->physical_address==UINT32_MAX){
@@ -429,21 +424,15 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 				DMI.eviction_shadow_hit_num++;
 				break;
 			case COLD_MISS_READ:
-				DMI.hit_num++;
-				DMI.miss_num--;
 				req->type==FS_SET_T?DMI.write_cold_miss_num--:DMI.read_cold_miss_num--;
 				req->type==FS_SET_T?DMI.write_shadow_hit_num++:DMI.read_shadow_hit_num++;
 				break;
-				/*
+			case AFTER_EVICTION:
 			case CAP_MISS_READ:
-				DMI.hit_num++;
-				DMI.misst_num--;
 				req->type==FS_SET_T?DMI.write_shadow_hit_num++:DMI.read_shadow_hit_num++;
 				break;
-				*/
 		}
 
-		req->type_ftl--;
 		//assign_param_ex *ap=(assign_param_ex*)param->param_ex;
 		//printf("overlap %u gtd idx:%u, input_lba:%u target_lba:%u\n",req->seq, etr->idx, target_data_lba, ap->lba[ap->idx]);
 		pending_debug_seq=req->seq;
@@ -494,16 +483,11 @@ static inline void write_updated_map(request *req, GTD_entry *target_etr,
 		invalidate_map_ppa(temp);
 	}
 	bool is_map_gc_triggered=false;
-	if(req->type_ftl<90){
-		req->type_ftl+=10;
-	}
 	target_etr->physical_address=get_map_ppa(target_etr->idx, &is_map_gc_triggered)*L2PGAP;
 
 
 	if(is_map_gc_triggered){
-		if(req->type_ftl<200){
-			req->type_ftl+=100;
-		}
+
 	}
 	mapping_sanity_checker_with_cache(req->value->value, target_etr->idx);
 #ifdef DFTL_DEBUG

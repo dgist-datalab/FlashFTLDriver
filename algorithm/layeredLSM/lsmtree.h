@@ -61,11 +61,10 @@ typedef struct lsmtree{
 	uint32_t now_memtable_idx;
 	run *memtable[MEMTABLE_NUM];
 	struct level **disk;
-#ifdef THREAD_COMPACTION
 	threadpool tp;
-#endif
 	lsmtree_monitor monitor;
 	lsmtree_parameter param;
+	fdriver_lock_t lock;
 }lsmtree;
 
 /*

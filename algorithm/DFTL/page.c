@@ -26,7 +26,7 @@ struct algorithm demand_ftl={
 	.load=demand_load,
 };
 
-page_read_buffer rb;
+//page_read_buffer rb;
 uint32_t read_buffer_hit_cnt=0;
 
 
@@ -35,12 +35,13 @@ void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo){
 	algo->bm=bm; //blockmanager is managing invalidation 
 
 	a_buffer.value=(char*)malloc(PAGESIZE);
-
+/*
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
 	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
+*/
 }
 
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
@@ -62,9 +63,10 @@ void page_destroy (lower_info* li, algorithm *algo){
 				li->req_type_cnt[GCMW]+
 				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	free(a_buffer.value);
-
+/*
 	delete rb.pending_req;
 	delete rb.issue_req;
+	*/
 	return;
 }
 
@@ -176,6 +178,7 @@ extern struct algorithm demand_ftl;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
+	/*
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
@@ -188,7 +191,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 		}
 		fdriver_unlock(&rb.read_buffer_lock);
 	}
-
+*/
 	page_params* params=(page_params*)malloc(sizeof(page_params));
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	params->value=value;
@@ -196,9 +199,10 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 	my_req->end_req=page_end_req;//this is callback function
 	my_req->param=(void*)params;//add your parameter structure 
 	my_req->type=type;//DATAR means DATA reads, this affect traffics results
+	my_req->type_lower=0;
 	/*you note that after read a PPA, the callback function called*/
 
-
+/*
 	if(type==DATAR){
 		fdriver_lock(&rb.pending_lock);
 		rb_r_iter temp_r_iter=rb.issue_req->find(ppa);
@@ -213,7 +217,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 			return;
 		}
 	}
-
+*/
 	switch(type){
 		case DATAR:
 			demand_ftl.li->read(ppa,PAGESIZE,value,my_req);
@@ -254,6 +258,7 @@ void *page_end_req(algo_req* input){
 			inf_free_valueset(params->value,FS_MALLOC_W);
 			break;
 		case DATAR:
+		/*
 			fdriver_lock(&rb.pending_lock);
 			target_r_iter=rb.pending_req->find(params->value->ppa/L2PGAP);
 			for(;target_r_iter->first==params->value->ppa/L2PGAP && 
@@ -265,11 +270,11 @@ void *page_end_req(algo_req* input){
 			}
 			rb.issue_req->erase(params->value->ppa/L2PGAP);
 			fdriver_unlock(&rb.pending_lock);
-
 			fdriver_lock(&rb.read_buffer_lock);
 			rb.buffer_ppa=params->value->ppa/L2PGAP;
 			memcpy(rb.buffer_value, params->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
+		*/
 
 			if(params->value->ppa%L2PGAP){
 				memmove(params->value->value, &params->value->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);

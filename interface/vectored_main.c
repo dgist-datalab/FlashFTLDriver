@@ -43,17 +43,28 @@ int main(int argc,char* argv[]){
 	}
 	else{
 		inf_init(0,0,argc,argv);
+#if 0
+		/*test function code start*/
+		inf_algorithm_testing();
+		inf_free();
+		return 0;
+#else 
 		bench_init();
 		bench_vectored_configure();
+		bench_add(VECTOREDSSET,0,RANGE,RANGE);
+		bench_add(VECTOREDSGET,0,RANGE,RANGE);
+	//	bench_add(VECTOREDRSET,0,RANGE,RANGE*2);
+	//	inf_print_log();
+	//	bench_add(VECTOREDSGET,0, RANGE, RANGE);
 	//	bench_add(VECTOREDUNIQRSET,0,RANGE,RANGE);
-		bench_add(VECTOREDRSET,0,RANGE,RANGE);
+	//	bench_add(VECTOREDRGET,0, RANGE, RANGE);
+	//	bench_add(VECTOREDRW,0, RANGE,(RANGE)*2);
 	//	bench_add(VECTOREDRGET,0,RANGE,RANGE);
 	//	bench_add(VECTOREDRGET,0,RANGE,RANGE);
 	//	bench_add(VECTOREDRSET,0,RANGE,RANGE*2);
 	//	bench_add(VECTOREDRW,0,RANGE,RANGE/2);
 	//	bench_add(VECTOREDRW,0,RANGE,RANGE*4);
-	
-		//inf_algorithm_testing();
+#endif
 	}
 	printf("range: %lu!\n",RANGE);
 
@@ -72,10 +83,11 @@ int main(int argc,char* argv[]){
 #endif
 	}
 
-	inf_free();
 	if(bp){
 		bench_parameters_free(bp);
 	}
 	bench_custom_print(write_opt_time,11);
+	
+		inf_free();
 	return 0;
 }

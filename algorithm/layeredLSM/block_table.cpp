@@ -34,6 +34,7 @@ L2P_bm *L2PBm_init(blockmanager *sm, uint32_t run_num){
 	res->now_summary_seg=sm->get_segment(sm, BLOCK_ACTIVE);
 	L2PBm_set_seg_type(res, res->now_summary_seg->seg_idx, SUMMARY_SEG);
 	bm_master=res;
+	fdriver_mutex_init(&res->lock);
 	return res;
 }
 
@@ -67,6 +68,7 @@ void L2PBm_invalidate_PBA(L2P_bm *bm, uint32_t PBA){
 
 extern lsmtree *LSM;
 uint32_t L2PBm_pick_empty_PBA(L2P_bm *bm){
+	fdriver_lock(&bm->lock);
 retry:
 	if(bm->now_seg_idx==NO_SEG){
 		blockmanager *sm=bm->segment_manager;
@@ -95,6 +97,7 @@ out:
 	if(bm->now_block_idx==BPS){
 		bm->now_seg_idx=NO_SEG;
 	}
+	fdriver_unlock(&bm->lock);
 	return res;
 }
 
@@ -173,6 +176,7 @@ void check_block_sanity(uint32_t piece_ppa){
 }
 
 uint32_t L2PBm_get_map_ppa(L2P_bm *bm){
+	fdriver_lock(&bm->lock);
 	blockmanager *sm=bm->segment_manager;
 	if(sm->check_full(bm->now_summary_seg)){
 		if(sm->is_gc_needed(sm)){
@@ -191,6 +195,7 @@ out:
 
 	uint32_t res= bm->segment_manager->get_page_addr(bm->now_summary_seg);
 	bm->PBA_map[res/_PPB].type=LSM_BLOCK_SUMMARY;
+	fdriver_unlock(&bm->lock);
 	return res;
 }
 

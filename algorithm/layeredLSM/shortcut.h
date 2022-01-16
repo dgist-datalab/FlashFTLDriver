@@ -3,9 +3,12 @@
 #include "./run.h"
 #include "../../include/sem_lock.h"
 #include "../../include/debug_utils.h"
+#include "./shortcut_dir.h"
 #include <list>
 #include <stdlib.h>
 #define NOT_ASSIGNED_SC UINT8_MAX
+#define MAX_SC_DIR_NUM (RANGE/SC_PER_DIR)
+
 typedef struct shortcut_info{
 	uint8_t idx;
 	uint32_t level_idx;
@@ -17,13 +20,17 @@ typedef struct shortcut_info{
 }shortcut_info;
 typedef struct shortcut_info sc_info;
 
+
 typedef struct shortcut_master{
 	std::list<uint32_t> *free_q;
 	uint8_t *sc_map;
+	shortcut_dir sc_dir[MAX_SC_DIR_NUM];
 	sc_info *info_set;
 	uint32_t max_shortcut_num;
 	uint32_t now_recency;
 	fdriver_lock_t lock;
+	uint64_t max_memory_usage;
+	uint64_t now_memory_usage;
 }shortcut_master;
 
 typedef shortcut_master sc_master;
@@ -113,6 +120,8 @@ run* shortcut_query(sc_master *sc, uint32_t lba);
  *		find old sc_info and unlinked lba and link new lba to run
  * */
 void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba);
+
+uint64_t shortcut_memory_usage(sc_master *sc);
 
 bool shortcut_validity_check_and_link(sc_master*sc, run *src_r, run* des_r, uint32_t lba);
 /*

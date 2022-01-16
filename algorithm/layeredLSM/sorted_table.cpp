@@ -139,7 +139,7 @@ void st_array_free(st_array *sa){
 	for(uint32_t i=0; i<sa->now_STE_num; i++){
 		if(sa->sp_meta[i].copied==false && invalidate_ppa(sa->bm->segment_manager, sa->sp_meta[i].ppa, true)
 				==BIT_ERROR){
-			EPRINT("invalidate map error!", true);
+			EPRINT("invalidate map error! %u", true, sa->sp_meta[i].ppa);
 		}
 		map_function *mf=sa->pba_array[i].mf;
 		if(mf){
@@ -286,7 +286,9 @@ uint32_t st_array_summary_translation(st_array *sa, bool force){
 	if(!sa->summary_write_alert && !force){
 		EPRINT("it is not write_summary_order", true);
 	}
-	return L2PBm_get_map_ppa(sa->bm)*L2PGAP;
+	uint32_t res=L2PBm_get_map_ppa(sa->bm)*L2PGAP;
+	//printf("res:%u\n", res);
+	return res;
 }
 
 uint32_t st_array_write_translation(st_array *sa){
@@ -382,37 +384,35 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 }
 
 void st_array_copy_STE(st_array *sa, STE *ste, summary_page_meta *spm, map_function *mf, bool unlinked_data_copy){
-	if(sa->sp_meta[sa->now_STE_num].pr_type!=NO_PR){
-		EPRINT("not allowed", true);
-	}
 
-	if(spm->unlinked_data_copy){
-		EPRINT("unlinked data copy not allowed", true);
-	}
-
-	memcpy(&sa->sp_meta[sa->now_STE_num], spm, sizeof(summary_page_meta));
-	st_array_set_now_PBA(sa, ste->PBA, TRIVIAL_MOVE_PBA);
-	sa->sp_meta[sa->now_STE_num].unlinked_data_copy=true;
-
-	//sa->pba_array[sa->now_STE_num].mf=ste->mf;
-	uint64_t memory_usage_bit=ste->mf->memory_usage_bit;
-	if(mf){
-		ste->mf->free(ste->mf);
-		sa->pba_array[sa->now_STE_num].mf=mf;
-	}
-	else{
-		sa->pba_array[sa->now_STE_num].mf=ste->mf;
-	}
-	ste->mf=map_empty_copy(memory_usage_bit);
-	
-	sa->pba_array[sa->now_STE_num].max_offset=ste->max_offset;
-
-	spm->copied=true;
+	st_array_copy_STE_des(sa, ste, spm, sa->now_STE_num, mf, unlinked_data_copy);
 
 	sa->global_write_pointer+=ste->max_offset+1;
 	st_array_finish_now_PBA(sa);
 	sa->now_STE_num++;
 	//sa->now_STE_num++;
+}
+void st_array_copy_STE_des(st_array *sa, STE *ste,summary_page_meta *spm, uint32_t des_idx, map_function *mf, bool unlinked_data_copy){
+	memcpy(&sa->sp_meta[des_idx], spm, sizeof(summary_page_meta));
+	st_array_set_now_PBA(sa, ste->PBA, TRIVIAL_MOVE_PBA);
+	sa->sp_meta[des_idx].unlinked_data_copy=true;
+
+	uint64_t memory_usage_bit=ste->mf->memory_usage_bit;
+	if(mf){
+		ste->mf->free(ste->mf);
+		sa->pba_array[des_idx].mf=mf;
+	}
+	else{
+		sa->pba_array[des_idx].mf=ste->mf;
+	}
+	ste->mf=map_empty_copy(memory_usage_bit);
+	
+	sa->pba_array[des_idx].max_offset=ste->max_offset;
+
+	spm->copied=true;
+
+	//sa->global_write_pointer+=ste->max_offset+1;
+	//st_array_finish_now_PBA(sa);
 }
 
 uint32_t st_array_force_skip_block(st_array *sa){

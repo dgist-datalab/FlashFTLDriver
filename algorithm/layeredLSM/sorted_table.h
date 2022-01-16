@@ -125,6 +125,8 @@ uint32_t st_array_get_target_STE(st_array *sa, uint32_t lba);
 uint32_t st_array_convert_global_offset_to_psa(st_array *sa, uint32_t global_offset);
 void st_array_copy_STE(st_array *sa, STE *ste, summary_page_meta *spm, struct map_function* mf, bool unlinked_data_copy);
 
+void st_array_copy_STE_des(st_array *sa, STE *ste, summary_page_meta *spm, uint32_t des_idx, struct map_function* mf, bool unlinked_data_copy);
+
 /*
 	Function: st_array_summary_translation
 	--------------------------------------

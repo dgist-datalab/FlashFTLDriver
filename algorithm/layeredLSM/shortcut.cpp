@@ -15,6 +15,10 @@ sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range){
 		res->free_q->push_back(i);
 	}
 
+	for(uint32_t i=0; i<MAX_SC_DIR_NUM; i++){
+		sc_dir_init(&res->sc_dir[i], NOT_ASSIGNED_SC);
+	}
+
 	fdriver_mutex_init(&res->lock);
 	return res;
 }
@@ -49,20 +53,11 @@ void shortcut_add_run_merge(sc_master *sc, run *r, run **rset,
 		EPRINT("already assigned info", true);
 	}
 	sc->free_q->pop_front();
-	/*
-	uint32_t target_recency=0;
-	for(uint32_t i=0; i<merge_num; i++){
-		if(rset[i]->info->recency > target_recency){
-			target_recency=rset[i]->info->recency;
-		}
-	}
-	*/
 	t_info->recency=sc->now_recency++;
 
 	r->info=t_info;
 	t_info->r=r;
 }
-
 
 void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 	sc_info *t_info=r->info;
@@ -70,6 +65,17 @@ void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 		EPRINT("no sc in run", true);
 	}
 	t_info->linked_lba_num++;
+
+	static uint32_t temp_idx=UINT32_MAX;
+	if(lba==1189210){
+		temp_idx=t_info->idx;
+		printf("target lba:%u -> sc_info:%u\n",lba, t_info->idx);
+	}
+/*
+	sc->now_memory_usage-=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);
+	sc_dir_insert_lba(&sc->sc_dir[lba/SC_PER_DIR], lba%SC_PER_DIR, t_info->idx);
+	sc->now_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);
+*/
 	sc->sc_map[lba]=t_info->idx;
 	if(lba==test_key){
 		printf("\t %u target map to info:%u,level:%u,run:%u\n",lba, t_info->idx,t_info->level_idx, r->run_idx);
@@ -92,6 +98,12 @@ void shortcut_unlink_lba(sc_master *sc, run *r, uint32_t lba){
 run* shortcut_query(sc_master *sc, uint32_t lba){
 	fdriver_lock(&sc->lock);
 	uint32_t sc_info_idx=sc->sc_map[lba];
+/*
+	uint32_t sc_info_temp_idx=sc_dir_query_lba(&sc->sc_dir[lba/SC_PER_DIR], lba%SC_PER_DIR);
+	if(sc_info_idx!=sc_info_temp_idx){
+		EPRINT("error sc info idx", true);
+	}
+*/
 	if(sc_info_idx==NOT_ASSIGNED_SC){
 	//	EPRINT("not assigned lba", true);
 		fdriver_unlock(&sc->lock);
@@ -107,7 +119,7 @@ static inline int32_t __get_recency_cmp(sc_info *a, sc_info *b){
 		return 1;
 	}
 	else if(a->level_idx > b->level_idx){
-		return -1;
+		return -1; 
 	}	
 	return a->recency-b->recency;
 }
@@ -169,6 +181,11 @@ void shortcut_release_sc_info(sc_master *sc, uint32_t idx){
 
 void shortcut_free(sc_master *sc){
 	delete sc->free_q;
+
+	for(uint32_t i=0; i<MAX_SC_DIR_NUM; i++){
+		sc_dir_free(&sc->sc_dir[i]);
+	}
+
 	free(sc->sc_map);
 	free(sc->info_set);
 	free(sc);
@@ -202,4 +219,8 @@ bool shortcut_validity_check_and_link(sc_master* sc, run *src_r, run* des_r, uin
 	}
 	fdriver_unlock(&sc->lock);
 	return res;
+}
+
+uint64_t shortcut_memory_usage(sc_master *sc){
+	return sc->now_memory_usage;
 }

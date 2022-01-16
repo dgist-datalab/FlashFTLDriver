@@ -21,10 +21,12 @@ static inline void __rm_free_ridx(run_manager *rm, uint32_t ridx){
 }
 
 run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, uint32_t entry_num, uint32_t level_num){
+	fdriver_lock(&lsm->lock);
 	uint32_t ridx=__rm_get_ridx(lsm->rm);
 	run *r=run_factory(ridx, map_type, entry_num, lsm->param.fpr, lsm->bm, run_type, lsm);
 	__rm_insert_run(lsm->rm, ridx, r);
 	shortcut_add_run(lsm->shortcut, r, level_num);
+	fdriver_unlock(&lsm->lock);
 	return r;
 }
 
@@ -59,12 +61,6 @@ void __lsm_calculate_memory_usage(lsmtree *lsm, uint64_t entry_num, int32_t memo
 	else{
 		mem_per_ent=(double)memory_usage_bit/entry_num-(pinning?lsm->param.target_bit:0);
 	}
-	//printf("now_usage_bit:%lf %lf %s:%lf\n", (double)lsm->monitor.now_memory_usage/RANGE, (double)lsm->param.max_memory_usage_bit/RANGE, map_type_to_string(map_type), mem_per_ent);
-	/*
-	if(lsm->monitor.now_memory_usage > lsm->param.max_memory_usage_bit){
-		//GDB_MAKE_BREAKPOINT;
-		//lsmtree_print_log(lsm);
-	}*/
 }
 
 void __lsm_free_run(lsmtree *lsm, run *r){
@@ -88,6 +84,7 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 	sorted_array_master_init(rm->total_run_num);
 	res->shortcut=shortcut_init(rm->total_run_num, RANGE);
 	res->bm=L2PBm_init(sm, rm->total_run_num);
+	fdriver_mutex_init(&res->lock);
 
 	param.spare_run_num-=MEMTABLE_NUM;
 	param.memtable_entry_num=param.memtable_entry_num < _PPS*L2PGAP ? param.memtable_entry_num:param.memtable_entry_num/(_PPS*L2PGAP)*(_PPS*L2PGAP);
@@ -107,9 +104,7 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 	}
 
 	res->monitor.now_memory_usage+=res->param.shortcut_bit;
-#ifdef THREAD_COMPACTION
 	res->tp=thpool_init(1);
-#endif
 	return res;
 }
 
@@ -133,8 +128,6 @@ void lsmtree_free(lsmtree *lsm){
 	L2PBm_free(lsm->bm);
 	free(lsm);
 }
-
-
 
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	run *r=lsm->memtable[lsm->now_memtable_idx];
@@ -160,6 +153,7 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	}
 	return 0;
 }
+
 uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res;
 	run *r=shortcut_query(lsm->shortcut, req->key);
@@ -216,6 +210,7 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 
 	printf("BF mem per ent: %.2lf\n",(double)lsm->monitor.bf_memory_usage/lsm->monitor.bf_memory_ent);
 	printf("PLR mem per ent: %.2lf\n",(double)lsm->monitor.plr_memory_usage/lsm->monitor.plr_memory_ent);
+	printf("SC mem per ent: %.2lf\n", (double)shortcut_memory_usage(lsm->shortcut)/RANGE);
 
 	printf("compaction log\n");
 	for(uint32_t i=0; i<=lsm->param.total_level_num; i++){

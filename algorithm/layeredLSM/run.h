@@ -122,6 +122,9 @@ void run_trivial_move_finish(run *r);
 
 void run_copy_ste_to(run *r, struct sorted_table_entry *ste, struct summary_page_meta *spm, map_function *mf, bool unlinked_data_copy);
 
+
+void run_copy_ste_to_des(run *r, struct sorted_table_entry *ste, struct summary_page_meta *spm, uint32_t idx, map_function *mf, bool unlinked_data_copy);
+
 void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag, uint32_t original_level, uint32_t original_recency);
 
 //#################################### run_insert.c done
@@ -204,6 +207,9 @@ uint64_t run_memory_usage(run *r, uint32_t target_bit);
  *
  * */
 void run_merge(uint32_t run_num, run **rset,  run *target_run, bool force, struct lsmtree *lsm);
+
+
+void run_merge_thread(uint32_t run_num, run **rset,  run *target_run, bool force, struct lsmtree *lsm);
 
 /*
  * Function: run_recontstruct

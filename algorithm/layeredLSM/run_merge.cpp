@@ -2,6 +2,7 @@
 #include "./run.h"
 #include "./summary_page_set.h"
 #include "../../include/sem_lock.h"
+#include "../../bench/measurement.h"
 #include "./piece_ppa.h"
 #include "./lsmtree.h"
 #include "./merge_helper.h"
@@ -157,9 +158,6 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	for(; iter!=sorted_list->end(); iter++){
 		__sorted_pair *t_pair=&(*iter);
 		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
-		if(t_pair->pair.lba==test_key){
-			EPRINT("target_read psa:%u", false, t_pair->original_psa);
-		}
 		__merge_issue_req(t_pair);
 	}
 }
@@ -355,31 +353,77 @@ static inline void __sorted_array_flush(run *res, std::list<__sorted_pair> *sort
 	__write_merged_data(res, sorted_arr, lsm->shortcut);
 }
 
+mm_container* __sorting_mm_set(mm_container *mm_set, uint32_t run_num, uint32_t target_round, std::list<__sorted_pair> *sorted_list, lsmtree *lsm, bool trivial_move_flag, uint32_t *_prev_lba){
+	uint32_t read_flag;
+	std::list<__sorted_pair> *sorted_arr=sorted_list;
+	__sorted_pair target_sorted_pair;
+	uint32_t prev_lba=*_prev_lba;
+	uint32_t ridx;
+	summary_pair target;
+	bool isstart=true;
+		//sort meta
+	do
+	{
+		read_flag = __set_read_flag(mm_set, run_num, target_round);
+		if (read_flag == ((1 << run_num) - 1))
+		{
+			break;
+		}
+		target = __pick_smallest_pair(mm_set, run_num, &ridx, lsm->shortcut);
+		target_sorted_pair.pair = target;
+		target_sorted_pair.r = mm_set[ridx].r;
+		target_sorted_pair.ste_num = sp_set_get_ste_num(mm_set[ridx].ssi, target.intra_offset);
+		if (target.lba != UINT32_MAX)
+		{
+			uint32_t end_lba;
+			if (trivial_move_flag && sp_set_noncopy_check(mm_set[ridx].ssi, target.lba, &end_lba))
+			{
+				*_prev_lba = prev_lba;
+				return &mm_set[ridx];
+			}
+			sorted_arr->push_back(target_sorted_pair);
+
+			/*checking sorting data*/
+			if (!isstart && prev_lba >= target.lba)
+			{
+				EPRINT("sorting error! prev_lba:%u, target.lba:%u", true, prev_lba, target.lba);
+			}
+			else if (isstart)
+			{
+				isstart = false;
+			}
+			prev_lba = target.lba;
+			read_flag = __move_iter(mm_set, run_num, target.lba, read_flag, ridx, target_round);
+		}
+	} while (read_flag != ((1 << run_num) - 1));
+	*_prev_lba=prev_lba;
+	return NULL;
+}
+
 typedef struct thread_req{
 	fdriver_lock_t lock;
-	std::list<__sorted_pair> sroted_list;
+	std::list<__sorted_pair> * sroted_list;
+	mm_container *mm_set;
+	mm_container *trivial_move_target;
+	lsmtree *lsm;
+	uint32_t prev_lba;
+	uint32_t run_num;
+	uint32_t target_round;
+	bool trivial_move_flag;
 }thread_req;
 
 void thread_sorting(void* arg, int thread_num){
 	thread_req *req=(thread_req*)arg;
-	
+	req->trivial_move_target=__sorting_mm_set(req->mm_set, req->run_num, req->target_round, req->sroted_list, req->lsm, req->trivial_move_flag, &req->prev_lba);
+	fdriver_unlock(&req->lock);
 }
 
-void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
-	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
-	static int cnt=0;
-	if(++cnt==270){
-		//debug_flag=true;
-	}
+static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num){
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
-
-	bool trivial_move_flag=!force;
-
 	for(uint32_t i=0; i<run_num; i++){
 		now_entry_num+=rset[i]->now_entry_num;
-
 		shortcut_set_compaction_flag(rset[i]->info, true);
 		mm_set[i].r=rset[i];
 		if(rset[i]->type==RUN_LOG){
@@ -392,6 +436,98 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 		mm_set[i].now_proc_block_idx=0;
 		mm_set[i].done=false;
 	}
+	return mm_set;
+}
+
+void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
+	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
+	mm_container *mm_set=__make_mmset(rset, target_run, run_num);
+
+	bool trivial_move_flag=!force;
+
+	if(trivial_move_flag){
+		__check_disjoint_spm(rset,run_num, mm_set);
+	}
+
+	uint32_t target_round=0, read_flag;
+	__sorted_pair target_sorted_pair;
+
+	run *res=target_run;
+
+	thread_req *th_req=(thread_req*)calloc(1, sizeof(thread_req));
+	fdriver_mutex_init(&th_req->lock);
+	th_req->mm_set=mm_set;
+	th_req->prev_lba=UINT32_MAX;
+	th_req->run_num=run_num;
+	th_req->trivial_move_target=NULL;
+	th_req->trivial_move_flag=trivial_move_flag;
+	th_req->lsm=lsm;
+
+	std::list<__sorted_pair> *sorted_arr=NULL;	
+
+	while(1){
+		target_round+=force?rset[0]->st_body->now_STE_num:4*BPS/run_num;
+		
+		th_req->target_round=target_round;
+		fdriver_lock(&th_req->lock);
+		th_req->sroted_list=new std::list<__sorted_pair>();
+
+		thpool_add_work(lsm->tp, thread_sorting, (void*)th_req);
+
+		if (sorted_arr && sorted_arr->size()){
+			__sorted_array_flush(res, sorted_arr, lsm);
+		}
+
+		if (sorted_arr){
+			delete sorted_arr;
+		}
+
+		fdriver_lock(&th_req->lock);
+		fdriver_unlock(&th_req->lock);
+		sorted_arr=th_req->sroted_list;
+
+		if(th_req->trivial_move_target){
+			if(sorted_arr->size()){
+				__sorted_array_flush(res, sorted_arr, lsm);
+			}			
+			summary_pair target=sp_set_iter_pick(th_req->trivial_move_target->ssi);
+			th_req->prev_lba=trivial_move(res, lsm->shortcut, th_req->trivial_move_target, target);
+			delete sorted_arr;
+			sorted_arr=NULL;
+			th_req->trivial_move_target=NULL;
+		}
+
+
+		bool done_flag=true;
+		for(uint32_t i=0; i<run_num; i++){
+			if(!mm_set[i].done){
+				done_flag=false; break;
+			}
+		}
+		if(done_flag) break;
+	}
+
+
+	while(sorted_arr && sorted_arr->size()){
+		__sorted_array_flush(res, sorted_arr, lsm);
+	}
+	if(sorted_arr){
+		delete sorted_arr;
+	}
+	for(uint32_t i=0; i<run_num; i++){
+		shortcut_set_compaction_flag(rset[i]->info, false);
+		sp_set_iter_free(mm_set[i].ssi);
+	}
+	free(th_req);
+	free(mm_set);
+	run_insert_done(res, true);
+}
+
+void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
+	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
+	mm_container *mm_set=__make_mmset(rset, target_run, run_num);
+
+	bool trivial_move_flag=!force;
 
 	if(trivial_move_flag){
 		__check_disjoint_spm(rset,run_num, mm_set);
@@ -402,47 +538,18 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	__sorted_pair target_sorted_pair;
 	uint32_t prev_lba=UINT32_MAX;
 
-	bool isstart=true;
 	run *res=target_run;
+
 	while(1){
 		target_round+=force?rset[0]->st_body->now_STE_num:4*BPS/run_num;
-		//uint32_t limited_lba=UINT32_MAX;
-		//sort meta
-		do{
-			read_flag=__set_read_flag(mm_set, run_num, target_round);
-			if(read_flag==((1<<run_num)-1)){
-				break;
-			}
-			uint32_t ridx;
-			summary_pair target=__pick_smallest_pair(mm_set, run_num, &ridx, lsm->shortcut);
-			target_sorted_pair.pair=target;
-			target_sorted_pair.r=rset[ridx];
-			target_sorted_pair.ste_num=sp_set_get_ste_num(mm_set[ridx].ssi, target.intra_offset);
-			if(target.lba!=UINT32_MAX){
-				uint32_t end_lba;
-				if(trivial_move_flag && sp_set_noncopy_check(mm_set[ridx].ssi, target.lba, &end_lba)){
-					if(sorted_arr.size()){
-						__sorted_array_flush(res, &sorted_arr, lsm);
-					}
-					prev_lba=trivial_move(res, lsm->shortcut, &mm_set[ridx], target);
-					continue;
-				}
-				sorted_arr.push_back(target_sorted_pair);
+		mm_container *tirivial_move_target=__sorting_mm_set(mm_set, run_num, target_round, &sorted_arr, lsm, trivial_move_flag, &prev_lba);
 
-				/*checking sorting data*/
-				if(!isstart && prev_lba>=target.lba){
-					EPRINT("sorting error! prev_lba:%u, target.lba:%u", true, prev_lba, target.lba);
-				}
-				else if(isstart){
-					isstart=false;
-				}
-				prev_lba=target.lba;
-				read_flag=__move_iter(mm_set, run_num, target.lba, read_flag, ridx, target_round);
-			}
-		}while(read_flag!=((1<<run_num)-1));
-		
 		if(sorted_arr.size()){
 			__sorted_array_flush(res, &sorted_arr, lsm);
+		}
+		if(tirivial_move_target){
+			summary_pair target=sp_set_iter_pick(tirivial_move_target->ssi);
+			prev_lba=trivial_move(res, lsm->shortcut, tirivial_move_target, target);
 		}
 
 		bool done_flag=true;
