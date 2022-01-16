@@ -196,8 +196,13 @@ void *vectored_main(void *__input){
 	
 				request *req=&vec_req->req_array[i];
 				req->type_ftl=req->type_lower=req->buffer_hit=0;
+				req->mapping_cpu_check=false;
 				switch(req->type){
 					case FS_GET_T:
+#ifdef MAPPING_TIME_CHECK
+						req->mapping_cpu_check=true;
+						measure_init(&req->mapping_cpu);
+#endif
 					case FS_SET_T:
 #ifdef REAL_BENCH_MODE
 #else

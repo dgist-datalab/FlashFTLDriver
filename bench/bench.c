@@ -418,13 +418,17 @@ void bench_print(){
 	}
 }
 
-void bench_update_typetime(bench_data *_d, uint8_t a_type,uint8_t l_type,uint8_t buffer_hit, uint64_t time){
-	bench_ftl_time *temp;
-	temp = &_d->ftl_poll[a_type][l_type][buffer_hit];
+static void bench_update_ftl_time(bench_ftl_time *temp, uint64_t time){
 	temp->total_micro += time;
 	temp->max = temp->max < time ? time : temp->max;
 	temp->min = temp->min > time ? time : temp->min;
 	temp->cnt++;
+}
+
+void bench_update_typetime(bench_data *_d, uint8_t a_type,uint8_t l_type,uint8_t buffer_hit, uint64_t time){
+	bench_ftl_time *temp;
+	temp = &_d->ftl_poll[a_type][l_type][buffer_hit];
+	bench_update_ftl_time(temp, time);
 }
 
 void bench_type_cdf_print(bench_data *_d){
@@ -441,6 +445,14 @@ void bench_type_cdf_print(bench_data *_d){
 						(float)_d->ftl_poll[i][k][j].cnt/_d->read_cnt*100);
 			}
 		}
+	}
+
+	if(_d->cpu_time.cnt){
+		fprintf(stderr, "MAP CHECK CPU TIME\n");
+		fprintf(stderr, "MAX\tMIN\tAVG\tCNT\n");
+		fprintf(stderr, "%lu\t%lu\t%.3f\t%lu\n",
+		_d->cpu_time.max, _d->cpu_time.min, (double)_d->cpu_time.total_micro/_d->cpu_time.cnt,
+		_d->cpu_time.cnt);
 	}
 }
 
@@ -512,10 +524,23 @@ void bench_reap_nostart(request *const req){
 	pthread_mutex_unlock(&bench_lock);
 }
 
+void bench_collect_map_cpu_time(bench_data *bd, request *req){
+#ifdef CDF
+	uint64_t cpu_time = req->mapping_cpu.adding.tv_sec * 1000000 + req->mapping_cpu.adding.tv_usec;
+	int slot_num = cpu_time / TIMESLOT;
+	if(slot_num>=1000000/TIMESLOT){
+			bd->map_cpu_time[1000000/TIMESLOT]++;
+	}	
+	else{
+		bd->map_cpu_time[slot_num]++;
+	}
+	bench_update_ftl_time(&bd->cpu_time, cpu_time);
+#endif
+}
+
 void bench_reap_data(request *const req,lower_info *li){
 	//for cdf
 	measure_calc(&req->latency_checker);
-
 	pthread_mutex_lock(&bench_lock);
 	if(!req){ 
 		pthread_mutex_unlock(&bench_lock);
@@ -525,7 +550,9 @@ void bench_reap_data(request *const req,lower_info *li){
 	if(idx==-1){return;}
 	monitor *_m=&_master->m[idx];
 	bench_data *_data=&_master->datas[idx];
-
+	if(req->mapping_cpu_check){
+		bench_collect_map_cpu_time(_data, req);
+	}
 	if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
 		bench_update_typetime(_data, req->type_ftl, req->type_lower, req->buffer_hit, req->latency_checker.micro_time);
 	}

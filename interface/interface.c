@@ -271,6 +271,7 @@ void inf_print_log(){
 	if(mp.algo->print_log){
 		mp.algo->print_log();
 	}
+	mp.li->print_traffic(mp.li);
 	memset(mp.li->req_type_cnt, 0, sizeof(mp.li->req_type_cnt));
 }
 

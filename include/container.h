@@ -103,6 +103,9 @@ e:for application req*/
 	bool isstart;
 	MeasureTime latency_checker;
 
+	bool mapping_cpu_check;
+	MeasureTime mapping_cpu;
+
 	/* HASH_KVSSD */
 #ifdef hash_dftl
 	void *hash_param;

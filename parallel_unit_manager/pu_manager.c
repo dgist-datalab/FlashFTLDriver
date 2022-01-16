@@ -37,7 +37,6 @@ lower_info pu_manager={
 	.print_traffic	=	pu_traffic_print,
 	.dump=pu_dump,
 	.load=pu_load,
-
 };
 
 static uint8_t test_type(uint8_t type){
@@ -46,6 +45,12 @@ static uint8_t test_type(uint8_t type){
 }
 
 void pu_traffic_print(lower_info *li){
+	for(uint32_t i=0; i<LREQ_TYPE_NUM; i++){
+		if(pu_manager.req_type_cnt[i]){
+			printf("pu_hit %s: %lu\n",bench_lower_type(i), pu_manager.req_type_cnt[i]);
+		}
+	}
+
 	lower_info *real_lower=(lower_info*)li->private_data;
 	if(real_lower->print_traffic){
 		real_lower->print_traffic(real_lower);
@@ -160,6 +165,11 @@ uint32_t pu_create(lower_info *_li, blockmanager *bm){
 }
 
 void* pu_destroy(lower_info *li){
+	for(uint32_t i=0; i<LREQ_TYPE_NUM; i++){
+		if(pu_manager.req_type_cnt[i]){
+			printf("pu_hit %s: %lu\n",bench_lower_type(i), pu_manager.req_type_cnt[i]);
+		}
+	}
 	lower_info *real_lower=(lower_info*)li->private_data;
 	real_lower->destroy(real_lower);
 	free(pu_wrapper_array);
@@ -190,6 +200,10 @@ static bool buffer_hit_check(uint32_t ppa, char *data){
 
 void* pu_read(uint32_t ppa, uint32_t size, value_set *value,algo_req * const req){
 	if(buffer_hit_check(ppa, value->value)){
+		if(req->parents){
+			req->parents->type_lower=1;
+		}
+		pu_manager.req_type_cnt[req->type]++;	
 		req->end_req(req);
 		return NULL;
 	}

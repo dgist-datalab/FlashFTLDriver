@@ -405,6 +405,21 @@ enum{
 	EVICTION_READ, COLD_MISS_READ, CAP_MISS_READ, AFTER_EVICTION
 };
 
+static uint32_t get_mapping_wrapper(request *req, uint32_t lba){
+#ifdef MAPPING_TIME_CHECK
+	if (req->mapping_cpu_check){
+		measure_start(&req->mapping_cpu);
+	}
+#endif
+	uint32_t res=dmm.cache->get_mapping(dmm.cache, lba);
+#ifdef MAPPING_TIME_CHECK
+	if (req->mapping_cpu_check){
+		measure_adding(&req->mapping_cpu);
+	}
+#endif
+	return res;
+}
+
 uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_param *param, 
 		uint32_t target_data_lba, uint32_t type){
 	param->flying_map_read_key=target_data_lba;
@@ -457,6 +472,7 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 
 		fdriver_unlock(&dmm.flying_map_read_lock);
 
+		req->type_ftl|=1;
 		demand_mapping_read(etr->physical_address/L2PGAP, dmm.li, req, param);
 		list_insert(etr->pending_req, (void*)req);
 	
@@ -487,7 +503,7 @@ static inline void write_updated_map(request *req, GTD_entry *target_etr,
 
 
 	if(is_map_gc_triggered){
-
+		req->type_ftl|=4;
 	}
 	mapping_sanity_checker_with_cache(req->value->value, target_etr->idx);
 #ifdef DFTL_DEBUG
@@ -495,12 +511,13 @@ static inline void write_updated_map(request *req, GTD_entry *target_etr,
 #endif
 
 	dp_monitor_update(dp, req->type==FS_SET_T, M_WRITE);
+	req->type_ftl|=2;
 	demand_mapping_write(target_etr->physical_address/L2PGAP, dmm.li, req, (void*)dp);
 }
 
 inline void __demand_map_pending_read(request *req, demand_param *dp, bool need_retrieve){
 	if(need_retrieve){
-		dp->target.ppa=dmm.cache->get_mapping(dmm.cache, dp->target.lba);
+		dp->target.ppa=get_mapping_wrapper(req, dp->target.lba);
 	}
 
 	dmm.all_now_req->erase(req->global_seq);
@@ -935,7 +952,6 @@ retry:
 			if(dp->is_hit_eviction){
 				return DONE_END;
 			}
-
 			if(now_etr->status==EMPTY || dmm.cache->exist(dmm.cache, now_pair->lba)){
 				/*direct insert and already exist*/
 				dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
@@ -951,6 +967,8 @@ retry:
 				else{
 					dp_status_update(dp, HIT); goto retry;
 				}
+			}
+			else{
 			}
 
 			if(dmm.cache->entry_type==DYNAMIC){
@@ -1168,7 +1186,7 @@ hit_eviction:
 						update_cache_entry_wrapper(now_etr, now_pair->lba, now_pair->ppa, false);
 					}
 					else{
-						now_pair->ppa=dmm.cache->get_mapping(dmm.cache, now_pair->lba);
+						now_pair->ppa=get_mapping_wrapper(req, now_pair->lba);
 					}
 					DMI.hit_eviction++;
 					dp->is_hit_eviction=true;
@@ -1188,7 +1206,7 @@ hit_eviction:
 				update_cache_entry_wrapper(now_etr, now_pair->lba, now_pair->ppa, false);
 			}
 			else{
-				now_pair->ppa=dmm.cache->get_mapping(dmm.cache, now_pair->lba);
+				now_pair->ppa=get_mapping_wrapper(req, now_pair->lba);
 			}
 			return DONE_END;
 		case EVICTIONR:

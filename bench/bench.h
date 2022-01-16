@@ -57,9 +57,11 @@ typedef struct{
 #ifdef CDF
 	uint64_t write_cdf[1000000/TIMESLOT+1];
 	uint64_t read_cdf[1000000/TIMESLOT+1];
+	uint64_t map_cpu_time[1000000/TIMESLOT+1];
 #endif
 	uint64_t read_cnt,write_cnt;
 	bench_ftl_time ftl_poll[ALGOTYPE][LOWERTYPE][BUFFER_HIT];
+	bench_ftl_time cpu_time;	
 	MeasureTime bench;
 }bench_data;
 

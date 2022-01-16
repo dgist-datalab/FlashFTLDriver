@@ -73,7 +73,14 @@ uint32_t run_query(run *r, request *req){
 	//printf("req->key:%u\n", req->key);
 	if(r->type==RUN_LOG){
 		mf=r->run_log_mf;
+#ifdef MAPPING_TIME_CHECK
+		measure_start(&req->mapping_cpu);
+#endif
 		uint32_t global_intra_offset=mf->query_by_req(mf, req, &param);
+
+#ifdef MAPPING_TIME_CHECK
+		measure_adding(&req->mapping_cpu);
+#endif
 		if(global_intra_offset==NOT_FOUND){
 			param->mf->query_done(param->mf, param);
 			goto not_found_end;
@@ -84,14 +91,27 @@ uint32_t run_query(run *r, request *req){
 		}
 	}
 	else{
+#ifdef MAPPING_TIME_CHECK
+		measure_start(&req->mapping_cpu);
+#endif
 		ste_num = st_array_get_target_STE(r->st_body, req->key);
+
+#ifdef MAPPING_TIME_CHECK
+		measure_adding(&req->mapping_cpu);
+#endif
 		if (ste_num == UINT32_MAX)
 		{
 			goto not_found_end;
 		}
 		req->retry = true;
 		mf = r->st_body->pba_array[ste_num].mf;
+#ifdef MAPPING_TIME_CHECK
+		measure_start(&req->mapping_cpu);
+#endif
 		uint32_t intra_offset = mf->query_by_req(mf, req, &param);
+#ifdef MAPPING_TIME_CHECK
+		measure_adding(&req->mapping_cpu);
+#endif
 		if (intra_offset == NOT_FOUND)
 		{
 			param->mf->query_done(param->mf, param);
@@ -123,7 +143,13 @@ uint32_t run_query_retry(run *r, request *req){
 	map_read_param *param=(map_read_param*)req->param;
 	uint32_t ste_num=param->ste_num;
 	map_function *mf=r->st_body->pba_array[ste_num].mf;
+#ifdef MAPPING_TIME_CHECK
+	measure_start(&req->mapping_cpu);
+#endif
 	uint32_t intra_offset=mf->query_retry(mf, param);
+#ifdef MAPPING_TIME_CHECK
+	measure_adding(&req->mapping_cpu);
+#endif
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
 		//fdriver_unlock(&param->r->lock);

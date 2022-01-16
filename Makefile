@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=layeredLSM
+export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -31,13 +31,14 @@ export COMMONFLAGS+=\
 			-Wno-unused-but-set-variable\
 			-DPARALLEL_MANAGER\
 			-DLSM_DEBUG\
+			-DTRACE_REPLAY\
 			-DPROGRESS\
+			-DMAPPING_TIME_CHECK\
 			-O3\
 #			-DLSM_DEBUG\
 #			-DMETAONLY\
 #			-DREAL_BENCH_MODE\
 #-DTRACE_COLLECT\
-#			-DTRACE_REPLAY\
 #-DDFTL_DEBUG\
 
 
