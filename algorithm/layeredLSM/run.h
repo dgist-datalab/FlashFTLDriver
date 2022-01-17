@@ -114,11 +114,6 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 void run_insert_done(run *r, bool merge_insert);
 
 void run_padding_current_block(run *r);
-/*
-void run_trivial_move_start(run *r, uint32_t PBA);
-void run_trivial_move_insert(run *r, struct shortcut_master *shortcut, uint32_t lba, uint32_t psa_for_pinning);
-void run_trivial_move_finish(run *r);
-*/
 
 void run_copy_ste_to(run *r, struct sorted_table_entry *ste, struct summary_page_meta *spm, map_function *mf, bool unlinked_data_copy);
 
@@ -126,6 +121,9 @@ void run_copy_ste_to(run *r, struct sorted_table_entry *ste, struct summary_page
 void run_copy_ste_to_des(run *r, struct sorted_table_entry *ste, struct summary_page_meta *spm, uint32_t idx, map_function *mf, bool unlinked_data_copy);
 
 void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag, uint32_t original_level, uint32_t original_recency);
+
+void run_trivial_move_setting(run *r, struct sorted_table_entry *ste);
+void run_trivial_move_insert(run *r, uint32_t lba, uint32_t psa, bool last);
 
 //#################################### run_insert.c done
 

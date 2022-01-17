@@ -63,7 +63,7 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 			}
 		}
 
-		st_array_insert_pair(r->st_body, lba, psa);
+		st_array_insert_pair(r->st_body, lba, psa, false);
 	}
 	__run_issue_write(target_ppa, pp_get_write_target(r->pp, force), (char*)r->pp->LBA, 
 			sm, NULL, type);
@@ -98,7 +98,7 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 			EPRINT("not allowed in RUN_PINNING", true);
 		}
 
-		st_array_insert_pair(r->st_body, lba, psa);
+		st_array_insert_pair(r->st_body, lba, psa, false);
 	}
 	else{
 		if(psa!=UINT32_MAX){
@@ -138,6 +138,20 @@ void run_padding_current_block(run *r){
 
 void run_copy_ste_to(run *r, struct sorted_table_entry *ste, summary_page_meta *spm, map_function *mf, bool unlinked_data_copy){
 	st_array_copy_STE(r->st_body, ste, spm, mf, unlinked_data_copy);
+
+}
+
+void run_trivial_move_setting(run *r, struct sorted_table_entry *ste){
+	st_array *sa=r->st_body;
+	st_array_set_now_PBA(sa, ste->PBA, TRIVIAL_MOVE_PBA);
+}
+
+void run_trivial_move_insert(run *r, uint32_t lba, uint32_t psa, bool last){
+	st_array_insert_pair(r->st_body, lba, psa, true);
+	r->now_entry_num++;
+	if(last){
+		__run_write_meta(r, r->st_body->bm->segment_manager, true);
+	}
 }
 
 void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag, uint32_t original_level, uint32_t original_recency){

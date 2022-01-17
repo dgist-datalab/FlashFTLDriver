@@ -11,6 +11,9 @@ void destroy_temp(lower_info *, struct algorithm *);
 uint32_t write_temp(request *const );
 uint32_t read_temp(request *const );
 uint32_t test_function();
+
+uint32_t algo_dump(FILE *fp);
+uint32_t algo_load(lower_info *li, blockmanager *bm, struct algorithm *al, FILE *fp);
 struct algorithm layered_lsm={
 	.argument_set=lsmtree_argument_set,
 	.create=create_temp,
@@ -21,6 +24,9 @@ struct algorithm layered_lsm={
 	.remove=remove_temp,
 	.test=test_function,
 	.print_log=print_log_temp,
+	.dump_prepare=NULL,
+	.dump=algo_dump,
+	.load=algo_load,
 };
 
 char all_set_data[PAGESIZE];
@@ -114,6 +120,16 @@ uint32_t read_temp(request *const req){
 
 	res=lsmtree_read(LSM, req);
 	return res;
+}
+
+uint32_t algo_dump(FILE *fp){
+	return lsmtree_dump(LSM, fp);
+}
+
+uint32_t algo_load(lower_info *li, blockmanager *bm, struct algorithm *al, FILE *fp){
+	LSM=lsmtree_load(fp, bm);
+	g_li=li;
+	return 1;
 }
 
 /***************************************test_function***************************************************/

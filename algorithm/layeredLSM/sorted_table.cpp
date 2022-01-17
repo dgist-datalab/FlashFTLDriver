@@ -219,8 +219,9 @@ void st_array_set_now_PBA(st_array *sa, uint32_t PBA, uint32_t set_type){
 	case TRIVIAL_MOVE_PBA:
 		sa->pba_array[sa->now_STE_num].PBA=PBA;
 		sa->pba_array[sa->now_STE_num].start_write_pointer=sa->global_write_pointer;
-		L2PBm_is_nomral_block(sa->bm, sa->pba_array[sa->now_STE_num].PBA);
-		L2PBm_move_owner(sa->bm, sa->pba_array[sa->now_STE_num].PBA, sa->sid, sa->now_STE_num);
+		if(L2PBm_is_nomral_block(sa->bm, sa->pba_array[sa->now_STE_num].PBA)){
+			L2PBm_move_owner(sa->bm, sa->pba_array[sa->now_STE_num].PBA, sa->sid, sa->now_STE_num);
+		}
 		break;
 	default:
 		EPRINT("not allowed type", true);
@@ -287,7 +288,6 @@ uint32_t st_array_summary_translation(st_array *sa, bool force){
 		EPRINT("it is not write_summary_order", true);
 	}
 	uint32_t res=L2PBm_get_map_ppa(sa->bm)*L2PGAP;
-	//printf("res:%u\n", res);
 	return res;
 }
 
@@ -327,7 +327,8 @@ static inline bool check_fragment(st_array *sa, uint32_t ste_num, uint32_t psa, 
 	return true;
 }
 
-uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
+
+uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa, bool trivial){
 	if(sa->summary_write_alert){
 		EPRINT("it is write_summary_order", true);
 	}
@@ -336,11 +337,13 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 		EPRINT("sorted_table is full!", true);
 	}
 
-	if(sa->sp_meta[sa->now_STE_num].pr_type==NO_PR){
-		sa->sp_meta[sa->now_STE_num].private_data=(void *)sp_init();
-		sa->sp_meta[sa->now_STE_num].pr_type=WRITE_PR;
+	if (sa->sp_meta[sa->now_STE_num].pr_type == NO_PR)
+	{
+		sa->sp_meta[sa->now_STE_num].private_data = (void *)sp_init();
+		sa->sp_meta[sa->now_STE_num].pr_type = WRITE_PR;
 	}
-	else if(sa->sp_meta[sa->now_STE_num].pr_type==READ_PR){
+	else if (sa->sp_meta[sa->now_STE_num].pr_type == READ_PR)
+	{
 		EPRINT("not allowed", true);
 	}
 
@@ -361,14 +364,18 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 	__st_insert_mf(sa, sa->bm->segment_manager, sa->now_STE_num, lba, sa->inblock_write_pointer);
 
 	if(sa->type==ST_PINNING){	
-		if(sa->inblock_write_pointer%MAX_SECTOR_IN_BLOCK==0){
-			st_array_set_now_PBA(sa, psa/L2PGAP/_PPB*_PPB, EMPTY_PBA);
-		}
 		sa->pinning_data[sa->global_write_pointer]=psa;
-		/*fragment block check*/
-		if (check_fragment(sa, sa->now_STE_num, psa, sa->inblock_write_pointer)){
-			L2PBm_block_fragment(sa->bm, psa/L2PGAP/_PPB*_PPB, sa->sid);
-			st_array_set_now_PBA(sa, UINT32_MAX, FRAGMENT_PBA);
+		if (trivial == false){
+			if (sa->inblock_write_pointer % MAX_SECTOR_IN_BLOCK == 0)
+			{
+				st_array_set_now_PBA(sa, psa / L2PGAP / _PPB * _PPB, EMPTY_PBA);
+			}
+			/*fragment block check*/
+			if (check_fragment(sa, sa->now_STE_num, psa, sa->inblock_write_pointer))
+			{
+				L2PBm_block_fragment(sa->bm, psa / L2PGAP / _PPB * _PPB, sa->sid);
+				st_array_set_now_PBA(sa, UINT32_MAX, FRAGMENT_PBA);
+			}
 		}
 	}
 	__check_debug(sa, lba, psa, sa->now_STE_num, sa->inblock_write_pointer);
@@ -384,9 +391,7 @@ uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa){
 }
 
 void st_array_copy_STE(st_array *sa, STE *ste, summary_page_meta *spm, map_function *mf, bool unlinked_data_copy){
-
 	st_array_copy_STE_des(sa, ste, spm, sa->now_STE_num, mf, unlinked_data_copy);
-
 	sa->global_write_pointer+=ste->max_offset+1;
 	st_array_finish_now_PBA(sa);
 	sa->now_STE_num++;

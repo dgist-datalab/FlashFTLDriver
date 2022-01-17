@@ -277,6 +277,39 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 }
 
 extern uint32_t test_key;
+
+uint32_t trivial_move2(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
+	run_padding_current_block(r);
+	bool unlinked_data_copy=false;
+	uint32_t des_ste_num=r->st_body->now_STE_num;
+	uint32_t original_level=mm->r->info->level_idx;
+	uint32_t original_recency=mm->r->info->recency;
+	uint32_t target_ste = sp_set_get_ste_num(mm->ssi, now.intra_offset);
+	uint32_t res= mm->r->st_body->sp_meta[target_ste].end_lba;
+
+	run_trivial_move_setting(r, &mm->r->st_body->pba_array[target_ste]);
+	while(1){
+		summary_pair target = sp_set_iter_pick(mm->ssi);
+		if(!shortcut_validity_check_and_link(shortcut,mm->r, r ,target.lba)){
+			unlinked_data_copy=true;
+			r->info->unlinked_lba_num++;
+		}
+		uint32_t original_psa=run_translate_intra_offset(mm->r, target_ste, target.intra_offset);
+		run_trivial_move_insert(r, target.lba, original_psa, target.lba==res);
+		if(target.lba==res){
+			break;
+		}
+		__move_iter_target(mm, 0);
+	}
+
+	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy, original_level, original_recency);
+	sp_set_iter_move_ste(mm->ssi, target_ste, res);
+	if (sp_set_iter_done_check(mm->ssi)){
+			mm->done = true;
+	}
+	return res;
+}
+
 uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
 	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 	run_padding_current_block(r);
@@ -288,7 +321,6 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 	}
 	target_ste = sp_set_get_ste_num(mm->ssi, now.intra_offset);
 	uint32_t res= mm->r->st_body->sp_meta[target_ste].end_lba;
-	//printf("%u ~ %u\n", mm->r->st_body->sp_meta[target_ste].start_lba, mm->r->st_body->sp_meta[target_ste].end_lba);
 
 	bool unlinked_data_copy=false;
 	uint32_t des_ste_num=r->st_body->now_STE_num;
@@ -301,32 +333,11 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 			mf->insert(mf, target.lba, i++);
 		}
 
-		if(target.lba==test_key){
-			uint32_t original_psa=run_translate_intra_offset(mm->r, target_ste, target.intra_offset);
-
-			uint32_t target_ste2=st_array_get_target_STE(r->st_body, test_key);
-			uint32_t read_psa=run_translate_intra_offset(r, target_ste2, mm->r->type==RUN_LOG?target.intra_offset%512:target.intra_offset);
-			EPRINT("trivial target move:%u, %u\n",false, original_psa, read_psa);
-			if(original_psa!=read_psa){
-				target_ste2=st_array_get_target_STE(r->st_body, test_key);
-				read_psa=run_translate_intra_offset(r, target_ste2, target.intra_offset);
-			}
-		}
-
 		if(!shortcut_validity_check_and_link(shortcut,mm->r, r ,target.lba)){
 			unlinked_data_copy=true;
 			r->info->unlinked_lba_num++;
 		}
 
-	/*
-		if(shortcut_validity_check_lba(shortcut, mm->r, target.lba)){
-			shortcut_unlink_and_link_lba(shortcut, r, target.lba);
-		}
-		else{
-			unlinked_data_copy=true;
-			r->info->unlinked_lba_num++;
-		}
-*/
 		r->now_entry_num++;
 
 		if (target.lba == res){
@@ -338,7 +349,6 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 		__move_iter_target(mm, 0);
 	}
 	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy, original_level, original_recency);
-	//run_copy_ste_to(r, &mm->r->st_body->pba_array[target_ste], &mm->r->st_body->sp_meta[target_ste], mf, false);
 	sp_set_iter_move_ste(mm->ssi, target_ste, res);
 	if (sp_set_iter_done_check(mm->ssi)){
 			mm->done = true;

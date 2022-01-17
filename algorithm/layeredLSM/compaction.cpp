@@ -83,13 +83,13 @@ void compaction_flush(lsmtree *lsm, run *r)
 	level_insert_run(lsm->disk[0], new_run);
 
 	__compaction_another_level(lsm, 0, false);
-	/*
+/*
+	DEBUG_CNT_PRINT(test,UINT32_MAX, __FUNCTION__, __LINE__);
 	static int cnt=0;
-	printf("cp flush %u\n", ++cnt);
-	if(cnt>=255){
-		GDB_MAKE_BREAKPOINT;
+	if(++cnt==1076){
 		debug_flag=true;
-	}*/
+	}
+	*/
 	while(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
 		lsm->monitor.force_compaction_cnt++;
 		__compaction_another_level(lsm, 0, true);

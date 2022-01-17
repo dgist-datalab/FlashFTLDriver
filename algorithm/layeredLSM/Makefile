@@ -20,6 +20,7 @@ SRCS +=\
 	   ./lsmtree_parameter.cpp\
 	   ./lsmtree.cpp\
 	   ./shortcut_dir.cpp\
+	   ./lsmtree_data_dump.cpp\
 
 
 OBJS :=\

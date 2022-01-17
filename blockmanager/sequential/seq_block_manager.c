@@ -20,7 +20,7 @@ static inline void  __mh_assign_hptr(void *a, void *hn){
 
 static inline int __mh_get_cnt(void *a){
 	__segment *aa=(__segment*)a;
-#ifdef layeredLSB
+#ifdef layeredLSM
 	return aa->invalid_block_num*_PPS*L2PGAP+aa->invalidate_piece_num;
 #else
 	return aa->invalidate_piece_num;

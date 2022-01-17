@@ -563,12 +563,17 @@ bool gc_check_enough_space(L2P_bm *bm, uint32_t target_pba_num){
 			}
 		}
 		else if(bm->seg_type[target->seg_idx]==DATA_SEG){
+			uint32_t seg_free_block_num=0;
 			for (uint32_t i = 0; i < BPS; i++)
 			{
 				if (target->blocks[i]->is_full_invalid)
 				{
 					free_block_num++;
+					seg_free_block_num++;
 				}
+			}
+			if(debug_flag){
+				printf("%u -> free_block_num:%u\n", target->seg_idx, seg_free_block_num);
 			}
 		}
 		temp_seg_q.push(target->seg_idx);

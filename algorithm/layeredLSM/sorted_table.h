@@ -156,7 +156,7 @@ uint32_t st_array_write_translation(st_array *sa);
  * lba: target_lba
  * psa: target_psa
  * */
-uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa);
+uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa, bool trivial);
 
 uint32_t st_array_force_skip_block(st_array *sa);
 
@@ -226,5 +226,6 @@ summary_write_param *st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
  * sp_idx: target sp meta idx
  * */
 void st_array_summary_write_done(summary_write_param *swp);
+
 
 #endif

@@ -2,8 +2,8 @@
 
 extern lower_info *g_li;
 void run_print(run *r, bool content){
-	printf("%u:%u:%u (recency:link:unlink)\t%u:%u:%u (sid:ste->now:ste->max)\n", 
-			r->info->recency, r->info->linked_lba_num, r->info->unlinked_lba_num,
+	printf("%u:%u:%u:%.3f (recency:link:unlink)\t%u:%u:%u (sid:ste->now:ste->max)\n", 
+			r->info->recency, r->info->linked_lba_num, r->info->unlinked_lba_num, (double)r->info->unlinked_lba_num/r->info->linked_lba_num,
 			r->st_body->sid, r->st_body->now_STE_num, r->st_body->max_STE_num);
 	if(content){
 		st_array *sa=r->st_body;
