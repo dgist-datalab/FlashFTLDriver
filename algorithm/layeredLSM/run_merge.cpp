@@ -148,6 +148,7 @@ static inline void __merge_issue_req(__sorted_pair *sort_pair){
 	req->value=sort_pair->value;
 	req->end_req=__merge_end_req;
 	req->param=(void*)sort_pair;
+	req->parents=NULL;
 	g_li->read(sort_pair->original_psa/L2PGAP, PAGESIZE, req->value, req);
 }
 
