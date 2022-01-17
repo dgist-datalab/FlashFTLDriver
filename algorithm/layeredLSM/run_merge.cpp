@@ -137,7 +137,7 @@ static inline void *__merge_end_req(algo_req* req){
 	return NULL;
 }
 
-static inline void __merge_issue_req(__sorted_pair *sort_pair){
+static value_set* __merge_issue_req(__sorted_pair *sort_pair){
 	algo_req *req=(algo_req*)malloc(sizeof(algo_req));
 	req->type=COMPACTIONDATAR;
 	sort_pair->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
@@ -150,17 +150,51 @@ static inline void __merge_issue_req(__sorted_pair *sort_pair){
 	req->param=(void*)sort_pair;
 	req->parents=NULL;
 	g_li->read(sort_pair->original_psa/L2PGAP, PAGESIZE, req->value, req);
+	return sort_pair->value;
 }
 
 static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_list,
  blockmanager *sm){
 	if(r->type==RUN_PINNING){ return;}
 	std::list<__sorted_pair>::iterator iter=sorted_list->begin();
+
+	uint32_t prev_original_psa=UINT32_MAX;
+	__sorted_pair *prev_t_pair=NULL;
+	value_set *start_value=NULL;
+	/*
 	for(; iter!=sorted_list->end(); iter++){
 		__sorted_pair *t_pair=&(*iter);
 		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
-		__merge_issue_req(t_pair);
+		t_pair->free_target=true;
+		start_value=__merge_issue_req(t_pair);
+	}*/
+	
+	for(; iter!=sorted_list->end(); iter++){
+		__sorted_pair *t_pair=&(*iter);
+		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
+		t_pair->free_target=false;
+		if(prev_original_psa==UINT32_MAX){
+			prev_original_psa=t_pair->original_psa;
+			prev_t_pair=t_pair;
+			start_value=__merge_issue_req(t_pair);
+		}
+		else{
+			if(prev_original_psa/L2PGAP==t_pair->original_psa/L2PGAP){
+				t_pair->data=&start_value->value[LPAGESIZE*(t_pair->original_psa%L2PGAP)];
+				fdriver_mutex_init(&t_pair->lock);
+			}
+			else{
+				prev_t_pair->free_target=true;
+				prev_t_pair->value=start_value;
+				start_value=__merge_issue_req(t_pair);
+			}
+			prev_original_psa=t_pair->original_psa;
+			prev_t_pair=t_pair;
+		}
 	}
+	prev_t_pair->free_target=true;
+	prev_t_pair->value=start_value;
+
 }
 
 extern lsmtree *LSM;
@@ -176,11 +210,6 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 		}
 	}
 
-	if (debug_flag)
-	{
-		printf("free_block_num:%u\n", gc_check_free_enable_space(LSM->bm));
-	}
-
 	iter=sorted_list->begin();
 	static uint32_t cnt=0;
 	for(; iter!=sorted_list->end(); ){
@@ -192,16 +221,30 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			if(!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true, shortcut)){
 				__invalidate_target(t_pair->r, t_pair->ste_num, t_pair->pair.intra_offset);
 			}
+			sorted_list->erase(iter++);
 		}
 		else{
 			//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 			if(!run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true, shortcut)){
 
 			}
-			inf_free_valueset(t_pair->value, FS_MALLOC_R);
+			//inf_free_valueset(t_pair->value, FS_MALLOC_R);
+			iter++;
 		}
-		sorted_list->erase(iter++);
+	//	sorted_list->erase(iter++);
 	}
+
+	if(r->type==RUN_NORMAL){
+		iter=sorted_list->begin();
+		for(; iter!=sorted_list->end(); ){
+			__sorted_pair *t_pair=&(*iter);
+			if(t_pair->free_target){
+				inf_free_valueset(t_pair->value, FS_MALLOC_R);
+			}
+			sorted_list->erase(iter++);
+		}
+	}
+	
 }
 
 static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_container *mm_set){
@@ -539,7 +582,6 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	mm_container *mm_set=__make_mmset(rset, target_run, run_num);
 
 	bool trivial_move_flag=!force;
-
 	if(trivial_move_flag){
 		__check_disjoint_spm(rset,run_num, mm_set);
 	}

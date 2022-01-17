@@ -13,6 +13,9 @@ extern uint32_t test_key;
 extern uint32_t test_piece_ppa;
 
 static inline void __check_debug(st_array *sa, uint32_t lba, uint32_t psa, uint32_t ste_num, uint32_t intra_offset){
+#ifndef LSM_DEBGU	
+	return;
+#endif
 	uint32_t retrieve_psa=st_array_read_translation(sa, ste_num, intra_offset);
 #ifdef LSM_DEBUG
 	if (psa != retrieve_psa){
@@ -184,6 +187,9 @@ static inline char *__set_type_to_char(uint32_t type){
 }
 
 static inline void __check_sid(st_array * sa, uint32_t now_ste, uint32_t PBA, uint32_t type){
+#ifndef LSM_DEBGU	
+	return;
+#endif
 	if(target_sid==UINT32_MAX) return;
 	if(sa->sid==target_sid && sa->now_STE_num==target_ste_idx){
 		//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);

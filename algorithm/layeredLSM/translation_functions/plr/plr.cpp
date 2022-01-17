@@ -152,7 +152,7 @@ void PLR::line_push_back(int64_t x, int64_t y, int32_t a, int32_t b) {
 #ifdef PARAM
 	if (a == -1) {
 		cout << "AHHHHHHHHHHHHHHH\n";
-		exit(0);
+		abort();
 	}
 #endif
 
@@ -411,7 +411,7 @@ void PLR::insert(int32_t LBA, int32_t PPA) {
 		std::cout << "LBA must be inserted in increasing order\n";
 		std::cout << "LBA_prev: " << LBA_prev << '\n';
 		std::cout << "LBA: " << LBA << '\n';
-		exit(0);
+		abort();
 	}
 	LBA_prev = LBA;
 	dot p = {(int64_t)LBA * CORRECTION, (int64_t)PPA * TICK + TICK / 2};
