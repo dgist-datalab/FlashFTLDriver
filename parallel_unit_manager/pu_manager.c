@@ -48,6 +48,7 @@ void pu_traffic_print(lower_info *li){
 	for(uint32_t i=0; i<LREQ_TYPE_NUM; i++){
 		if(pu_manager.req_type_cnt[i]){
 			printf("pu_hit %s: %lu\n",bench_lower_type(i), pu_manager.req_type_cnt[i]);
+			pu_manager.req_type_cnt[i]=0;
 		}
 	}
 
@@ -168,6 +169,7 @@ void* pu_destroy(lower_info *li){
 	for(uint32_t i=0; i<LREQ_TYPE_NUM; i++){
 		if(pu_manager.req_type_cnt[i]){
 			printf("pu_hit %s: %lu\n",bench_lower_type(i), pu_manager.req_type_cnt[i]);
+			pu_manager.req_type_cnt[i]=0;
 		}
 	}
 	lower_info *real_lower=(lower_info*)li->private_data;
