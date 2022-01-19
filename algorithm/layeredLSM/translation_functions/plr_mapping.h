@@ -9,7 +9,7 @@
 #include "../mapping_function.h"
 #include "../../../include/debug_utils.h"
 
-#define SLOPE_BIT 8
+#define SLOPE_BIT 7
 
 #define extract_plr(mf) ((plr_map*)mf->private_data)
 

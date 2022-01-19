@@ -8,7 +8,7 @@
 #include "../../include/utils/thpool.h"
 #include <queue>
 #include <stdlib.h>
-#define MEMTABLE_NUM 2
+#define MEMTABLE_NUM 1
 //#define THREAD_COMPACTION
 
 typedef struct range{
@@ -65,6 +65,9 @@ typedef struct lsmtree{
 	lsmtree_monitor monitor;
 	lsmtree_parameter param;
 	fdriver_lock_t lock;
+
+	fdriver_lock_t read_cnt_lock;
+	uint32_t now_flying_read_cnt;
 }lsmtree;
 
 /*

@@ -3,6 +3,7 @@
 
 extern lower_info *g_li;
 extern uint32_t test_key;
+extern uint32_t test_key2;
 extern uint32_t target_recency;
 extern uint32_t test_piece_ppa;
 
@@ -40,7 +41,7 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 		
 		psa_list[i]=psa;
 		uint32_t lba=r->pp->LBA[i];
-		if(lba==test_key){
+		if(lba==test_key || lba ==test_key2){
 			EPRINT("%u ppa->%u", false, lba, psa);
 		}
 		if(i==0){

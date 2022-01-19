@@ -105,6 +105,9 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 
 	res->monitor.now_memory_usage+=res->param.shortcut_bit;
 	res->tp=thpool_init(1);
+
+	fdriver_mutex_init(&res->read_cnt_lock);
+	res->now_flying_read_cnt=0;
 	return res;
 }
 
@@ -131,10 +134,18 @@ void lsmtree_free(lsmtree *lsm){
 
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	run *r=lsm->memtable[lsm->now_memtable_idx];
+
+	fdriver_lock(&lsm->read_cnt_lock);
+	if(lsm->now_flying_read_cnt && r->now_entry_num+1==r->max_entry_num){
+		inf_assign_try(req);
+		fdriver_unlock(&lsm->read_cnt_lock);
+		return 1;
+	}
+	fdriver_unlock(&lsm->read_cnt_lock);
+
 	//printf("req->key write:%u\n", req->key);
 	run_insert(r, req->key, UINT32_MAX, req->value->value, false, 
 		lsm->shortcut);
-
 
 	if(run_is_full(r)){
 		run_insert_done(r, false);
@@ -149,25 +160,30 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 		//printf("free block num:%u\n", L2PBm_get_free_block_num(lsm->bm));
 		lsm->now_memtable_idx=(lsm->now_memtable_idx+1)%MEMTABLE_NUM;
 		lsm->memtable[lsm->now_memtable_idx]=__lsm_populate_new_run(lsm, lsm->param.BF_level_range.start==1?GUARD_BF:PLR_MAP, RUN_LOG, lsm->param.memtable_entry_num, 0);
-		lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=NULL;
+		if(MEMTABLE_NUM!=1){
+			lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=NULL;
+		}
 	}
 	return 0;
 }
 
 uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res;
-	run *r=shortcut_query(lsm->shortcut, req->key);
-	//printf("req->key read:%u\n", req->key);
-	if(r==NULL){
-		req->type=FS_NOTFOUND_T;
-		//printf("req->key :%u not found\n", req->key);
-		req->end_req(req);
-		return READ_NOT_FOUND;
-	}
-	if(!req->retry){
-		res=run_query(r, req);
+	run *r;
+	if(req->retry==false){
+		r = shortcut_query(lsm->shortcut, req->key);
+		//printf("req->key read:%u\n", req->key);
+		if (r == NULL)
+		{
+			req->type = FS_NOTFOUND_T;
+			//printf("req->key :%u not found\n", req->key);
+			req->end_req(req);
+			return READ_NOT_FOUND;
+		}
+		res = run_query(r, req);
 	}
 	else{
+		r=((map_read_param*)req->param)->r;
 		req->type_ftl++;
 		res=run_query_retry(r, req);
 	}

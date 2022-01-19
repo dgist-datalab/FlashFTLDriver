@@ -11,6 +11,16 @@
 #define BUFFER_HIT 10
 #define BENCHNUM 16
 
+
+#define REQSIZE (sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint32_t)+sizeof(uint32_t))
+#define TXNHEADERSIZE (sizeof(uint32_t)+sizeof(uint32_t))
+#define REQPERCOMMAND QSIZE
+#if REQPERCOMMAND!=0
+	#define MAXBUFSIZE (REQPERCOMMAND*REQSIZE+TXNHEADERSIZE)
+#else
+	#define MAXBUFSIZE (4*K)
+#endif
+
 #ifdef CDF
 #define TIMESLOT 10 //micro sec
 #endif
@@ -176,6 +186,7 @@ void vectored_set(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_get(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_rw(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_unique_rset(uint32_t, uint32_t, monitor*);
+void vectored_localized_get(uint32_t, uint32_t, monitor *);
 
 int my_itoa(uint32_t key, char **_target, char *buf);
 

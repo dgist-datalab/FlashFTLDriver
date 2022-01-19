@@ -9,6 +9,7 @@ extern sc_master *shortcut;
 extern lower_info *g_li;
 extern bool debug_flag;
 extern lsmtree *LSM;
+extern uint32_t test_key;
 static void *__gc_end_req(algo_req *req){
 	gc_value *g_value=(gc_value*)req->param;
 	switch(req->type){
@@ -318,10 +319,18 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 					if(sm->is_invalid_piece(sm, g_value->ppa*L2PGAP+j)){
 						continue;
 					}
+
+
 					uint32_t lba=g_value->oob[j];
 					uint32_t psa=g_value->ppa*L2PGAP+j;
 					uint32_t intra_offset;
 					uint32_t ste_num;
+
+
+					if(g_value->ppa*L2PGAP+j==16496192 && lba==test_key){
+						GDB_MAKE_BREAKPOINT;
+					}
+
 					run *r=run_find_include_address(LSM->shortcut, lba, psa, &ste_num, &intra_offset);
 					if(r==NULL){ //unlinked ppa;
 						bool processed=false;

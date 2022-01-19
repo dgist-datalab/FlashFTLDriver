@@ -94,9 +94,9 @@ uint32_t write_temp(request *const req){
 	}
 	req->end_req(req);*/
 
-	lsmtree_insert(LSM, req);
-	req->end_req(req);
-
+	if(lsmtree_insert(LSM, req)==0){
+		req->end_req(req);
+	}
 	return 1;
 }
 

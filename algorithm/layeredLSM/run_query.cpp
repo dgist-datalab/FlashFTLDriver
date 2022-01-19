@@ -2,6 +2,7 @@
 #include "../../interface/interface.h"
 #include "./lsmtree.h"
 extern uint32_t test_key;
+extern uint32_t test_key2;
 extern lower_info *g_li;
 extern lsmtree *LSM;
 static void *__run_read_end_req(algo_req *req){
@@ -14,6 +15,11 @@ static void *__run_read_end_req(algo_req *req){
 	param->oob_set=(uint32_t*)LSM->bm->segment_manager->get_oob(LSM->bm->segment_manager, req->ppa);
 	uint32_t intra_offset=param->mf->oob_check(param->mf, param);
 	if(intra_offset!=NOT_FOUND){
+
+		fdriver_lock(&LSM->read_cnt_lock);
+		LSM->now_flying_read_cnt--;
+		fdriver_unlock(&LSM->read_cnt_lock);
+
 		memmove(&p_req->value->value[0], &p_req->value->value[intra_offset*LPAGESIZE], LPAGESIZE);
 		p_req->end_req(p_req);
 	//	fdriver_unlock(&param->r->lock);
@@ -33,6 +39,7 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 	res->param=(void *)param;
 	res->type=retry?MISSDATAR:DATAR;
 	res->end_req=__run_read_end_req;
+
 	g_li->read(ppa, PAGESIZE, value, res);
 }
 
@@ -58,9 +65,9 @@ uint32_t run_query(run *r, request *req){
 		}
 	}
 
-	if(req->key==test_key){
-		//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
-		//GDB_MAKE_BREAKPOINT;
+	if(req->key==test_key || req->key==test_key2){
+		DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
+	//	GDB_MAKE_BREAKPOINT;
 	}
 
 	req->retry=true;
@@ -112,6 +119,7 @@ uint32_t run_query(run *r, request *req){
 #ifdef MAPPING_TIME_CHECK
 		measure_adding(&req->mapping_cpu);
 #endif
+retry:
 		if (intra_offset == NOT_FOUND)
 		{
 			param->mf->query_done(param->mf, param);
@@ -120,7 +128,11 @@ uint32_t run_query(run *r, request *req){
 		psa = run_translate_intra_offset(r, ste_num, intra_offset);
 		if (psa == UNLINKED_PSA)
 		{
-			EPRINT("shortcut error", true);
+			intra_offset=mf->query_retry(mf, param);
+			goto retry;
+			//EPRINT("shortcut error", false);
+			//param->mf->query_done(param->mf, param);
+			//goto not_found_end;
 		}
 	}
 	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
@@ -129,6 +141,11 @@ uint32_t run_query(run *r, request *req){
 	param->ste_num=ste_num;
 	param->r=r;
 	req->param=(void*)param;
+
+	fdriver_lock(&LSM->read_cnt_lock);
+	LSM->now_flying_read_cnt++;
+	fdriver_unlock(&LSM->read_cnt_lock);
+
 	__run_issue_read(req, psa/L2PGAP, req->value, param, false);
 	return READ_DONE;
 not_found_end:
@@ -152,6 +169,9 @@ uint32_t run_query_retry(run *r, request *req){
 #endif
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
+		fdriver_lock(&LSM->read_cnt_lock);
+		LSM->now_flying_read_cnt--;
+		fdriver_unlock(&LSM->read_cnt_lock);
 		//fdriver_unlock(&param->r->lock);
 		return READ_NOT_FOUND;
 	}

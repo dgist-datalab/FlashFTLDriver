@@ -10,10 +10,11 @@ extern bool debug_flag;
 sa_master *sa_m;
 
 extern uint32_t test_key;
+extern uint32_t test_key2;
 extern uint32_t test_piece_ppa;
 
 static inline void __check_debug(st_array *sa, uint32_t lba, uint32_t psa, uint32_t ste_num, uint32_t intra_offset){
-#ifndef LSM_DEBGU	
+#ifndef LSM_DEBUG
 	return;
 #endif
 	uint32_t retrieve_psa=st_array_read_translation(sa, ste_num, intra_offset);
@@ -24,9 +25,9 @@ static inline void __check_debug(st_array *sa, uint32_t lba, uint32_t psa, uint3
 		st_array_read_translation(sa, ste_num, intra_offset);
 	}
 #endif
-	if(lba==test_key || psa==test_piece_ppa){
+	if((lba==test_key || lba==test_key2)  || psa==test_piece_ppa){
 		uint32_t recency=sa_m->sid_map[sa->sid].r->info->recency;
-		printf("target insert (%u:%u, %u:%u) sid,ste,intra (%u,%u,%u) recency:%u:\n",test_key,lba, test_piece_ppa, psa, sa->sid, ste_num, intra_offset, recency);
+		printf("target insert (%u:%u:%u, %u:%u) sid,ste,intra (%u,%u,%u) recency:%u:\n",test_key, test_key2, lba, test_piece_ppa, psa, sa->sid, ste_num, intra_offset, recency);
 	//	run_print(r, false);
 	}
 }
@@ -487,9 +488,6 @@ summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
 	swp->spm=&sa->sp_meta[sa->now_STE_num];
 	swp->oob[0]=sa->sp_meta[sa->now_STE_num].start_lba;
 	swp->oob[1]=sa->sp_meta[sa->now_STE_num].end_lba;
-	if(ppa==230615){
-		printf("%u map to %u,%u\n",ppa,sa->sid, sa->now_STE_num);
-	}
 	st_array_finish_now_PBA(sa);
 
 	sa->pba_array[sa->now_STE_num].mf->make_done(sa->pba_array[sa->now_STE_num].mf);

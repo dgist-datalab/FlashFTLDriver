@@ -3,15 +3,6 @@
 #include "../include/settings.h"
 extern master *_master;
 
-#define REQSIZE (sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint32_t)+sizeof(uint32_t))
-#define TXNHEADERSIZE (sizeof(uint32_t)+sizeof(uint32_t))
-#define REQPERCOMMAND QSIZE
-#if REQPERCOMMAND!=0
-	#define MAXBUFSIZE (REQPERCOMMAND*REQSIZE+TXNHEADERSIZE)
-#else
-	#define MAXBUFSIZE (4*K)
-#endif
-
 extern int KEYLENGTH;
 
 void bench_vectored_configure(){

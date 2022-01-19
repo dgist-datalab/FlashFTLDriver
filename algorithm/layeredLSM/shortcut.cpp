@@ -1,5 +1,6 @@
 #include "./shortcut.h"
 extern uint32_t test_key;
+extern uint32_t test_key2;
 sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range){
 	sc_master *res=(sc_master*)calloc(1, sizeof(sc_master));
 	res->free_q=new std::list<uint32_t> ();
@@ -77,8 +78,8 @@ void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 	sc->now_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);
 */
 	sc->sc_map[lba]=t_info->idx;
-	if(lba==test_key){
-		printf("\t %u target map to info:%u,level:%u,run:%u\n",lba, t_info->idx,t_info->level_idx, r->run_idx);
+	if(lba==test_key || lba==test_key2){
+		EPRINT_CNT(test,UINT32_MAX, "\t %u target map to info:%u,level:%u,run:%u\n",false, lba, t_info->idx,t_info->level_idx, r->run_idx);
 	}
 }
 

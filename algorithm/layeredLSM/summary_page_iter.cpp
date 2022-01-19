@@ -8,8 +8,8 @@ static void *__spi_read_end_req(algo_req *req){
 	if(req->type!=MAPPINGR){
 		EPRINT("not_allowed type", true);
 	}
-	fdriver_unlock(&spi->read_done);
 	spi->read_flag=true;
+	fdriver_unlock(&spi->read_done);
 	free(req);
 	return NULL;
 }

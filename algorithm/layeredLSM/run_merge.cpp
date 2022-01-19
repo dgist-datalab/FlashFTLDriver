@@ -11,6 +11,7 @@ extern lower_info *g_li;
 bool debug_flag=false;
 extern uint32_t target_PBA;
 extern uint32_t test_key;
+extern uint32_t test_key2;
 typedef struct merge_meta_container{
 	run *r;
 	sp_set_iter *ssi;
@@ -98,9 +99,6 @@ retry:
 	}
 
 	t_idx=*ridx;
-	if(res.lba==test_key){
-		//EPRINT_CNT(test, 3, "picked", false);
-	}
 	if(res.lba==UINT32_MAX){
 		__move_iter_target(mm_set, t_idx);
 	}

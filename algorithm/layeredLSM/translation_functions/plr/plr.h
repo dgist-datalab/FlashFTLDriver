@@ -135,6 +135,18 @@ class PLR {
  */ 
 	int64_t get(int64_t LBA);
 
+	void set_X_bit(uint32_t x){
+		this->X_BIT=x;
+	}
+
+	void set_Y_bit(uint32_t y){
+		this->Y_BIT=y;
+	}
+
+	void set_delta_size(uint32_t size){
+		this->DELTA_SIZE=size;
+	}
+
 /*
  * clear
  * 메모리 free
