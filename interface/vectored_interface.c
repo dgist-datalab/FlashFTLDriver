@@ -204,7 +204,8 @@ void *vectored_main(void *__input){
 						measure_init(&req->mapping_cpu);
 #endif
 					case FS_SET_T:
-#ifdef REAL_BENCH_MODE
+
+#ifdef WRITE_STOP_READ
 #else
 						measure_init(&req->latency_checker);
 						measure_start(&req->latency_checker);
@@ -292,6 +293,13 @@ void assign_vectored_req(vec_request *txn){
 		}
 	//	printf("flying tagnum %u, txn->size %u, req_q->size:%u\n", QDEPTH-flying_cnt, txn->size, mp.processors[0].req_q->size);
 		
+		#ifdef WRITE_STOP_READ
+			for(uint32_t i=0; i<txn->size; i++){
+				request* req=&txn->req_array[i];
+				measure_init(&req->latency_checker);
+				measure_start(&req->latency_checker);
+			}
+		#endif
 		if(q_enqueue((void*)txn, mp.processors[0].req_q)){
 			break;
 		}

@@ -10,6 +10,7 @@
 
 extern master_processor mp;
 
+
 #define TOTAL_SIZE (3ULL *1024L *1024L *1024L)
 #define TRACE_DEV_SIZE (128ULL * 1024L * 1024L * 1024L)
 #define CRC_BUFSIZE (2ULL * 1024L * 1024L)
@@ -46,6 +47,7 @@ void request_memset_print_log(){
 
 extern pthread_mutex_t req_cnt_lock;
 
+
 static inline char *get_buf_addr(char **pdata_addr, int id) {
     int idx = id / ITEMS_PER_HP;
     return pdata_addr[idx] + ((id % ITEMS_PER_HP) * CHEEZE_BUF_SIZE);
@@ -77,7 +79,14 @@ uint32_t* crc_buffer;
 #endif
 
 #define TRACE_TARGET "/trace"
+#ifdef WRITE_STOP_READ
+fdriver_lock_t write_check_lock;
+volatile uint32_t write_cnt;
+#endif
 void init_trace_cheeze(){
+#ifdef WRITE_STOP_READ
+	fdriver_mutex_init(&write_check_lock);
+#endif
 	trace_fd = open(TRACE_TARGET, O_RDONLY);
 	if (trace_fd < 0) {
 		perror("Failed to open " TRACE_TARGET);
@@ -95,6 +104,9 @@ void init_trace_cheeze(){
 }
 
 void init_cheeze(uint64_t phy_addr){
+#ifdef WRITE_STOP_READ
+	fdriver_mutex_init(&write_check_lock);
+#endif
 	printf("QSIZE:%u\n", QSIZE);
 	int chrfd = open("/dev/mem", O_RDWR);
 	if (chrfd < 0) {
@@ -172,8 +184,10 @@ const char *type_to_str(uint32_t type){
 }
 
 static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
+	static uint32_t global_vec_seq_id=0;
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
 	res->tag_id=id;
+	res->seq_id=global_vec_seq_id++;
 
 	error_check(creq);
 
@@ -184,6 +198,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	res->mark=0;
 
 	FSTYPE type=decode_type(creq->op);
+	res->type=type;
 	if(type!=FS_GET_T && type!=FS_SET_T){
 		res->buf=NULL;
 	}
@@ -205,7 +220,10 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	uint32_t consecutive_cnt=0;
 	static uint32_t global_seq=0;
 
-
+#ifdef WRITE_STOP_READ
+	static uint32_t previous_type;
+	uint32_t now_type=type;
+#endif
 	for(uint32_t i=0; i<res->size; i++){
 		request *temp=&res->req_array[i];
 		temp->parents=res;
@@ -217,8 +235,6 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		temp->is_sequential_start=false;
 		temp->flush_all=0;
 		temp->global_seq=global_seq++;
-
-		
 		if(i==0){
 			if(res->size>1){
 				if(type==FS_GET_T){
@@ -321,6 +337,17 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 
 	res->req_array[(res->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
 	res->req_array[(res->size-1)-consecutive_cnt].consecutive_length=0;//consecutive_cnt;
+
+#ifdef WRITE_STOP_READ
+	if (now_type == FS_SET_T){
+		fdriver_lock(&write_check_lock);
+		write_cnt++;
+		fdriver_unlock(&write_check_lock);
+	}
+	else if (now_type==FS_GET_T){
+		while(write_cnt!=0){}
+	}
+#endif
 	return res;
 }
 
@@ -510,6 +537,15 @@ bool cheeze_end_req(request *const req){
 	release_each_req(req);
 	if(preq->size==preq->done_cnt){
 		end_req_num++;
+
+#ifdef WRITE_STOP_READ
+		if(preq->type==FS_SET_T){
+			fdriver_lock(&write_check_lock);
+			write_cnt--;
+			fdriver_unlock(&write_check_lock);
+		}
+#endif
+
 #ifdef TRACE_REPLAY
 
 #else
