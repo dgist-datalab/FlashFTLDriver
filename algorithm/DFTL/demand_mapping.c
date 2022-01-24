@@ -147,6 +147,19 @@ static inline void demand_req_data_collect(demand_param *dp, bool iswrite, bool 
 #endif
 }
 
+
+static void write_done_check(request *req){
+	bool should_end_req=false;
+	fdriver_lock(&req->done_lock);
+	req->map_done=true;
+	should_end_req=req->map_done && req->write_done;
+	fdriver_unlock(&req->done_lock);
+	if(should_end_req){
+		fdriver_destroy(&req->done_lock);
+		req->end_req(req);
+	}
+}
+
 void print_all_processed_req(){
 	std::map<uint32_t, request *>::iterator iter;
 	for(iter=dmm.all_now_req->begin(); iter!=dmm.all_now_req->end(); iter++){
@@ -432,6 +445,8 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 		abort();
 	}
 
+	req->type_ftl|=1;
+	
 	if(etr->status==FLYING){
 		switch(type){
 			case EVICTION_READ:
@@ -471,7 +486,6 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 
 		fdriver_unlock(&dmm.flying_map_read_lock);
 
-		req->type_ftl|=1;
 		demand_mapping_read(etr->physical_address/L2PGAP, dmm.li, req, param);
 		list_insert(etr->pending_req, (void*)req);
 	
@@ -551,13 +565,6 @@ bool flying_request_hit_check(request *req, uint32_t lba, demand_param *dp ,bool
 		dp_status_update(dp, MISSR);
 		list_insert(etr->pending_req, (void*)req);
 		dp->now_eviction_hint=0;
-		DMI.hit_num++;
-		if(iswrite){
-			DMI.write_hit_num++;
-		}
-		else{
-			DMI.read_hit_num++;
-		}
 		fdriver_unlock(&etr->lock);
 		return true;
 	}
@@ -629,7 +636,8 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 
 				dmm.flying_req->erase(treq->seq);
 				free(dp);
-				treq->end_req(treq);
+				//treq->end_req(treq);
+				write_done_check(treq);
 				if(req==treq){
 					res=1;	
 				}
@@ -735,7 +743,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 			if(treq==req){
 				head_req_is_missread=1;
 			}
-			uint32_t temp_ppa=((uint32_t*)temp_value)[mapping->lba%4096];
+			uint32_t temp_ppa=((uint32_t*)temp_value)[mapping->lba%(PAGESIZE/sizeof(uint32_t))];
 			already_in_cache=dmm.cache->insert_entry_from_translation(dmm.cache, etr, mapping->lba, temp_value, 
 					&dmm.eviction_hint, dp->now_eviction_hint);
 			if(!already_in_cache && temp_ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm, temp_ppa)){
@@ -766,8 +774,10 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 					}
 
 					dmm.flying_req->erase(treq->seq);
+					//send_user_req(treq, DATAW, dp->ppa, dp->value);
 					free(dp);
-					treq->end_req(treq);
+//					treq->end_req(treq);
+					write_done_check(treq);
 				}
 				else{
 					dp_initialize(dp);
@@ -1191,12 +1201,12 @@ hit_eviction:
 					dp->is_hit_eviction=true;
 					goto eviction_path;
 				}
-				DMI.hit_num++;
-				iswrite_path ? DMI.write_hit_num++ : DMI.read_hit_num++;
 				dp_status_update(dp, HIT); goto retry;
 			}
 			abort(); //not covered case 
 		case HIT:
+			DMI.hit_num++;
+			iswrite_path ? DMI.write_hit_num++ : DMI.read_hit_num++;
 			if(iswrite_path){
 				if(dp->is_fresh_miss){
 					dmm.eviction_hint=dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, false);
@@ -1318,6 +1328,7 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		req->round_cnt=0;
 
 		dmm.all_now_req->insert(std::pair<uint32_t, request*>(req->global_seq, req));
+		//send_user_req(req, DATAW, dp->ppa, dp->value);
 	}
 	else{
 		dp=(demand_param*)req->param;
@@ -1377,8 +1388,8 @@ end:
 
 			free(req->param);
 		}
-
-		req->end_req(req);
+		
+		write_done_check(req);
 		reinsert_stopped_request();
 		return 1;
 	}

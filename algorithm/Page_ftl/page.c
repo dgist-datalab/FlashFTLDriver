@@ -19,8 +19,8 @@ uint32_t log_fd;
 
 extern uint32_t test_key;
 align_buffer a_buffer;
-//typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
-//page_read_buffer rb;
+typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
+page_read_buffer rb;
 
 extern MeasureTime mt;
 uint32_t print_traffic();
@@ -47,13 +47,13 @@ uint32_t print_traffic(){
 void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo){
 	algo->li=li; //lower_info means the NAND CHIP
 	algo->bm=bm; //blockmanager is managing invalidation 
-/*
+
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
 	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
-*/
+
 #ifdef LBA_LOGGING
 	log_fd=open(LBA_LOGGING, 0x666, O_CREAT | O_WRONLY | O_TRUNC);
 	if (log_fd < 0) {
@@ -75,15 +75,15 @@ void page_destroy (lower_info* li, algorithm *algo){
 	close(log_fd);
 #endif
 	//page_map_free();
-	/*
+	
 	delete rb.pending_req;
-	delete rb.issue_req;*/
+	delete rb.issue_req;
 	return;
 }
 
 inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
-	/*
+	
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
@@ -97,7 +97,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 			return;
 		}
 		fdriver_unlock(&rb.read_buffer_lock);
-	}*/
+	}
 
 	page_param* param=(page_param*)malloc(sizeof(page_param));
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
@@ -109,7 +109,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 	my_req->type_lower=0;
 	/*you note that after read a PPA, the callback function called*/
 
-/*
+
 	if(type==DATAR){
 		fdriver_lock(&rb.pending_lock);
 		rb_r_iter temp_r_iter=rb.issue_req->find(ppa);
@@ -124,7 +124,7 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 			return;
 		}
 	}
-*/
+
 	switch(type){
 		case DATAR:
 			page_ftl.li->read(ppa,PAGESIZE,value,my_req);
@@ -215,8 +215,10 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
-		send_user_req(NULL, DATAW, ppa, value);
+		req->value=NULL;
+		send_user_req(req, DATAW, ppa, value);
 		a_buffer.idx=0;
+		return 0;
 	}
 	return 1;
 }
@@ -226,9 +228,10 @@ uint32_t page_write(request *const req){
 	dprintf(log_fd, "W %u\n",req->key);
 #endif
 	//printf("write key :%u\n",req->key);
-	align_buffering(req, 0, NULL);
-	req->value=NULL;
-	req->end_req(req);
+	if(align_buffering(req, 0, NULL)!=0){
+		req->value=NULL;
+		req->end_req(req);
+	}
 	//send_user_req(req, DATAW, page_map_assign(req->key), req->value);
 	return 0;
 }
@@ -274,9 +277,9 @@ static void processing_pending_req(algo_req *req, value_set *v){
 
 void *page_end_req(algo_req* input){
 	//this function is called when the device layer(lower_info) finish the request.
-	/*
+	
 	rb_r_iter target_r_iter;
-	rb_r_iter target_r_iter_temp;*/
+	rb_r_iter target_r_iter_temp;
 	algo_req *pending_req;
 	page_param* param=(page_param*)input->param;
 	request *res=input->parents;
@@ -290,7 +293,7 @@ void *page_end_req(algo_req* input){
 			inf_free_valueset(param->value,FS_MALLOC_W);
 			break;
 		case DATAR:
-		/*
+		
 			fdriver_lock(&rb.pending_lock);
 			target_r_iter=rb.pending_req->find(param->value->ppa/L2PGAP);
 			for(;target_r_iter->first==param->value->ppa/L2PGAP && 
@@ -307,7 +310,7 @@ void *page_end_req(algo_req* input){
 			rb.buffer_ppa=param->value->ppa/L2PGAP;
 			memcpy(rb.buffer_value, param->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
-*/
+
 			if(param->value->ppa%L2PGAP){
 				memmove(param->value->value, &param->value->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 			}

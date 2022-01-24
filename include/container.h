@@ -83,7 +83,6 @@ struct request {
 	void *param;
 	void *__hash_node;
 	//pthread_mutex_t async_mutex;
-	//fdriver_lock_t sync_lock;
 	int mark;
 	bool is_sequential_start;
 	uint32_t consecutive_length; 
@@ -108,6 +107,9 @@ e:for application req*/
 	bool mapping_cpu_check;
 	MeasureTime mapping_cpu;
 
+	fdriver_lock_t done_lock;
+	bool write_done;
+	bool map_done;
 	/* HASH_KVSSD */
 #ifdef hash_dftl
 	void *hash_param;
