@@ -328,7 +328,7 @@ void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, bl
 	for(uint32_t i=0; i<total_translation_page_num; i++){
 		fdriver_mutex_init(&dmm.GTD[i].lock);
 		dmm.GTD[i].idx=i;
-		dmm.GTD[i].pending_req=list_init();
+		//dmm.GTD[i].pending_req=list_init();
 		dmm.GTD[i].physical_address=UINT32_MAX;
 	}
 }
@@ -368,8 +368,8 @@ void demand_map_free(){
 
 
 	for(uint32_t i=0; i<total_translation_page_num; i++){
-		fdriver_destroy(&dmm.GTD[i].lock);
-		list_free(dmm.GTD[i].pending_req);
+		//fdriver_destroy(&dmm.GTD[i].lock);
+		//list_free(dmm.GTD[i].pending_req);
 	}
 	free(dmm.GTD);
 	dmm.cache->free(dmm.cache);
@@ -450,9 +450,9 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 		//assign_param_ex *ap=(assign_param_ex*)param->param_ex;
 		//printf("overlap %u gtd idx:%u, input_lba:%u target_lba:%u\n",req->seq, etr->idx, target_data_lba, ap->lba[ap->idx]);
 		pending_debug_seq=req->seq;
-		fdriver_lock(&etr->lock);
-		list_insert(etr->pending_req, (void*)req);
-		fdriver_unlock(&etr->lock);
+	//	fdriver_lock(&etr->lock);
+	//	list_insert(etr->pending_req, (void*)req);
+	//	fdriver_unlock(&etr->lock);
 		return FLYING_HIT_END;
 	}else{
 		fdriver_lock(&etr->lock);
@@ -1690,3 +1690,4 @@ uint32_t demand_argument(int argc, char **argv){
 	dmm.max_caching_pages=physical_page_num;
 	return 1;
 }
+
