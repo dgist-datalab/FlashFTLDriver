@@ -26,7 +26,7 @@ struct algorithm demand_ftl={
 	.load=demand_load,
 };
 
-//page_read_buffer rb;
+page_read_buffer rb;
 uint32_t read_buffer_hit_cnt=0;
 
 
@@ -35,13 +35,13 @@ void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo){
 	algo->bm=bm; //blockmanager is managing invalidation 
 
 	a_buffer.value=(char*)malloc(PAGESIZE);
-/*
+
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
 	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
-*/
+
 }
 
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
@@ -63,10 +63,9 @@ void page_destroy (lower_info* li, algorithm *algo){
 				li->req_type_cnt[GCMW]+
 				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
 	free(a_buffer.value);
-/*
+
 	delete rb.pending_req;
 	delete rb.issue_req;
-	*/
 	return;
 }
 
@@ -117,7 +116,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	if(a_buffer.idx==L2PGAP){
 		ppa_t ppa=get_ppa(a_buffer.key, a_buffer.idx);
 		value_set *value=inf_get_valueset(a_buffer.value, FS_MALLOC_W, PAGESIZE);
-		send_user_req(NULL, DATAW, ppa, value);
+		send_user_req(req, DATAW, ppa, value);
 		
 		KEYT physical[L2PGAP];
 
@@ -140,7 +139,10 @@ uint32_t page_write(request *const req){
 	if(req->param){
 		return demand_map_assign(req, NULL, NULL, NULL);
 	}
-
+	
+	req->write_done=false;
+	req->map_done=false;
+	fdriver_mutex_init(&req->done_lock);
 	/*std::pair<ppa_t, value_set *> r; 
 	if(caching_num_lb!=0){
 		r=buffer->put(req->key, req->value);
@@ -178,7 +180,7 @@ extern struct algorithm demand_ftl;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
-	/*
+
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
@@ -191,7 +193,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 		}
 		fdriver_unlock(&rb.read_buffer_lock);
 	}
-*/
+
 	page_params* params=(page_params*)malloc(sizeof(page_params));
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	params->value=value;
@@ -202,7 +204,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 	my_req->type_lower=0;
 	/*you note that after read a PPA, the callback function called*/
 
-/*
+
 	if(type==DATAR){
 		fdriver_lock(&rb.pending_lock);
 		rb_r_iter temp_r_iter=rb.issue_req->find(ppa);
@@ -217,7 +219,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 			return;
 		}
 	}
-*/
+
 	switch(type){
 		case DATAR:
 			demand_ftl.li->read(ppa,PAGESIZE,value,my_req);
@@ -258,7 +260,7 @@ void *page_end_req(algo_req* input){
 			inf_free_valueset(params->value,FS_MALLOC_W);
 			break;
 		case DATAR:
-		/*
+		
 			fdriver_lock(&rb.pending_lock);
 			target_r_iter=rb.pending_req->find(params->value->ppa/L2PGAP);
 			for(;target_r_iter->first==params->value->ppa/L2PGAP && 
@@ -274,15 +276,24 @@ void *page_end_req(algo_req* input){
 			rb.buffer_ppa=params->value->ppa/L2PGAP;
 			memcpy(rb.buffer_value, params->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
-		*/
 
 			if(params->value->ppa%L2PGAP){
 				memmove(params->value->value, &params->value->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 			}
-
 			break;
 	}
-	if(res){
+	if(input->type==DATAW && res){
+		bool should_end_req=false;
+		fdriver_lock(&res->done_lock);
+		res->write_done=true;
+		should_end_req=res->map_done && res->write_done;
+		fdriver_unlock(&res->done_lock);
+		if(should_end_req){
+			fdriver_destroy(&res->done_lock);
+			res->end_req(res);
+		}
+	}
+	else if(res){
 		res->end_req(res);//you should call the parents end_req like this
 	}
 	free(params);

@@ -43,7 +43,10 @@ void print_temp_log(int sig){
 	request_memset_print_log();
 	inf_print_log();
 }
-
+#ifdef WRITE_STOP_READ
+extern fdriver_lock_t write_check_lock;
+extern volatile uint32_t write_cnt;
+#endif
 void * thread_test(void *){
 	sigset_t tSigSetMask;
 	int nSigNum;
@@ -55,6 +58,17 @@ void * thread_test(void *){
 	vec_request **req_arr=NULL;
 	while((req_arr=get_vectored_request_arr())){
 		for(int i=0; req_arr[i]!=NULL; i++){
+#ifdef WRITE_STOP_READ
+			if (req_arr[i]->type == FS_SET_T){
+				fdriver_lock(&write_check_lock);
+				//printf("issue cnt:%u %u\n", write_cnt, req_arr[i]->seq_id);
+				write_cnt++;
+				fdriver_unlock(&write_check_lock);
+			}
+			else if(req_arr[i]->type==FS_GET_T){	
+				while(write_cnt!=0){}
+			}
+#endif
 			assign_vectored_req(req_arr[i]);
 		}
 		free(req_arr);
