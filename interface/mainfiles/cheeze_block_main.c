@@ -49,7 +49,7 @@ void * thread_test(void *){
 	int nSigNum;
 	int nErrno;
 	sigemptyset(&tSigSetMask);
-	sigaddset(&tSigSetMask, SIGUSR1);
+//	sigaddset(&tSigSetMask, SIGUSR1);
 	pthread_sigmask(SIG_SETMASK, &tSigSetMask, NULL);
 
 	vec_request **req_arr=NULL;

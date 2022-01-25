@@ -433,6 +433,8 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 		abort();
 	}
 
+	req->type_ftl|=1;
+
 	if(etr->status==FLYING){
 		switch(type){
 			case EVICTION_READ:
@@ -472,7 +474,6 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 
 		fdriver_unlock(&dmm.flying_map_read_lock);
 
-		req->type_ftl|=1;
 		demand_mapping_read(etr->physical_address/L2PGAP, dmm.li, req, param);
 		list_insert(etr->pending_req, (void*)req);
 	
