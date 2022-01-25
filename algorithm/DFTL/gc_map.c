@@ -39,7 +39,7 @@ ppa_t get_map_ppa(KEYT gtd_idx, bool *gc_triggered){
 retry:
 	res=demand_ftl.bm->get_page_addr(p->map_active);
 	if(res==UINT32_MAX){
-		p->map_active=demand_ftl.bm->get_segment(demand_ftl.bm, false); //get a new block
+		p->map_active=demand_ftl.bm->get_segment(demand_ftl.bm, BLOCK_ACTIVE); //get a new block
 		p->seg_type_checker[p->map_active->seg_idx]=MAPSEG;
 		goto retry;
 	}

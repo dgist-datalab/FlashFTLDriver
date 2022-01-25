@@ -337,17 +337,6 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 
 	res->req_array[(res->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
 	res->req_array[(res->size-1)-consecutive_cnt].consecutive_length=0;//consecutive_cnt;
-
-#ifdef WRITE_STOP_READ
-	if (now_type == FS_SET_T){
-		fdriver_lock(&write_check_lock);
-		write_cnt++;
-		fdriver_unlock(&write_check_lock);
-	}
-	else if (now_type==FS_GET_T){
-		while(write_cnt!=0){}
-	}
-#endif
 	return res;
 }
 
@@ -541,6 +530,7 @@ bool cheeze_end_req(request *const req){
 #ifdef WRITE_STOP_READ
 		if(preq->type==FS_SET_T){
 			fdriver_lock(&write_check_lock);
+//			printf("return cnt:%u %u\n", write_cnt, preq->seq_id);
 			write_cnt--;
 			fdriver_unlock(&write_check_lock);
 		}
