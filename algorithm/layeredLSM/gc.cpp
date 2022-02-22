@@ -92,9 +92,6 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target, uint32_t activie_assign)
 			__gc_read_check(g_value);
 			uint32_t start_lba=g_value->oob[0];
 			uint32_t intra_idx;
-			if(g_value->ppa==1053172){
-				GDB_MAKE_BREAKPOINT;
-			}
 			sid_info* info=sorted_array_master_get_info_mapgc(start_lba, g_value->ppa, &intra_idx);
 			if(info==NULL || info->sa->sp_meta[intra_idx].ppa!=g_value->ppa){
 				EPRINT("mapping error", true);
@@ -325,11 +322,6 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 					uint32_t psa=g_value->ppa*L2PGAP+j;
 					uint32_t intra_offset;
 					uint32_t ste_num;
-
-
-					if(g_value->ppa*L2PGAP+j==16496192 && lba==test_key){
-						GDB_MAKE_BREAKPOINT;
-					}
 
 					run *r=run_find_include_address(LSM->shortcut, lba, psa, &ste_num, &intra_offset);
 					if(r==NULL){ //unlinked ppa;

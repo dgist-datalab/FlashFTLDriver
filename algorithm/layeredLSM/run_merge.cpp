@@ -5,7 +5,6 @@
 #include "../../bench/measurement.h"
 #include "./piece_ppa.h"
 #include "./lsmtree.h"
-#include "./merge_helper.h"
 #include "./gc.h"
 extern lower_info *g_li;
 bool debug_flag=false;
@@ -103,7 +102,12 @@ retry:
 		__move_iter_target(mm_set, t_idx);
 	}
 	/*check validataion whether old or not*/
-	else if(!shortcut_validity_check_lba(shortcut, mm_set[t_idx].r, res.lba)){
+#ifdef SC_QUERY_DP
+	else if(!shortcut_validity_check_dp_lba(shortcut, mm_set[t_idx].r, mm_set[t_idx].ssi->dp, res.lba))
+#else
+	else if(!shortcut_validity_check_lba(shortcut, mm_set[t_idx].r, res.lba))
+#endif
+	{
 		__invalidate_target(mm_set[t_idx].r, sp_set_get_ste_num(mm_set[t_idx].ssi, res.intra_offset), res.intra_offset);
 		__move_iter_target(mm_set, t_idx);
 		res.lba=UINT32_MAX;
@@ -113,7 +117,12 @@ retry:
 	else if((spm=sp_set_check_trivial_old_data(mm_set[t_idx].ssi))!=NULL){
 		uint32_t original_level=spm->original_level;
 		uint32_t original_recency=spm->original_recency;
-		if(!shortcut_validity_check_by_value(shortcut, mm_set[t_idx].r, original_level, original_recency, res.lba)){
+#ifdef SC_QUERY_DP
+		if(!shortcut_validity_check_by_dp_value(shortcut, mm_set[t_idx].r, mm_set[t_idx].ssi->dp, original_level, original_recency, res.lba))
+#else
+		if(!shortcut_validity_check_by_value(shortcut, mm_set[t_idx].r, original_level, original_recency, res.lba))
+#endif
+		{
 			__invalidate_target(mm_set[t_idx].r, sp_set_get_ste_num(mm_set[t_idx].ssi, res.intra_offset), res.intra_offset);
 			__move_iter_target(mm_set, t_idx);
 			res.lba = UINT32_MAX;
@@ -159,14 +168,7 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	uint32_t prev_original_psa=UINT32_MAX;
 	__sorted_pair *prev_t_pair=NULL;
 	value_set *start_value=NULL;
-	/*
-	for(; iter!=sorted_list->end(); iter++){
-		__sorted_pair *t_pair=&(*iter);
-		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
-		t_pair->free_target=true;
-		start_value=__merge_issue_req(t_pair);
-	}*/
-	
+
 	for(; iter!=sorted_list->end(); iter++){
 		__sorted_pair *t_pair=&(*iter);
 		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
@@ -192,7 +194,6 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	}
 	prev_t_pair->free_target=true;
 	prev_t_pair->value=start_value;
-
 }
 
 extern lsmtree *LSM;
@@ -208,29 +209,33 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 		}
 	}
 
+	std::vector<uint32_t> lba_set;
 	iter=sorted_list->begin();
 	static uint32_t cnt=0;
-	for(; iter!=sorted_list->end(); ){
-		__sorted_pair *t_pair=&(*iter);
-		if(r->type==RUN_PINNING){
-			t_pair->original_psa=run_translate_intra_offset(t_pair->r, t_pair->ste_num, 
-			t_pair->pair.intra_offset);
-			
-			if(!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true, shortcut)){
+	for (; iter != sorted_list->end();)
+	{
+		__sorted_pair *t_pair = &(*iter);
+		lba_set.push_back(t_pair->pair.lba);
+		if (r->type == RUN_PINNING)
+		{
+			t_pair->original_psa = run_translate_intra_offset(t_pair->r, t_pair->ste_num,
+															  t_pair->pair.intra_offset);
+			if (!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true, shortcut))
+			{
 				__invalidate_target(t_pair->r, t_pair->ste_num, t_pair->pair.intra_offset);
 			}
 			sorted_list->erase(iter++);
 		}
-		else{
-			//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
-			if(!run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true, shortcut)){
-
+		else
+		{
+			if (!run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true, shortcut))
+			{
 			}
-			//inf_free_valueset(t_pair->value, FS_MALLOC_R);
 			iter++;
 		}
-	//	sorted_list->erase(iter++);
 	}
+
+	shortcut_link_bulk_lba(shortcut, r, &lba_set);
 
 	if(r->type==RUN_NORMAL){
 		iter=sorted_list->begin();
@@ -280,15 +285,6 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 				}
 				if(check_self==false && rset[k]->type==RUN_NORMAL){
 					set_idx = spm_joint_check(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
-					
-					/*
-					uint32_t set_idx_debug = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
-					if(set_idx!=set_idx_debug){
-						EPRINT("joint error",false);
-						GDB_MAKE_BREAKPOINT; //not be commented
-						set_idx = spm_joint_check(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
-					}
-					*/
 				}
 				else{
 					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp, (check_self && k==i)?j:UINT32_MAX);
@@ -319,38 +315,6 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 
 extern uint32_t test_key;
 
-uint32_t trivial_move2(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
-	run_padding_current_block(r);
-	bool unlinked_data_copy=false;
-	uint32_t des_ste_num=r->st_body->now_STE_num;
-	uint32_t original_level=mm->r->info->level_idx;
-	uint32_t original_recency=mm->r->info->recency;
-	uint32_t target_ste = sp_set_get_ste_num(mm->ssi, now.intra_offset);
-	uint32_t res= mm->r->st_body->sp_meta[target_ste].end_lba;
-
-	run_trivial_move_setting(r, &mm->r->st_body->pba_array[target_ste]);
-	while(1){
-		summary_pair target = sp_set_iter_pick(mm->ssi);
-		if(!shortcut_validity_check_and_link(shortcut,mm->r, r ,target.lba)){
-			unlinked_data_copy=true;
-			r->info->unlinked_lba_num++;
-		}
-		uint32_t original_psa=run_translate_intra_offset(mm->r, target_ste, target.intra_offset);
-		run_trivial_move_insert(r, target.lba, original_psa, target.lba==res);
-		if(target.lba==res){
-			break;
-		}
-		__move_iter_target(mm, 0);
-	}
-
-	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy, original_level, original_recency);
-	sp_set_iter_move_ste(mm->ssi, target_ste, res);
-	if (sp_set_iter_done_check(mm->ssi)){
-			mm->done = true;
-	}
-	return res;
-}
-
 uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
 	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 	run_padding_current_block(r);
@@ -368,17 +332,38 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 	run_copy_ste_to(r, &mm->r->st_body->pba_array[target_ste], &mm->r->st_body->sp_meta[target_ste], mf, false);
 	uint32_t original_level=mm->r->info->level_idx;
 	uint32_t original_recency=mm->r->info->recency;
+
+#ifdef SC_QUERY_DP
+	sc_dir_dp *temp_dp=sc_dir_dp_init(shortcut, now.lba);
+#endif
+
+	std::vector<uint32_t> temp_vec;
 	while(1){
 		summary_pair target = sp_set_iter_pick(mm->ssi);
 		if(mf){
 			mf->insert(mf, target.lba, i++);
 		}
-
-		if(!shortcut_validity_check_and_link(shortcut,mm->r, r ,target.lba)){
+		temp_vec.push_back(target.lba);
+#ifdef SC_QUERY_DP
+		if(!shortcut_validity_check_dp_lba(shortcut, mm->r, temp_dp, target.lba))
+#else
+		if(!shortcut_validity_check_lba(shortcut, mm->r, target.lba))
+#endif
+		{
 			unlinked_data_copy=true;
 			r->info->unlinked_lba_num++;
 		}
-
+/*
+#ifdef 	SC_QUERY_DP
+		if(!shortcut_validity_check_and_link_dp(shortcut, temp_dp, mm->r, r ,target.lba))
+#else
+		if(!shortcut_validity_check_and_link(shortcut, mm->r, r ,target.lba))
+#endif
+		{
+			unlinked_data_copy=true;
+			r->info->unlinked_lba_num++;
+		}
+*/
 		r->now_entry_num++;
 
 		if (target.lba == res){
@@ -389,6 +374,12 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 		}
 		__move_iter_target(mm, 0);
 	}
+
+	shortcut_link_bulk_lba(shortcut, r, &temp_vec);
+
+#ifdef SC_QUERY_DP
+	sc_dir_dp_free(temp_dp);
+#endif
 	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy, original_level, original_recency);
 	sp_set_iter_move_ste(mm->ssi, target_ste, res);
 	if (sp_set_iter_done_check(mm->ssi)){
@@ -470,7 +461,7 @@ void thread_sorting(void* arg, int thread_num){
 	fdriver_unlock(&req->lock);
 }
 
-static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num){
+static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num, sc_master *sc){
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
@@ -485,6 +476,10 @@ static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num)
 		else{
 			mm_set[i].ssi=sp_set_iter_init(rset[i]->st_body->now_STE_num, rset[i]->st_body->sp_meta, prefetch_num,rset[i]->st_body->param.map_type!=target_run->st_body->param.map_type);
 		}
+#ifdef SC_MEM_OPT
+		mm_set[i].ssi->dp=sc_dir_dp_init(sc, rset[i]->st_body->sp_meta[0].start_lba);
+#endif
+
 		mm_set[i].now_proc_block_idx=0;
 		mm_set[i].done=false;
 	}
@@ -493,7 +488,7 @@ static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num)
 
 void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
-	mm_container *mm_set=__make_mmset(rset, target_run, run_num);
+	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
 
 	bool trivial_move_flag=!force;
 
@@ -577,7 +572,7 @@ void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force,
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
-	mm_container *mm_set=__make_mmset(rset, target_run, run_num);
+	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
 
 	bool trivial_move_flag=!force;
 	if(trivial_move_flag){
@@ -618,6 +613,9 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 
 	for(uint32_t i=0; i<run_num; i++){
 		shortcut_set_compaction_flag(rset[i]->info, false);
+#ifdef SC_MEM_OPT
+		sc_dir_dp_free(mm_set[i].ssi->dp);
+#endif
 		sp_set_iter_free(mm_set[i].ssi);
 	}
 	free(mm_set);

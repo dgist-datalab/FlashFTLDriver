@@ -6,8 +6,8 @@
 #include "./debug.h"
 
 enum{BIT_ERROR, BIT_SUCCESS};
-static uint32_t test_piece_ppa=41416*L2PGAP;
-//static uint32_t test_piece_ppa=UINT32_MAX;
+//static uint32_t test_piece_ppa=41416*L2PGAP;
+static uint32_t test_piece_ppa=UINT32_MAX;
 
 static inline void __debug_check(blockmanager *bm, uint32_t piece_ppa, 
 		bool valid){

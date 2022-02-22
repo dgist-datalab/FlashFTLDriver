@@ -4,6 +4,7 @@
 #include "../../../../include/settings.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "../../../../include/debug_utils.h"
 
 extern uint32_t debug_lba;
 extern uint32_t test_ppa;
@@ -224,10 +225,13 @@ inline static uint32_t expand_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 	uint32_t old_ppa;	
 	uint32_t head_offset;
 	uint32_t distance=0;
+	
 	head_offset=get_head_offset(sc->map, lba);
 
 	bool is_next_do=false;
 	uint32_t next_original_ppa;
+
+	DEBUG_CNT_PRINT(test, 55622396, __FUNCTION__, __LINE__);
 	if(ISLASTOFFSET(lba+1)){}
 	else{
 		if(!bitmap_is_set(sc->map, GETOFFSET(lba+1))){

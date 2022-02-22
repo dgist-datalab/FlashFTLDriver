@@ -1,5 +1,6 @@
 #ifndef SUMMARY_PAGE_SET_H
 #define SUMMARY_PAGE_SET_H
+#include "./shortcut_dir.h"
 #include "./sorted_table.h"
 #include "./summary_page.h"
 #include "./mapping_function.h"
@@ -19,6 +20,7 @@ typedef struct summary_page_set_iter{
 	uint32_t miter_pick_cnt;
 	map_iter *miter;
 	summary_page_meta *spm_set;
+	sc_dir_dp *dp;
 
 	bool differ_map;
 	uint32_t noncopy_idx;

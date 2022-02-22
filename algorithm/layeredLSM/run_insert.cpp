@@ -1,5 +1,6 @@
 #include "run.h"
 #include "piece_ppa.h"
+#include "../../include/sem_lock.h"
 
 extern lower_info *g_li;
 extern uint32_t test_key;
@@ -90,7 +91,7 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 		return false;
 	}
 
-	if(!shortcut_validity_check_and_link(shortcut, r, r, lba)){
+	if(r->type==RUN_LOG && !shortcut_validity_check_and_link(shortcut, r, r, lba)){
 		return false;
 	}
 
@@ -194,3 +195,94 @@ void run_insert_done(run *r, bool merge_insert){
 	}
 	*/
 }
+#ifdef SC_MEM_OPT
+
+typedef struct reinsert_node{
+	bool prev_same;
+	uint32_t lba;
+	uint32_t piece_ppa;
+	run *r;
+	uint32_t ste;
+	value_set *value;
+	fdriver_lock_t lock;
+}reinsert_node;
+
+static void *__read_for_piece_ppa_end_req(algo_req *req){
+	reinsert_node *node=(reinsert_node*)req->param;
+	fdriver_unlock(&node->lock);
+	free(req);
+}
+
+void __read_for_piece_ppa(uint32_t ppa, reinsert_node *issue_node){
+	algo_req *req=(algo_req*)malloc(sizeof(algo_req));
+	issue_node->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+	fdriver_mutex_init(&issue_node->lock);
+	fdriver_lock(&issue_node->lock);
+
+	req->type=COMPACTIONDATAR;
+	req->value=issue_node->value;
+	req->end_req=__read_for_piece_ppa_end_req;
+	req->param=(void*)issue_node;
+	req->parents=NULL;
+	g_li->read(ppa, PAGESIZE, req->value, req);
+}
+
+bool run_reinsert(run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *sc){
+	uint32_t info_idx=r->info->idx;
+	sc_dir_dp *temp_dp=sc_dir_dp_init(sc, start_lba);
+	std::list<reinsert_node*> temp_list;
+	reinsert_node *prev_node=NULL;
+	reinsert_node *temp_node;
+
+	for(uint32_t i=start_lba; i<start_lba+SC_PER_DIR; i++){
+		uint32_t now_info_idx=sc_dir_dp_get_sc(temp_dp, sc, i);
+		if(info_idx!=now_info_idx){
+			temp_node = (reinsert_node *)malloc(sizeof(reinsert_node));
+			temp_node->lba = i;
+			temp_node->piece_ppa = UINT32_MAX;
+			temp_node->r = sc->info_set[info_idx].r;
+			temp_node->ste = st_array_get_target_STE(temp_node->r->st_body, i);
+			temp_node->prev_same = false;
+			temp_node->value = NULL;
+			//read target;
+			if (prev_node)
+			{
+				if (temp_node->r == prev_node->r && temp_node->ste == prev_node->ste)
+				{
+					temp_node->prev_same = true;
+				}
+			}
+			prev_node = temp_node;
+
+			if (!temp_node->prev_same)
+			{
+				__read_for_piece_ppa(temp_node->r->st_body->sp_meta[temp_node->ste].ppa, temp_node);
+			}
+		}
+	}
+
+	std::list<reinsert_node*>::iterator iter;
+	for(iter=temp_list.begin(); iter!=temp_list.end();){
+		temp_node=*iter;
+		uint32_t offset;
+		if(temp_node->prev_same){
+			offset=sp_find_offset_by_value(prev_node->value->value, temp_node->lba);
+		}	
+		else{
+			fdriver_lock(&temp_node->lock);
+			offset=sp_find_offset_by_value(temp_node->value->value, temp_node->lba);
+			prev_node=temp_node;
+		}
+
+		temp_node->piece_ppa=run_translate_intra_offset(r, temp_node->ste, offset);
+		run_insert(r, start_lba, temp_node->piece_ppa, NULL, false, sc);
+
+		temp_list.erase(iter++);
+		fdriver_destroy(&temp_node->lock);
+		free(temp_node);
+	}
+
+	sc_dir_dp_free(temp_dp);
+	return true;
+}
+#endif

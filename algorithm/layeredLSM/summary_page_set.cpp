@@ -13,6 +13,7 @@ sp_set_iter *__sp_set_iter_init(uint32_t max_STE_num, summary_page_meta *spm_set
 	res->noncopy_end_lba=(uint32_t*)calloc(max_STE_num ,sizeof(uint32_t));
 	res->noncopy_flag=(bool*)calloc(max_STE_num, sizeof(bool));
 	res->differ_map=differ_map;
+
 	return res;
 }
 

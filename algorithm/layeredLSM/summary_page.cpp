@@ -62,6 +62,12 @@ uint32_t sp_find_psa(summary_page *sp, uint32_t lba){
 	return res;
 }
 
+uint32_t sp_find_offset_by_value(char *data, uint32_t lba){
+	uint32_t res=0;
+	bs_search((summary_pair*)data, 0, MAX_IDX_SP, lba, summary_pair_cmp, res);
+	return res;
+}
+
 void sp_print_all(summary_page *sp){
 	summary_pair p;
 	uint32_t idx;

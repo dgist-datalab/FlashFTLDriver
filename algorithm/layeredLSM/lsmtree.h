@@ -11,6 +11,15 @@
 #define MEMTABLE_NUM 1
 //#define THREAD_COMPACTION
 
+typedef struct page_read_buffer{
+	std::multimap<uint32_t, algo_req *> * pending_req;
+	std::multimap<uint32_t, algo_req *>* issue_req;
+	fdriver_lock_t pending_lock;
+	fdriver_lock_t read_buffer_lock;
+	uint32_t buffer_ppa;
+	char buffer_value[PAGESIZE];
+}page_read_buffer;
+
 typedef struct range{
 	uint32_t start;
 	uint32_t end;

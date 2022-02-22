@@ -185,6 +185,8 @@ value_set *sp_get_data(summary_page *sp);
  */
 uint32_t sp_find_psa(summary_page *sp, uint32_t lba);
 
+uint32_t sp_find_offset_by_value(char *data, uint32_t lba);
+
 /*
 	Function: sp_print_all
 	--------------------

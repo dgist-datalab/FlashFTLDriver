@@ -1,6 +1,8 @@
 #include "lsmtree.h"
 #include "compaction.h"
 
+page_read_buffer rb;
+
 extern uint32_t test_key;
 static inline uint32_t __rm_get_ridx(run_manager *rm){
 	if(rm->ridx_queue->empty()){
@@ -82,7 +84,7 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 	res->rm=rm;
 	res->param=param;
 	sorted_array_master_init(rm->total_run_num);
-	res->shortcut=shortcut_init(rm->total_run_num, RANGE);
+	res->shortcut=shortcut_init(rm->total_run_num, RANGE, param.target_bit);
 	res->bm=L2PBm_init(sm, rm->total_run_num);
 	fdriver_mutex_init(&res->lock);
 
@@ -108,6 +110,12 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 
 	fdriver_mutex_init(&res->read_cnt_lock);
 	res->now_flying_read_cnt=0;
+
+	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
+	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
+	fdriver_mutex_init(&rb.pending_lock);
+	fdriver_mutex_init(&rb.read_buffer_lock);
+	rb.buffer_ppa=UINT32_MAX;
 	return res;
 }
 
@@ -130,6 +138,8 @@ void lsmtree_free(lsmtree *lsm){
 	shortcut_free(lsm->shortcut);
 	L2PBm_free(lsm->bm);
 	free(lsm);
+	delete rb.pending_req;
+	delete rb.issue_req;
 }
 
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
@@ -146,6 +156,12 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	//printf("req->key write:%u\n", req->key);
 	run_insert(r, req->key, UINT32_MAX, req->value->value, false, 
 		lsm->shortcut);
+
+#ifdef SC_MEM_OPT
+	if(shortcut_memory_full(lsm->shortcut) && lsm->shortcut->sc_dir[req->key/SC_PER_DIR].map_num > MAX_TABLE_NUM){
+		run_reinsert(r, req->key/SC_PER_DIR*SC_PER_DIR, SC_PER_DIR, lsm->shortcut);
+	}
+#endif
 
 	if(run_is_full(r)){
 		run_insert_done(r, false);
@@ -226,7 +242,14 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 
 	printf("BF mem per ent: %.2lf\n",(double)lsm->monitor.bf_memory_usage/lsm->monitor.bf_memory_ent);
 	printf("PLR mem per ent: %.2lf\n",(double)lsm->monitor.plr_memory_usage/lsm->monitor.plr_memory_ent);
-	printf("SC mem per ent: %.2lf\n", (double)shortcut_memory_usage(lsm->shortcut)/RANGE);
+	printf("SC mem per ent: %.4lf\n", (double)shortcut_memory_usage(lsm->shortcut)/RANGE);
+#ifdef SC_MEM_OPT
+	uint64_t table_num=0;
+	for(uint32_t i=0; i<MAX_SC_DIR_NUM; i++){
+		table_num+=lsm->shortcut->sc_dir[i].map_num;
+	}
+	printf("\t average table num:%lf\n",(double)table_num/MAX_SC_DIR_NUM);
+#endif
 
 	printf("compaction log\n");
 	for(uint32_t i=0; i<=lsm->param.total_level_num; i++){

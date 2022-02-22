@@ -105,6 +105,9 @@ static run *run_extract_target(request *req){
 bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
  	bool merge_insert, struct shortcut_master *shortcut);
 
+#ifdef SC_MEM_OPT
+bool run_reinsert(run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *shortcut);
+#endif
 /*
  * Fucntion: run_insert_done
  * -------------------

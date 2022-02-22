@@ -14,6 +14,7 @@ extern bool debug_flag;
 
 void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 	uint32_t disk_idx = start_idx;
+	uint64_t original_shortcut_memory=lsm->shortcut->now_memory_usage;
 	while ((force || level_is_full(lsm->disk[disk_idx])) && disk_idx != lsm->param.total_level_num){
 		if(force && lsm->disk[disk_idx]->now_run_num==0){
 			disk_idx++;
@@ -68,12 +69,20 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 		if(last_level_compaction) break;
 		disk_idx++;
 	}
+	uint64_t now_shortcut_memory=lsm->shortcut->now_memory_usage;
+	if(original_shortcut_memory > now_shortcut_memory){
+		printf("sc memory decrease! %lf\n", (double)now_shortcut_memory/original_shortcut_memory);
+	}
+	else if(original_shortcut_memory< now_shortcut_memory){
+		printf("sc memory increase!\n");
+	}
 }
 
 void compaction_flush(lsmtree *lsm, run *r)
 {
 	bool pinning_enable = __lsm_pinning_enable(lsm, r->now_entry_num);
 	run *new_run = __lsm_populate_new_run(lsm, lsm->disk[0]->map_type, pinning_enable ? RUN_PINNING : RUN_NORMAL, r->now_entry_num, 1);
+
 
 	run_recontstruct(lsm, r, new_run, false);
 
@@ -83,18 +92,13 @@ void compaction_flush(lsmtree *lsm, run *r)
 	level_insert_run(lsm->disk[0], new_run);
 
 	__compaction_another_level(lsm, 0, false);
-/*
-	DEBUG_CNT_PRINT(test,UINT32_MAX, __FUNCTION__, __LINE__);
-	static int cnt=0;
-	if(++cnt==1076){
-		debug_flag=true;
-	}
-	*/
+
 	while(gc_check_enough_space(lsm->bm, lsm->param.memtable_entry_num/MAX_SECTOR_IN_BLOCK)==false){
 		lsm->monitor.force_compaction_cnt++;
 		__compaction_another_level(lsm, 0, true);
 	}
 	__lsm_free_run(lsm, r);
+	uint64_t new_shortcut_memory=lsm->shortcut->now_memory_usage;
 }
 
 void compaction_clean_last_level(lsmtree *lsm){

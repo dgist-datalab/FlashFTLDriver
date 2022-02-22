@@ -111,7 +111,7 @@ void vectored_unique_rset(uint32_t start, uint32_t end, monitor* m){
 	for(uint32_t i=0; i<max_num_of_req; i++){
 		key_buf[i]=max_num_of_req-1-i;
 	}
-	/*
+	
 	for(uint32_t i=0; i<max_num_of_req; i++){
 		uint32_t temp_idx=rand()%max_num_of_req;
 		uint32_t temp_idx2=rand()%max_num_of_req;
@@ -119,7 +119,7 @@ void vectored_unique_rset(uint32_t start, uint32_t end, monitor* m){
 		uint32_t temp=key_buf[temp_idx];
 		key_buf[temp_idx]=key_buf[temp_idx2];
 		key_buf[temp_idx2]=temp;
-	}*/
+	}
 
 	
 	uint32_t key_idx=0;
