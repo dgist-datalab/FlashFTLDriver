@@ -167,6 +167,7 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 		uint64_t before_memory_usage=lsm->shortcut->now_memory_usage;
 		uint32_t move=run_reinsert(lsm, r, req->key/SC_PER_DIR*SC_PER_DIR, SC_PER_DIR, lsm->shortcut);
 		uint64_t after_memory_usage=lsm->shortcut->now_memory_usage;
+		printf("reinsert cnt:%u\n",++cnt);
 		//printf("%u sc memory diff:%lf, move:%u fool:%u\n", cnt++, (double)after_memory_usage/before_memory_usage,move, shortcut_memory_full(lsm->shortcut));
 	}
 #endif
