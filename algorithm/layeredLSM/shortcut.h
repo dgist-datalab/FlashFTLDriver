@@ -103,7 +103,7 @@ bool shortcut_validity_check_by_dp_value(sc_master *sc, run *r, struct shortcut_
  * */
 void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba);
 
-void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_set);
+void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_set, bool unlink);
 
 /*
  * Function: shortcut_unlink_lba

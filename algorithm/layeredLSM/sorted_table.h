@@ -43,12 +43,17 @@ typedef struct sorted_table_array{
 	uint32_t sid;
 	uint32_t max_STE_num;
 	uint32_t now_STE_num;
+	volatile uint32_t issue_STE_num;
+	volatile uint32_t end_STE_num;
 	uint32_t inblock_write_pointer;
 	uint32_t global_write_pointer; //physical_page granuality
+	uint32_t ghost_write_pointer;
 	uint32_t type;
 
 	L2P_bm *bm;
 	bool summary_write_alert; //for letting run know when it should issue summary block
+	bool unaligned_block_write;
+	uint32_t unaligned_block_PBA;
 	STE *pba_array;
 
 	uint32_t *pinning_data;
@@ -158,17 +163,25 @@ uint32_t st_array_write_translation(st_array *sa);
  * */
 uint32_t st_array_insert_pair(st_array *sa, uint32_t lba, uint32_t psa, bool trivial);
 
+uint32_t st_array_insert_pair_for_reinsert(st_array *sa, uint32_t lba, uint32_t psa, bool trivial);
+
 uint32_t st_array_force_skip_block(st_array *sa);
 
 void st_array_set_now_PBA(st_array *sa, uint32_t PBA, uint32_t set_type);
 
-static inline void st_array_finish_now_PBA(st_array *sa){
+static inline void st_array_finish_now_PBA(st_array *sa, bool reinsert){
 	sa->pba_array[sa->now_STE_num].max_offset=sa->inblock_write_pointer-1;
 	if(sa->pba_array[sa->now_STE_num].max_offset!=(MAX_SECTOR_IN_BLOCK-1)){
 		sa->internal_fragmented=true;
 	}
-	sa->inblock_write_pointer=0;
+
+	if(sa->unaligned_block_write==false){
+		sa->inblock_write_pointer=0;
+	}
+	sa->ghost_write_pointer=0;
 }
+
+void st_array_set_unaligned_block_write(st_array *sa);
 
 /*
  * Function: st_array_update_pinned_info

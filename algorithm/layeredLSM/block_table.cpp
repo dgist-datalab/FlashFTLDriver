@@ -1,5 +1,6 @@
 #include "block_table.h"
 #include "compaction.h"
+#include "./piece_ppa.h"
 #include "./gc.h"
 #define NO_MAP UINT32_MAX
 #define NO_SEG UINT32_MAX
@@ -13,6 +14,9 @@ L2P_bm *L2PBm_init(blockmanager *sm, uint32_t run_num){
 	L2P_bm *res=(L2P_bm*)calloc(1, sizeof(L2P_bm));
 	res->PBA_map=(block_info*)malloc(_NOB * sizeof(block_info));
 	memset(res->PBA_map, -1, _NOB*sizeof(block_info));
+	for(uint32_t i=0; i<_NOB; i++){
+		res->PBA_map[i].type=LSM_BLOCK_EMPTY;
+	}
 
 	res->gc_lock=(bool*)calloc(_NOB, sizeof(bool));
 
@@ -124,46 +128,65 @@ void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid,
 	if(bm->PBA_map[PBA/_PPB].sid!=NO_MAP){
 		EPRINT("the mapping should be empty", true);
 	}
-	if(PBA==target_PBA){
-		printf("target insert into %u:%u\n", sid, intra_idx);
-		if(sid==25 && intra_idx==0){
-			//debug_flag=true;
-		}
+	if(PBA/_PPB==test_piece_ppa/L2PGAP/_PPB){
+		printf("%u target populate\n", PBA/_PPB);
 	}
 	bm->PBA_map[PBA/_PPB].sid=sid;
 	bm->PBA_map[PBA/_PPB].intra_idx=intra_idx;
 	bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_NORMAL;
 }
 
+void L2PBm_make_map_mixed(L2P_bm *bm, uint32_t PBA, uint32_t sid, uint32_t intra_idx, uint64_t frag_info){
+	if(bm->PBA_map[PBA/_PPB].sid!=NO_MAP){
+		EPRINT("the mapping should be empty", true);
+	}
+	bm->PBA_map[PBA/_PPB].sid=sid;
+	bm->PBA_map[PBA/_PPB].intra_idx=intra_idx;
+	bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_MIXED;
+	bm->PBA_map[PBA/_PPB].frag_info=frag_info;
+}
+
 void L2PBm_move_owner(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
-uint32_t intra_idx){
+uint32_t intra_idx, uint32_t type){
 	if(bm->PBA_map[PBA/_PPB].sid==NO_MAP){
 		EPRINT("the mapping should be assigned", true);
 	}
-	if(bm->PBA_map[PBA/_PPB].type!=LSM_BLOCK_NORMAL){
-		EPRINT("this block should be normal block", true);
+	if(bm->PBA_map[PBA/_PPB].type!=LSM_BLOCK_NORMAL && bm->PBA_map[PBA/_PPB].type!=LSM_BLOCK_MIXED){
+		EPRINT("this block should be normal/mixed block", true);
 	}
 	if(PBA==target_PBA){
 		printf("move %u:%u -> %u:%u\n", bm->PBA_map[PBA/_PPB].sid, bm->PBA_map[PBA/_PPB].intra_idx, sid, intra_idx);
 	}
+
 	bm->PBA_map[PBA/_PPB].sid=sid;
 	bm->PBA_map[PBA/_PPB].intra_idx=intra_idx;
-	bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_NORMAL;
+	bm->PBA_map[PBA/_PPB].type=type;
 }
-
-
 
 void L2PBm_block_fragment(L2P_bm *bm, uint32_t PBA, uint32_t sid){
 	uint32_t bidx=PBA/_PPB;
-	if(PBA==target_PBA){
-		printf("target fragmented!\n");
+	if(bm->PBA_map[bidx].type!=LSM_BLOCK_MIXED){
+		if (bidx == test_piece_ppa / L2PGAP / _PPB)
+		{
+			if ((bm->PBA_map[bidx].frag_info & (1 << sid)) == 0)
+			{
+				printf("%u fragment, sid:%u\n", bidx, sid);
+			}
+		}
+		bm->PBA_map[bidx].sid = NO_MAP;
+		bm->PBA_map[bidx].intra_idx = NO_MAP;
+		bm->PBA_map[bidx].type = LSM_BLOCK_FRAGMENT;
 	}
-	bm->PBA_map[bidx].sid=NO_MAP;
-	bm->PBA_map[bidx].intra_idx=NO_MAP;
-	bm->PBA_map[bidx].type=LSM_BLOCK_FRAGMENT;
 	bm->PBA_map[bidx].frag_info|=(1<<sid);
 }
 
+void L2PBm_block_mixed_check_and_set(L2P_bm *bm, uint32_t PBA, uint32_t sid){
+	uint32_t bidx=PBA/_PPB;
+	if(bm->PBA_map[bidx].type==LSM_BLOCK_NORMAL){
+		bm->PBA_map[bidx].type=LSM_BLOCK_MIXED;
+	}
+	bm->PBA_map[bidx].frag_info|=(1<<sid);
+}
 
 void check_block_sanity(uint32_t piece_ppa){
 	uint32_t bidx=piece_ppa/L2PGAP/_PPB;

@@ -145,6 +145,10 @@ void lsmtree_free(lsmtree *lsm){
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	run *r=lsm->memtable[lsm->now_memtable_idx];
 
+	if(req->key==test_key){
+		printf("%u inserted from user\n", req->key);
+	}
+
 	fdriver_lock(&lsm->read_cnt_lock);
 	if(lsm->now_flying_read_cnt && r->now_entry_num+1==r->max_entry_num){
 		inf_assign_try(req);
@@ -159,7 +163,11 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 
 #ifdef SC_MEM_OPT
 	if(shortcut_memory_full(lsm->shortcut) && lsm->shortcut->sc_dir[req->key/SC_PER_DIR].map_num > MAX_TABLE_NUM){
-		run_reinsert(r, req->key/SC_PER_DIR*SC_PER_DIR, SC_PER_DIR, lsm->shortcut);
+		static uint32_t cnt=0;
+		uint64_t before_memory_usage=lsm->shortcut->now_memory_usage;
+		uint32_t move=run_reinsert(lsm, r, req->key/SC_PER_DIR*SC_PER_DIR, SC_PER_DIR, lsm->shortcut);
+		uint64_t after_memory_usage=lsm->shortcut->now_memory_usage;
+		//printf("%u sc memory diff:%lf, move:%u fool:%u\n", cnt++, (double)after_memory_usage/before_memory_usage,move, shortcut_memory_full(lsm->shortcut));
 	}
 #endif
 

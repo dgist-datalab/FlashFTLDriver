@@ -18,6 +18,7 @@ enum{
 typedef struct run{
 	uint32_t run_idx;
 	uint32_t max_entry_num;
+	uint32_t limit_entry_num;
 	uint32_t now_entry_num;
 	uint32_t type;
 	struct shortcut_info *info;
@@ -32,7 +33,6 @@ typedef struct run{
 typedef struct __sorted_pair{
 	run *r;
 	summary_pair pair;
-	uint32_t ste_num;
 	uint32_t original_psa;
 	char *data;
 	fdriver_lock_t lock;
@@ -71,7 +71,7 @@ void run_free(run *r,struct shortcut_master *sc);
  * r:
  * */
 static inline bool run_is_full(run *r){
-	return r->now_entry_num==r->max_entry_num;
+	return r->now_entry_num>=r->max_entry_num;
 }
 
 static inline bool run_is_empty(run *r){
@@ -106,7 +106,7 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
  	bool merge_insert, struct shortcut_master *shortcut);
 
 #ifdef SC_MEM_OPT
-bool run_reinsert(run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *shortcut);
+uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *shortcut);
 #endif
 /*
  * Fucntion: run_insert_done
@@ -179,6 +179,8 @@ uint32_t run_translate_intra_offset(run *r, uint32_t ste_num, uint32_t intra_off
 run *run_find_include_address(struct shortcut_master *sc, uint32_t lba, uint32_t psa, uint32_t *_ste_num, 
 uint32_t *intra_offset);
 
+run *run_find_include_address_for_mixed(struct shortcut_master *sc, uint32_t lba, uint32_t psa, uint32_t *_ste_num, uint32_t *intra_offset);
+
 /*
  * Function: run_find_include_address_byself
  *------------------------------------
@@ -189,6 +191,7 @@ uint32_t *intra_offset);
  *psa:
  * */
 uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa, uint32_t *ste_num);
+
 
 //#################################### run_query.c done
 

@@ -1,9 +1,10 @@
 #include "run.h"
 
-static inline run *__run_init(uint32_t run_idx, uint32_t entry_num){
+static inline run *__run_init(uint32_t run_idx, uint32_t limit_entry_num, uint32_t entry_num){
 	run *res=(run*)malloc(sizeof(run));
 	res->run_idx=run_idx;
 	res->max_entry_num=entry_num;
+	res->limit_entry_num=limit_entry_num;
 	res->now_entry_num=0;
 	res->pp=NULL;
 	res->info=NULL;
@@ -13,7 +14,7 @@ static inline run *__run_init(uint32_t run_idx, uint32_t entry_num){
 
 run *run_factory(uint32_t run_idx, uint32_t map_type, 
 	uint32_t entry_num, float fpr, L2P_bm *bm, uint32_t type, lsmtree *lsm){
-	run *res=__run_init(run_idx, entry_num);
+	run *res=__run_init(run_idx, entry_num+SC_PER_DIR, entry_num);
 	map_param param;
 	param.fpr=fpr;
 	param.lba_bit=lsm->param.target_bit;
@@ -25,8 +26,10 @@ run *run_factory(uint32_t run_idx, uint32_t map_type,
 			break;
 		case RUN_LOG:
 			param.map_type=TREE_MAP;
-			res->run_log_mf=map_function_factory(param, entry_num);
+			res->run_log_mf=map_function_factory(param, entry_num+SC_PER_DIR);
 			param.map_type=map_type;
+			res->st_body=st_array_init(res, entry_num+SC_PER_DIR, bm, true, param);
+			break;
 		case RUN_PINNING:
 			if(map_type==PLR_MAP){
 				EPRINT("PLR_MAP is not enable on RUN_PINNING type", true);

@@ -19,7 +19,7 @@ enum{
 
 typedef struct summary_pair{
 	uint32_t lba;
-	uint32_t intra_offset;
+	uint32_t piece_ppa;
 }summary_pair;
 
 typedef struct summary_page{
@@ -39,6 +39,7 @@ typedef struct summary_page_meta{
 	bool sorted;
 	bool unlinked_data_copy;
 	bool copied;
+	bool all_reinsert;
 	void *private_data;
 }summary_page_meta;
 

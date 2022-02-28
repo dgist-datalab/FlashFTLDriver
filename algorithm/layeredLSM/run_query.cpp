@@ -285,6 +285,24 @@ uint32_t *_ste_num, uint32_t *_intra_offset){
 	return r;
 }
 
+run *run_find_include_address_for_mixed(sc_master *sc, uint32_t lba, uint32_t psa,
+		uint32_t *_ste_num, uint32_t *_intra_offset){
+	run *r=shortcut_query(sc, lba);
+	if(r->type==RUN_NORMAL){
+		uint32_t ste_num=st_array_get_target_STE(r->st_body, lba);
+		*_ste_num=ste_num;
+		*_intra_offset=NOT_FOUND;
+	}
+	else{
+		uint32_t intra_offset=__find_target_in_run(r, lba, psa, _ste_num);
+		*_intra_offset=intra_offset;
+		if(intra_offset==NOT_FOUND){
+			return NULL;
+		}
+	}
+	return r;
+}
+
 uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa, uint32_t *_ste_num){
 	return __find_target_in_run(r, lba, psa, _ste_num);
 }

@@ -27,10 +27,10 @@ static inline summary_pair * __get_sp_idx(summary_page *sp, uint32_t idx){
 	return &((summary_pair*)sp->body)[idx];
 }
 
-bool sp_insert(summary_page *sp, uint32_t lba, uint32_t intra_offset){
+bool sp_insert(summary_page *sp, uint32_t lba, uint32_t piece_ppa){
 	summary_pair* p=__get_sp_idx(sp, sp->write_pointer);
 	p->lba=lba;
-	p->intra_offset=intra_offset;
+	p->piece_ppa=piece_ppa;
 
 	if(sp->write_pointer!=0 && sp->sorted){
 		summary_pair *prev_p=__get_sp_idx(sp, sp->write_pointer-1);
@@ -55,23 +55,31 @@ value_set *sp_get_data(summary_page *sp){
 	return sp->value;
 }
 
-int summary_pair_cmp(summary_pair p, uint32_t target){return p.lba-target;}
+int summary_pair_cmp(summary_pair p, uint32_t target){
+	if(p.lba < target){
+		return -1;
+	}
+	else if(p.lba >target){
+		return 1;
+	}
+	return 0;
+}
 uint32_t sp_find_psa(summary_page *sp, uint32_t lba){
-	uint32_t res=0;
-	bs_search((summary_pair*)sp->body, 0, MAX_IDX_SP, lba, summary_pair_cmp, res);
-	return res;
+	uint32_t t_res=0;
+	bs_search((summary_pair*)sp->body, 0, MAX_IDX_SP, lba, summary_pair_cmp, t_res);
+	return t_res;
 }
 
 uint32_t sp_find_offset_by_value(char *data, uint32_t lba){
-	uint32_t res=0;
-	bs_search((summary_pair*)data, 0, MAX_IDX_SP, lba, summary_pair_cmp, res);
-	return res;
+	uint32_t t_res=0;
+	bs_search((summary_pair*)data, 0, MAX_IDX_SP, lba, summary_pair_cmp, t_res);
+	return t_res;
 }
 
 void sp_print_all(summary_page *sp){
 	summary_pair p;
 	uint32_t idx;
 	for_each_sp_pair(sp, idx, p){
-		printf("%u %u->%u\n", idx, p.lba, p.intra_offset);
+		printf("%u %u->%u\n", idx, p.lba, p.piece_ppa);
 	}
 }

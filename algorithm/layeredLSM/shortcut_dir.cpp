@@ -217,7 +217,7 @@ uint32_t sc_dir_dp_get_sc(sc_dir_dp *dp, sc_master *sc, uint32_t lba){
     return UINT32_MAX;
 }
 
-uint32_t sc_dir_insert_lba_dp(shortcut_dir *target, sc_master *sc, uint32_t sc_idx, uint32_t start_idx, std::vector<uint32_t> *lba_set){
+uint32_t sc_dir_insert_lba_dp(shortcut_dir *target, sc_master *sc, uint32_t sc_idx, uint32_t start_idx, std::vector<uint32_t> *lba_set, bool unlink){
     uint32_t temp_offset=0;
     int target_table_idx=-1;
     uint32_t idx=start_idx;
@@ -236,7 +236,12 @@ uint32_t sc_dir_insert_lba_dp(shortcut_dir *target, sc_master *sc, uint32_t sc_i
         if(prev_check){
             target_table_idx++; //the number of setted bit including itself
         }
-
+		if(unlink){
+			uint32_t info_idx=__dir_map_query(target, target_table_idx);
+			if(info_idx!=NOT_ASSIGNED_SC){
+				sc->info_set[info_idx].unlinked_lba_num++;
+			}
+		}
         compression_target(target, target_table_idx, target_offset, sc_idx);
         if(bitmap_is_set(target->bmap, target_offset)){
             if(!prev_check){

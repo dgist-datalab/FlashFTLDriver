@@ -15,7 +15,7 @@ void run_print(run *r, bool content){
 			summary_pair *pair=(summary_pair*)data;
 			for(uint32_t idx=0; pair[idx].lba!=UINT32_MAX && idx<MAX_CUR_POINTER; ++idx ){
 				printf("%u : %u\n",pair[idx].lba, 
-						run_translate_intra_offset(r, i,pair[idx].intra_offset));
+						run_translate_intra_offset(r, i,pair[idx].piece_ppa));
 			}
 		}
 	}

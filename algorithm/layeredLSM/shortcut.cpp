@@ -21,12 +21,13 @@ sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range, uint32_t
 	}
 #ifdef SC_MEM_OPT
 	res->sc_dir=(shortcut_dir*)malloc(sizeof(shortcut_dir)*MAX_SC_DIR_NUM);
+	
 	for(uint32_t i=0; i<MAX_SC_DIR_NUM; i++){
 		sc_dir_init(&res->sc_dir[i], i, NOT_ASSIGNED_SC);
 		res->now_memory_usage+=sc_dir_memory_usage(&res->sc_dir[i]);
 	}
 	sc_dir_dp_master_init();
-	res->max_memory_usage=MAX_TABLE_NUM*lba_bit*MAX_SC_DIR_NUM+lba_range;
+	res->max_memory_usage=(MAX_TABLE_NUM*5*MAX_SC_DIR_NUM+lba_range);
 #else
 	res->sc_map=(uint8_t*)malloc(sizeof(uint8_t)* lba_range);
 	memset(res->sc_map, NOT_ASSIGNED_SC, sizeof(uint8_t) * lba_range);
@@ -92,9 +93,7 @@ void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 	}
 }
 
-
-
-void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_set){
+void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_set, bool unlink){
 	sc_info *t_info=r->info;
 #ifdef SC_MEM_OPT
 	uint32_t idx=0;
@@ -102,11 +101,20 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 		uint32_t lba=(*lba_set)[idx];
 		uint32_t target_idx=lba/SC_PER_DIR;
 		sc->now_memory_usage-=sc_dir_memory_usage(&sc->sc_dir[target_idx]);	
+		if(test_key==lba){
+			printf("%u move target sc->%u\n", test_key, t_info->idx);
+		}
 #ifdef SC_QUERY_DP
-		idx=sc_dir_insert_lba_dp(&sc->sc_dir[target_idx], sc, t_info->idx, idx, lba_set);
+		idx=sc_dir_insert_lba_dp(&sc->sc_dir[target_idx], sc, t_info->idx, idx, lba_set, unlink);
 #else	
 		for(idx; idx<lba_set->size() && (*lba_set)[idx]/SC_PER_DIR==target_idx; idx++){
 			lba=(*lba_set)[idx];
+			if(unlink){
+				uint32_t info_idx=sc_dir_query_lba(SC_DIR(sc, lba), SC_OFFSET(lba));
+				if(info_idx!=NOT_ASSIGNED_SC){
+					sc->info_set[info_idx].r->unlinked_lba_num++;
+				}
+			}
 			sc_dir_insert_lba(SC_DIR(sc, lba), SC_OFFSET(lba), t_info->idx);
 		}
 #endif
@@ -121,6 +129,9 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 	std::vector<uint32_t>::iterator iter = lba_set->begin();
 	for (; iter != lba_set->end(); iter++){
 		uint32_t lba = *iter;
+		if(unlink){
+			sc->info_set[sc->sc_map[lba]].r->unlinked_lba_num++;
+		}
 		sc->sc_map[lba] = t_info->idx;
 		if (lba == test_key || lba == test_key2)
 		{

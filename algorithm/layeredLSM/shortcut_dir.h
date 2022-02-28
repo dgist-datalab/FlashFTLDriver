@@ -43,7 +43,7 @@ void sc_dir_dp_master_free();
 sc_dir_dp *sc_dir_dp_init(struct shortcut_master *sc, uint32_t lba);
 uint32_t sc_dir_dp_get_sc(sc_dir_dp *dp, struct shortcut_master *sc, uint32_t lba);
 uint32_t sc_dir_insert_lba_dp(shortcut_dir *target, struct shortcut_master *sc, 
-uint32_t sc_idx, uint32_t start_idx, std::vector<uint32_t> *lba_set);
+uint32_t sc_idx, uint32_t start_idx, std::vector<uint32_t> *lba_set, bool unlink);
 void sc_dir_dp_free(sc_dir_dp* dp);
 
 void sc_dir_init(shortcut_dir *target,uint32_t idx, uint32_t init_value);
