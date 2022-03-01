@@ -116,10 +116,10 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 				}
 			}
 			sc_dir_insert_lba(SC_DIR(sc, lba), SC_OFFSET(lba), t_info->idx);
+			t_info->linked_lba_num++;
 		}
 #endif
 		sc->now_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[target_idx]);
-		t_info->linked_lba_num++;
 		//printf("%lu sc->memory_usage\n", sc->now_memory_usage);
 		if(idx==lba_set->size()){
 			break;

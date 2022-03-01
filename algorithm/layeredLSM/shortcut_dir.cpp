@@ -243,6 +243,7 @@ uint32_t sc_dir_insert_lba_dp(shortcut_dir *target, sc_master *sc, uint32_t sc_i
 			}
 		}
         compression_target(target, target_table_idx, target_offset, sc_idx);
+        sc->info_set[sc_idx].linked_lba_num++;
         if(bitmap_is_set(target->bmap, target_offset)){
             if(!prev_check){
                 target_table_idx++;
