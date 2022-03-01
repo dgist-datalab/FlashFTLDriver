@@ -14,7 +14,8 @@
 #define MAX_RUN_NUM_FOR_FRAG 64 
 
 enum{
-	LSM_BLOCK_EMPTY, LSM_BLOCK_SUMMARY, LSM_BLOCK_NORMAL, LSM_BLOCK_FRAGMENT
+	LSM_BLOCK_EMPTY, LSM_BLOCK_SUMMARY, LSM_BLOCK_NORMAL, LSM_BLOCK_FRAGMENT,
+	LSM_BLOCK_MIXED,
 };
 
 
@@ -114,8 +115,10 @@ uint32_t L2PBm_pick_empty_RPBA(L2P_bm *bm);
 void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
 		uint32_t intra_idx);
 
+void L2PBm_make_map_mixed(L2P_bm *bm, uint32_t PBA, uint32_t sid, uint32_t intra_idx, uint64_t frag_info);
+
 void L2PBm_move_owner(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
-uint32_t intra_idx);
+uint32_t intra_idx, uint32_t type);
 
 /* 
  * Function: L2PBm_block_fragment
@@ -125,6 +128,8 @@ uint32_t intra_idx);
  *	ppa: target ppa
  * */
 void L2PBm_block_fragment(L2P_bm *bm, uint32_t ppa, uint32_t sid);
+
+void L2PBm_block_mixed_check_and_set(L2P_bm*bm, uint32_t PBA, uint32_t sid);
 
 /*
  * Function:L2PBm_get_map_ppa
@@ -185,6 +190,11 @@ static inline void L2PBm_clear_block_info(L2P_bm *bm, uint32_t bidx){
 static inline bool L2PBm_is_nomral_block(L2P_bm *bm, uint32_t PBA){
 	return bm->PBA_map[PBA/_PPB].type==LSM_BLOCK_NORMAL;
 }
+
+static inline uint32_t L2PBm_get_block_type(L2P_bm *bm, uint32_t PBA){
+	return bm->PBA_map[PBA/_PPB].type;
+}
+
 static inline bool L2PBm_is_frag_block(L2P_bm *bm, uint32_t PBA){
 	return bm->PBA_map[PBA/_PPB].type==LSM_BLOCK_FRAGMENT;
 }

@@ -5,12 +5,11 @@ extern uint32_t test_key;
 extern uint32_t test_key2;
 extern lower_info *g_li;
 extern lsmtree *LSM;
-static void *__run_read_end_req(algo_req *req){
-	if(req->type!=DATAR  && req->type!=MISSDATAR){
-		EPRINT("not allowed type", true);
-	}
+extern page_read_buffer rb;
 
+static void __check_data(algo_req *req, char *value){
 	request *p_req=req->parents;
+
 	map_read_param *param=(map_read_param*)req->param;
 	param->oob_set=(uint32_t*)LSM->bm->segment_manager->get_oob(LSM->bm->segment_manager, req->ppa);
 	uint32_t intra_offset=param->mf->oob_check(param->mf, param);
@@ -20,7 +19,7 @@ static void *__run_read_end_req(algo_req *req){
 		LSM->now_flying_read_cnt--;
 		fdriver_unlock(&LSM->read_cnt_lock);
 
-		memmove(&p_req->value->value[0], &p_req->value->value[intra_offset*LPAGESIZE], LPAGESIZE);
+		memmove(&p_req->value->value[0], &value[intra_offset*LPAGESIZE], LPAGESIZE);
 		p_req->end_req(p_req);
 	//	fdriver_unlock(&param->r->lock);
 		param->mf->query_done(param->mf, param);
@@ -29,6 +28,34 @@ static void *__run_read_end_req(algo_req *req){
 		inf_assign_try(p_req);
 	}
 	free(req);
+}
+
+typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
+static void *__run_read_end_req(algo_req *req){
+	if(req->type!=DATAR  && req->type!=MISSDATAR){
+		EPRINT("not allowed type", true);
+	}
+
+	rb_r_iter target_r_iter;
+	algo_req *pending_req;
+
+	fdriver_lock(&rb.pending_lock);
+	target_r_iter=rb.pending_req->find(req->value->ppa);
+	for(;target_r_iter->first==req->value->ppa && 
+					target_r_iter!=rb.pending_req->end();){
+		pending_req=target_r_iter->second;
+		__check_data(pending_req, req->value->value);
+		rb.pending_req->erase(target_r_iter++);
+	}
+	rb.issue_req->erase(req->value->ppa);
+	fdriver_unlock(&rb.pending_lock);
+
+	fdriver_lock(&rb.read_buffer_lock);
+	rb.buffer_ppa = req->value->ppa;
+	memcpy(rb.buffer_value, req->value->value, PAGESIZE);
+	__check_data(req, rb.buffer_value);;
+	fdriver_unlock(&rb.read_buffer_lock);
+
 	return NULL;
 }
 
@@ -39,6 +66,34 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 	res->param=(void *)param;
 	res->type=retry?MISSDATAR:DATAR;
 	res->end_req=__run_read_end_req;
+	res->value=value;
+	value->ppa=ppa;
+
+	fdriver_lock(&rb.read_buffer_lock);
+	if (ppa == rb.buffer_ppa)
+	{
+		//memcpy(value->value, &rb.buffer_value, PAGESIZE);
+		req->buffer_hit++;
+		__check_data(res, rb.buffer_value);
+		fdriver_unlock(&rb.read_buffer_lock);
+		return;
+	}
+	fdriver_unlock(&rb.read_buffer_lock);
+
+	fdriver_lock(&rb.pending_lock);
+	rb_r_iter temp_r_iter = rb.issue_req->find(ppa);
+	if (temp_r_iter == rb.issue_req->end())
+	{
+		rb.issue_req->insert(std::pair<uint32_t, algo_req *>(ppa, res));
+		fdriver_unlock(&rb.pending_lock);
+	}
+	else
+	{
+		req->buffer_hit++;
+		rb.pending_req->insert(std::pair<uint32_t, algo_req *>(ppa, res));
+		fdriver_unlock(&rb.pending_lock);
+		return;
+	}
 
 	g_li->read(ppa, PAGESIZE, value, res);
 }
@@ -157,9 +212,11 @@ uint32_t run_query_retry(run *r, request *req){
 	if(r->type==RUN_LOG){
 		return READ_NOT_FOUND;
 	}
+
 	map_read_param *param=(map_read_param*)req->param;
 	uint32_t ste_num=param->ste_num;
 	map_function *mf=r->st_body->pba_array[ste_num].mf;
+retry:
 #ifdef MAPPING_TIME_CHECK
 	measure_start(&req->mapping_cpu);
 #endif
@@ -177,7 +234,7 @@ uint32_t run_query_retry(run *r, request *req){
 	}
 	uint32_t psa=st_array_read_translation(r->st_body, ste_num, intra_offset);
 	if(psa==UNLINKED_PSA){
-		EPRINT("shortcut error", true);
+		goto retry;
 	}
 
 	param->intra_offset=psa%L2PGAP;
@@ -185,7 +242,6 @@ uint32_t run_query_retry(run *r, request *req){
 	__run_issue_read(req, psa/L2PGAP, req->value, param, true);
 	return 0;
 }
-
 
 static inline uint32_t __find_target_in_run(run *r, uint32_t lba, uint32_t psa, uint32_t *_ste_num){
 	if(r->type==RUN_NORMAL){
@@ -225,6 +281,24 @@ uint32_t *_ste_num, uint32_t *_intra_offset){
 	*_intra_offset=intra_offset;
 	if(intra_offset==NOT_FOUND){
 		return NULL;
+	}
+	return r;
+}
+
+run *run_find_include_address_for_mixed(sc_master *sc, uint32_t lba, uint32_t psa,
+		uint32_t *_ste_num, uint32_t *_intra_offset){
+	run *r=shortcut_query(sc, lba);
+	if(r->type==RUN_NORMAL){
+		uint32_t ste_num=st_array_get_target_STE(r->st_body, lba);
+		*_ste_num=ste_num;
+		*_intra_offset=NOT_FOUND;
+	}
+	else{
+		uint32_t intra_offset=__find_target_in_run(r, lba, psa, _ste_num);
+		*_intra_offset=intra_offset;
+		if(intra_offset==NOT_FOUND){
+			return NULL;
+		}
 	}
 	return r;
 }

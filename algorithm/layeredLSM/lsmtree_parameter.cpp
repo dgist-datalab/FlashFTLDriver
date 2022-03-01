@@ -162,16 +162,25 @@ lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, ui
 			double plr_bit=0;
 			double bf_bit=0;
 			uint32_t bf_level=0;
+			if(max_level_num==2){
+				//GDB_MAKE_BREAKPOINT;
+			}
 			for (int32_t level = max_level_num; level >= 0; level--)
 			{
 				double cover_run_ratio = (double)(total_range - total_range / (run_per_level)) / run_per_level;
 				double cover_level_ratio = cover_run_ratio * run_per_level;
 				if (level == 0)
 				{
-					level_avg_bit += total_range * (2 * target_bit+PTR_BIT);
+					/*
+					temp.memtable_entry_num=(uint32_t)(total_range*RANGE)/(_PPB*L2PGAP) *(_PPB*L2PGAP);
+					level_avg_bit += total_range * (target_bit+ceil(log2(temp.memtable_entry_num))+PTR_BIT);
+					l0_bit=total_range*(target_bit+ceil(log2(temp.memtable_entry_num))+PTR_BIT);
+					*/
+					
+					level_avg_bit += total_range * (2*target_bit+PTR_BIT);
 					l0_bit=total_range*(2*target_bit+PTR_BIT);
 					temp.memtable_entry_num=(uint32_t)(total_range*RANGE)/(_PPB*L2PGAP) *(_PPB*L2PGAP);
-					//temp.memtable_entry_num=temp.memtable_entry_num/(_PPS*L2PGAP)*(_PPS*L2PGAP);
+					
 				}
 				else if (cover_run_ratio > bf_advance)
 				{
@@ -199,13 +208,15 @@ lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, ui
 			temp.max_memory_usage_bit=(level_avg_bit+bit_res)*RANGE;
 			//printf("level bit:%.2f remain_bit:%.2f \t", level_avg_bit, remain_avg_bit);
 			//printf("L0:%.2f BF:%.2f PLR:%.2f\n", l0_bit, bf_bit, plr_bit);
-			if(level_avg_bit <= remain_avg_bit){
+			if(level_avg_bit <= remain_avg_bit && temp.memtable_entry_num){
 				if(res.total_level_num > temp.total_level_num){
 					res=temp;
 				}
 				else if(res.total_level_num==temp.total_level_num){
-					
-					if(res.BF_level_range.start==0 && temp.BF_level_range.start!=0){
+					if(res.max_memory_usage_bit > temp.max_memory_usage_bit){
+						res=temp;
+					}
+					else if(res.BF_level_range.start==0 && temp.BF_level_range.start!=0){
 						res=temp;
 					}
 					/*

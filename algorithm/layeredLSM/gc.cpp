@@ -34,6 +34,7 @@ static algo_req *__get_algo_req(gc_value *g_value, uint32_t type){
 	res->value=g_value->value;
 	res->end_req=__gc_end_req;
 	res->param=(void*)g_value;
+	res->parents=NULL;
 	return res;
 }
 
@@ -49,10 +50,32 @@ static gc_value* __gc_issue_read(uint32_t ppa, blockmanager *sm, uint32_t type){
 	return g_value;
 }
 
+
 static inline void __gc_issue_write(gc_value *g_value, blockmanager *sm, uint32_t type){
 	algo_req *res=__get_algo_req(g_value, type);
 	sm->set_oob(sm, (char*)g_value->oob, sizeof(uint32_t) *L2PGAP, res->ppa);
 	g_li->write(res->ppa, PAGESIZE, res->value, res);
+}
+
+static void *__temp_gc_end_req(algo_req *req){
+	value_set *value=(value_set*)req->param;
+	inf_free_valueset(value, FS_MALLOC_W);
+	free(req);
+	return NULL;
+}
+
+static inline void __gc_issue_temp_meta_write(uint32_t ppa, value_set *value, 
+blockmanager *sm, uint32_t start_lba, uint32_t end_lba){
+	uint32_t *oob=(uint32_t*)sm->get_oob(sm, ppa);
+	oob[0]=start_lba;
+	oob[1]=end_lba;
+	algo_req *res=(algo_req *)malloc(sizeof(algo_req));
+	res->type=GCMW_DGC;
+	res->ppa=ppa;
+	res->value=value;
+	res->end_req=__temp_gc_end_req;
+	res->param=(void*)value;
+	g_li->write(ppa, PAGESIZE, value, res);
 }
 
 static inline void __gc_read_check(gc_value* g_value){
@@ -64,6 +87,9 @@ static inline void __clear_block_and_gsegment(L2P_bm *bm, __gsegment *target){
 	__block *blk;
 	uint32_t bidx;
 	for_each_block(target, blk, bidx){
+		if(blk->block_idx==test_piece_ppa/L2PGAP/_PPB){
+			printf("%u clear\n", blk->block_idx);
+		}
 		L2PBm_clear_block_info(bm, blk->block_idx);
 	}
 	blockmanager *sm=bm->segment_manager;
@@ -92,9 +118,6 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target, uint32_t activie_assign)
 			__gc_read_check(g_value);
 			uint32_t start_lba=g_value->oob[0];
 			uint32_t intra_idx;
-			if(g_value->ppa==1053172){
-				GDB_MAKE_BREAKPOINT;
-			}
 			sid_info* info=sorted_array_master_get_info_mapgc(start_lba, g_value->ppa, &intra_idx);
 			if(info==NULL || info->sa->sp_meta[intra_idx].ppa!=g_value->ppa){
 				EPRINT("mapping error", true);
@@ -114,11 +137,6 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target, uint32_t activie_assign)
 			case GET_MIXED:
 				rppa=L2PBm_get_map_ppa_mixed(bm);
 				break;
-			}
-
-			if (rppa == 230615)
-			{
-				printf("rpp %u map to %u,%u\n", rppa, info->sa->sid, intra_idx);
 			}
 
 			if(validate_ppa(sm, rppa, true)==BIT_ERROR){
@@ -186,15 +204,12 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 			}
 		}
 
-		if(bidx*_PPB==target_PBA){
-			printf("%u inv:v %u:%u\n", target_PBA, invalidate_piece_num, validate_piece_num);
-		}
-
 		uint32_t new_pba=L2PBm_pick_empty_RPBA(bm);
 		uint32_t prev_ppa=UINT32_MAX;
 		bool valid_data_ptr[L2PGAP];
 		uint32_t idx=g_blk->b_info->intra_idx;
 		L2PBm_make_map(bm, new_pba, info->sid, idx);
+
 		/*write all page to new address*/
 		while(temp_list->size){
 			for_each_list_node_safe(temp_list, p_now, p_nxt){
@@ -212,6 +227,7 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 					}
 				}
 
+
 				uint32_t start_rppa=new_pba+(g_value->ppa%_PPB);
 				if(prev_ppa==UINT32_MAX || prev_ppa<start_rppa){
 					prev_ppa=start_rppa;
@@ -220,12 +236,12 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 					EPRINT("start_rppa should be increase", true);
 				}
 				g_value->ppa=start_rppa;
-	
 
 				for(uint32_t j=0; j<L2PGAP; j++){
 					if(!valid_data_ptr[j]){
 						continue;
 					}
+
 					if(validate_piece_ppa(sm, g_value->ppa*L2PGAP+j, true)==BIT_ERROR){
 						EPRINT("bit error in normal block copy", true);
 					}
@@ -235,7 +251,7 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 				list_delete_node(temp_list, p_now);
 			}
 		}
-		
+
 		/*update block mapping*/
 		if(info->sa->pba_array[idx].PBA!=bidx*_PPB){
 			EPRINT("inaccurate block! target:%u, sid_pba:%u", true, bidx*_PPB, info->sa->pba_array[idx].PBA);
@@ -262,7 +278,10 @@ typedef struct pinned_info{
 	run *r;
 	uint32_t intra_offset;
 	uint32_t old_psa;
+	uint32_t new_piece_ppa;
 	uint32_t ste_num;
+	uint32_t lba;
+	bool update_target;
 }pinned_info;
 
 static inline void __update_pinning(uint32_t *lba_set, pinned_info *pset, uint32_t ppa,
@@ -274,6 +293,35 @@ static inline void __update_pinning(uint32_t *lba_set, pinned_info *pset, uint32
 		}
 		st_array_update_pinned_info(r->st_body, pset[i].ste_num, pset[i].intra_offset, ppa*L2PGAP+i, pset[i].old_psa);
 	}
+}
+
+static inline uint32_t __processing_unlinked_psa(block_info *binfo, uint32_t lba, uint32_t psa, bool mixed){
+	bool processed=false;
+	uint32_t intra_offset;
+	uint32_t ste_num;
+	for(uint32_t k=0; k<MAX_RUN_NUM_FOR_FRAG; k++){
+		if((binfo->frag_info & (1<<k))==0) continue;
+		sid_info* temp_sid=sorted_array_master_get_info(k);
+		if(temp_sid==NULL) continue;
+		if(temp_sid->r==NULL) continue;
+
+		intra_offset=run_find_include_address_byself(temp_sid->r, lba, psa, &ste_num);
+		if(intra_offset==NOT_FOUND) continue;
+
+		st_array_unlink_bit_set(temp_sid->sa, ste_num, intra_offset, psa);
+		processed=true;
+		break;
+	}
+	if(!processed){
+		if(mixed){
+			//the data reside in binfo, but new lba was written
+			return UINT32_MAX;
+		}
+		else{
+			EPRINT("unlinking psa failed", true);
+		}
+	}
+	return UINT32_MAX;
 }
 
 static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
@@ -320,37 +368,15 @@ static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 						continue;
 					}
 
-
 					uint32_t lba=g_value->oob[j];
 					uint32_t psa=g_value->ppa*L2PGAP+j;
 					uint32_t intra_offset;
 					uint32_t ste_num;
 
-
-					if(g_value->ppa*L2PGAP+j==16496192 && lba==test_key){
-						GDB_MAKE_BREAKPOINT;
-					}
-
 					run *r=run_find_include_address(LSM->shortcut, lba, psa, &ste_num, &intra_offset);
 					if(r==NULL){ //unlinked ppa;
-						bool processed=false;
 						block_info *binfo=g_blk->b_info;
-						for(uint32_t k=0; k<MAX_RUN_NUM_FOR_FRAG; k++){
-							if((binfo->frag_info & (1<<k))==0) continue;
-
-							sid_info* temp_sid=sorted_array_master_get_info(k);
-							if(temp_sid->r==NULL) continue;
-
-							intra_offset=run_find_include_address_byself(temp_sid->r, lba, psa, &ste_num);
-							if(intra_offset==NOT_FOUND) continue;
-
-							st_array_unlink_bit_set(temp_sid->sa, ste_num, intra_offset, psa);
-							processed=true;
-							break;
-						}
-						if(!processed){
-							EPRINT("unlinking psa failed", true);
-						}
+						__processing_unlinked_psa(binfo, lba, psa, false);
 						continue;
 					}
 					else{
@@ -422,10 +448,153 @@ static inline bool __normal_block_valid_check(blockmanager *sm, uint32_t block_i
 	return invalidate_cnt!=L2PGAP *_PPB;
 }
 
+static inline void copy_mixed_block(L2P_bm *bm, list *blk_list){
+	if(blk_list->size==0) return;
+	li_node *now, *nxt, *p_now, *p_nxt;
+	blockmanager *sm=bm->segment_manager;
+	list *temp_list=list_init();
+	gc_value *g_value;
+	pinned_info pset[L2PGAP];
+	for_each_list_node_safe(blk_list, now, nxt){
+		gc_block *g_blk=(gc_block*)now->data;
+		uint32_t bidx=g_blk->blk->block_idx;
+		sid_info* info=sorted_array_master_get_info(g_blk->b_info->sid);
+		if(info->sa==NULL){
+			EPRINT("not found info at sid:%u", false, g_blk->b_info->sid);
+			GDB_MAKE_BREAKPOINT; //not be commented
+			info=sorted_array_master_get_info(g_blk->b_info->sid);
+		}
+		uint32_t invalidate_piece_num=0, validate_piece_num=0;
+
+		/*read all page*/
+		for(uint32_t i=0; i<_PPB; i++){
+			uint32_t page=bidx*_PPB+i;
+			bool read_flag=false;
+			for(uint32_t j=0; j<L2PGAP; j++){
+				if(sm->is_invalid_piece(sm, page*L2PGAP+j)){
+					invalidate_piece_num++;
+					continue;
+				}
+				validate_piece_num++;
+				read_flag=true;
+				break;
+			}
+
+			if(read_flag){
+				g_value=__gc_issue_read(page, sm, GCDR);
+				list_insert(temp_list, (void*)g_value);
+			}
+		}
+		if(bidx==test_piece_ppa/L2PGAP/_PPB){
+			printf("%u block including target gced copy_num:%u\n", test_piece_ppa, temp_list->size);
+		}
+
+		if(temp_list->size==0){
+			info->sa->sp_meta[g_blk->b_info->intra_idx].all_reinsert=true;
+			free(g_blk);
+			list_delete_node(blk_list, now);
+			 continue;
+		}
+
+		uint32_t new_pba=L2PBm_pick_empty_RPBA(bm);
+		uint32_t prev_ppa=UINT32_MAX;
+		bool valid_data_ptr[L2PGAP];
+		uint32_t idx=g_blk->b_info->intra_idx;
+		L2PBm_make_map_mixed(bm, new_pba, info->sid, idx, g_blk->b_info->frag_info);
+
+		while(temp_list->size){
+			for_each_list_node_safe(temp_list, p_now, p_nxt){
+				g_value=(gc_value*)p_now->data;
+				__gc_read_check(g_value);
+
+				for(uint32_t j=0; j<L2PGAP; j++){
+					pset[j].update_target=false;
+					if(sm->is_invalid_piece(sm, g_value->ppa*L2PGAP+j)){
+						valid_data_ptr[j]=false;
+						continue;
+					}
+
+					valid_data_ptr[j]=true;
+					pset[j].lba=g_value->oob[j];
+					pset[j].old_psa=g_value->ppa*L2PGAP+j;
+
+					uint32_t ste_num; 
+					uint32_t intra_offset;
+					run *r=run_find_include_address_for_mixed(LSM->shortcut, pset[j].lba, pset[j].old_psa, &ste_num, &intra_offset);
+					if(intra_offset==NOT_FOUND){
+						if(r && r->st_body->pba_array[ste_num].PBA==bidx*_PPB){
+							pset[j].r=NULL;
+							pset[j].update_target=false;
+						}
+						else{
+							pset[j].r=NULL;
+							pset[j].update_target=true;
+						}
+					}
+					else{
+						pset[j].r=r;
+						pset[j].update_target=true;
+						pset[j].ste_num=ste_num;
+						pset[j].intra_offset=intra_offset;
+					}
+
+					if(invalidate_piece_ppa(sm, g_value->ppa*L2PGAP+j, true)==BIT_ERROR){
+						EPRINT("bit error in normal block copy", true);
+					}
+				}
+					
+				uint32_t start_rppa=new_pba+(g_value->ppa%_PPB);
+				if(prev_ppa==UINT32_MAX || prev_ppa<start_rppa){
+					prev_ppa=start_rppa;
+				}
+				else{
+					EPRINT("start_rppa should be increase", true);
+				}
+				g_value->ppa=start_rppa;
+
+				for(uint32_t j=0; j<L2PGAP; j++){
+					if(!valid_data_ptr[j]){
+						continue;
+					}
+					pset[j].new_piece_ppa=g_value->ppa*L2PGAP+j;
+					if(validate_piece_ppa(sm, g_value->ppa*L2PGAP+j, true)==BIT_ERROR){
+						EPRINT("bit error in normal block copy", true);
+					}
+				}
+
+				__gc_issue_write(g_value, sm, GCDW);
+				
+				for(uint32_t j=0; j<L2PGAP; j++){
+					if(pset[j].update_target==false) continue;
+					if(pset[j].r){
+						st_array_update_pinned_info(pset[j].r->st_body, pset[j].ste_num, pset[j].intra_offset, pset[j].new_piece_ppa, pset[j].old_psa);
+					}
+					else{
+						__processing_unlinked_psa(g_blk->b_info, pset[j].lba, pset[j].old_psa, true);
+					}
+				}
+
+
+				list_delete_node(temp_list, p_now);
+			}
+		}
+
+		/*update block mapping*/
+		if(info->sa->pba_array[idx].PBA!=bidx*_PPB){
+			EPRINT("inaccurate block! target:%u, sid_pba:%u", true, bidx*_PPB, info->sa->pba_array[idx].PBA);
+		}
+		info->sa->pba_array[idx].PBA=new_pba;
+
+		free(g_blk);
+		list_delete_node(blk_list, now);
+	}
+}
+
 uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
 	//DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
 	blockmanager *sm=bm->segment_manager;
 	list *normal_list=list_init();
+	list *mixed_list=list_init();
 	list *frag_list=list_init();
 	__block *blk;
 	uint32_t bidx;
@@ -443,6 +612,9 @@ uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
 					free(temp);
 				}
 				break;
+			case LSM_BLOCK_MIXED:
+				list_insert(mixed_list, (void*)temp);
+				break;
 			case LSM_BLOCK_FRAGMENT:
 				list_insert(frag_list, (void*)temp);
 				break;
@@ -453,6 +625,7 @@ uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
 	}
 
 	copy_normal_block(bm, normal_list);
+	copy_mixed_block(bm, mixed_list);
 	copy_frag_block(bm, frag_list);
 
 	__clear_block_and_gsegment(bm, target);

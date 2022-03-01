@@ -66,34 +66,6 @@ uint32_t print_log_temp(){
 }
 
 uint32_t write_temp(request *const req){
-	/*
-	static bool debug_flag=false;
-	static run *now_run=NULL;
-	
-	if(now_run==NULL){
-		uint32_t idx=empty_space();
-		run_array[idx]=run_factory(idx, TREE_MAP, entry_per_run, 0.1, bm, RUN_LOG);
-		now_run=run_array[idx];
-	}
-
-	if(run_is_empty(now_run)){
-		shortcut_add_run(shortcut, now_run);
-	}
-
-	run_insert(now_run, req->key, UINT32_MAX, req->value->value, false);
-	
-	if(run_is_full(now_run)){
-		run_check(now_run, bm->segment_manager);
-		run_insert_done(now_run, false);
-		if(shortcut_compaction_trigger(shortcut)){
-			run *res=compaction_test(shortcut, 2, GUARD_BF, 0.1, bm);
-			uint32_t idx=empty_space();
-			run_array[idx]=res;
-		}
-		now_run=NULL;
-	}
-	req->end_req(req);*/
-
 	if(lsmtree_insert(LSM, req)==0){
 		req->end_req(req);
 	}
@@ -102,22 +74,6 @@ uint32_t write_temp(request *const req){
 
 uint32_t read_temp(request *const req){
 	uint32_t res;
-	/*
-	run *t_run=shortcut_query(shortcut, req->key);
-
-	if(!req->retry){
-		res=run_query(t_run, req);
-	}
-	else{
-		res=run_query_retry(t_run, req);
-	}
-
-	if(res==NOT_FOUND){
-		req->type==FS_NOTFOUND_T;
-		printf("%u not found\n", req->key);
-		abort();
-	}*/
-
 	res=lsmtree_read(LSM, req);
 	return res;
 }

@@ -1,5 +1,6 @@
 #ifndef SUMMARY_PAGE_SET_H
 #define SUMMARY_PAGE_SET_H
+#include "./shortcut_dir.h"
 #include "./sorted_table.h"
 #include "./summary_page.h"
 #include "./mapping_function.h"
@@ -19,6 +20,7 @@ typedef struct summary_page_set_iter{
 	uint32_t miter_pick_cnt;
 	map_iter *miter;
 	summary_page_meta *spm_set;
+	sc_dir_dp *dp;
 
 	bool differ_map;
 	uint32_t noncopy_idx;
@@ -32,7 +34,7 @@ sp_set_iter *sp_set_iter_init(uint32_t max_STE_num, summary_page_meta *sp_set, u
 sp_set_iter *sp_set_iter_init_mf(uint32_t max_STE_num, summary_page_meta *sp_set, uint32_t entry_num, map_function *mf, bool differ_map);
 
 uint32_t sp_set_get_ste_num(sp_set_iter *ssi, uint32_t global_offset);
-summary_pair sp_set_iter_pick(sp_set_iter *ssi);
+summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r);
 void sp_set_iter_skip_lba(sp_set_iter *ssi, uint32_t idx, uint32_t lba, uint32_t end);
 bool sp_set_noncopy_check(sp_set_iter *ssi, uint32_t lba, uint32_t *end_lba);
 uint32_t sp_set_iter_move(sp_set_iter *ssi);

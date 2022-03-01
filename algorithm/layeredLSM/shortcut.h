@@ -6,8 +6,11 @@
 #include "./shortcut_dir.h"
 #include <list>
 #include <stdlib.h>
+#include <vector>
 #define NOT_ASSIGNED_SC UINT8_MAX
 #define MAX_SC_DIR_NUM (RANGE/SC_PER_DIR)
+#define SC_MEM_OPT
+#define SC_QUERY_DP
 
 typedef struct shortcut_info{
 	uint8_t idx;
@@ -20,11 +23,13 @@ typedef struct shortcut_info{
 }shortcut_info;
 typedef struct shortcut_info sc_info;
 
-
 typedef struct shortcut_master{
 	std::list<uint32_t> *free_q;
+#ifdef SC_MEM_OPT
+	struct shortcut_directory* sc_dir;
+#else
 	uint8_t *sc_map;
-	shortcut_dir sc_dir[MAX_SC_DIR_NUM];
+#endif
 	sc_info *info_set;
 	uint32_t max_shortcut_num;
 	uint32_t now_recency;
@@ -43,7 +48,7 @@ typedef shortcut_master sc_master;
  *	max_shortcut_num: max number of shortcut
  *	lba_range: max number of lba
  * */
-sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range);
+sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range, uint32_t lba_bit);
 
 /*
  * Function: shortcut_add_run
@@ -81,6 +86,11 @@ void shortcut_add_run_merge(sc_master *sc, run *r, run **rset, uint32_t merge_nu
 bool shortcut_validity_check_lba(sc_master *sc, run *r, uint32_t lba);
 
 bool shortcut_validity_check_by_value(sc_master *sc, run *r, uint32_t level, uint32_t recency, uint32_t lba);
+#ifdef SC_QUERY_DP
+bool shortcut_validity_check_dp_lba(sc_master *sc, run *r, struct shortcut_directory_dp *dp, uint32_t lba);
+
+bool shortcut_validity_check_by_dp_value(sc_master *sc, run *r, struct shortcut_directory_dp *dp, uint32_t level, uint32_t recency, uint32_t lba);
+#endif
 
 /*
  * Function: shortcut_link_lba
@@ -92,6 +102,8 @@ bool shortcut_validity_check_by_value(sc_master *sc, run *r, uint32_t level, uin
  *	lba:
  * */
 void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba);
+
+void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_set, bool unlink);
 
 /*
  * Function: shortcut_unlink_lba
@@ -114,6 +126,9 @@ void shortcut_unlink_lba(sc_master *sc, run *r, uint32_t lba);
  * */
 run* shortcut_query(sc_master *sc, uint32_t lba);
 
+#ifdef SC_QUERY_DP
+run* shortcut_dp_query(sc_master *sc, struct shortcut_directory_dp *dp, uint32_t lba);
+#endif
 /*
  * Function: shortcut_unlink_and_link_lba
  * ------------------------------------
@@ -124,6 +139,10 @@ void shortcut_unlink_and_link_lba(sc_master *sc, run *r, uint32_t lba);
 uint64_t shortcut_memory_usage(sc_master *sc);
 
 bool shortcut_validity_check_and_link(sc_master*sc, run *src_r, run* des_r, uint32_t lba);
+
+#ifdef SC_QUERY_DP
+bool shortcut_validity_check_and_link_dp(sc_master*sc, struct shortcut_directory_dp* dp, run *src_r, run* des_r, uint32_t lba);
+#endif
 /*
  * Function: shortcut_release_sc_info
  * ---------------------------------
@@ -157,6 +176,10 @@ static inline bool shortcut_is_full(sc_master *sc){
 
 static inline bool shortcut_compaction_trigger(sc_master *sc){
 	return sc->free_q->size()==1;
+}
+
+static inline bool shortcut_memory_full(sc_master *sc){
+	return sc->now_memory_usage >= sc->max_memory_usage;
 }
 
 #endif

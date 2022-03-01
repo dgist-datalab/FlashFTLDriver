@@ -1,5 +1,6 @@
 #include "run.h"
 #include "piece_ppa.h"
+#include "../../include/sem_lock.h"
 
 extern lower_info *g_li;
 extern uint32_t test_key;
@@ -31,6 +32,19 @@ static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blo
 	g_li->write(ppa, PAGESIZE, value, res);
 }
 
+static void __run_write_meta(run *r, blockmanager *sm, bool force){
+	uint32_t target_ppa=st_array_summary_translation(r->st_body, force)/L2PGAP;
+	summary_write_param *swp=st_array_get_summary_param(r->st_body, target_ppa, force);
+	if(!swp) return;
+
+	if(validate_ppa(sm, target_ppa, true)!=BIT_SUCCESS){
+		EPRINT("map write error", true);
+	}
+
+	__run_issue_write(target_ppa, swp->value, (char*)swp->oob, 
+			r->st_body->bm->segment_manager, (void*)swp, MAPPINGW);
+}
+
 static void __run_write_buffer(run *r, blockmanager *sm, bool force, 
 		uint32_t type){
 	uint32_t target_ppa=UINT32_MAX, psa, intra_offset;
@@ -41,15 +55,14 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 		
 		psa_list[i]=psa;
 		uint32_t lba=r->pp->LBA[i];
-		if(lba==test_key || lba ==test_key2){
-			EPRINT("%u ppa->%u", false, lba, psa);
-		}
+
 		if(i==0){
 			target_ppa=psa/L2PGAP;
 #ifdef LSM_DEBUG
 			sm->set_oob(sm, (char*)r->pp->LBA, sizeof(uint32_t) * L2PGAP, target_ppa);
 #endif
 		}
+
 		if(validate_piece_ppa(sm, psa_list[i], true)!=BIT_SUCCESS){
 			EPRINT("double insert error", true);
 		}
@@ -65,32 +78,22 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 		}
 
 		st_array_insert_pair(r->st_body, lba, psa, false);
+		if(r->st_body->unaligned_block_write && r->st_body->summary_write_alert){
+			__run_write_meta(r, r->st_body->bm->segment_manager, false);
+		}
 	}
 	__run_issue_write(target_ppa, pp_get_write_target(r->pp, force), (char*)r->pp->LBA, 
 			sm, NULL, type);
 }
 
-static void __run_write_meta(run *r, blockmanager *sm, bool force){
-	uint32_t target_ppa=st_array_summary_translation(r->st_body, force)/L2PGAP;
-	summary_write_param *swp=st_array_get_summary_param(r->st_body, target_ppa, force);
-	if(!swp) return;
-
-	if(validate_ppa(sm, target_ppa, true)!=BIT_SUCCESS){
-		EPRINT("map write error", true);
-	}
-
-	__run_issue_write(target_ppa, swp->value, (char*)swp->oob, 
-			r->st_body->bm->segment_manager, (void*)swp, MAPPINGW);
-}
-
 bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, 
 	bool merge_insert,	sc_master *shortcut){
-	if(r->max_entry_num < r->now_entry_num){
+	if(r->limit_entry_num < r->now_entry_num){
 		EPRINT("run full!", true);
 		return false;
 	}
 
-	if(!shortcut_validity_check_and_link(shortcut, r, r, lba)){
+	if(r->type==RUN_LOG && !shortcut_validity_check_and_link(shortcut, r, r, lba)){
 		return false;
 	}
 
@@ -98,7 +101,6 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 		if(data){
 			EPRINT("not allowed in RUN_PINNING", true);
 		}
-
 		st_array_insert_pair(r->st_body, lba, psa, false);
 	}
 	else{
@@ -139,7 +141,6 @@ void run_padding_current_block(run *r){
 
 void run_copy_ste_to(run *r, struct sorted_table_entry *ste, summary_page_meta *spm, map_function *mf, bool unlinked_data_copy){
 	st_array_copy_STE(r->st_body, ste, spm, mf, unlinked_data_copy);
-
 }
 
 void run_trivial_move_setting(run *r, struct sorted_table_entry *ste){
@@ -194,3 +195,142 @@ void run_insert_done(run *r, bool merge_insert){
 	}
 	*/
 }
+#ifdef SC_MEM_OPT
+
+typedef struct reinsert_node{
+	bool prev_same;
+	uint32_t lba;
+	uint32_t piece_ppa;
+	run *r;
+	uint32_t ste;
+	value_set *value;
+	fdriver_lock_t lock;
+}reinsert_node;
+
+static void *__read_for_piece_ppa_end_req(algo_req *req){
+	reinsert_node *node=(reinsert_node*)req->param;
+	fdriver_unlock(&node->lock);
+	free(req);
+	return NULL;
+}
+
+void __read_for_piece_ppa(uint32_t ppa, reinsert_node *issue_node){
+	algo_req *req=(algo_req*)malloc(sizeof(algo_req));
+	issue_node->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+	fdriver_mutex_init(&issue_node->lock);
+	fdriver_lock(&issue_node->lock);
+
+	req->type=COMPACTIONDATAR;
+	req->value=issue_node->value;
+	req->end_req=__read_for_piece_ppa_end_req;
+	req->param=(void*)issue_node;
+	req->parents=NULL;
+	g_li->read(ppa, PAGESIZE, req->value, req);
+}
+
+uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *sc){
+	uint32_t info_idx=r->info->idx;
+	sc_dir_dp *temp_dp=sc_dir_dp_init(sc, start_lba);
+	std::list<reinsert_node*> temp_list;
+	reinsert_node *prev_node=NULL;
+	reinsert_node *temp_node;
+
+	static uint32_t reinsert_cnt=0;
+	bool debug_flag=false;
+	if(reinsert_cnt++==152801){
+//		debug_flag=true;
+	}
+	//printf("reinsert_cnt :%u\n", reinsert_cnt++);
+
+	for(uint32_t i=start_lba; i<start_lba+SC_PER_DIR; i++){
+		uint32_t now_info_idx=sc_dir_dp_get_sc(temp_dp, sc, i);
+		if(info_idx!=now_info_idx && now_info_idx!=NOT_ASSIGNED_SC){
+			temp_node = (reinsert_node *)malloc(sizeof(reinsert_node));
+			temp_node->lba = i;
+			temp_node->piece_ppa = UINT32_MAX;
+			temp_node->r = sc->info_set[now_info_idx].r;
+
+			temp_node->ste = st_array_get_target_STE(temp_node->r->st_body, i);
+			temp_node->prev_same = false;
+			temp_node->value = NULL;
+			//read target;
+			if (prev_node)
+			{
+				if (temp_node->r == prev_node->r && temp_node->ste == prev_node->ste)
+				{
+					temp_node->prev_same = true;
+				}
+			}
+			prev_node = temp_node;
+
+			if (!temp_node->prev_same)
+			{
+				__read_for_piece_ppa(temp_node->r->st_body->sp_meta[temp_node->ste].ppa, temp_node);
+			}
+			temp_list.push_back(temp_node);
+		}
+	}
+
+	st_array_set_unaligned_block_write(r->st_body);
+
+	std::vector<uint32_t> bulk_lba_set;
+	std::list<reinsert_node*>::iterator iter;
+	value_set *prev_value_set=NULL;
+	for(iter=temp_list.begin(); iter!=temp_list.end();){
+		temp_node=*iter;
+		uint32_t offset;
+		if(temp_node->prev_same){
+			offset=sp_find_offset_by_value(prev_value_set->value, temp_node->lba);
+		}	
+		else{
+			if(prev_value_set){
+				inf_free_valueset(prev_value_set, FS_MALLOC_R);
+			}
+			fdriver_lock(&temp_node->lock);
+			fdriver_destroy(&temp_node->lock);
+			offset=sp_find_offset_by_value(temp_node->value->value, temp_node->lba);
+			prev_value_set=temp_node->value;
+		}
+		bulk_lba_set.push_back(temp_node->lba);
+		temp_node->piece_ppa=run_translate_intra_offset(temp_node->r, temp_node->ste, offset);
+
+		if(temp_node->r->type==RUN_PINNING){
+			st_array_unlink_bit_set(temp_node->r->st_body, temp_node->ste, offset, temp_node->piece_ppa);
+		}
+
+	//	printf("global intra:%u\n", r->st_body->global_write_pointer);
+		uint32_t intra_offset=r->st_body->global_write_pointer;
+		if(r->type==RUN_LOG){
+			uint32_t res=r->run_log_mf->insert(r->run_log_mf,  temp_node->lba, intra_offset);
+			if(res!=INSERT_SUCCESS){
+				EPRINT("it cannot be!!", true);
+			}
+		}
+		else{
+			EPRINT("error type in reinsert", true);
+		}
+
+		L2PBm_block_mixed_check_and_set(lsm->bm, temp_node->piece_ppa/L2PGAP/_PPB*_PPB, r->st_body->sid);
+		st_array_insert_pair_for_reinsert(r->st_body, temp_node->lba, temp_node->piece_ppa, false);
+		r->now_entry_num++;
+		
+		if(r->st_body->summary_write_alert){
+			__run_write_meta(r, r->st_body->bm->segment_manager, false);
+		}
+
+		free(temp_node);
+		temp_list.erase(iter++);
+	}
+	
+	if(prev_value_set){
+		inf_free_valueset(prev_value_set, FS_MALLOC_R);
+	}
+
+	uint32_t res=bulk_lba_set.size();
+	if(res!=0){
+		shortcut_link_bulk_lba(sc, r, &bulk_lba_set, true);
+	}
+	sc_dir_dp_free(temp_dp);
+	return res;
+}
+#endif

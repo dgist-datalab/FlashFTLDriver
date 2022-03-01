@@ -5,7 +5,6 @@
 #include "../../bench/measurement.h"
 #include "./piece_ppa.h"
 #include "./lsmtree.h"
-#include "./merge_helper.h"
 #include "./gc.h"
 extern lower_info *g_li;
 bool debug_flag=false;
@@ -29,11 +28,10 @@ static inline uint32_t __set_read_flag(mm_container *mm_set, uint32_t run_num, u
 	return res;
 } 
 
-static inline void __invalidate_target(run *r, uint32_t ste, uint32_t intra_offset){
-	uint32_t original_psa=run_translate_intra_offset(r, ste, intra_offset);
-	if(original_psa==UNLINKED_PSA) return;
-	if(invalidate_piece_ppa(r->st_body->bm->segment_manager, original_psa, true)==BIT_ERROR){
-		EPRINT("BIT ERROR piece_ppa: %u", true, original_psa);
+static inline void __invalidate_target(run *r, uint32_t piece_ppa, bool force){
+	if(piece_ppa==UNLINKED_PSA) return;
+	if(invalidate_piece_ppa(r->st_body->bm->segment_manager, piece_ppa, force)==BIT_ERROR){
+		EPRINT("BIT ERROR piece_ppa: %u", true, piece_ppa);
 	}
 }
 
@@ -47,12 +45,12 @@ static inline bool __move_iter_target(mm_container *mm_set, uint32_t idx){
 	return mm_set[idx].now_proc_block_idx!=prev_now;
 }
 
-static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint32_t lba,
+static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint32_t lba, uint32_t piece_ppa, 
 		uint32_t read_flag, uint32_t ridx, uint32_t target_round){
 	summary_pair res;
 	for(uint32_t i=0; i<run_num; i++){
 		if(mm_set[i].done) continue;
-		res=sp_set_iter_pick(mm_set[i].ssi);
+		res=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r);
 		if(res.lba==UINT32_MAX && __move_iter_target(mm_set, i)){
 			if(mm_set[i].now_proc_block_idx>=target_round){
 				read_flag |= (1 << i);
@@ -60,8 +58,14 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 			continue;
 		}
 		if(res.lba==lba){
-			if(i!=ridx){
-				__invalidate_target(mm_set[i].r, sp_set_get_ste_num(mm_set[i].ssi, res.intra_offset), res.intra_offset);
+			if(i!=ridx && res.piece_ppa!=piece_ppa){
+				uint32_t now_ste_num=mm_set[i].ssi->now_STE_num;
+				if(mm_set[i].r->st_body->sp_meta[now_ste_num].all_reinsert){
+
+				}
+				else{
+					__invalidate_target(mm_set[i].r, res.piece_ppa, false);
+				}
 			}
 
 			if(__move_iter_target(mm_set, i)){
@@ -86,12 +90,12 @@ retry:
 		if(mm_set[i].done) continue;
 		if(i==0 || res.lba==UINT32_MAX){
 			*ridx=i;
-			res=sp_set_iter_pick(mm_set[i].ssi);
+			res=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r);
 			continue;
 		}
 
 		//DEBUG_CNT_PRINT(temp, 371522, __FUNCTION__, __LINE__);
-		now=sp_set_iter_pick(mm_set[i].ssi);
+		now=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r);
 		if(res.lba > now.lba){
 			res=now;
 			*ridx=i;
@@ -103,21 +107,43 @@ retry:
 		__move_iter_target(mm_set, t_idx);
 	}
 	/*check validataion whether old or not*/
-	else if(!shortcut_validity_check_lba(shortcut, mm_set[t_idx].r, res.lba)){
-		__invalidate_target(mm_set[t_idx].r, sp_set_get_ste_num(mm_set[t_idx].ssi, res.intra_offset), res.intra_offset);
+#ifdef SC_QUERY_DP
+	else if(!shortcut_validity_check_dp_lba(shortcut, mm_set[t_idx].r, mm_set[t_idx].ssi->dp, res.lba))
+#else
+	else if(!shortcut_validity_check_lba(shortcut, mm_set[t_idx].r, res.lba))
+#endif
+	{
+		uint32_t now_ste_num=mm_set[t_idx].ssi->now_STE_num;
+		if(mm_set[t_idx].r->st_body->sp_meta[now_ste_num].all_reinsert){
+
+		}
+		else{
+			__invalidate_target(mm_set[t_idx].r, res.piece_ppa, false);
+		}
 		__move_iter_target(mm_set, t_idx);
 		res.lba=UINT32_MAX;
-		res.intra_offset=UINT32_MAX;
+		res.piece_ppa=UINT32_MAX;
 		goto retry;
 	}
 	else if((spm=sp_set_check_trivial_old_data(mm_set[t_idx].ssi))!=NULL){
 		uint32_t original_level=spm->original_level;
 		uint32_t original_recency=spm->original_recency;
-		if(!shortcut_validity_check_by_value(shortcut, mm_set[t_idx].r, original_level, original_recency, res.lba)){
-			__invalidate_target(mm_set[t_idx].r, sp_set_get_ste_num(mm_set[t_idx].ssi, res.intra_offset), res.intra_offset);
+#ifdef SC_QUERY_DP
+		if(!shortcut_validity_check_by_dp_value(shortcut, mm_set[t_idx].r, mm_set[t_idx].ssi->dp, original_level, original_recency, res.lba))
+#else
+		if(!shortcut_validity_check_by_value(shortcut, mm_set[t_idx].r, original_level, original_recency, res.lba))
+#endif
+		{
+			uint32_t now_ste_num=mm_set[t_idx].ssi->now_STE_num;
+			if(mm_set[t_idx].r->st_body->sp_meta[now_ste_num].all_reinsert){
+
+			}
+			else{
+				__invalidate_target(mm_set[t_idx].r, res.piece_ppa, false);
+			}
 			__move_iter_target(mm_set, t_idx);
 			res.lba = UINT32_MAX;
-			res.intra_offset = UINT32_MAX;
+			res.piece_ppa = UINT32_MAX;
 			goto retry;
 		}
 	}
@@ -159,17 +185,10 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	uint32_t prev_original_psa=UINT32_MAX;
 	__sorted_pair *prev_t_pair=NULL;
 	value_set *start_value=NULL;
-	/*
+
 	for(; iter!=sorted_list->end(); iter++){
 		__sorted_pair *t_pair=&(*iter);
-		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
-		t_pair->free_target=true;
-		start_value=__merge_issue_req(t_pair);
-	}*/
-	
-	for(; iter!=sorted_list->end(); iter++){
-		__sorted_pair *t_pair=&(*iter);
-		t_pair->original_psa=run_translate_intra_offset(t_pair->r,t_pair->ste_num, t_pair->pair.intra_offset);
+		t_pair->original_psa=t_pair->pair.piece_ppa;
 		t_pair->free_target=false;
 		if(prev_original_psa==UINT32_MAX){
 			prev_original_psa=t_pair->original_psa;
@@ -192,7 +211,6 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 	}
 	prev_t_pair->free_target=true;
 	prev_t_pair->value=start_value;
-
 }
 
 extern lsmtree *LSM;
@@ -204,33 +222,36 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			__sorted_pair *t_pair=&(*iter);
 			fdriver_lock(&t_pair->lock);
 			fdriver_destroy(&t_pair->lock);
-			__invalidate_target(t_pair->r, t_pair->ste_num, t_pair->pair.intra_offset);
+			__invalidate_target(t_pair->r, t_pair->pair.piece_ppa, true);
 		}
 	}
 
+	std::vector<uint32_t> lba_set;
 	iter=sorted_list->begin();
 	static uint32_t cnt=0;
-	for(; iter!=sorted_list->end(); ){
-		__sorted_pair *t_pair=&(*iter);
-		if(r->type==RUN_PINNING){
-			t_pair->original_psa=run_translate_intra_offset(t_pair->r, t_pair->ste_num, 
-			t_pair->pair.intra_offset);
-			
-			if(!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true, shortcut)){
-				__invalidate_target(t_pair->r, t_pair->ste_num, t_pair->pair.intra_offset);
+	for (; iter != sorted_list->end();)
+	{
+		__sorted_pair *t_pair = &(*iter);
+		lba_set.push_back(t_pair->pair.lba);
+		if (r->type == RUN_PINNING)
+		{
+			t_pair->original_psa =t_pair->pair.piece_ppa;
+			if (!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, true, shortcut))
+			{
+				__invalidate_target(t_pair->r, t_pair->pair.piece_ppa, true);
 			}
 			sorted_list->erase(iter++);
 		}
-		else{
-			//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
-			if(!run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true, shortcut)){
-
+		else
+		{
+			if (!run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, true, shortcut))
+			{
 			}
-			//inf_free_valueset(t_pair->value, FS_MALLOC_R);
 			iter++;
 		}
-	//	sorted_list->erase(iter++);
 	}
+
+	shortcut_link_bulk_lba(shortcut, r, &lba_set, true);
 
 	if(r->type==RUN_NORMAL){
 		iter=sorted_list->begin();
@@ -280,15 +301,6 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 				}
 				if(check_self==false && rset[k]->type==RUN_NORMAL){
 					set_idx = spm_joint_check(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
-					
-					/*
-					uint32_t set_idx_debug = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
-					if(set_idx!=set_idx_debug){
-						EPRINT("joint error",false);
-						GDB_MAKE_BREAKPOINT; //not be commented
-						set_idx = spm_joint_check(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp);
-					}
-					*/
 				}
 				else{
 					set_idx = spm_joint_check_debug(rset[k]->st_body->sp_meta, rset[k]->st_body->now_STE_num, temp, (check_self && k==i)?j:UINT32_MAX);
@@ -319,38 +331,6 @@ static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_contain
 
 extern uint32_t test_key;
 
-uint32_t trivial_move2(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
-	run_padding_current_block(r);
-	bool unlinked_data_copy=false;
-	uint32_t des_ste_num=r->st_body->now_STE_num;
-	uint32_t original_level=mm->r->info->level_idx;
-	uint32_t original_recency=mm->r->info->recency;
-	uint32_t target_ste = sp_set_get_ste_num(mm->ssi, now.intra_offset);
-	uint32_t res= mm->r->st_body->sp_meta[target_ste].end_lba;
-
-	run_trivial_move_setting(r, &mm->r->st_body->pba_array[target_ste]);
-	while(1){
-		summary_pair target = sp_set_iter_pick(mm->ssi);
-		if(!shortcut_validity_check_and_link(shortcut,mm->r, r ,target.lba)){
-			unlinked_data_copy=true;
-			r->info->unlinked_lba_num++;
-		}
-		uint32_t original_psa=run_translate_intra_offset(mm->r, target_ste, target.intra_offset);
-		run_trivial_move_insert(r, target.lba, original_psa, target.lba==res);
-		if(target.lba==res){
-			break;
-		}
-		__move_iter_target(mm, 0);
-	}
-
-	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy, original_level, original_recency);
-	sp_set_iter_move_ste(mm->ssi, target_ste, res);
-	if (sp_set_iter_done_check(mm->ssi)){
-			mm->done = true;
-	}
-	return res;
-}
-
 uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pair now){
 	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 	run_padding_current_block(r);
@@ -360,7 +340,15 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 	if(mm->ssi->differ_map){
 		mf=map_function_factory(r->st_body->param, MAX_SECTOR_IN_BLOCK);
 	}
-	target_ste = sp_set_get_ste_num(mm->ssi, now.intra_offset);
+
+	if(mm->r->type==RUN_LOG){
+		//piece_ppa is used as global idx in L0
+		target_ste = sp_set_get_ste_num(mm->ssi, now.piece_ppa);
+	}
+	else{
+		target_ste = st_array_get_target_STE(mm->r->st_body, now.lba);
+	}
+
 	uint32_t res= mm->r->st_body->sp_meta[target_ste].end_lba;
 
 	bool unlinked_data_copy=false;
@@ -368,17 +356,45 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 	run_copy_ste_to(r, &mm->r->st_body->pba_array[target_ste], &mm->r->st_body->sp_meta[target_ste], mf, false);
 	uint32_t original_level=mm->r->info->level_idx;
 	uint32_t original_recency=mm->r->info->recency;
+
+#ifdef SC_QUERY_DP
+	sc_dir_dp *temp_dp=sc_dir_dp_init(shortcut, now.lba);
+#endif
+
+	std::vector<uint32_t> temp_vec;
 	while(1){
-		summary_pair target = sp_set_iter_pick(mm->ssi);
+		summary_pair target = sp_set_iter_pick(mm->ssi, mm->r);
 		if(mf){
 			mf->insert(mf, target.lba, i++);
 		}
-
-		if(!shortcut_validity_check_and_link(shortcut,mm->r, r ,target.lba)){
+		if(target.lba==test_key){
+			printf("%u target trivial_move psa:%u\n", target.lba, target.piece_ppa);
+		}
+#ifdef SC_QUERY_DP
+		if(!shortcut_validity_check_dp_lba(shortcut, mm->r, temp_dp, target.lba))
+#else
+		if(!shortcut_validity_check_lba(shortcut, mm->r, target.lba))
+#endif
+		{
 			unlinked_data_copy=true;
 			r->info->unlinked_lba_num++;
 		}
+		else{
+			temp_vec.push_back(target.lba);
+		}
 
+
+/*
+#ifdef 	SC_QUERY_DP
+		if(!shortcut_validity_check_and_link_dp(shortcut, temp_dp, mm->r, r ,target.lba))
+#else
+		if(!shortcut_validity_check_and_link(shortcut, mm->r, r ,target.lba))
+#endif
+		{
+			unlinked_data_copy=true;
+			r->info->unlinked_lba_num++;
+		}
+*/
 		r->now_entry_num++;
 
 		if (target.lba == res){
@@ -389,6 +405,12 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 		}
 		__move_iter_target(mm, 0);
 	}
+
+	shortcut_link_bulk_lba(shortcut, r, &temp_vec, true);
+
+#ifdef SC_QUERY_DP
+	sc_dir_dp_free(temp_dp);
+#endif
 	run_copy_unlinked_flag_update(r, des_ste_num, unlinked_data_copy, original_level, original_recency);
 	sp_set_iter_move_ste(mm->ssi, target_ste, res);
 	if (sp_set_iter_done_check(mm->ssi)){
@@ -424,7 +446,6 @@ mm_container* __sorting_mm_set(mm_container *mm_set, uint32_t run_num, uint32_t 
 		target = __pick_smallest_pair(mm_set, run_num, &ridx, lsm->shortcut);
 		target_sorted_pair.pair = target;
 		target_sorted_pair.r = mm_set[ridx].r;
-		target_sorted_pair.ste_num = sp_set_get_ste_num(mm_set[ridx].ssi, target.intra_offset);
 		if (target.lba != UINT32_MAX)
 		{
 			uint32_t end_lba;
@@ -445,7 +466,7 @@ mm_container* __sorting_mm_set(mm_container *mm_set, uint32_t run_num, uint32_t 
 				isstart = false;
 			}
 			prev_lba = target.lba;
-			read_flag = __move_iter(mm_set, run_num, target.lba, read_flag, ridx, target_round);
+			read_flag = __move_iter(mm_set, run_num, target.lba, target.piece_ppa, read_flag, ridx, target_round);
 		}
 	} while (read_flag != ((1 << run_num) - 1));
 	*_prev_lba=prev_lba;
@@ -470,7 +491,7 @@ void thread_sorting(void* arg, int thread_num){
 	fdriver_unlock(&req->lock);
 }
 
-static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num){
+static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num, sc_master *sc){
 	uint32_t prefetch_num=CEIL(DEV_QDEPTH, run_num);
 	mm_container *mm_set=(mm_container*)malloc(run_num *sizeof(mm_container));
 	uint32_t now_entry_num=0;
@@ -485,6 +506,10 @@ static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num)
 		else{
 			mm_set[i].ssi=sp_set_iter_init(rset[i]->st_body->now_STE_num, rset[i]->st_body->sp_meta, prefetch_num,rset[i]->st_body->param.map_type!=target_run->st_body->param.map_type);
 		}
+#ifdef SC_MEM_OPT
+		mm_set[i].ssi->dp=sc_dir_dp_init(sc, rset[i]->st_body->sp_meta[0].start_lba);
+#endif
+
 		mm_set[i].now_proc_block_idx=0;
 		mm_set[i].done=false;
 	}
@@ -493,7 +518,7 @@ static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num)
 
 void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
-	mm_container *mm_set=__make_mmset(rset, target_run, run_num);
+	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
 
 	bool trivial_move_flag=!force;
 
@@ -542,7 +567,7 @@ void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force,
 			if(sorted_arr->size()){
 				__sorted_array_flush(res, sorted_arr, lsm);
 			}			
-			summary_pair target=sp_set_iter_pick(th_req->trivial_move_target->ssi);
+			summary_pair target=sp_set_iter_pick(th_req->trivial_move_target->ssi, th_req->trivial_move_target->r);
 			th_req->prev_lba=trivial_move(res, lsm->shortcut, th_req->trivial_move_target, target);
 			delete sorted_arr;
 			sorted_arr=NULL;
@@ -577,7 +602,7 @@ void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force,
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
-	mm_container *mm_set=__make_mmset(rset, target_run, run_num);
+	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
 
 	bool trivial_move_flag=!force;
 	if(trivial_move_flag){
@@ -591,6 +616,12 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 
 	run *res=target_run;
 
+	static uint32_t cnt=0;
+	if(++cnt==496){
+		//debug_flag=true;
+		//GDB_MAKE_BREAKPOINT;
+	}
+
 	while(1){
 		target_round+=force?rset[0]->st_body->now_STE_num:4*BPS/run_num;
 		mm_container *tirivial_move_target=__sorting_mm_set(mm_set, run_num, target_round, &sorted_arr, lsm, trivial_move_flag, &prev_lba);
@@ -599,7 +630,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 			__sorted_array_flush(res, &sorted_arr, lsm);
 		}
 		if(tirivial_move_target){
-			summary_pair target=sp_set_iter_pick(tirivial_move_target->ssi);
+			summary_pair target=sp_set_iter_pick(tirivial_move_target->ssi, tirivial_move_target->r);
 			prev_lba=trivial_move(res, lsm->shortcut, tirivial_move_target, target);
 		}
 
@@ -618,6 +649,9 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 
 	for(uint32_t i=0; i<run_num; i++){
 		shortcut_set_compaction_flag(rset[i]->info, false);
+#ifdef SC_MEM_OPT
+		sc_dir_dp_free(mm_set[i].ssi->dp);
+#endif
 		sp_set_iter_free(mm_set[i].ssi);
 	}
 	free(mm_set);

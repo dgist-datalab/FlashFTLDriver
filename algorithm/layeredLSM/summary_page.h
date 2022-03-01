@@ -19,7 +19,7 @@ enum{
 
 typedef struct summary_pair{
 	uint32_t lba;
-	uint32_t intra_offset;
+	uint32_t piece_ppa;
 }summary_pair;
 
 typedef struct summary_page{
@@ -39,6 +39,7 @@ typedef struct summary_page_meta{
 	bool sorted;
 	bool unlinked_data_copy;
 	bool copied;
+	bool all_reinsert;
 	void *private_data;
 }summary_page_meta;
 
@@ -184,6 +185,8 @@ value_set *sp_get_data(summary_page *sp);
 	sp:
  */
 uint32_t sp_find_psa(summary_page *sp, uint32_t lba);
+
+uint32_t sp_find_offset_by_value(char *data, uint32_t lba);
 
 /*
 	Function: sp_print_all

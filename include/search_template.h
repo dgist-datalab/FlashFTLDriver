@@ -19,7 +19,9 @@
 				__end=__mid-1;\
 			}\
 		}\
-		if(__start>=__end) (target_idx)=UINT32_MAX;\
+		if(__start>__end){\
+			(target_idx)=UINT32_MAX;\
+		}\
 	}while(0)
 
 #define bs_lower_bound(body, s, m, target, cmp, target_idx)\
