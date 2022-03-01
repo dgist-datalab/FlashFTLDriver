@@ -1,6 +1,7 @@
 #include "run.h"
 #include "../../interface/interface.h"
 #include "./lsmtree.h"
+#include "./piece_ppa.h"
 extern uint32_t test_key;
 extern uint32_t test_key2;
 extern lower_info *g_li;
@@ -118,11 +119,6 @@ uint32_t run_query(run *r, request *req){
 			req->end_req(req);
 			return READ_DONE;
 		}
-	}
-
-	if(req->key==test_key || req->key==test_key2){
-		DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
-	//	GDB_MAKE_BREAKPOINT;
 	}
 
 	req->retry=true;
@@ -247,29 +243,53 @@ static inline uint32_t __find_target_in_run(run *r, uint32_t lba, uint32_t psa, 
 	if(r->type==RUN_NORMAL){
 		return NOT_FOUND;
 	}
-
-	uint32_t ste_num=st_array_get_target_STE(r->st_body, lba);
-	if(ste_num==UINT32_MAX){
-		return NOT_FOUND;
-	}
-	*_ste_num=ste_num;
-	map_function *mf=r->st_body->pba_array[ste_num].mf;
+	uint32_t intra_offset=NOT_FOUND;
+	map_function *mf;
 	map_read_param *param;
-	uint32_t intra_offset=mf->query(mf, lba, &param);
-	if(intra_offset==UINT32_MAX){
-		return NOT_FOUND;
-	}
-	uint32_t t_psa=st_array_read_translation(r->st_body, ste_num, intra_offset);
-	if(r->type==RUN_LOG && t_psa!=psa){
-		return NOT_FOUND;
-	}
-	while(t_psa!=psa){
-		intra_offset=mf->query_retry(mf, param);
-		if(intra_offset==NOT_FOUND){
-			break;
+	uint32_t t_psa;
+	if(r->type==RUN_LOG){
+		mf=r->run_log_mf;
+		intra_offset=mf->query(mf, lba, &param);
+		if(intra_offset==UINT32_MAX){
+			goto out;
 		}
-		t_psa=st_array_read_translation(r->st_body, ste_num, intra_offset);
+		t_psa=run_translate_intra_offset(r, UINT32_MAX, intra_offset);
+
+		if(t_psa==psa){
+			*_ste_num=intra_offset/MAX_SECTOR_IN_BLOCK;
+			intra_offset%=MAX_SECTOR_IN_BLOCK;
+			goto out;
+		}
+		else{
+			intra_offset=NOT_FOUND;
+			goto out;
+		}
 	}
+	else{
+		uint32_t ste_num = st_array_get_target_STE(r->st_body, lba);
+		if (ste_num == UINT32_MAX)
+		{
+			return NOT_FOUND;
+		}
+		*_ste_num = ste_num;
+		mf = r->st_body->pba_array[ste_num].mf;
+		intra_offset = mf->query(mf, lba, &param);
+		if (intra_offset == UINT32_MAX)
+		{
+			goto out;
+		}
+		t_psa = st_array_read_translation(r->st_body, ste_num, intra_offset);
+		while (t_psa != psa)
+		{
+			intra_offset = mf->query_retry(mf, param);
+			if (intra_offset == NOT_FOUND)
+			{
+				break;
+			}
+			t_psa = st_array_read_translation(r->st_body, ste_num, intra_offset);
+		}
+	}
+out:
 	free(param);
 	return intra_offset;
 }

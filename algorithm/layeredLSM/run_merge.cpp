@@ -656,6 +656,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	}
 	free(mm_set);
 	run_insert_done(res, true);
+	printf("merge end\n");
 }
 
 void run_recontstruct(lsmtree *lsm, run *src, run *des, bool force){

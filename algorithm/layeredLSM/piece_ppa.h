@@ -6,16 +6,16 @@
 #include "./debug.h"
 
 enum{BIT_ERROR, BIT_SUCCESS};
-//static uint32_t test_piece_ppa=1422336;
-static uint32_t test_piece_ppa=UINT32_MAX;
+static uint32_t test_piece_ppa=17470722;
+//static uint32_t test_piece_ppa=UINT32_MAX;
 
 static inline void __debug_check(blockmanager *bm, uint32_t piece_ppa, 
 		bool valid, bool map){
 	if(test_piece_ppa==UINT32_MAX) return;
-	if(test_piece_ppa==piece_ppa && map==false){
+	if(test_piece_ppa==piece_ppa){
 		static int cnt=0;
 		uint32_t lba=print_lba_from_piece_ppa(bm, piece_ppa);
-		printf("%u lba=%u:",++cnt, lba);
+		printf("%u lba=%u: (map:%u)",++cnt, lba, map);
 		valid?printf("valid-\n"):printf("invalid-\n");
 		//print_stacktrace(8);
 	}

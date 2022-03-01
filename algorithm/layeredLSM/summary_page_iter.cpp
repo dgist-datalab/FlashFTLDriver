@@ -1,5 +1,6 @@
 #include "summary_page.h"
 #include "../../include/debug_utils.h"
+#include "./piece_ppa.h"
 extern lower_info *g_li;
 extern bool debug_flag;
 
