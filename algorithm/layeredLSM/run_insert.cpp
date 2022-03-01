@@ -273,7 +273,8 @@ uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_nu
 
 	st_array_set_unaligned_block_write(r->st_body);
 
-	std::vector<uint32_t> bulk_lba_set;
+	//std::vector<uint32_t> bulk_lba_set;
+	uint32_t res=0;
 	std::list<reinsert_node*>::iterator iter;
 	value_set *prev_value_set=NULL;
 	for(iter=temp_list.begin(); iter!=temp_list.end();){
@@ -291,13 +292,13 @@ uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_nu
 			offset=sp_find_offset_by_value(temp_node->value->value, temp_node->lba);
 			prev_value_set=temp_node->value;
 		}
-		bulk_lba_set.push_back(temp_node->lba);
+		//bulk_lba_set.push_back(temp_node->lba);
 		temp_node->piece_ppa=run_translate_intra_offset(temp_node->r, temp_node->ste, offset);
 
 		if(temp_node->r->type==RUN_PINNING){
 			st_array_unlink_bit_set(temp_node->r->st_body, temp_node->ste, offset, temp_node->piece_ppa);
 		}
-
+		res++;
 	//	printf("global intra:%u\n", r->st_body->global_write_pointer);
 		uint32_t intra_offset=r->st_body->global_write_pointer;
 		if(r->type==RUN_LOG){
@@ -326,10 +327,11 @@ uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_nu
 		inf_free_valueset(prev_value_set, FS_MALLOC_R);
 	}
 
-	uint32_t res=bulk_lba_set.size();
+	//uint32_t res=bulk_lba_set.size();
+	/*
 	if(res!=0){
 		shortcut_link_bulk_lba(sc, r, &bulk_lba_set, true);
-	}
+	}*/
 	sc_dir_dp_free(temp_dp);
 	return res;
 }

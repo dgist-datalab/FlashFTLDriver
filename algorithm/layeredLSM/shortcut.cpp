@@ -119,6 +119,7 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 		}
 #endif
 		sc->now_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[target_idx]);
+		t_info->linked_lba_num++;
 		//printf("%lu sc->memory_usage\n", sc->now_memory_usage);
 		if(idx==lba_set->size()){
 			break;
@@ -129,6 +130,7 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 	std::vector<uint32_t>::iterator iter = lba_set->begin();
 	for (; iter != lba_set->end(); iter++){
 		uint32_t lba = *iter;
+		t_info->linked_lba_num++;
 		if(unlink){
 			sc->info_set[sc->sc_map[lba]].r->unlinked_lba_num++;
 		}
