@@ -304,7 +304,6 @@ static inline uint32_t __processing_unlinked_psa(block_info *binfo, uint32_t lba
 		sid_info* temp_sid=sorted_array_master_get_info(k);
 		if(temp_sid==NULL) continue;
 		if(temp_sid->r==NULL) continue;
-
 		intra_offset=run_find_include_address_byself(temp_sid->r, lba, psa, &ste_num);
 		if(intra_offset==NOT_FOUND) continue;
 
@@ -557,6 +556,9 @@ static inline void copy_mixed_block(L2P_bm *bm, list *blk_list){
 						continue;
 					}
 					pset[j].new_piece_ppa=g_value->ppa*L2PGAP+j;
+					if(pset[j].lba==test_key){
+						printf("target %u moved to %u\n", pset[j].lba, pset[j].new_piece_ppa);
+					}
 					if(validate_piece_ppa(sm, g_value->ppa*L2PGAP+j, true)==BIT_ERROR){
 						EPRINT("bit error in normal block copy", true);
 					}
@@ -754,9 +756,10 @@ bool gc_check_enough_space(L2P_bm *bm, uint32_t target_pba_num){
 					seg_free_block_num++;
 				}
 			}
-			if(debug_flag){
+			
+			/*if(debug_flag){
 				printf("%u -> free_block_num:%u\n", target->seg_idx, seg_free_block_num);
-			}
+			}*/
 		}
 		temp_seg_q.push(target->seg_idx);
 		free(target);

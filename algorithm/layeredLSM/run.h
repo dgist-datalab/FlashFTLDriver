@@ -192,6 +192,8 @@ run *run_find_include_address_for_mixed(struct shortcut_master *sc, uint32_t lba
  * */
 uint32_t run_find_include_address_byself(run *r, uint32_t lba, uint32_t psa, uint32_t *ste_num);
 
+bool run_log_gc_update(run *r, uint32_t lba, uint32_t old_psa, uint32_t new_psa);
+
 
 //#################################### run_query.c done
 

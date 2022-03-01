@@ -41,7 +41,7 @@ sp_set_iter *sp_set_iter_init_mf(uint32_t max_STe_num, summary_page_meta *spm_se
 	res->miter=mf->iter_init(mf);
 	return res;
 }
-
+extern bool debug_flag;
 summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r){
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 
