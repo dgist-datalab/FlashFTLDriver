@@ -171,7 +171,7 @@ uint64_t map_memory_per_ent(uint32_t type, uint32_t target_bit, float fpr);
  * param: target read param to check
  * */
 static inline uint32_t map_default_oob_check(map_function *m, map_read_param *param){
-	if(param->oob_set[param->intra_offset]==param->p_req->key){
+	if(param->oob_set[param->intra_offset]==param->lba){
 		return param->intra_offset;
 	}
 	return NOT_FOUND;

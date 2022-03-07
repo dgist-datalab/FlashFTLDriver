@@ -101,6 +101,10 @@ out:
 	if(bm->now_block_idx==BPS){
 		bm->now_seg_idx=NO_SEG;
 	}
+
+	if(res/_PPB==test_piece_ppa/L2PGAP/_PPB){
+		printf("%u populate for data\n", test_piece_ppa/L2PGAP/_PPB);
+	}	
 	//fdriver_unlock(&bm->lock);
 	return res;
 }

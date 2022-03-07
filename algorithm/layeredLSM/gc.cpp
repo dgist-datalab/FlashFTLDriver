@@ -88,7 +88,8 @@ static inline void __clear_block_and_gsegment(L2P_bm *bm, __gsegment *target){
 	uint32_t bidx;
 	for_each_block(target, blk, bidx){
 		if(blk->block_idx==test_piece_ppa/L2PGAP/_PPB){
-			printf("%u clear\n", blk->block_idx);
+			static int cnt=0;
+			printf("%u clear[%u]\n", blk->block_idx, cnt++);
 		}
 		L2PBm_clear_block_info(bm, blk->block_idx);
 	}
@@ -237,11 +238,11 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 				}
 				g_value->ppa=start_rppa;
 
+				sm->set_oob(sm, (char*)g_value->oob, sizeof(uint32_t)*L2PGAP, g_value->ppa);
 				for(uint32_t j=0; j<L2PGAP; j++){
 					if(!valid_data_ptr[j]){
 						continue;
 					}
-
 					if(validate_piece_ppa(sm, g_value->ppa*L2PGAP+j, true)==BIT_ERROR){
 						EPRINT("bit error in normal block copy", true);
 					}
@@ -551,6 +552,7 @@ static inline void copy_mixed_block(L2P_bm *bm, list *blk_list){
 				}
 				g_value->ppa=start_rppa;
 
+				sm->set_oob(sm, (char*)g_value->oob, sizeof(uint32_t)*L2PGAP, g_value->ppa);
 				for(uint32_t j=0; j<L2PGAP; j++){
 					if(!valid_data_ptr[j]){
 						continue;
@@ -593,7 +595,8 @@ static inline void copy_mixed_block(L2P_bm *bm, list *blk_list){
 }
 
 uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
-	//DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
+	DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
+	static uint32_t cnt=0;
 	blockmanager *sm=bm->segment_manager;
 	list *normal_list=list_init();
 	list *mixed_list=list_init();
@@ -604,7 +607,6 @@ uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
 		gc_block *temp=(gc_block*)malloc(sizeof(gc_block));
 		temp->b_info=&bm->PBA_map[blk->block_idx];
 		temp->blk=blk;
-
 		switch(bm->PBA_map[blk->block_idx].type){
 			case LSM_BLOCK_NORMAL:
 				if(__normal_block_valid_check(sm, blk->block_idx)){
@@ -756,10 +758,6 @@ bool gc_check_enough_space(L2P_bm *bm, uint32_t target_pba_num){
 					seg_free_block_num++;
 				}
 			}
-			
-			/*if(debug_flag){
-				printf("%u -> free_block_num:%u\n", target->seg_idx, seg_free_block_num);
-			}*/
 		}
 		temp_seg_q.push(target->seg_idx);
 		free(target);

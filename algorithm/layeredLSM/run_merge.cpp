@@ -616,12 +616,6 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 
 	run *res=target_run;
 
-	static uint32_t cnt=0;
-	if(++cnt==496){
-		//debug_flag=true;
-		//GDB_MAKE_BREAKPOINT;
-	}
-
 	while(1){
 		target_round+=force?rset[0]->st_body->now_STE_num:4*BPS/run_num;
 		mm_container *tirivial_move_target=__sorting_mm_set(mm_set, run_num, target_round, &sorted_arr, lsm, trivial_move_flag, &prev_lba);
