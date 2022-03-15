@@ -157,9 +157,12 @@ void st_array_free(st_array *sa){
 			mf->free(mf);
 		}
 		uint32_t PBA=sa->pba_array[i].PBA;
-		if(sa->sp_meta[i].all_reinsert==false && sa->sp_meta[i].copied==false && PBA!=UINT32_MAX){
-			if(sa->bm->PBA_map[PBA/_PPB].type==LSM_BLOCK_MIXED){
-				sa->bm->PBA_map[PBA/_PPB].type=LSM_BLOCK_FRAGMENT;
+		if (sa->sp_meta[i].all_reinsert == false && sa->sp_meta[i].copied == false && PBA != UINT32_MAX)
+		{
+			if(sa->bm->PBA_map[PBA/_PPB].sid==sa->sid){
+				if (sa->bm->PBA_map[PBA / _PPB].type == LSM_BLOCK_MIXED){
+					sa->bm->PBA_map[PBA / _PPB].type = LSM_BLOCK_FRAGMENT;
+				}
 			}
 		}
 	}
@@ -246,7 +249,6 @@ void st_array_set_now_PBA(st_array *sa, uint32_t PBA, uint32_t set_type){
 		EPRINT("not allowed type", true);
 		break;
 	}
-
 	__check_sid(sa, sa->now_STE_num, PBA, set_type);
 }
 

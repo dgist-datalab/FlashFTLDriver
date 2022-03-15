@@ -199,11 +199,14 @@ void run_insert_done(run *r, bool merge_insert){
 
 typedef struct reinsert_node{
 	bool prev_same;
+	bool done;
 	uint32_t lba;
 	uint32_t piece_ppa;
 	run *r;
 	uint32_t ste;
 	value_set *value;
+	map_function *mf;
+	map_read_param *param;
 	fdriver_lock_t lock;
 }reinsert_node;
 
@@ -213,8 +216,7 @@ static void *__read_for_piece_ppa_end_req(algo_req *req){
 	free(req);
 	return NULL;
 }
-
-void __read_for_piece_ppa(uint32_t ppa, reinsert_node *issue_node){
+void __read_for_piece_ppa(lsmtree *lsm, uint32_t ppa, reinsert_node *issue_node){
 	algo_req *req=(algo_req*)malloc(sizeof(algo_req));
 	issue_node->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 	fdriver_mutex_init(&issue_node->lock);
@@ -225,10 +227,11 @@ void __read_for_piece_ppa(uint32_t ppa, reinsert_node *issue_node){
 	req->end_req=__read_for_piece_ppa_end_req;
 	req->param=(void*)issue_node;
 	req->parents=NULL;
+	issue_node->param->oob_set=(uint32_t*)lsm->bm->segment_manager->get_oob(lsm->bm->segment_manager, ppa);
 	g_li->read(ppa, PAGESIZE, req->value, req);
 }
 
-uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *sc){
+uint32_t run_reinsert2(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *sc){
 	uint32_t info_idx=r->info->idx;
 	sc_dir_dp *temp_dp=sc_dir_dp_init(sc, start_lba);
 	std::list<reinsert_node*> temp_list;
@@ -262,7 +265,7 @@ uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_nu
 
 			if (!temp_node->prev_same)
 			{
-				__read_for_piece_ppa(temp_node->r->st_body->sp_meta[temp_node->ste].ppa, temp_node);
+				__read_for_piece_ppa(lsm, temp_node->r->st_body->sp_meta[temp_node->ste].ppa, temp_node);
 			}
 			temp_list.push_back(temp_node);
 		}
@@ -333,6 +336,96 @@ uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_nu
 	if(res!=0){
 		shortcut_link_bulk_lba(sc, r, &bulk_lba_set, true);
 	}
+	sc_dir_dp_free(temp_dp);
+	return res;
+}
+
+uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *sc){
+	uint32_t info_idx=r->info->idx;
+	sc_dir_dp *temp_dp=sc_dir_dp_init(sc, start_lba);
+	std::list<reinsert_node*> temp_list;
+	reinsert_node *prev_node=NULL;
+	reinsert_node *temp_node;
+
+	static uint32_t reinsert_cnt=0;
+	bool debug_flag=false;
+	printf("reinsert_cnt :%u\n", reinsert_cnt++);
+
+	for(uint32_t i=start_lba; i<start_lba+SC_PER_DIR; i++){
+		uint32_t now_info_idx=sc_dir_dp_get_sc(temp_dp, sc, i);
+		if(info_idx!=now_info_idx && now_info_idx!=NOT_ASSIGNED_SC){
+			temp_node = (reinsert_node *)calloc(1, sizeof(reinsert_node));
+			temp_node->lba = i;
+			temp_node->piece_ppa = UINT32_MAX;
+			temp_node->r = sc->info_set[now_info_idx].r;
+
+			temp_node->ste = st_array_get_target_STE(temp_node->r->st_body, i);
+			temp_node->prev_same = false;
+			temp_node->value = NULL;
+
+			temp_node->mf=temp_node->r->st_body->pba_array[temp_node->ste].mf;
+
+			uint32_t intra_offset=temp_node->mf->query(temp_node->mf, i, &temp_node->param);
+			
+			temp_node->piece_ppa=run_translate_intra_offset(temp_node->r, temp_node->ste, intra_offset);
+			temp_node->param->intra_offset=temp_node->piece_ppa%L2PGAP;
+
+			__read_for_piece_ppa(lsm, temp_node->piece_ppa/L2PGAP, temp_node);
+			temp_list.push_back(temp_node);
+		}
+	}
+
+	std::list<reinsert_node*>::iterator iter;
+	uint32_t done_cnt;
+	while(1){
+		done_cnt = 0;
+		for (iter = temp_list.begin(); iter != temp_list.end(); ++iter)
+		{
+			temp_node = *iter;
+			if (temp_node->done)
+			{
+				done_cnt++;
+				continue;
+			}
+			fdriver_lock(&temp_node->lock);
+			fdriver_destroy(&temp_node->lock);
+
+			uint32_t temp_intra_offset = temp_node->mf->oob_check(temp_node->mf, temp_node->param);
+			if (temp_intra_offset == NOT_FOUND)
+			{
+				temp_intra_offset=temp_node->mf->query_retry(temp_node->mf, temp_node->param);
+				temp_node->piece_ppa=run_translate_intra_offset(temp_node->r, temp_node->ste, temp_intra_offset);
+				temp_node->param->intra_offset=temp_node->piece_ppa%L2PGAP;
+				__read_for_piece_ppa(lsm,temp_node->piece_ppa/L2PGAP, temp_node);
+				continue;
+			}
+			else
+			{
+				temp_node->piece_ppa=temp_node->piece_ppa/L2PGAP*L2PGAP+temp_intra_offset;
+				temp_node->done=true;
+				temp_node->mf->query_done(temp_node->mf, temp_node->param);
+				done_cnt++;
+				continue;
+			}
+		}
+		if(done_cnt==temp_list.size()){
+			break;
+		}
+	}
+
+	uint32_t res=temp_list.size();
+	value_set *prev_value_set=NULL;
+	for(iter=temp_list.begin(); iter!=temp_list.end();){
+		temp_node=*iter;
+		uint32_t offset;
+		run_insert(r, temp_node->lba, UINT32_MAX, &temp_node->value->value[(temp_node->piece_ppa%L2PGAP)*LPAGESIZE], false, lsm->shortcut);
+
+		inf_free_valueset(temp_node->value, FS_MALLOC_R);
+
+		free(temp_node);
+		temp_list.erase(iter++);
+	}
+
 	sc_dir_dp_free(temp_dp);
 	return res;
 }
