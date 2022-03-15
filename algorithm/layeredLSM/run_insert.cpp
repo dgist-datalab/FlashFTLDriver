@@ -418,7 +418,7 @@ uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_nu
 	for(iter=temp_list.begin(); iter!=temp_list.end();){
 		temp_node=*iter;
 		uint32_t offset;
-		run_insert(r, temp_node->lba, UINT32_MAX, &temp_node->value->value[(temp_node->piece_ppa%L2PGAP)*LPAGESIZE], false, lsm->shortcut);
+		run_insert(r, temp_node->lba, UINT32_MAX, &temp_node->value->value[(temp_node->piece_ppa%L2PGAP)*LPAGESIZE], true, lsm->shortcut);
 
 		inf_free_valueset(temp_node->value, FS_MALLOC_R);
 
