@@ -62,6 +62,7 @@ uint32_t remove_temp(request *const req){
 uint32_t print_log_temp(){
 	lsmtree_print_log(LSM);
 	g_li->print_traffic(g_li);
+	memset(&LSM->monitor, 0, sizeof(lsmtree_monitor));
 	return 1;
 }
 

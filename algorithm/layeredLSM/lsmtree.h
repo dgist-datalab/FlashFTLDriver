@@ -61,6 +61,7 @@ typedef struct lsmtree_monitor{
 	uint64_t compaction_input_entry_num[10];
 	uint64_t compaction_output_entry_num[10];
 	uint32_t force_compaction_cnt;
+	uint32_t reinsert_cnt;
 }lsmtree_monitor;
 
 typedef struct lsmtree{

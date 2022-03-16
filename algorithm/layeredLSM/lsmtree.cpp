@@ -270,7 +270,7 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 		}
 	}
 	printf("\t force_compaction_cnt:%u\n", lsm->monitor.force_compaction_cnt);
-
+	printf("\t reinsert_compaction_cnt:%u\n", lsm->monitor.reinsert_cnt);
 	return 1;
 }
 
