@@ -104,7 +104,7 @@ static run *run_extract_target(request *req){
  * merge_insert: flag is set when the function is called in run_merge
  * */
 bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
- 	bool merge_insert, struct shortcut_master *shortcut);
+ 	uint32_t io_type, struct shortcut_master *shortcut);
 
 #ifdef SC_MEM_OPT
 uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_num, struct shortcut_master *shortcut);

@@ -70,6 +70,10 @@ uint32_t write_temp(request *const req){
 	if(lsmtree_insert(LSM, req)==0){
 		req->end_req(req);
 	}
+	static bool print_test=false;
+	if(print_test==false && g_li->req_type_cnt[DATAW]==19904199){
+		g_li->print_traffic(g_li);
+	}
 	return 1;
 }
 
@@ -127,7 +131,7 @@ uint32_t test_function2(){
 	run *a=__lsm_populate_new_run(LSM, GUARD_BF, RUN_LOG, target_entry_num, 0);
 	for(uint32_t i=0; i<target_entry_num; i++){
 		request *req=__make_dummy_request(i,false);
-		run_insert(a, req->key,UINT32_MAX, req->value->value, false, LSM->shortcut);
+		run_insert(a, req->key,UINT32_MAX, req->value->value, DATAW, LSM->shortcut);
 		req->end_req(req);
 	}
 	run_insert_done(a, false);
@@ -158,10 +162,10 @@ uint32_t test_function(){ //random+sequential+normal
 		for(uint32_t j=0; j<first_set_num/2; j++){
 			request *req=__make_dummy_request(first_set[first_set_idx++],false);
 			if(i==0){
-				run_insert(a, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
+				run_insert(a, req->key, UINT32_MAX, req->value->value, DATAW, LSM->shortcut);
 			}
 			else{
-				run_insert(b, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
+				run_insert(b, req->key, UINT32_MAX, req->value->value, DATAW, LSM->shortcut);
 			}
 			req->end_req(req);
 		}
@@ -169,13 +173,13 @@ uint32_t test_function(){ //random+sequential+normal
 
 	for(uint32_t i=first_set_num; i<first_set_num+_PPB*L2PGAP; i++){
 		request *req=__make_dummy_request(i,false);
-		run_insert(a, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
+		run_insert(a, req->key, UINT32_MAX, req->value->value, DATAW, LSM->shortcut);
 		req->end_req(req);
 	}
 
 	for(uint32_t i=first_set_num+_PPB*L2PGAP; i<first_set_num+_PPB*L2PGAP*2; i++){
 		request *req=__make_dummy_request(i,false);
-		run_insert(b, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
+		run_insert(b, req->key, UINT32_MAX, req->value->value, DATAW, LSM->shortcut);
 		req->end_req(req);
 	}
 
@@ -184,10 +188,10 @@ uint32_t test_function(){ //random+sequential+normal
 		for(uint32_t j=0; j<second_set_num/2; j++){
 			request *req=__make_dummy_request(second_set[second_set_idx++],false);
 			if(i==0){
-				run_insert(a, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
+				run_insert(a, req->key, UINT32_MAX, req->value->value, DATAW, LSM->shortcut);
 			}
 			else{
-				run_insert(b, req->key, UINT32_MAX, req->value->value, false, LSM->shortcut);
+				run_insert(b, req->key, UINT32_MAX, req->value->value, DATAW, LSM->shortcut);
 			}
 			req->end_req(req);
 		}

@@ -158,7 +158,7 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	fdriver_unlock(&lsm->read_cnt_lock);
 
 	//printf("req->key write:%u\n", req->key);
-	run_insert(r, req->key, UINT32_MAX, req->value->value, false, 
+	run_insert(r, req->key, UINT32_MAX, req->value->value, DATAW, 
 		lsm->shortcut);
 
 #ifdef SC_MEM_OPT
