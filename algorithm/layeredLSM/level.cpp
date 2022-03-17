@@ -27,7 +27,6 @@ void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
 	else if(run_num==2){
 		uint32_t first_idx=UINT32_MAX;
 		uint32_t second_idx=UINT32_MAX;
-		float target_ratio=0;
 		
 		float target_ratio=-1.0f;
 		for(uint32_t round=0; round<run_num; round++){
