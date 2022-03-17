@@ -366,12 +366,13 @@ uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_nu
 			temp_node->mf=temp_node->r->st_body->pba_array[temp_node->ste].mf;
 
 			uint32_t intra_offset;
-retry:
 			intra_offset=temp_node->mf->query(temp_node->mf, i, &temp_node->param);
+retry:
 			
 			temp_node->piece_ppa=run_translate_intra_offset(temp_node->r, temp_node->ste, intra_offset);
 			temp_node->param->intra_offset=temp_node->piece_ppa%L2PGAP;
 			if(temp_node->piece_ppa==UNLINKED_PSA){
+				intra_offset=temp_node->mf->query_retry(temp_node->mf, temp_node->param);
 				goto retry;
 			}
 
