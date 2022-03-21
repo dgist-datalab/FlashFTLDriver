@@ -35,7 +35,8 @@ run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, 
 bool __lsm_pinning_enable(lsmtree *lsm, uint32_t entry_num){
 	uint64_t need_memory_bit=map_memory_per_ent(GUARD_BF, lsm->param.target_bit, lsm->param.fpr) *entry_num;
 	need_memory_bit+=lsm->param.target_bit * entry_num;
-	if(need_memory_bit+lsm->monitor.now_memory_usage <=lsm->param.max_memory_usage_bit){
+	uint64_t now_memory_usage=lsm->monitor.now_mapping_memory_usage+lsm->shortcut->now_sc_memory_usage;
+	if(need_memory_bit+now_memory_usage <=lsm->param.max_memory_usage_bit){
 		return true;
 	}
 	return false;
@@ -54,8 +55,7 @@ void __lsm_calculate_memory_usage(lsmtree *lsm, uint64_t entry_num, int32_t memo
 				break;
 		}
 	}
-	//if(memory_usage_bit)
-	lsm->monitor.now_memory_usage+=memory_usage_bit;
+	lsm->monitor.now_mapping_memory_usage+=memory_usage_bit;
 	double mem_per_ent;
 	if(memory_usage_bit<0){
 		mem_per_ent=(double)memory_usage_bit/entry_num+(pinning?lsm->param.target_bit:0);
@@ -105,7 +105,9 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 		res->disk[i]=level_init(i, run_num, isbf? GUARD_BF: PLR_MAP);
 	}
 
-	res->monitor.now_memory_usage+=res->param.shortcut_bit;
+	res->monitor.now_mapping_memory_usage=0;
+	res->monitor.max_mapping_memory_usage=res->param.BF_bit+res->param.L0_bit+res->param.PLR_bit;
+
 	res->tp=thpool_init(1);
 
 	fdriver_mutex_init(&res->read_cnt_lock);
@@ -162,14 +164,19 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 		lsm->shortcut);
 
 #ifdef SC_MEM_OPT
-	if(shortcut_memory_full(lsm->shortcut) && lsm->shortcut->sc_dir[req->key/SC_PER_DIR].map_num > MAX_TABLE_NUM){
-		//static uint32_t cnt=0;
-		uint64_t before_memory_usage=lsm->shortcut->now_memory_usage;
-		uint32_t move=run_reinsert(lsm, r, req->key/SC_PER_DIR*SC_PER_DIR, SC_PER_DIR, lsm->shortcut);
-		uint64_t after_memory_usage=lsm->shortcut->now_memory_usage;
-		lsm->monitor.reinsert_cnt++;
-		//printf("reinsert cnt:%u\n",++cnt);
-		//printf("%u sc memory diff:%lf, move:%u fool:%u\n", cnt++, (double)after_memory_usage/before_memory_usage,move, shortcut_memory_full(lsm->shortcut));
+	if (shortcut_memory_full(lsm->shortcut)){
+		int64_t now_plr_remain_memory=0;
+		if(lsm->monitor.plr_memory_ent){
+			double now_per_plr_bit=(double)lsm->monitor.plr_memory_usage/lsm->monitor.plr_memory_ent;
+			now_plr_remain_memory=(lsm->param.per_plr_bit-now_per_plr_bit) * lsm->monitor.plr_memory_ent;
+		}
+		if ( now_plr_remain_memory < lsm->shortcut->now_sc_memory_usage - lsm->shortcut->max_sc_memory_usage 
+		 && lsm->shortcut->sc_dir[req->key / SC_PER_DIR].map_num > MAX_TABLE_NUM){
+			uint64_t before_memory_usage = lsm->shortcut->now_sc_memory_usage;
+			uint32_t move = run_reinsert(lsm, r, req->key / SC_PER_DIR * SC_PER_DIR, SC_PER_DIR, lsm->shortcut);
+			uint64_t after_memory_usage = lsm->shortcut->now_sc_memory_usage;
+			lsm->monitor.reinsert_cnt++;
+		}
 	}
 #endif
 
@@ -222,8 +229,9 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 }
 
 uint32_t lsmtree_print_log(lsmtree *lsm){
-	printf("shortcut memory:%.2lf\n", (double)lsm->param.shortcut_bit/(RANGE*lsm->param.target_bit));
-	printf("now_memory usage:%.2lf\n",(double)lsm->monitor.now_memory_usage/lsm->param.max_memory_usage_bit);
+	uint64_t now_memory_usage=lsm->monitor.now_mapping_memory_usage+lsm->shortcut->now_sc_memory_usage;
+	printf("shortcut memory:%.2lf\n", (double)lsm->shortcut->now_sc_memory_usage/(RANGE*lsm->param.target_bit));
+	printf("now_memory usage:%.2lf\n",(double)now_memory_usage/lsm->param.max_memory_usage_bit);
 	printf("level memory:\n");
 	uint64_t pftl_memory=lsm->param.target_bit*RANGE;
 	uint64_t memtable_memory=0;
@@ -249,13 +257,13 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 		pinning_run_num, target_level->max_run_num,
 		(double)memory_usage_per_level/(pftl_memory));
 	}
-
 	printf("BF mem per ent: %.2lf\n",(double)lsm->monitor.bf_memory_usage/lsm->monitor.bf_memory_ent);
 	printf("PLR mem per ent: %.2lf\n",(double)lsm->monitor.plr_memory_usage/lsm->monitor.plr_memory_ent);
 	printf("SC mem per ent: %.4lf\n", (double)shortcut_memory_usage(lsm->shortcut)/RANGE);
 #ifdef SC_MEM_OPT
 	uint64_t table_num=0;
 	for(uint32_t i=0; i<MAX_SC_DIR_NUM; i++){
+//		printf("\t %u -> %u\n", i, lsm->shortcut->sc_dir[i].map_num);
 		table_num+=lsm->shortcut->sc_dir[i].map_num;
 	}
 	printf("\t average table num:%lf\n",(double)table_num/MAX_SC_DIR_NUM);

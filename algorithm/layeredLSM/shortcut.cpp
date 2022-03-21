@@ -24,10 +24,10 @@ sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range, uint32_t
 	
 	for(uint32_t i=0; i<MAX_SC_DIR_NUM; i++){
 		sc_dir_init(&res->sc_dir[i], i, NOT_ASSIGNED_SC);
-		res->now_memory_usage+=sc_dir_memory_usage(&res->sc_dir[i]);
+		res->now_sc_memory_usage+=sc_dir_memory_usage(&res->sc_dir[i]);
 	}
 	sc_dir_dp_master_init();
-	res->max_memory_usage=(MAX_TABLE_NUM*5*MAX_SC_DIR_NUM+lba_range);
+	res->max_sc_memory_usage=(MAX_TABLE_NUM*5*MAX_SC_DIR_NUM+lba_range);
 #else
 	res->sc_map=(uint8_t*)malloc(sizeof(uint8_t)* lba_range);
 	memset(res->sc_map, NOT_ASSIGNED_SC, sizeof(uint8_t) * lba_range);
@@ -81,9 +81,9 @@ void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 	t_info->linked_lba_num++;
 
 #ifdef SC_MEM_OPT
-	sc->now_memory_usage-=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);	
+	sc->now_sc_memory_usage-=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);	
 	sc_dir_insert_lba(SC_DIR(sc, lba), SC_OFFSET(lba), t_info->idx);
-	sc->now_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);
+	sc->now_sc_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);
 #else
 	sc->sc_map[lba]=t_info->idx;
 #endif
@@ -100,7 +100,7 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 	while(1){
 		uint32_t lba=(*lba_set)[idx];
 		uint32_t target_idx=lba/SC_PER_DIR;
-		sc->now_memory_usage-=sc_dir_memory_usage(&sc->sc_dir[target_idx]);	
+		sc->now_sc_memory_usage-=sc_dir_memory_usage(&sc->sc_dir[target_idx]);	
 		if(test_key==lba){
 			printf("%u move target sc->%u\n", test_key, t_info->idx);
 		}
@@ -119,8 +119,7 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 			t_info->linked_lba_num++;
 		}
 #endif
-		sc->now_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[target_idx]);
-		//printf("%lu sc->memory_usage\n", sc->now_memory_usage);
+		sc->now_sc_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[target_idx]);
 		if(idx==lba_set->size()){
 			break;
 		}
@@ -158,9 +157,9 @@ void shortcut_unlink_lba(sc_master *sc, run *r, uint32_t lba){
 	t_info->unlinked_lba_num++;
 
 #ifdef SC_MEM_OPT
-	sc->now_memory_usage-=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);	
+	sc->now_sc_memory_usage-=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);	
 	sc_dir_insert_lba(SC_DIR(sc, lba), SC_OFFSET(lba), NOT_ASSIGNED_SC);
-	sc->now_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);	
+	sc->now_sc_memory_usage+=sc_dir_memory_usage(&sc->sc_dir[lba/SC_PER_DIR]);	
 #else
 	sc->sc_map[lba]=NOT_ASSIGNED_SC;
 #endif
@@ -407,5 +406,5 @@ bool shortcut_validity_check_and_link_dp(sc_master* sc, sc_dir_dp *dp, run *src_
 #endif
 
 uint64_t shortcut_memory_usage(sc_master *sc){
-	return sc->now_memory_usage;
+	return sc->now_sc_memory_usage;
 }

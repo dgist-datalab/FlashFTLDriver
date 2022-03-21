@@ -44,13 +44,18 @@ typedef struct lsmtree_parameter{
 	uint64_t BF_bit;
 	uint64_t PLR_bit;
 	uint64_t L0_bit;
+
+	double per_bf_bit;
+	double per_plr_bit;
+
 	range BF_level_range;
 	range PLR_level_range;
 	uint64_t max_memory_usage_bit;
 }lsmtree_parameter;
 
 typedef struct lsmtree_monitor{
-	uint64_t now_memory_usage;
+	uint64_t now_mapping_memory_usage;
+	uint64_t max_mapping_memory_usage;
 
 	uint64_t plr_memory_ent;
 	uint64_t plr_memory_usage;
