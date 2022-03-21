@@ -62,7 +62,12 @@ uint32_t remove_temp(request *const req){
 uint32_t print_log_temp(){
 	lsmtree_print_log(LSM);
 	g_li->print_traffic(g_li);
-	memset(&LSM->monitor, 0, sizeof(lsmtree_monitor));
+	memset(LSM->monitor.compaction_cnt, 0, sizeof(uint32_t)*10);
+	memset(LSM->monitor.compaction_input_entry_num, 0, sizeof(uint64_t)*10);
+	memset(LSM->monitor.compaction_output_entry_num, 0, sizeof(uint64_t)*10);
+	LSM->monitor.force_compaction_cnt=0;
+	LSM->monitor.reinsert_cnt=0;
+	//memset(&LSM->monitor, 0, sizeof(lsmtree_monitor));
 	return 1;
 }
 
