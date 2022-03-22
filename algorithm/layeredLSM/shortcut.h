@@ -7,6 +7,7 @@
 #include <list>
 #include <stdlib.h>
 #include <vector>
+#include<set>
 #define NOT_ASSIGNED_SC UINT8_MAX
 #define MAX_SC_DIR_NUM (RANGE/SC_PER_DIR)
 #define SC_MEM_OPT
@@ -34,8 +35,9 @@ typedef struct shortcut_master{
 	uint32_t max_shortcut_num;
 	uint32_t now_recency;
 	fdriver_lock_t lock;
-	uint64_t max_memory_usage;
-	uint64_t now_memory_usage;
+	uint64_t max_sc_memory_usage;
+	uint64_t now_sc_memory_usage;
+	std::set<uint32_t> update_list;
 }shortcut_master;
 
 typedef shortcut_master sc_master;
@@ -179,7 +181,7 @@ static inline bool shortcut_compaction_trigger(sc_master *sc){
 }
 
 static inline bool shortcut_memory_full(sc_master *sc){
-	return sc->now_memory_usage >= sc->max_memory_usage;
+	return sc->now_sc_memory_usage >= sc->max_sc_memory_usage;
 }
 
 #endif

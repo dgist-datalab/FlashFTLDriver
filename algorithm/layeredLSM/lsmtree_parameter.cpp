@@ -203,7 +203,9 @@ lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, ui
 			temp.BF_level_range.end=bf_level;
 
 			temp.BF_bit=bf_bit*RANGE;
+			temp.per_bf_bit=bf_bit;
 			temp.PLR_bit=plr_bit*RANGE;
+			temp.per_plr_bit=plr_bit;
 			temp.L0_bit=l0_bit*RANGE;
 			temp.max_memory_usage_bit=(level_avg_bit+bit_res)*RANGE;
 			//printf("level bit:%.2f remain_bit:%.2f \t", level_avg_bit, remain_avg_bit);

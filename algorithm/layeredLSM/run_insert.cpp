@@ -87,7 +87,7 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 }
 
 bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, 
-	bool merge_insert,	sc_master *shortcut){
+	uint32_t io_type,	sc_master *shortcut){
 	if(r->limit_entry_num < r->now_entry_num){
 		EPRINT("run full!", true);
 		return false;
@@ -111,7 +111,7 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 			r->pp=pp_init();
 		}
 		if(pp_insert_value(r->pp, lba, data)){
-			__run_write_buffer(r, r->st_body->bm->segment_manager, false, merge_insert?COMPACTIONDATAW:DATAW);
+			__run_write_buffer(r, r->st_body->bm->segment_manager, false, io_type);
 			pp_reinit_buffer(r->pp);
 		}
 	}
@@ -366,12 +366,13 @@ uint32_t run_reinsert(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_nu
 			temp_node->mf=temp_node->r->st_body->pba_array[temp_node->ste].mf;
 
 			uint32_t intra_offset;
-retry:
 			intra_offset=temp_node->mf->query(temp_node->mf, i, &temp_node->param);
+retry:
 			
 			temp_node->piece_ppa=run_translate_intra_offset(temp_node->r, temp_node->ste, intra_offset);
 			temp_node->param->intra_offset=temp_node->piece_ppa%L2PGAP;
 			if(temp_node->piece_ppa==UNLINKED_PSA){
+				intra_offset=temp_node->mf->query_retry(temp_node->mf, temp_node->param);
 				goto retry;
 			}
 
@@ -427,7 +428,7 @@ retry2:
 	for(iter=temp_list.begin(); iter!=temp_list.end();){
 		temp_node=*iter;
 		uint32_t offset;
-		run_insert(r, temp_node->lba, UINT32_MAX, &temp_node->value->value[(temp_node->piece_ppa%L2PGAP)*LPAGESIZE], true, lsm->shortcut);
+		run_insert(r, temp_node->lba, UINT32_MAX, &temp_node->value->value[(temp_node->piece_ppa%L2PGAP)*LPAGESIZE], TEST_IO, lsm->shortcut);
 
 		inf_free_valueset(temp_node->value, FS_MALLOC_R);
 
