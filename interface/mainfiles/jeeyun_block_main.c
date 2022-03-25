@@ -11,7 +11,7 @@
 #include "../interface.h"
 #include "../vectored_interface.h"
 #include "../cheeze_hg_block.h"
-/*
+
 void log_print(int sig){
 	free_cheeze();
 	printf("f cheeze\n");
@@ -24,7 +24,8 @@ void log_print(int sig){
 	exit(1);
 }
 
-void * thread_test(void * argv[]){
+void * thread_test(void * argv){
+	/*
 	vec_request **req_arr=NULL;
 	while((req_arr=get_vectored_request_arr())){
 		for(int i=0; req_arr[i]!=NULL; i++){
@@ -32,13 +33,34 @@ void * thread_test(void * argv[]){
 		}
 		free(req_arr);
 	}
+	*/
+	FILE *pFile = fopen((char*)argv, "r");
+        char tmp[128];
+
+        while(fgets(tmp, 128, pFile)) {
+                vec_request *req=jy_ureq2vec_req(tmp);
+                if (!req) continue;
+		assign_vectored_req(req);
+
+                //free(req_arr);
+        }
+
+        fclose(pFile);
+
 	return NULL;
 }
-*/
+
+void log_lower_print(int sig){
+        printf("----------lower print!!!!----------\n");
+        inf_lower_log_print();
+        printf("----------lower print end----------\n");
+}
+
+
 //int MS_TIME_SL;
-//pthread_t thr; 
+pthread_t thr; 
 int main(int argc,char* argv[]){
-	/*
+	
 	struct sigaction sa;
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
@@ -53,7 +75,7 @@ int main(int argc,char* argv[]){
     sa2.sa_handler = log_lower_print;
     sigaction(SIGUSR1, &sa2, NULL);
 
-    	*/
+    	
 
 	inf_init(1,0, argc, argv, false);
 
@@ -65,17 +87,21 @@ int main(int argc,char* argv[]){
 		init_cheeze(atoll(argv[1]));
 	}
 	*/
-	FILE *pFile = fopen(argv[1], "r");
-	char tmp[128];
-	
-	while(fgets(tmp, 128, pFile)) {
-		vec_request *req=jy_ureq2vec_req(tmp);
-		assign_vectored_req(req);
-		
-		//free(req_arr);
-	}
 
-	fclose(pFile);
+
+        pthread_create(&thr, NULL, thread_test, (void*) argv[1]);
+        pthread_join(thr, NULL);
+        //free_cheeze();
+
+        while(!jy_is_finished()){
+#ifdef LEAKCHECK
+                sleep(1);
+#endif
+        }
+
+
+
+
 	//free_cheeze();
 	inf_free();
 	return 0;

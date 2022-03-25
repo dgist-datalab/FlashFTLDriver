@@ -39,10 +39,10 @@ void validate_ppa(uint32_t ppa, KEYT *lbas, uint32_t max_idx, uint32_t mig_count
 	}
 
 	/*this function is used for write some data to OOB(spare area) for reverse mapping*/
-	int len=sizeof(KEYT)*max_idx+sizeof(uint32_t)+1;
+	int len=sizeof(KEYT)*L2PGAP+sizeof(uint32_t)+1;
 	char *oob_data = (char*)calloc(len, 1);
-	memcpy(oob_data, (char*)lbas, sizeof(KEYT)*max_idx);
-	memcpy(&oob_data[sizeof(KEYT)*max_idx], &mig_count, sizeof(uint32_t));
+	memcpy(oob_data, (char*)lbas, sizeof(KEYT)*L2PGAP);
+	memcpy(&oob_data[sizeof(KEYT)*L2PGAP], &mig_count, sizeof(uint32_t));
 	//printf("validate_ppa: %u\n", oob_data[sizeof(KEYT)*max_idx]);
 	page_ftl.bm->set_oob(page_ftl.bm, oob_data, len,ppa);
 	//set_migration_count(page_ftl.bm, mig_count, sizeof(KEYT)*max_idx, ppa);
@@ -384,7 +384,7 @@ void do_gc(){
 			list_delete_node(temp_list,now);
 		}
 	}
-	if (tmp_mig_count > 0) seg_ratio[tmp_mig_count-1]--;
+	seg_ratio[tmp_mig_count]--;
 	if(g_buffer.idx!=0){
 		//if (g_buffer.mig_count >= GNUMBER) printf("problem 2: %d\n", g_buffer.mig_count);
 		uint32_t res=page_map_gc_update(g_buffer.key, g_buffer.idx, g_buffer.mig_count);
@@ -451,22 +451,25 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	/*you can check if the gc is needed or not, using this condition*/
 //	if(page_ftl.bm->check_full(page_ftl.bm, p->active,MASTER_PAGE) && (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=5)){
 //		new_do_gc();//call gc
-	/*
-	if ((req_num%8388608==0) || (req_num/4>69206014)) {
+	
+//	if ((req_num%8388608==0) || (req_num/4>69206014)) {
+	if (req_num >= 40000000) {
+		
 		char gnum_buf[64];
 		//block number per groups
-		for (int i=0;i<(GNUMBER-1);++i) {
-			sprintf(gnum_buf, "%d %d\n", i+1, seg_ratio[i]);
-			fputs(gnum_buf, gFile);
+		for (int i=0;i<(GNUMBER);++i) {
+			//printf("%d %d\n", i+1, seg_ratio[i]);
+		//	fputs(gnum_buf, gFile);
 		}
 		//printf("%lu %lu \n", page_ftl.bm->li->req_type_cnt[6], page_ftl.bm->li->req_type_cnt[8]);
+		
 		//WAF	
-		sprintf(gnum_buf, "%f\n", (float)((float)(page_ftl.bm->li->req_type_cnt[6]+page_ftl.bm->li->req_type_cnt[8])
-					/(float)(page_ftl.bm->li->req_type_cnt[6])));
-		fputs(gnum_buf, wFile);
+		//printf("WAF: %f\n", (float)((float)(page_ftl.bm->li->req_type_cnt[6]+page_ftl.bm->li->req_type_cnt[8])
+		//			/(float)(page_ftl.bm->li->req_type_cnt[6])));
+		//fputs(gnum_buf, wFile);
 		
 	}
-	*/
+	
 	if (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=2) {
 		//printf("# of Free Blocks: %d\n",page_ftl.bm->get_free_segment_number(page_ftl.bm)); 
 		do_gc();//call gc
@@ -485,8 +488,10 @@ retry:
 		}
 		*/
 		//printf("free segment: %u\n", page_ftl.bm->get_free_segment_number(page_ftl.bm));
-		page_ftl.bm->free_segment(page_ftl.bm, p->active);
-		p->active=page_ftl.bm->get_segment(page_ftl.bm,false); //get a new block
+		++seg_ratio[0];
+		__segment *tmp = p->active;
+		p->active = page_ftl.bm->change_reserve(page_ftl.bm, p->active);
+		page_ftl.bm->free_segment(page_ftl.bm,tmp); //get a new block
 		goto retry;
 	}
 

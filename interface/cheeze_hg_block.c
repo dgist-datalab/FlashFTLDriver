@@ -23,6 +23,9 @@ static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
 static uint64_t seq = 0;
 static int trace_fd = 0;
 
+static uint32_t jy_req_start=0;
+static uint32_t jy_req_end=0;
+
 static int id_req=0;
 //static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
 //static uint32_t trace_crc_buf[CRC_BUFSIZE];
@@ -280,10 +283,11 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	return res;
 }
 
-
+char load_signal=0;
 vec_request *jy_ureq2vec_req(char* request_raw) {
 	uint32_t lba_r=0;
 	uint32_t size_r=0;
+	char* load_sig = "LOAD";
 	//uint32_t out1_max = 1583789;
 	//uint32_t out2_max = 7045835;
 	//uint32_t out_384_max = 8982377;
@@ -293,6 +297,10 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 //	uint32_t zip_08=201326592;
 	uint32_t zip_32=41943139;
 	//printf("request: %s\n", request_raw);
+	if (strstr(request_raw, load_sig)) {
+		load_signal=1;
+		return NULL;	
+	}
 	char *tmp=strtok(request_raw, " \t");
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
 	res->tag_id=id_req++;
@@ -303,15 +311,28 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	//char *read="R";
 	//printf("type: %s\n", tmp);
 	float perct = (float)id_req*(float)100/(float)zip_32;
-	if (id_req%1000==0) printf("\rpercent: %f%%", perct);
+	//if (id_req%1000==0) printf("\rpercent: %f%%", perct);
 	//if (perct > 40) exit(0);
-	if (id_req%10000000==0) printf("\n");
+	//if (id_req%10000000==0) printf("\n");
+	/*
 	if (strchr(tmp, 'W')) type=FS_SET_T;
 	else if (strchr(tmp, 'R')) type=FS_GET_T;
 	else {
 		printf("type err\n");
 		abort();
 	}
+	*/
+	int ttp = atoi(tmp);
+	if (ttp == 0) type=FS_GET_T;
+	else if (ttp == 1) type = FS_SET_T;
+	else if (ttp == 2) type = FS_FLUSH_T;
+	else if (ttp == 3) type = FS_DELETE_T;
+	else {
+		printf("type err\n");
+		abort();
+	}
+	if (ttp > 1) return NULL;
+
 	lba_r = atoi(strtok(NULL, " \t"));
 	size_r = atoi(strtok(NULL, " \t"));
 	//printf("size: %d\n", size_r);
@@ -351,7 +372,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 				abort();
 				break;
 		}
-		temp->key=lba_r/8+i;
+		temp->key=lba_r+i;
 
 		if (prev_lba = UINT32_MAX) {
 			prev_lba = temp->key;
@@ -369,12 +390,21 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	}
 	res->req_array[(res->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
 	res->req_array[(res->size-1)-consecutive_cnt].consecutive_length=consecutive_cnt;
+	++jy_req_start;
 	return res;
 
 }
 extern volatile vectored_request *now_processing;
 
 bool jeeyun_end_req(request *const req) {
+	if (load_signal) {
+		printf("\nTRIM: %ld\n", (long) mp.li->req_type_cnt[0]);
+		printf("MAPPINGW: %ld\n", (long) mp.li->req_type_cnt[2]);
+		printf("GCMW: %ld\n", (long) mp.li->req_type_cnt[4]);
+		printf("DATAW: %ld\n", (long) mp.li->req_type_cnt[6]);
+		printf("GCDW: %ld\n", (long) mp.li->req_type_cnt[8]);
+		load_signal=0;
+	}
 	vectored_request *preq=req->parents;
 	switch(req->type) {
 		case FS_NOTFOUND_T:
@@ -407,10 +437,19 @@ bool jeeyun_end_req(request *const req) {
 		free(preq->req_array);
 		now_processing=NULL;
 		free(preq);
+		++jy_req_end;
 	}
 	pthread_mutex_unlock(&req_cnt_lock);
 	return true;
 }
+
+
+bool jy_is_finished() {
+        if (jy_req_start == jy_req_end) return true;
+        else return false;
+}
+
+
 //extern int MS_TIME_SL;
 //#define MS_TIME_SL 7
 //set to time!!

@@ -116,10 +116,10 @@ TARGETOBJ =\
 			$(patsubst %.c,%.o,$(SRCS))\
 
 MEMORYOBJ =\
-		   	$(patsubst %.c,%_mem.o,$(SRCS))\
+			$(patsubst %.c,%_mem.o,$(SRCS))\
 
 DEBUGOBJ =\
-		   	$(patsubst %.c,%_d.o,$(SRCS))\
+			$(patsubst %.c,%_d.o,$(SRCS))\
 
 
 ifeq ($(TARGET_LOWER),bdbm_drv)
@@ -162,6 +162,19 @@ jriver_11: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main
 
 jriver_ran: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
+jriver_2: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
+jriver_4: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
+jriver_8: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
+jriver_16: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
+
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)

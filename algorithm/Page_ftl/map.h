@@ -3,8 +3,8 @@
 
 #ifndef __grouping__
 #define __grouping__
-#define GNUMBER 16
-#define BENCH_JY 2
+#define GNUMBER 8
+#define BENCH_JY 1
 //0 is zip08, 1 is zip11, 2 is random
 #endif
 
