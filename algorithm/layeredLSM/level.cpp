@@ -12,6 +12,7 @@ level *level_init(uint32_t level_idx, uint32_t max_run_num, uint32_t map_type){
 	return res;
 }
 extern bool running_flag;
+extern uint32_t gc_type;
 void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
 	run **res=*target;
 	if(run_num==lev->now_run_num){
@@ -32,7 +33,8 @@ void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
 		float second_average_inv_ratio=0;
 		float max_inv_ratio=0;
 		uint32_t sum_cnt=0;
-	//	if(running_flag){
+
+		if(running_flag){
 			for(uint32_t i=0; i<lev->now_run_num; i++){
 				run *temp_run = lev->run_array[i];
 				if(temp_run==NULL) continue;
@@ -45,7 +47,7 @@ void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
 				}
 				printf("%f -> %u\n", invalid_ratio, temp_run->now_entry_num);
 			}
-	//	}
+		}
 
 		second_average_inv_ratio=first_average_inv_ratio;
 		first_average_inv_ratio/=sum_cnt;
@@ -64,32 +66,14 @@ void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
 				if(temp_run==NULL) continue;
 				sc_info *temp_scinfo = temp_run->info;
 				float invalid_ratio = (float)(temp_scinfo->unlinked_lba_num) / temp_run->now_entry_num;
-				/*
-				if (target_ratio < invalid_ratio)
-				{	
-					if(round==0){
-						first_idx=i;
-						target_ratio = invalid_ratio;
-					}
-					else if(round==1){
-						if(first_idx==i){
-							continue;
-						}
-						else{
-							second_idx=i;
-							target_ratio=invalid_ratio;
-						}
-					}
-				}*/
-				
-				uint32_t now_copy_entry_num=temp_run->now_entry_num-temp_scinfo->unlinked_lba_num;
-				if(round < run_num){
-					if (invalid_ratio >= first_average_inv_ratio && copy_entry_num > now_copy_entry_num)
+				if (gc_type == 0)
+				{
+					if (target_ratio < invalid_ratio)
 					{
 						if (round == 0)
 						{
 							first_idx = i;
-							copy_entry_num = now_copy_entry_num;
+							target_ratio = invalid_ratio;
 						}
 						else if (round == 1)
 						{
@@ -100,21 +84,50 @@ void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
 							else
 							{
 								second_idx = i;
-								copy_entry_num = now_copy_entry_num;
+								target_ratio = invalid_ratio;
 							}
 						}
 					}
 				}
-				else{
-					if (invalid_ratio >= second_average_inv_ratio && copy_entry_num > now_copy_entry_num){
-						if (first_idx == i)
+				else
+				{
+					uint32_t now_copy_entry_num = temp_run->now_entry_num - temp_scinfo->unlinked_lba_num;
+					if (round < run_num)
+					{
+						if (invalid_ratio >= first_average_inv_ratio && copy_entry_num > now_copy_entry_num)
 						{
-							continue;
+							if (round == 0)
+							{
+								first_idx = i;
+								copy_entry_num = now_copy_entry_num;
+							}
+							else if (round == 1)
+							{
+								if (first_idx == i)
+								{
+									continue;
+								}
+								else
+								{
+									second_idx = i;
+									copy_entry_num = now_copy_entry_num;
+								}
+							}
 						}
-						else
+					}
+					else
+					{
+						if (invalid_ratio >= second_average_inv_ratio && copy_entry_num > now_copy_entry_num)
 						{
-							second_idx = i;
-							copy_entry_num = now_copy_entry_num;
+							if (first_idx == i)
+							{
+								continue;
+							}
+							else
+							{
+								second_idx = i;
+								copy_entry_num = now_copy_entry_num;
+							}
 						}
 					}
 				}

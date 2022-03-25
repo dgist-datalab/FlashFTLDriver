@@ -70,11 +70,12 @@ uint32_t print_log_temp(){
 	//memset(&LSM->monitor, 0, sizeof(lsmtree_monitor));
 	return 1;
 }
-//bool running_flag=false;
+bool running_flag=false;
 uint32_t write_temp(request *const req){
 	if(lsmtree_insert(LSM, req)==0){
 		req->end_req(req);
-	}/*
+	}
+	/*
 	static bool print_test=false;
 	if(print_test==false && g_li->req_type_cnt[DATAW]>=19755371){
 		running_flag=true;

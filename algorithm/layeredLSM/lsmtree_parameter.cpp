@@ -248,14 +248,14 @@ static void print_help(){
 }
 
 extern lsmtree_parameter *target_param;
-
+uint32_t gc_type;
 uint32_t lsmtree_argument_set(int argc, char **argv){
 	int c;
 	float fpr=0.1;
 	uint32_t test_flag=0;
 	uint32_t target_bit=33;//bit_calculate(RANGE);
 	uint32_t memory_usage=29;
-	while((c=getopt(argc,argv,"hHmMtTfFbB"))!=-1){
+	while((c=getopt(argc,argv,"hHmMtTfFbBGg"))!=-1){
 		switch(c){
 			case 'h':
 			case 'H':
@@ -269,6 +269,10 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 			case 'm':
 			case 'M':
 				memory_usage=atoi(argv[optind]);
+				break;
+			case 'g':
+			case 'G':
+				gc_type=atoi(argv[optind]);
 				break;
 			case 'f':
 			case 'F':
@@ -284,6 +288,7 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 				break;
 		}
 	}
+	printf("gc_type:%u\n",gc_type);
 	//lsmtree_calculate_parameter2(fpr, target_bit, RANGE*target_bit/100*memory_usage,RANGE);
 
 	lsmtree_parameter param=lsmtree_calculate_parameter(fpr, target_bit, RANGE*target_bit/100*memory_usage,RANGE);
