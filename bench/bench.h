@@ -67,6 +67,8 @@ typedef struct{
 #ifdef CDF
 	uint64_t write_cdf[1000000/TIMESLOT+1];
 	uint64_t read_cdf[1000000/TIMESLOT+1];
+	uint64_t vector_read_cdf[1000000/TIMESLOT+1];
+	uint64_t vector_read_cnt;
 	uint64_t map_cpu_time[1000000/TIMESLOT+1];
 #endif
 	uint64_t read_cnt,write_cnt;
@@ -164,6 +166,7 @@ void bench_print_cdf();
 char *get_vectored_bench(uint32_t *mark);
 char *get_vectored_one_command(uint8_t type, uint32_t tid, uint32_t key);
 
+void bench_vector_latency(vec_request *req);
 #ifdef CDF
 void bench_cdf_print(uint64_t, uint8_t istype, bench_data*);
 #endif

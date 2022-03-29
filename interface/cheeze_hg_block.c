@@ -525,6 +525,7 @@ bool cheeze_end_req(request *const req){
 
 	release_each_req(req);
 	if(preq->size==preq->done_cnt){
+		bench_vector_latency(preq);
 		end_req_num++;
 
 #ifdef WRITE_STOP_READ

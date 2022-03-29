@@ -49,6 +49,7 @@ typedef struct vectored_request{
 	uint32_t mark;
 	void* (*end_req)(void*);
 	void* origin_req;
+	MeasureTime latency_checker;
 } vec_request;
 
 struct request {
