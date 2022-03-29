@@ -60,6 +60,8 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		temp->mark=txn->mark;
 		temp->parents=txn;
 		temp->type=*(uint8_t*)buf_parser(buf, &idx, sizeof(uint8_t));
+
+		if(i==0){txn->type=temp->type;}
 		temp->end_req=vectored_end_req;
 		temp->param=NULL;
 		temp->value=NULL;
@@ -181,6 +183,8 @@ void *vectored_main(void *__input){
 			inf_algorithm_caller(inf_req);	
 		}else{
 			uint32_t size=vec_req->size;
+			measure_init(&vec_req->latency_checker);
+			measure_start(&vec_req->latency_checker);
 			for(uint32_t i=0; i<size; i++){
 				/*retry queue*/
 				while(1){
@@ -251,6 +255,7 @@ bool vectored_end_req (request * const req){
 	preq->done_cnt++;
 	//uint32_t tag_num=req->tag_num;
 	if(preq->size==preq->done_cnt){
+		bench_vector_latency(preq);
 		if(preq->end_req){
 			preq->end_req((void*)preq);	
 		}

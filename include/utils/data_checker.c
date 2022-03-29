@@ -9,10 +9,10 @@
 uint32_t *keymap;
 static uint32_t my_seed;
 static fdriver_lock_t data_check_lock;
-//uint32_t test_key2=7686265;
-//uint32_t test_key=2630848;
-uint32_t test_key=UINT32_MAX;
-uint32_t test_key2=test_key;
+//uint32_t test_key2=UINT32_MAX;
+uint32_t test_key=545230;
+//uint32_t test_key=UINT32_MAX;
+uint32_t test_key2=UINT32_MAX;
 
 int str2int(const char* str, int len)
 {
