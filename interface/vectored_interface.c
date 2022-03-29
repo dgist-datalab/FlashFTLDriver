@@ -115,26 +115,8 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 	txn->req_array[(txn->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
 	txn->req_array[(txn->size-1)-consecutive_cnt].consecutive_length=consecutive_cnt;
 
-	while(1){
-		pthread_mutex_lock(&flying_cnt_lock);
-		if(flying_cnt - (int32_t)txn->size < 0){
-			pthread_mutex_unlock(&flying_cnt_lock);
-			continue;
-		}
-		else{
-			flying_cnt-=txn->size;
-			if(flying_cnt<0){
-				printf("abort!!!\n");
-				abort();
-			}
-			pthread_mutex_unlock(&flying_cnt_lock);
-		}
-		
-		if(q_enqueue((void*)txn, mp.processors[0].req_q)){
-			break;
-		}
-	}
 
+	 assign_vectored_req(txn);
 	return 1;
 }
 
@@ -277,6 +259,13 @@ void release_each_req(request *req){
 }
 
 void assign_vectored_req(vec_request *txn){
+#ifdef WRITE_STOP_READ
+	for(uint32_t i=0; i<txn->size; i++){
+		request* req=&txn->req_array[i];
+		measure_init(&req->latency_checker);
+		measure_start(&req->latency_checker);
+	}
+#endif
 	while(1){
 		pthread_mutex_lock(&flying_cnt_lock);
 		if(flying_cnt - (int32_t)txn->size < 0){
@@ -293,13 +282,6 @@ void assign_vectored_req(vec_request *txn){
 		}
 	//	printf("flying tagnum %u, txn->size %u, req_q->size:%u\n", QDEPTH-flying_cnt, txn->size, mp.processors[0].req_q->size);
 		
-		#ifdef WRITE_STOP_READ
-			for(uint32_t i=0; i<txn->size; i++){
-				request* req=&txn->req_array[i];
-				measure_init(&req->latency_checker);
-				measure_start(&req->latency_checker);
-			}
-		#endif
 		if(q_enqueue((void*)txn, mp.processors[0].req_q)){
 			break;
 		}
