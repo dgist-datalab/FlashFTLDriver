@@ -515,6 +515,14 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 			if(nor==cumulate_number)
 				break;
 		}
+
+		printf("\n\n[cdf] vector read\n");
+		uint64_t vector_aggregate_num=0;
+		for(int i=0; i<1000000/TIMESLOT+1; i++){
+			vector_aggregate_num+=_d->vector_read_cdf[i];
+			if(_d->vector_read_cdf[i]==0) continue;
+			fprintf(stderr, "%d,%ld,%f\n", i*10, _d->vector_read_cdf[i], (float)vector_aggregate_num/_d->vector_read_cnt);
+		}
 	}
 }
 #endif
@@ -538,6 +546,24 @@ void bench_collect_map_cpu_time(bench_data *bd, request *req){
 		bd->map_cpu_time[slot_num]++;
 	}
 	bench_update_ftl_time(&bd->cpu_time, cpu_time);
+#endif
+}
+
+void bench_vector_latency(vec_request *req){
+#ifdef CDF
+	measure_calc(&req->latency_checker);
+	if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
+		uint32_t idx=req->mark;
+		bench_data *_data=&_master->datas[idx];
+		_data->vector_read_cnt++;
+		int slot_num=req->latency_checker.micro_time/TIMESLOT;
+		if(slot_num>=1000000/TIMESLOT){
+			_data->vector_read_cdf[1000000/TIMESLOT]++;
+		}
+		else{
+			_data->vector_read_cdf[slot_num]++;
+		}
+	}
 #endif
 }
 
@@ -573,7 +599,6 @@ void bench_reap_data(request *const req,lower_info *li){
 			_data->read_cdf[slot_num]++;
 		}
 		if(_m->r_num%1000000==0){
-		//	bench_cdf_print(_m->r_num,_m->type,_data);
 		}
 	}
 	else if(req->type==FS_SET_T){
