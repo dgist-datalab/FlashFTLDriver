@@ -407,10 +407,14 @@ vec_request **get_vectored_request_arr()
 #endif
 		barrier();
 		*send = 0;
+	
+#ifdef SYNC_WRITE
+#else
 		if (ureq->op!=REQ_OP_READ) {
 			barrier();
 			*recv = 1;
 		}
+#endif
 		if(i==CHEEZE_QUEUE_SIZE-1){
 			previous_queue=0;
 		}
@@ -534,6 +538,13 @@ bool cheeze_end_req(request *const req){
 //			printf("return cnt:%u %u\n", write_cnt, preq->seq_id);
 			write_cnt--;
 			fdriver_unlock(&write_check_lock);
+		}
+#endif
+
+#ifdef SYNC_WRITE
+		if (preq->type==FS_SET_T) {
+			barrier();
+			*recv = 1;
 		}
 #endif
 
