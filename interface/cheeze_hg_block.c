@@ -409,12 +409,14 @@ vec_request **get_vectored_request_arr()
 		*send = 0;
 	
 #ifdef SYNC_WRITE
+		if(ureq->op!=REQ_OP_READ && ureq->op!=REQ_OP_WRITE)
 #else
-		if (ureq->op!=REQ_OP_READ) {
+		if (ureq->op!=REQ_OP_READ) 
+#endif
+		{
 			barrier();
 			*recv = 1;
 		}
-#endif
 		if(i==CHEEZE_QUEUE_SIZE-1){
 			previous_queue=0;
 		}
