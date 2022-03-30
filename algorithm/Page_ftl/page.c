@@ -216,7 +216,8 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
 		req->value=NULL;
-		send_user_req(req, DATAW, ppa, value);
+		//send_user_req(req, DATAW, ppa, value);
+		send_user_req(NULL, DATAW, ppa, value);
 		a_buffer.idx=0;
 		return 0;
 	}
@@ -227,12 +228,12 @@ uint32_t page_write(request *const req){
 #ifdef LBA_LOGGING
 	dprintf(log_fd, "W %u\n",req->key);
 #endif
-	//printf("write key :%u\n",req->key);
 	if(align_buffering(req, 0, NULL)!=0){
-		req->value=NULL;
-		req->end_req(req);
+	//	req->value=NULL;
+	//	req->end_req(req);
 	}
-	//send_user_req(req, DATAW, page_map_assign(req->key), req->value);
+	req->value=NULL;
+	req->end_req(req);
 	return 0;
 }
 
