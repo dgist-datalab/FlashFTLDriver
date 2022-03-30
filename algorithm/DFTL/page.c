@@ -116,7 +116,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	if(a_buffer.idx==L2PGAP){
 		ppa_t ppa=get_ppa(a_buffer.key, a_buffer.idx);
 		value_set *value=inf_get_valueset(a_buffer.value, FS_MALLOC_W, PAGESIZE);
-		send_user_req(req, DATAW, ppa, value);
+		send_user_req(NULL, DATAW, ppa, value);
+		req->write_done=true;
+		//send_user_req(req, DATAW, ppa, value);
 		
 		KEYT physical[L2PGAP];
 
