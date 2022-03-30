@@ -543,8 +543,7 @@ bool cheeze_end_req(request *const req){
 
 #ifdef SYNC_WRITE
 		if (preq->type==FS_SET_T) {
-			barrier();
-			*recv = 1;
+			recv_event_addr[preq->tag_id]=1;
 		}
 #endif
 
