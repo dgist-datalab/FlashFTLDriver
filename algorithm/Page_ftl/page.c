@@ -216,8 +216,11 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
 		req->value=NULL;
-		//send_user_req(req, DATAW, ppa, value);
+#ifdef WRITE_STOP_READ
+		send_user_req(req, DATAW, ppa, value);
+#else
 		send_user_req(NULL, DATAW, ppa, value);
+#endif
 		a_buffer.idx=0;
 		return 0;
 	}
@@ -229,11 +232,17 @@ uint32_t page_write(request *const req){
 	dprintf(log_fd, "W %u\n",req->key);
 #endif
 	if(align_buffering(req, 0, NULL)!=0){
-	//	req->value=NULL;
-	//	req->end_req(req);
+#ifdef WRITE_STOP_READ
+		req->value=NULL;
+		req->end_req(req);
+#endif
 	}
+
+#ifdef WRITE_STOP_READ
+#else
 	req->value=NULL;
 	req->end_req(req);
+#endif
 	return 0;
 }
 
