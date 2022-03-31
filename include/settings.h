@@ -27,7 +27,7 @@
 #define _PPB (256*8/PAGE_TARGET_KILO)
 
 #if 1
-	#define CARD_NUM 2
+	#define CARD_NUM 1
 	#define BUS_NUM 8
 	#define CHIP_NUM 8
 #else // using BPS=1
@@ -39,7 +39,7 @@
 #define BPS (BUS_NUM *CHIP_NUM*CARD_NUM)
 #define _PPS (_PPB*BPS)
 
-#define PUNIT (128)
+#define PUNIT (BPS)
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)<(b)?(b):(a))
