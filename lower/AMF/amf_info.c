@@ -176,11 +176,13 @@ void* amf_info_trim_block(uint32_t ppa){
 	}
 	p_bbuf_issue(LOWER_TRIM, ppa, NULL, NULL);
 #else
-	if((ppa*R2PGAP)%PAGES_PER_SEGMENT){
+
+	if(ppa%_PPS){
 		printf("not aligned! %u\n", ppa);
 		//print_stacktrace();
 		abort();
 	}
+
 	normal_write_issue(LOWER_TRIM, ppa, NULL, NULL);
 #endif
 	return NULL;
