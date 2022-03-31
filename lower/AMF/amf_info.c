@@ -95,6 +95,8 @@ uint32_t amf_info_create(lower_info *li, blockmanager *bm){
 		mem_pool[i]=(char*)malloc(PAGESIZE);
 	}
 #endif
+
+	printf("BPS:%u PPS:%u AMF_PUNIT:%u\n", BPS, _PPS, AMF_PUNIT);
 	return 1;
 }
 

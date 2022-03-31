@@ -63,19 +63,25 @@ void normal_write_init(){
 }
 
 static inline void __issue(uint32_t type, char *data, amf_wrapper *temp_req){
+
+	uint32_t intra_seg_idx=temp_req->ppa % (_PPS);
+	uint32_t seg_idx=temp_req->ppa / (_PPS);
+	uint32_t chip_num=seg_idx%2;
+	seg_idx=seg_idx/2*2;
 	for(uint32_t i=0; i<R2PGAP; i++){
-		/*
-		char temp[10]={0,};
-		sprintf(temp, "%u",(temp_req->ppa*R2PGAP+i) & (AMF_PUNIT-1));
-		measure_start(&amf_time);*/
+		uint32_t target_ppa=intra_seg_idx*2+i;
+		target_ppa<<=1;
+		target_ppa=seg_idx*(_PPS*2)+target_ppa;
+		target_ppa+=chip_num;
+
 		switch(type){
 #ifndef TESTING
 			case LOWER_WRITE:
-				AmfWrite(am, temp_req->ppa*R2PGAP+i, &data[i*REAL_PAGE_SIZE], 
+				AmfWrite(am, target_ppa, &data[i*REAL_PAGE_SIZE], 
 						(void *)temp_req);
 				break;
 			case LOWER_READ:
-				AmfRead(am, temp_req->ppa*R2PGAP+i, &data[i*REAL_PAGE_SIZE], 
+				AmfRead(am, target_ppa, &data[i*REAL_PAGE_SIZE], 
 						(void *)temp_req);
 				break;
 			case LOWER_TRIM:
@@ -102,8 +108,17 @@ void normal_write_issue(uint32_t type, uint32_t ppa, char *data,  algo_req *req)
 		__issue(type, data, temp_req);
 	}
 	else{
-		for(uint32_t i=0; i<128; i++){
-			AmfErase(am, ppa*R2PGAP+i, NULL);
+		uint32_t intra_seg_idx=ppa % (_PPS);
+		uint32_t seg_idx=ppa / (_PPS);
+		uint32_t chip_num=seg_idx%2;
+		seg_idx=seg_idx/2*2;
+
+		for(uint32_t i=0; i<AMF_PUNIT; i++){
+			uint32_t target_ppa=intra_seg_idx*2+i;
+			target_ppa<<=1;
+			target_ppa=seg_idx*(_PPS*2)+target_ppa;
+			target_ppa+=chip_num;		
+			AmfErase(am, target_ppa, NULL);
 		}
 	}
 }
