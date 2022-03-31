@@ -160,10 +160,29 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	}
 	fdriver_unlock(&lsm->read_cnt_lock);
 
-	//printf("req->key write:%u\n", req->key);
 	uint32_t res=0;
+	if(run_is_full(r)){
+		run_insert_done(r, false);
+#ifdef THREAD_COMPACTION
+		if(thpool_num_threads_working(lsm->tp)==1){
+			thpool_wait(lsm->tp);
+		}
+		thpool_add_work(lsm->tp,compaction_thread_run, (void*)r);
+#else
+		compaction_flush(lsm, r);
+#endif
+		//printf("free block num:%u\n", L2PBm_get_free_block_num(lsm->bm));
+		lsm->now_memtable_idx=(lsm->now_memtable_idx+1)%MEMTABLE_NUM;
+		lsm->memtable[lsm->now_memtable_idx]=__lsm_populate_new_run(lsm, lsm->param.BF_level_range.start==1?GUARD_BF:PLR_MAP, RUN_LOG, lsm->param.memtable_entry_num, 0);
+		if(MEMTABLE_NUM!=1){
+			lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=NULL;
+		}
+		r=lsm->memtable[lsm->now_memtable_idx];
+	}
+
+	//printf("req->key write:%u\n", req->key);
 	res=run_insert(r, req->key, UINT32_MAX, req->value->value, DATAW, 
-		lsm->shortcut);
+		lsm->shortcut, req);
 
 
 #ifdef SC_MEM_OPT
@@ -183,29 +202,8 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	}
 #endif
 
-	if(run_is_full(r)){
-		run_insert_done(r, false);
-#ifdef THREAD_COMPACTION
-		if(thpool_num_threads_working(lsm->tp)==1){
-			thpool_wait(lsm->tp);
-		}
-		thpool_add_work(lsm->tp,compaction_thread_run, (void*)r);
-#else
-		compaction_flush(lsm, r);
-#endif
-		//printf("free block num:%u\n", L2PBm_get_free_block_num(lsm->bm));
-		lsm->now_memtable_idx=(lsm->now_memtable_idx+1)%MEMTABLE_NUM;
-		lsm->memtable[lsm->now_memtable_idx]=__lsm_populate_new_run(lsm, lsm->param.BF_level_range.start==1?GUARD_BF:PLR_MAP, RUN_LOG, lsm->param.memtable_entry_num, 0);
-		if(MEMTABLE_NUM!=1){
-			lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=NULL;
-		}
-		res=2;
-	}
-
 	if(res==2){
-#ifdef WRITE_STOP_READ
-		g_li->lower_flying_req_wait();
-#endif
+		return 1;
 	}
 	return 0;
 }
