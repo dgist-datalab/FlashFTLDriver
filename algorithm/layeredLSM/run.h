@@ -103,7 +103,7 @@ static run *run_extract_target(request *req){
  * data: target data
  * merge_insert: flag is set when the function is called in run_merge
  * */
-bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
+uint32_t run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
  	uint32_t io_type, struct shortcut_master *shortcut);
 
 #ifdef SC_MEM_OPT

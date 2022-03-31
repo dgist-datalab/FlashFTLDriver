@@ -86,15 +86,18 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 			sm, NULL, type);
 }
 
-bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data, 
+uint32_t run_insert(run *r, uint32_t lba, uint32_t psa, char *data, 
 	uint32_t io_type,	sc_master *shortcut){
+	uint32_t res=1;
 	if(r->limit_entry_num < r->now_entry_num){
 		EPRINT("run full!", true);
-		return false;
+		res=0;
+		goto out;
 	}
 
 	if(r->type==RUN_LOG && !shortcut_validity_check_and_link(shortcut, r, r, lba)){
-		return false;
+		res=0;
+		goto out;
 	}
 
 	if(r->type==RUN_PINNING){
@@ -113,14 +116,17 @@ bool run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 		if(pp_insert_value(r->pp, lba, data)){
 			__run_write_buffer(r, r->st_body->bm->segment_manager, false, io_type);
 			pp_reinit_buffer(r->pp);
+			res=2;
 		}
 	}
 	if(r->st_body->summary_write_alert){
 		__run_write_meta(r, r->st_body->bm->segment_manager, false);
+		res=2;
 	}
 
 	r->now_entry_num++;
-	return true;
+out:
+	return res;
 }
 
 void run_padding_current_block(run *r){
