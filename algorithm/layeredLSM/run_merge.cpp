@@ -236,7 +236,7 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 		if (r->type == RUN_PINNING)
 		{
 			t_pair->original_psa =t_pair->pair.piece_ppa;
-			if (!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, COMPACTIONDATAW, shortcut))
+			if (!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, COMPACTIONDATAW, shortcut ,NULL))
 			{
 				__invalidate_target(t_pair->r, t_pair->pair.piece_ppa, true);
 			}
@@ -244,7 +244,7 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 		}
 		else
 		{
-			if (!run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, COMPACTIONDATAW, shortcut))
+			if (!run_insert(r, t_pair->pair.lba, UINT32_MAX, t_pair->data, COMPACTIONDATAW, shortcut, NULL))
 			{
 			}
 			iter++;

@@ -15,12 +15,18 @@ static void* __run_write_end_req(algo_req *req){
 	else{
 		inf_free_valueset(req->value, FS_MALLOC_W);
 	}
+
+	if(req->parents){
+		req->parents->end_req(req->parents);
+	}
+
 	free(req);
 	return NULL;
 }
 
-static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blockmanager *sm, void *param, uint32_t  type){
+static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blockmanager *sm, void *param, uint32_t  type, request *preq){
 	algo_req *res=(algo_req*)malloc(sizeof(algo_req));
+	res->parents=preq;
 	res->type=type;
 	res->ppa=ppa;
 	res->value=value;
@@ -42,11 +48,11 @@ static void __run_write_meta(run *r, blockmanager *sm, bool force){
 	}
 
 	__run_issue_write(target_ppa, swp->value, (char*)swp->oob, 
-			r->st_body->bm->segment_manager, (void*)swp, MAPPINGW);
+			r->st_body->bm->segment_manager, (void*)swp, MAPPINGW, NULL);
 }
 
 static void __run_write_buffer(run *r, blockmanager *sm, bool force, 
-		uint32_t type){
+		uint32_t type, request *preq){
 	uint32_t target_ppa=UINT32_MAX, psa, intra_offset;
 	uint32_t psa_list[L2PGAP];
 	for(uint32_t i=0; i<r->pp->buffered_num; i++){
@@ -83,11 +89,11 @@ static void __run_write_buffer(run *r, blockmanager *sm, bool force,
 		}
 	}
 	__run_issue_write(target_ppa, pp_get_write_target(r->pp, force), (char*)r->pp->LBA, 
-			sm, NULL, type);
+			sm, NULL, type, preq);
 }
 
 uint32_t run_insert(run *r, uint32_t lba, uint32_t psa, char *data, 
-	uint32_t io_type,	sc_master *shortcut){
+	uint32_t io_type,	sc_master *shortcut, request *preq){
 	uint32_t res=1;
 	if(r->limit_entry_num < r->now_entry_num){
 		EPRINT("run full!", true);
@@ -114,7 +120,7 @@ uint32_t run_insert(run *r, uint32_t lba, uint32_t psa, char *data,
 			r->pp=pp_init();
 		}
 		if(pp_insert_value(r->pp, lba, data)){
-			__run_write_buffer(r, r->st_body->bm->segment_manager, false, io_type);
+			__run_write_buffer(r, r->st_body->bm->segment_manager, false, io_type, preq);
 			pp_reinit_buffer(r->pp);
 			res=2;
 		}
@@ -131,7 +137,7 @@ out:
 
 void run_padding_current_block(run *r){
 	if(r->pp && r->pp->buffered_num!=0){
-		__run_write_buffer(r, r->st_body->bm->segment_manager,true, COMPACTIONDATAW);
+		__run_write_buffer(r, r->st_body->bm->segment_manager,true, COMPACTIONDATAW, NULL);
 		pp_reinit_buffer(r->pp);
 	}
 	if(st_array_force_skip_block(r->st_body)==0){
@@ -170,7 +176,7 @@ void run_copy_unlinked_flag_update(run *r, uint32_t ste_num, bool flag, uint32_t
 
 void run_insert_done(run *r, bool merge_insert){
 	if(r->pp && r->pp->buffered_num!=0){
-		__run_write_buffer(r, r->st_body->bm->segment_manager,true, merge_insert?COMPACTIONDATAW:DATAW);
+		__run_write_buffer(r, r->st_body->bm->segment_manager,true, merge_insert?COMPACTIONDATAW:DATAW, NULL);
 	}
 	__run_write_meta(r, r->st_body->bm->segment_manager, true);
 
@@ -434,7 +440,7 @@ retry2:
 	for(iter=temp_list.begin(); iter!=temp_list.end();){
 		temp_node=*iter;
 		uint32_t offset;
-		run_insert(r, temp_node->lba, UINT32_MAX, &temp_node->value->value[(temp_node->piece_ppa%L2PGAP)*LPAGESIZE], TEST_IO, lsm->shortcut);
+		run_insert(r, temp_node->lba, UINT32_MAX, &temp_node->value->value[(temp_node->piece_ppa%L2PGAP)*LPAGESIZE], TEST_IO, lsm->shortcut, NULL);
 
 		inf_free_valueset(temp_node->value, FS_MALLOC_R);
 
