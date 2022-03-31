@@ -144,6 +144,7 @@ void lsmtree_free(lsmtree *lsm){
 	delete rb.issue_req;
 }
 
+extern lower_info *g_li;
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	run *r=lsm->memtable[lsm->now_memtable_idx];
 
@@ -160,8 +161,10 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	fdriver_unlock(&lsm->read_cnt_lock);
 
 	//printf("req->key write:%u\n", req->key);
-	run_insert(r, req->key, UINT32_MAX, req->value->value, DATAW, 
+	uint32_t res=0;
+	res=run_insert(r, req->key, UINT32_MAX, req->value->value, DATAW, 
 		lsm->shortcut);
+
 
 #ifdef SC_MEM_OPT
 	if (shortcut_memory_full(lsm->shortcut)){
@@ -196,6 +199,13 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 		if(MEMTABLE_NUM!=1){
 			lsm->memtable[(lsm->now_memtable_idx+1)%MEMTABLE_NUM]=NULL;
 		}
+		res=2;
+	}
+
+	if(res==2){
+#ifdef WRITE_STOP_READ
+		g_li->lower_flying_req_wait();
+#endif
 	}
 	return 0;
 }
