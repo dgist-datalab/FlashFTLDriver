@@ -181,8 +181,13 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	}
 
 	//printf("req->key write:%u\n", req->key);
+#ifdef WRITE_STOP_READ
 	res=run_insert(r, req->key, UINT32_MAX, req->value->value, DATAW, 
 		lsm->shortcut, req);
+#else
+	res=run_insert(r, req->key, UINT32_MAX, req->value->value, DATAW, 
+		lsm->shortcut, NULL);
+#endif
 
 
 #ifdef SC_MEM_OPT
@@ -202,9 +207,11 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	}
 #endif
 
+#ifdef WRITE_STOP_READ
 	if(res==2){
 		return 1;
 	}
+#endif
 	return 0;
 }
 
