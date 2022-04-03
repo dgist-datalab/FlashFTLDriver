@@ -28,6 +28,9 @@ typedef struct summary_page_set_iter{
 	bool *noncopy_flag;
 	uint32_t *noncopy_start_lba;
 	uint32_t *noncopy_end_lba;
+
+	uint32_t prev_ppa;
+	value_set *prev_value;
 }sp_set_iter;
 
 sp_set_iter *sp_set_iter_init(uint32_t max_STE_num, summary_page_meta *sp_set, uint32_t prefetch_num, bool differ_map);

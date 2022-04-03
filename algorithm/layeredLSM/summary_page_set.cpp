@@ -16,6 +16,8 @@ sp_set_iter *__sp_set_iter_init(uint32_t max_STE_num, summary_page_meta *spm_set
 	res->noncopy_flag=(bool*)calloc(max_STE_num, sizeof(bool));
 	res->differ_map=differ_map;
 
+	res->prev_ppa=UINT32_MAX;
+	res->prev_value=NULL;
 	return res;
 }
 
@@ -24,7 +26,8 @@ sp_set_iter *sp_set_iter_init(uint32_t max_STE_num, summary_page_meta *spm_set, 
 	res->prefetch_num=prefetch_num;
 	res->read_STE_num=MIN(max_STE_num, prefetch_num);
 	for(uint32_t i=0; i<res->read_STE_num; i++){
-		spi_init(&res->spm_set[i]);
+		spi_init(&res->spm_set[i], res->prev_ppa, &res->prev_value);
+		res->prev_ppa=res->spm_set[i].piece_ppa/L2PGAP;
 	}
 	return res;
 }
@@ -114,7 +117,9 @@ void sp_set_iter_move_ste(sp_set_iter *ssi, uint32_t ste_num, uint32_t end_lba){
 		if (ssi->read_STE_num < ssi->max_STE_num)
 		{
 
-			spi_init(&ssi->spm_set[ssi->read_STE_num++]);
+			spi_init(&ssi->spm_set[ssi->read_STE_num], ssi->prev_ppa, &ssi->prev_value);
+			ssi->prev_ppa=ssi->spm_set[ssi->read_STE_num].piece_ppa/L2PGAP;
+			ssi->read_STE_num++;
 		}
 	}
 	else{
@@ -140,7 +145,9 @@ uint32_t sp_set_iter_move(sp_set_iter *ssi){
 			if (ssi->read_STE_num < ssi->max_STE_num)
 			{	
 
-				spi_init(&ssi->spm_set[ssi->read_STE_num++]);
+				spi_init(&ssi->spm_set[ssi->read_STE_num], ssi->prev_ppa, &ssi->prev_value);
+				ssi->prev_ppa=ssi->spm_set[ssi->read_STE_num].piece_ppa/L2PGAP;
+				ssi->read_STE_num++;
 			}
 			
 		}

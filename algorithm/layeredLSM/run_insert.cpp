@@ -11,6 +11,7 @@ extern uint32_t test_piece_ppa;
 static void* __run_write_end_req(algo_req *req){
 	if(req->param){//for summary_write
 		st_array_summary_write_done((summary_write_param*)req->param);
+		inf_free_valueset(req->value, FS_MALLOC_W);
 	}
 	else{
 		inf_free_valueset(req->value, FS_MALLOC_W);
@@ -39,16 +40,28 @@ static void __run_issue_write(uint32_t ppa, value_set *value, char *oob_set, blo
 }
 
 static void __run_write_meta(run *r, blockmanager *sm, bool force){
-	uint32_t target_ppa=st_array_summary_translation(r->st_body, force)/L2PGAP;
-	summary_write_param *swp=st_array_get_summary_param(r->st_body, target_ppa, force);
-	if(!swp) return;
+	value_set *value;
+	uint32_t oob[L2PGAP];
+	if(!st_check_swp(r->st_body)){
+		uint32_t ppa;
+		if((value=st_get_remain(oob, &ppa))){
+			__run_issue_write(ppa, value, (char*)oob, 
+				r->st_body->bm->segment_manager, NULL, MAPPINGW, NULL);
+		}
+		return;
+	}
+	static int cnt=0;
+	uint32_t target_piece_ppa=st_array_summary_translation(r->st_body, force);
+	summary_write_param *swp=st_array_get_summary_param(r->st_body, target_piece_ppa, force);
 
-	if(validate_ppa(sm, target_ppa, true)!=BIT_SUCCESS){
+
+	if(validate_piece_ppa(sm, target_piece_ppa, true)!=BIT_SUCCESS){
 		EPRINT("map write error", true);
 	}
-
-	__run_issue_write(target_ppa, swp->value, (char*)swp->oob, 
+	if((value=st_swp_write(swp, oob, force))){
+		__run_issue_write(target_piece_ppa/L2PGAP, value, (char*)oob, 
 			r->st_body->bm->segment_manager, (void*)swp, MAPPINGW, NULL);
+	}
 }
 
 static void __run_write_buffer(run *r, blockmanager *sm, bool force, 
@@ -277,7 +290,7 @@ uint32_t run_reinsert2(lsmtree *lsm, run *r, uint32_t start_lba, uint32_t data_n
 
 			if (!temp_node->prev_same)
 			{
-				__read_for_piece_ppa(lsm, temp_node->r->st_body->sp_meta[temp_node->ste].ppa, temp_node);
+				__read_for_piece_ppa(lsm, temp_node->r->st_body->sp_meta[temp_node->ste].piece_ppa, temp_node);
 			}
 			temp_list.push_back(temp_node);
 		}
