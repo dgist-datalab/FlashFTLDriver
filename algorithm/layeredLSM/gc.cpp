@@ -18,8 +18,11 @@ static void *__gc_end_req(algo_req *req){
 			fdriver_unlock(&g_value->lock);
 			break;
 		case GCDW:
-		case GCMW:
 			inf_free_valueset(g_value->value, FS_MALLOC_R);
+			free(g_value);
+			break;
+		case GCMW:
+			inf_free_valueset(g_value->value, FS_MALLOC_W);
 			free(g_value);
 			break;
 	}
@@ -101,54 +104,97 @@ enum{
 	GET_RPPA, GET_PPA, GET_MIXED,
 };
 
+uint32_t gc_summary_get_rppa(L2P_bm *bm, uint32_t flag){
+	uint32_t rppa;
+	switch (flag)
+	{
+	case GET_RPPA:
+		rppa = L2PBm_get_map_rppa(bm);
+		break;
+	case GET_PPA:
+		rppa = L2PBm_get_map_ppa(bm);
+		break;
+	case GET_MIXED:
+		rppa = L2PBm_get_map_ppa_mixed(bm);
+		break;
+	}
+	return rppa;
+}
+
 void gc_summary_segment(L2P_bm *bm, __gsegment *target, uint32_t activie_assign){
 	blockmanager *sm=bm->segment_manager;
 	list *temp_list=list_init();
 	uint32_t page, bidx, pidx;
 	gc_value *g_value;
 	for_each_page_in_seg(target,page,bidx,pidx){
-		if(sm->is_invalid_piece(sm, page * L2PGAP)) continue;
-		g_value=__gc_issue_read(page, sm, GCMR);
-		list_insert(temp_list, (void*)g_value);
+		bool read_flag=false;
+		for(uint32_t i=0; i<L2PGAP; i++){
+			if(sm->is_invalid_piece(sm, page * L2PGAP+i)) continue;
+			else{
+				read_flag=true;
+				break;
+			}
+		}
+		if(read_flag){
+			g_value=__gc_issue_read(page, sm, GCMR);
+			list_insert(temp_list, (void*)g_value);
+		}
 	}
 
 	li_node *now,*nxt;
+	gc_value *write_gc_value=NULL;
+	uint32_t gc_idx=0;
+	uint32_t rppa;
+
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list,now,nxt){
 			g_value=(gc_value*)now->data;
 			__gc_read_check(g_value);
-			uint32_t start_lba=g_value->oob[0];
-			uint32_t intra_idx;
-			sid_info* info=sorted_array_master_get_info_mapgc(start_lba, g_value->ppa, &intra_idx);
-			if(info==NULL || info->sa->sp_meta[intra_idx].ppa!=g_value->ppa){
-				EPRINT("mapping error", true);
-			}
 
-			if(invalidate_ppa(sm, g_value->ppa, true) ==BIT_ERROR){
-				EPRINT("invalidate map error", true);
-			}
-			uint32_t rppa;
-			switch(activie_assign){
-			case GET_RPPA:
-				rppa=L2PBm_get_map_rppa(bm);
-				break;
-			case GET_PPA:
-				rppa=L2PBm_get_map_ppa(bm);
-				break;
-			case GET_MIXED:
-				rppa=L2PBm_get_map_ppa_mixed(bm);
-				break;
-			}
+			for(uint32_t i=0; i<L2PGAP; i++){
+				if(sm->is_invalid_piece(sm, g_value->ppa*L2PGAP+i)) continue;
+				uint32_t start_lba=g_value->oob[i];
+				uint32_t intra_idx;
+				uint32_t target_piece_ppa=g_value->ppa*L2PGAP+i;
+				sid_info* info=sorted_array_master_get_info_mapgc(start_lba, target_piece_ppa, &intra_idx);
+				if(info==NULL || info->sa->sp_meta[intra_idx].piece_ppa!=target_piece_ppa){
+					EPRINT("mapping error", true);
+				}
 
-			if(validate_ppa(sm, rppa, true)==BIT_ERROR){
-				EPRINT("validate map error", true);
-			}
-			info->sa->sp_meta[intra_idx].ppa=rppa;
-			g_value->ppa=rppa;
+				if(invalidate_piece_ppa(sm, target_piece_ppa, true) ==BIT_ERROR){
+					EPRINT("invalidate map error", true);
+				}
 
-			__gc_issue_write(g_value, sm, GCMW);
+				if(write_gc_value==NULL){
+					write_gc_value=(gc_value*)calloc(1, sizeof(gc_value));
+					write_gc_value->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+					rppa=gc_summary_get_rppa(bm, activie_assign);
+					write_gc_value->ppa=rppa;
+				}
+				uint32_t target_r_piece_ppa=rppa*L2PGAP+gc_idx;
+				if(validate_piece_ppa(sm, target_r_piece_ppa, true)==BIT_ERROR){
+					EPRINT("validate map error", true);
+				}
+				info->sa->sp_meta[intra_idx].piece_ppa=target_r_piece_ppa;
+				write_gc_value->oob[gc_idx]=g_value->oob[i];
+				memcpy(&write_gc_value->value->value[(gc_idx)*LPAGESIZE], &g_value->value->value[(i)*LPAGESIZE], LPAGESIZE);
+				gc_idx++;
+
+				if(gc_idx==L2PGAP){
+					__gc_issue_write(write_gc_value, sm,GCMW);
+					write_gc_value=NULL;
+					gc_idx=0;
+				}
+
+			}
+			inf_free_valueset(g_value->value, FS_MALLOC_R);
+			free(g_value);
 			list_delete_node(temp_list,now);
 		}
+	}
+
+	if(write_gc_value){
+		__gc_issue_write(write_gc_value, sm, GCMW);
 	}
 
 	__clear_block_and_gsegment(bm, target);

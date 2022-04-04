@@ -27,7 +27,7 @@
 #define _PPB (256*8/PAGE_TARGET_KILO)
 
 #if 1
-	#define CARD_NUM 1
+	#define CARD_NUM 2
 	#define BUS_NUM 8
 	#define CHIP_NUM 8
 #else // using BPS=1

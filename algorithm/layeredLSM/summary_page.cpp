@@ -6,14 +6,17 @@ extern char all_set_data[PAGESIZE];
 summary_page *sp_init(){
 	summary_page *res=(summary_page *)malloc(sizeof(summary_page));
 	res->write_pointer=0;
-	res->value=inf_get_valueset(all_set_data, FS_MALLOC_W, PAGESIZE);
-	res->body=res->value->value;
+	//res->value=inf_get_valueset(all_set_data, FS_MALLOC_W, PAGESIZE);
+	res->value=(char*)malloc(LPAGESIZE);
+	memcpy(res->value, all_set_data, LPAGESIZE);
+	res->body=res->value;
 	res->sorted=true;
 	return res;
 }
 
 void sp_free(summary_page *sp){
-	inf_free_valueset(sp->value, FS_MALLOC_W);
+	//inf_free_valueset(sp->value, FS_MALLOC_W);
+	free(sp->value);
 	free(sp);
 }
 
@@ -51,7 +54,7 @@ bool sp_insert_spair(summary_page *sp, summary_pair p){
 	else return false;
 }
 
-value_set *sp_get_data(summary_page *sp){
+char *sp_get_data(summary_page *sp){
 	return sp->value;
 }
 

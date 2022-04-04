@@ -28,13 +28,16 @@ typedef struct summary_page_set_iter{
 	bool *noncopy_flag;
 	uint32_t *noncopy_start_lba;
 	uint32_t *noncopy_end_lba;
+
+	uint32_t prev_ppa;
+	value_set *prev_value;
 }sp_set_iter;
 
 sp_set_iter *sp_set_iter_init(uint32_t max_STE_num, summary_page_meta *sp_set, uint32_t prefetch_num, bool differ_map);
 sp_set_iter *sp_set_iter_init_mf(uint32_t max_STE_num, summary_page_meta *sp_set, uint32_t entry_num, map_function *mf, bool differ_map);
 
 uint32_t sp_set_get_ste_num(sp_set_iter *ssi, uint32_t global_offset);
-summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r);
+summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r, uint32_t *ste_num, uint32_t *intra_idx);
 void sp_set_iter_skip_lba(sp_set_iter *ssi, uint32_t idx, uint32_t lba, uint32_t end);
 bool sp_set_noncopy_check(sp_set_iter *ssi, uint32_t lba, uint32_t *end_lba);
 uint32_t sp_set_iter_move(sp_set_iter *ssi);

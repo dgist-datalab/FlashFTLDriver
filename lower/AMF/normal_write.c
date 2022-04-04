@@ -63,16 +63,22 @@ void normal_write_init(){
 }
 
 static inline void __issue(uint32_t type, char *data, amf_wrapper *temp_req){
-
+#if BPS==64
 	uint32_t intra_seg_idx=temp_req->ppa % (_PPS);
 	uint32_t seg_idx=temp_req->ppa / (_PPS);
 	uint32_t chip_num=seg_idx%2;
 	seg_idx=seg_idx/2*2;
+#endif
+	uint32_t target_ppa;
 	for(uint32_t i=0; i<R2PGAP; i++){
+#if BPS==64
 		uint32_t target_ppa=intra_seg_idx*2+i;
 		target_ppa<<=1;
 		target_ppa=seg_idx*(_PPS*2)+target_ppa;
 		target_ppa+=chip_num;
+#else
+		target_ppa=temp_req->ppa*R2PGAP+i;
+#endif
 
 		switch(type){
 #ifndef TESTING
@@ -108,6 +114,8 @@ void normal_write_issue(uint32_t type, uint32_t ppa, char *data,  algo_req *req)
 		__issue(type, data, temp_req);
 	}
 	else{
+
+#if BPS==64
 		uint32_t intra_seg_idx=ppa % (_PPS);
 		uint32_t seg_idx=ppa / (_PPS);
 		uint32_t chip_num=seg_idx%2;
@@ -120,6 +128,11 @@ void normal_write_issue(uint32_t type, uint32_t ppa, char *data,  algo_req *req)
 			target_ppa+=chip_num;		
 			AmfErase(am, target_ppa, NULL);
 		}
+#else
+		for(uint32_t i=0; i<AMF_PUNIT; i++){
+			AmfErase(am, ppa*R2PGAP+i, NULL);
+		}
+#endif
 	}
 }
 

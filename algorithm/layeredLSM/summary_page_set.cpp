@@ -16,6 +16,8 @@ sp_set_iter *__sp_set_iter_init(uint32_t max_STE_num, summary_page_meta *spm_set
 	res->noncopy_flag=(bool*)calloc(max_STE_num, sizeof(bool));
 	res->differ_map=differ_map;
 
+	res->prev_ppa=UINT32_MAX;
+	res->prev_value=NULL;
 	return res;
 }
 
@@ -24,7 +26,8 @@ sp_set_iter *sp_set_iter_init(uint32_t max_STE_num, summary_page_meta *spm_set, 
 	res->prefetch_num=prefetch_num;
 	res->read_STE_num=MIN(max_STE_num, prefetch_num);
 	for(uint32_t i=0; i<res->read_STE_num; i++){
-		spi_init(&res->spm_set[i]);
+		spi_init(&res->spm_set[i], res->prev_ppa, &res->prev_value);
+		res->prev_ppa=res->spm_set[i].piece_ppa/L2PGAP;
 	}
 	return res;
 }
@@ -42,7 +45,7 @@ sp_set_iter *sp_set_iter_init_mf(uint32_t max_STe_num, summary_page_meta *spm_se
 	return res;
 }
 extern bool debug_flag;
-summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r){
+summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r, uint32_t *ste_num, uint32_t *intra_idx){
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 
 	if(ssi->type==SPI_SET){
@@ -56,19 +59,36 @@ summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r){
 		if(r->st_body->type==ST_PINNING){
 			//printf("pinning %u\n", res.lba);
 			uint32_t global_intra_idx=ssi->now_STE_num * MAX_SECTOR_IN_BLOCK+spi->read_pointer;
-			res.piece_ppa=r->st_body->pinning_data[global_intra_idx];
 			res.piece_ppa=st_array_read_translation(r->st_body, ssi->now_STE_num, spi->read_pointer);
+			if(intra_idx){
+				*intra_idx=spi->read_pointer;
+			}
+			if(ste_num){
+				*ste_num=ssi->now_STE_num;
+			}
 		}
 		else{
 			uint32_t intra_offset=res.piece_ppa%MAX_SECTOR_IN_BLOCK;
+			if(ste_num){
+				*ste_num=ssi->now_STE_num;
+			}
+			if(intra_idx){
+				*intra_idx=intra_offset;
+			}
 			res.piece_ppa=st_array_read_translation(r->st_body, ssi->now_STE_num, intra_offset);
 		}
-}
+	}
 	else{
 		if (ssi->miter->iter_done_flag){
 			return res;
 		}
 		res=ssi->mf->iter_pick(ssi->miter);
+		if(intra_idx){
+			*intra_idx=res.piece_ppa;
+		}
+		if(ste_num){
+			*ste_num=UINT32_MAX;
+		}
 		res.piece_ppa=r->st_body->pinning_data[res.piece_ppa];
 	}
 	return res;
@@ -114,7 +134,9 @@ void sp_set_iter_move_ste(sp_set_iter *ssi, uint32_t ste_num, uint32_t end_lba){
 		if (ssi->read_STE_num < ssi->max_STE_num)
 		{
 
-			spi_init(&ssi->spm_set[ssi->read_STE_num++]);
+			spi_init(&ssi->spm_set[ssi->read_STE_num], ssi->prev_ppa, &ssi->prev_value);
+			ssi->prev_ppa=ssi->spm_set[ssi->read_STE_num].piece_ppa/L2PGAP;
+			ssi->read_STE_num++;
 		}
 	}
 	else{
@@ -140,7 +162,9 @@ uint32_t sp_set_iter_move(sp_set_iter *ssi){
 			if (ssi->read_STE_num < ssi->max_STE_num)
 			{	
 
-				spi_init(&ssi->spm_set[ssi->read_STE_num++]);
+				spi_init(&ssi->spm_set[ssi->read_STE_num], ssi->prev_ppa, &ssi->prev_value);
+				ssi->prev_ppa=ssi->spm_set[ssi->read_STE_num].piece_ppa/L2PGAP;
+				ssi->read_STE_num++;
 			}
 			
 		}

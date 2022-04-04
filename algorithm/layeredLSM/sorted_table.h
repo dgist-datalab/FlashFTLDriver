@@ -12,6 +12,7 @@
 #include "../../include/data_struct/bitmap.h"
 #include "./mapping_function.h"
 #include "./run.h"
+#include "../../include/sem_lock.h"
 
 #define UNLINKED_PSA (UINT32_MAX-1)
 #define NOT_POPULATE_PSA (UINT32_MAX-2)
@@ -36,6 +37,14 @@ typedef struct sorted_table_entry{
 	map_function *mf;
 }STE;
 
+typedef struct map_ppa_manager{
+	uint32_t now_ppa;
+	uint32_t now_idx;
+	//char value[PAGESIZE];
+	value_set *target_value;
+	uint32_t oob[L2PGAP];
+}map_ppa_manager;
+
 typedef struct sorted_table_array{
 	bool internal_fragmented;
 	map_param param;
@@ -59,14 +68,17 @@ typedef struct sorted_table_array{
 	uint32_t *pinning_data;
 	bitmap *gced_unlink_data;
 
+	map_ppa_manager mp_manager;
+
 	summary_page_meta *sp_meta;
 }st_array;
 
 typedef struct summary_write_param{
 	uint32_t idx;
 	st_array *sa;
-	value_set *value;
-	uint32_t oob[L2PGAP];
+	//value_set *value;
+	char *value;
+	uint32_t oob;
 	summary_page_meta *spm;
 }summary_write_param;
 
@@ -81,6 +93,8 @@ typedef struct sorted_array_master{
 	std::queue<uint32_t> *sid_queue;
 	uint32_t now_sid_info;
 	uint32_t total_run_num;
+	//map_ppa_manager mp_manager;
+	fdriver_lock_t lock;
 }sa_master;
 
 void sorted_array_master_init(uint32_t total_run_num);
@@ -240,5 +254,15 @@ summary_write_param *st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
  * */
 void st_array_summary_write_done(summary_write_param *swp);
 
+value_set *st_swp_write(st_array *sa, summary_write_param *swp, uint32_t *oob, bool force);
+value_set *st_get_remain(st_array *sa, uint32_t *oob, uint32_t *ppa);
+
+
+static bool st_check_swp(st_array *sa){
+	if(sa->sp_meta[sa->now_STE_num].pr_type==NO_PR){
+		return false;
+	}
+	return true;
+}
 
 #endif

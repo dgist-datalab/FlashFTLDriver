@@ -29,6 +29,7 @@ typedef struct run_manager{
 	uint32_t total_run_num;
 	std::queue<uint32_t>* ridx_queue;
 	run **run_array;
+	fdriver_lock_t lock;
 }run_manager;
 
 typedef struct lsmtree_parameter{

@@ -24,7 +24,7 @@ typedef struct summary_pair{
 
 typedef struct summary_page{
 	uint32_t write_pointer;
-	value_set *value;
+	char *value;
 	bool sorted;
 	char *body;
 }summary_page;
@@ -32,7 +32,7 @@ typedef struct summary_page{
 typedef struct summary_page_meta{
 	uint32_t start_lba;
 	uint32_t end_lba;
-	uint32_t ppa;
+	uint32_t piece_ppa;
 	uint32_t pr_type;
 	uint32_t original_level;
 	uint32_t original_recency;
@@ -176,7 +176,7 @@ bool sp_insert_spair(summary_page *sp, summary_pair p);
 		return summary_page's value
 	sp:
  */
-value_set *sp_get_data(summary_page *sp);
+char *sp_get_data(summary_page *sp);
 
 /*
 	Function: sp_find_psa
@@ -203,7 +203,7 @@ void sp_print_all(summary_page *sp);
 		return summary_page_iterator from summary_page
 	sp: iterating target 
  */
-summary_page_iter* spi_init(summary_page_meta *sp);
+summary_page_iter* spi_init(summary_page_meta *sp, uint32_t prev_ppa, value_set **value);
 
 /*
 	Function: spi_init_by_data

@@ -94,6 +94,7 @@ void shortcut_link_lba(sc_master *sc, run *r, uint32_t lba){
 }
 
 void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_set, bool unlink){
+	fdriver_lock(&sc->lock);
 	sc_info *t_info=r->info;
 #ifdef SC_MEM_OPT
 	uint32_t idx=0;
@@ -140,6 +141,7 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 		}
 	}
 #endif
+	fdriver_unlock(&sc->lock);
 }
 
 void shortcut_unlink_lba(sc_master *sc, run *r, uint32_t lba){

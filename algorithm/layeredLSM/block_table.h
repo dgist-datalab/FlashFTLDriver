@@ -51,7 +51,8 @@ typedef struct L2P_block_manager{
 	blockmanager *segment_manager; 
 	uint32_t *seg_type;
 
-	fdriver_lock_t lock;
+	fdriver_lock_t data_block_lock;
+	fdriver_lock_t map_block_lock;
 }L2P_bm;
 
 

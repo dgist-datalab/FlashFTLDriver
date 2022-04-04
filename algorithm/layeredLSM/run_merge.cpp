@@ -50,7 +50,7 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 	summary_pair res;
 	for(uint32_t i=0; i<run_num; i++){
 		if(mm_set[i].done) continue;
-		res=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r);
+		res=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r, NULL, NULL);
 		if(res.lba==UINT32_MAX && __move_iter_target(mm_set, i)){
 			if(mm_set[i].now_proc_block_idx>=target_round){
 				read_flag |= (1 << i);
@@ -79,26 +79,30 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 }
 
 static inline summary_pair __pick_smallest_pair(mm_container *mm_set, uint32_t run_num, uint32_t *ridx,
-sc_master *shortcut){
+sc_master *shortcut, __sorted_pair *target_sorted_pair){
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 	summary_pair now;
 	uint32_t t_idx;
 	summary_page_meta *spm;
+	uint32_t ste_num;
+	uint32_t intra_idx;
 
 retry:
 	for(uint32_t i=0; i<run_num; i++){
 		if(mm_set[i].done) continue;
 		if(i==0 || res.lba==UINT32_MAX){
 			*ridx=i;
-			res=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r);
+			res=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r, &(*target_sorted_pair).ste, &(*target_sorted_pair).intra_idx);
 			continue;
 		}
 
 		//DEBUG_CNT_PRINT(temp, 371522, __FUNCTION__, __LINE__);
-		now=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r);
+		now=sp_set_iter_pick(mm_set[i].ssi, mm_set[i].r, &ste_num, &intra_idx);
 		if(res.lba > now.lba){
 			res=now;
 			*ridx=i;
+			target_sorted_pair->ste=ste_num;
+			target_sorted_pair->intra_idx=intra_idx;
 		}
 	}
 
@@ -147,6 +151,7 @@ retry:
 			goto retry;
 		}
 	}
+
 	return res;
 }
 
@@ -177,6 +182,22 @@ static value_set* __merge_issue_req(__sorted_pair *sort_pair){
 	return sort_pair->value;
 }
 
+uint32_t __get_original_psa(__sorted_pair *pair){
+	if(pair->r->st_body->pinning_data){
+		uint32_t idx;
+		if(pair->ste==UINT32_MAX){
+			idx=pair->intra_idx;
+			return pair->r->st_body->pinning_data[idx];
+		}
+		else{
+			return st_array_read_translation(pair->r->st_body, pair->ste, pair->intra_idx);
+		}
+	}
+	else{
+		return st_array_read_translation(pair->r->st_body, pair->ste, pair->intra_idx);
+	}
+}
+
 static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_list,
  blockmanager *sm){
 	if(r->type==RUN_PINNING){ return;}
@@ -188,7 +209,7 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 
 	for(; iter!=sorted_list->end(); iter++){
 		__sorted_pair *t_pair=&(*iter);
-		t_pair->original_psa=t_pair->pair.piece_ppa;
+		t_pair->original_psa=__get_original_psa(t_pair);
 		t_pair->free_target=false;
 		if(prev_original_psa==UINT32_MAX){
 			prev_original_psa=t_pair->original_psa;
@@ -222,7 +243,10 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			__sorted_pair *t_pair=&(*iter);
 			fdriver_lock(&t_pair->lock);
 			fdriver_destroy(&t_pair->lock);
-			__invalidate_target(t_pair->r, t_pair->pair.piece_ppa, true);
+			if(t_pair->r->st_body->type==ST_PINNING){
+				t_pair->original_psa = __get_original_psa(t_pair);
+			}
+			__invalidate_target(t_pair->r, t_pair->original_psa, true);
 		}
 	}
 
@@ -235,10 +259,10 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 		lba_set.push_back(t_pair->pair.lba);
 		if (r->type == RUN_PINNING)
 		{
-			t_pair->original_psa =t_pair->pair.piece_ppa;
+			t_pair->original_psa = __get_original_psa(t_pair);
 			if (!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, COMPACTIONDATAW, shortcut ,NULL))
 			{
-				__invalidate_target(t_pair->r, t_pair->pair.piece_ppa, true);
+				__invalidate_target(t_pair->r, t_pair->original_psa, true);
 			}
 			sorted_list->erase(iter++);
 		}
@@ -363,7 +387,7 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 
 	std::vector<uint32_t> temp_vec;
 	while(1){
-		summary_pair target = sp_set_iter_pick(mm->ssi, mm->r);
+		summary_pair target = sp_set_iter_pick(mm->ssi, mm->r, NULL, NULL);
 		if(mf){
 			mf->insert(mf, target.lba, i++);
 		}
@@ -443,7 +467,7 @@ mm_container* __sorting_mm_set(mm_container *mm_set, uint32_t run_num, uint32_t 
 		{
 			break;
 		}
-		target = __pick_smallest_pair(mm_set, run_num, &ridx, lsm->shortcut);
+		target = __pick_smallest_pair(mm_set, run_num, &ridx, lsm->shortcut, &target_sorted_pair);
 		target_sorted_pair.pair = target;
 		target_sorted_pair.r = mm_set[ridx].r;
 		if (target.lba != UINT32_MAX)
@@ -567,7 +591,7 @@ void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force,
 			if(sorted_arr->size()){
 				__sorted_array_flush(res, sorted_arr, lsm);
 			}			
-			summary_pair target=sp_set_iter_pick(th_req->trivial_move_target->ssi, th_req->trivial_move_target->r);
+			summary_pair target=sp_set_iter_pick(th_req->trivial_move_target->ssi, th_req->trivial_move_target->r, NULL, NULL);
 			th_req->prev_lba=trivial_move(res, lsm->shortcut, th_req->trivial_move_target, target);
 			delete sorted_arr;
 			sorted_arr=NULL;
@@ -593,11 +617,15 @@ void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force,
 	}
 	for(uint32_t i=0; i<run_num; i++){
 		shortcut_set_compaction_flag(rset[i]->info, false);
+#ifdef SC_MEM_OPT
+		sc_dir_dp_free(mm_set[i].ssi->dp);
+#endif
 		sp_set_iter_free(mm_set[i].ssi);
 	}
 	free(th_req);
 	free(mm_set);
 	run_insert_done(res, true);
+	printf("merge end\n");
 }
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
@@ -624,7 +652,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 			__sorted_array_flush(res, &sorted_arr, lsm);
 		}
 		if(tirivial_move_target){
-			summary_pair target=sp_set_iter_pick(tirivial_move_target->ssi, tirivial_move_target->r);
+			summary_pair target=sp_set_iter_pick(tirivial_move_target->ssi, tirivial_move_target->r, NULL, NULL);
 			prev_lba=trivial_move(res, lsm->shortcut, tirivial_move_target, target);
 		}
 
