@@ -59,7 +59,6 @@ summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r, uint32_t *ste_num, uint3
 		if(r->st_body->type==ST_PINNING){
 			//printf("pinning %u\n", res.lba);
 			uint32_t global_intra_idx=ssi->now_STE_num * MAX_SECTOR_IN_BLOCK+spi->read_pointer;
-			res.piece_ppa=r->st_body->pinning_data[global_intra_idx];
 			res.piece_ppa=st_array_read_translation(r->st_body, ssi->now_STE_num, spi->read_pointer);
 			if(intra_idx){
 				*intra_idx=spi->read_pointer;

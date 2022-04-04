@@ -187,11 +187,11 @@ uint32_t __get_original_psa(__sorted_pair *pair){
 		uint32_t idx;
 		if(pair->ste==UINT32_MAX){
 			idx=pair->intra_idx;
+			return pair->r->st_body->pinning_data[idx];
 		}
 		else{
-			idx=pair->ste*MAX_SECTOR_IN_BLOCK+pair->intra_idx;
+			return st_array_read_translation(pair->r->st_body, pair->ste, pair->intra_idx);
 		}
-		return pair->r->st_body->pinning_data[idx];
 	}
 	else{
 		return st_array_read_translation(pair->r->st_body, pair->ste, pair->intra_idx);
