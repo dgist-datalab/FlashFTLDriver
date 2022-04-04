@@ -37,6 +37,14 @@ typedef struct sorted_table_entry{
 	map_function *mf;
 }STE;
 
+typedef struct map_ppa_manager{
+	uint32_t now_ppa;
+	uint32_t now_idx;
+	//char value[PAGESIZE];
+	value_set *target_value;
+	uint32_t oob[L2PGAP];
+}map_ppa_manager;
+
 typedef struct sorted_table_array{
 	bool internal_fragmented;
 	map_param param;
@@ -60,6 +68,8 @@ typedef struct sorted_table_array{
 	uint32_t *pinning_data;
 	bitmap *gced_unlink_data;
 
+	map_ppa_manager mp_manager;
+
 	summary_page_meta *sp_meta;
 }st_array;
 
@@ -78,20 +88,12 @@ typedef struct sid_info{
 	struct run *r;
 }sid_info;
 
-typedef struct map_ppa_manager{
-	uint32_t now_ppa;
-	uint32_t now_idx;
-	//char value[PAGESIZE];
-	value_set *target_value;
-	uint32_t oob[L2PGAP];
-}map_ppa_manager;
-
 typedef struct sorted_array_master{
 	sid_info *sid_map;
 	std::queue<uint32_t> *sid_queue;
 	uint32_t now_sid_info;
 	uint32_t total_run_num;
-	map_ppa_manager mp_manager;
+	//map_ppa_manager mp_manager;
 	fdriver_lock_t lock;
 }sa_master;
 
@@ -252,8 +254,8 @@ summary_write_param *st_array_get_summary_param(st_array *sa, uint32_t ppa, bool
  * */
 void st_array_summary_write_done(summary_write_param *swp);
 
-value_set *st_swp_write(summary_write_param *swp, uint32_t *oob, bool force);
-value_set *st_get_remain(uint32_t *oob, uint32_t *ppa);
+value_set *st_swp_write(st_array *sa, summary_write_param *swp, uint32_t *oob, bool force);
+value_set *st_get_remain(st_array *sa, uint32_t *oob, uint32_t *ppa);
 
 
 static bool st_check_swp(st_array *sa){

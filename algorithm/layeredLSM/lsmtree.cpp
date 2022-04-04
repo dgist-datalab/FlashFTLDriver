@@ -5,21 +5,27 @@ page_read_buffer rb;
 
 extern uint32_t test_key;
 static inline uint32_t __rm_get_ridx(run_manager *rm){
+	fdriver_lock(&rm->lock);
 	if(rm->ridx_queue->empty()){
 		EPRINT("empty ridx queue", true);
 	}
 	uint32_t res=rm->ridx_queue->front();
 	rm->ridx_queue->pop();
+	fdriver_unlock(&rm->lock);
 	return res;
 }
 
 static inline void __rm_insert_run(run_manager *rm, uint32_t ridx, run *r){
+	fdriver_lock(&rm->lock);
 	rm->run_array[ridx]=r;
+	fdriver_unlock(&rm->lock);
 }
 
 static inline void __rm_free_ridx(run_manager *rm, uint32_t ridx){
+	fdriver_lock(&rm->lock);
 	rm->run_array[ridx]=NULL;
 	rm->ridx_queue->push(ridx);
+	fdriver_unlock(&rm->lock);
 }
 
 run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, uint32_t entry_num, uint32_t level_num){
@@ -33,16 +39,20 @@ run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, 
 }
 
 bool __lsm_pinning_enable(lsmtree *lsm, uint32_t entry_num){
+	fdriver_lock(&lsm->lock);
 	uint64_t need_memory_bit=map_memory_per_ent(GUARD_BF, lsm->param.target_bit, lsm->param.fpr) *entry_num;
 	need_memory_bit+=lsm->param.target_bit * entry_num;
 	uint64_t now_memory_usage=lsm->monitor.now_mapping_memory_usage+lsm->shortcut->now_sc_memory_usage;
 	if(need_memory_bit+now_memory_usage <=lsm->param.max_memory_usage_bit){
+		fdriver_unlock(&lsm->lock);
 		return true;
 	}
+	fdriver_unlock(&lsm->lock);
 	return false;
 }
 
 void __lsm_calculate_memory_usage(lsmtree *lsm, uint64_t entry_num, int32_t memory_usage_bit, uint32_t map_type, bool pinning){
+	fdriver_lock(&lsm->lock);
 	if(memory_usage_bit>=0){
 		switch(map_type){
 			case GUARD_BF:
@@ -63,6 +73,7 @@ void __lsm_calculate_memory_usage(lsmtree *lsm, uint64_t entry_num, int32_t memo
 	else{
 		mem_per_ent=(double)memory_usage_bit/entry_num-(pinning?lsm->param.target_bit:0);
 	}
+	fdriver_unlock(&lsm->lock);
 }
 
 void __lsm_free_run(lsmtree *lsm, run *r){
@@ -72,6 +83,8 @@ void __lsm_free_run(lsmtree *lsm, run *r){
 
 lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 	run_manager *rm=(run_manager *)malloc(sizeof(run_manager));
+	fdriver_mutex_init(&rm->lock);
+
 	lsmtree *res=(lsmtree*)calloc(1, sizeof(lsmtree));
 
 	rm->total_run_num=param.total_run_num+param.spare_run_num;

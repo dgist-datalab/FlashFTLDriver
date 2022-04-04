@@ -44,7 +44,7 @@ static void __run_write_meta(run *r, blockmanager *sm, bool force){
 	uint32_t oob[L2PGAP];
 	if(!st_check_swp(r->st_body)){
 		uint32_t ppa;
-		if((value=st_get_remain(oob, &ppa))){
+		if((value=st_get_remain(r->st_body, oob, &ppa))){
 			__run_issue_write(ppa, value, (char*)oob, 
 				r->st_body->bm->segment_manager, NULL, MAPPINGW, NULL);
 		}
@@ -58,7 +58,7 @@ static void __run_write_meta(run *r, blockmanager *sm, bool force){
 	if(validate_piece_ppa(sm, target_piece_ppa, true)!=BIT_SUCCESS){
 		EPRINT("map write error", true);
 	}
-	if((value=st_swp_write(swp, oob, force))){
+	if((value=st_swp_write(r->st_body,swp, oob, force))){
 		__run_issue_write(target_piece_ppa/L2PGAP, value, (char*)oob, 
 			r->st_body->bm->segment_manager, (void*)swp, MAPPINGW, NULL);
 	}

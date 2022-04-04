@@ -44,9 +44,6 @@ void sorted_array_master_init(uint32_t total_run_num){
 	}
 	sa_m->sid_map=(sid_info*)calloc(total_run_num, sizeof(sid_info));
 	sa_m->total_run_num=total_run_num;
-	sa_m->mp_manager.now_ppa=UINT32_MAX;
-	sa_m->mp_manager.now_idx=0;
-	sa_m->mp_manager.target_value=NULL;
 
 	fdriver_mutex_init(&sa_m->lock);
 }
@@ -61,18 +58,25 @@ static sid_info* __find_sid_info_iter(uint32_t sid){
 	if(sa_m->total_run_num <=sid){
 		return NULL;
 	}
-	return &sa_m->sid_map[sid];
+	fdriver_lock(&sa_m->lock);
+	sid_info *res=&sa_m->sid_map[sid];
+	fdriver_unlock(&sa_m->lock);
+	return res;
 }
 
 static uint32_t __get_empty_sid_idx(){
+	fdriver_lock(&sa_m->lock);
 	uint32_t sa_idx=sa_m->sid_queue->front();
 	sa_m->sid_queue->pop();
+	fdriver_unlock(&sa_m->lock);
 	return sa_idx;
 }
 
 static inline void __release_sid_info_idx(uint32_t idx){
+	fdriver_lock(&sa_m->lock);
 	memset(&sa_m->sid_map[idx], 0, sizeof(sid_info));
 	sa_m->sid_queue->push(idx);
+	fdriver_unlock(&sa_m->lock);
 }
 
 sid_info* sorted_array_master_get_info(uint32_t sid){
@@ -148,6 +152,10 @@ st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinnin
 		EPRINT("alread assigned sid_info at run idx:%u\n", true, temp->r->run_idx);
 	}
 	temp->sid=res->sid; temp->sa=res; temp->r=r;
+
+	res->mp_manager.now_ppa=UINT32_MAX;
+	res->mp_manager.now_idx=0;
+	res->mp_manager.target_value=NULL;
 	return res;
 }
 extern uint32_t target_PBA;
@@ -319,28 +327,27 @@ uint32_t st_array_summary_translation(st_array *sa, bool force){
 		EPRINT("it is not write_summary_order", true);
 	}
 
-	if(sa_m->mp_manager.now_idx==0){
-		sa_m->mp_manager.now_ppa=L2PBm_get_map_ppa(sa->bm);
+	if(sa->mp_manager.now_idx==0){
+		sa->mp_manager.now_ppa=L2PBm_get_map_ppa(sa->bm);
 	}
 
-	uint32_t res=sa_m->mp_manager.now_ppa*L2PGAP+sa_m->mp_manager.now_idx++;
+	uint32_t res=sa->mp_manager.now_ppa*L2PGAP+sa->mp_manager.now_idx++;
 	return res;
 }
 
-value_set* st_swp_write(summary_write_param *swp, uint32_t *oob, bool force){
-	
-	if(sa_m->mp_manager.target_value==NULL){
-		sa_m->mp_manager.target_value=inf_get_valueset(NULL,FS_MALLOC_W,PAGESIZE);
+value_set* st_swp_write(st_array *sa, summary_write_param *swp, uint32_t *oob, bool force){
+	if(sa->mp_manager.target_value==NULL){
+		sa->mp_manager.target_value=inf_get_valueset(NULL,FS_MALLOC_W,PAGESIZE);
 	}
 	uint32_t idx=swp->spm->piece_ppa%L2PGAP;
-	memcpy(&sa_m->mp_manager.target_value->value[(idx)*LPAGESIZE], swp->value, LPAGESIZE);
-	sa_m->mp_manager.oob[idx]=swp->oob;
-	if(force || sa_m->mp_manager.now_idx==L2PGAP){
-		value_set *res=sa_m->mp_manager.target_value;
-		sa_m->mp_manager.target_value=NULL;
-		memcpy(oob, sa_m->mp_manager.oob, sizeof(uint32_t)*L2PGAP);
-		sa_m->mp_manager.now_idx=0;
-		sa_m->mp_manager.now_ppa=UINT32_MAX;
+	memcpy(&sa->mp_manager.target_value->value[(idx)*LPAGESIZE], swp->value, LPAGESIZE);
+	sa->mp_manager.oob[idx]=swp->oob;
+	if(force || sa->mp_manager.now_idx==L2PGAP){
+		value_set *res=sa->mp_manager.target_value;
+		sa->mp_manager.target_value=NULL;
+		memcpy(oob, sa->mp_manager.oob, sizeof(uint32_t)*L2PGAP);
+		sa->mp_manager.now_idx=0;
+		sa->mp_manager.now_ppa=UINT32_MAX;
 		return res;
 	}
 	else{
@@ -349,16 +356,16 @@ value_set* st_swp_write(summary_write_param *swp, uint32_t *oob, bool force){
 	return NULL;
 }
 
-value_set* st_get_remain(uint32_t *oob, uint32_t *ppa){
-	if(sa_m->mp_manager.target_value==NULL) return NULL;
-	value_set *res = sa_m->mp_manager.target_value;
-	sa_m->mp_manager.target_value = NULL;
-	memcpy(oob, sa_m->mp_manager.oob, sizeof(uint32_t) * L2PGAP);
-	sa_m->mp_manager.now_idx = 0;
+value_set* st_get_remain(st_array *sa, uint32_t *oob, uint32_t *ppa){
+	if(sa->mp_manager.target_value==NULL) return NULL;
+	value_set *res = sa->mp_manager.target_value;
+	sa->mp_manager.target_value = NULL;
+	memcpy(oob, sa->mp_manager.oob, sizeof(uint32_t) * L2PGAP);
+	sa->mp_manager.now_idx = 0;
 
-	*ppa=sa_m->mp_manager.now_ppa;
+	*ppa=sa->mp_manager.now_ppa;
 
-	sa_m->mp_manager.now_ppa = UINT32_MAX;
+	sa->mp_manager.now_ppa = UINT32_MAX;
 	return res;
 }
 

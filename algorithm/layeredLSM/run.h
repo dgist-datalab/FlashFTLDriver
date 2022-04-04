@@ -35,6 +35,8 @@ typedef struct __sorted_pair{
 	run *r;
 	summary_pair pair;
 	uint32_t original_psa;
+	uint32_t ste;
+	uint32_t intra_idx;
 	char *data;
 	fdriver_lock_t lock;
 	bool free_target;

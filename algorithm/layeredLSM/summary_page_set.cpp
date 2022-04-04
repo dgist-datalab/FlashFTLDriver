@@ -45,7 +45,7 @@ sp_set_iter *sp_set_iter_init_mf(uint32_t max_STe_num, summary_page_meta *spm_se
 	return res;
 }
 extern bool debug_flag;
-summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r){
+summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r, uint32_t *ste_num, uint32_t *intra_idx){
 	summary_pair res={UINT32_MAX, UINT32_MAX};
 
 	if(ssi->type==SPI_SET){
@@ -61,17 +61,35 @@ summary_pair sp_set_iter_pick(sp_set_iter *ssi, run *r){
 			uint32_t global_intra_idx=ssi->now_STE_num * MAX_SECTOR_IN_BLOCK+spi->read_pointer;
 			res.piece_ppa=r->st_body->pinning_data[global_intra_idx];
 			res.piece_ppa=st_array_read_translation(r->st_body, ssi->now_STE_num, spi->read_pointer);
+			if(intra_idx){
+				*intra_idx=spi->read_pointer;
+			}
+			if(ste_num){
+				*ste_num=ssi->now_STE_num;
+			}
 		}
 		else{
 			uint32_t intra_offset=res.piece_ppa%MAX_SECTOR_IN_BLOCK;
+			if(ste_num){
+				*ste_num=ssi->now_STE_num;
+			}
+			if(intra_idx){
+				*intra_idx=intra_offset;
+			}
 			res.piece_ppa=st_array_read_translation(r->st_body, ssi->now_STE_num, intra_offset);
 		}
-}
+	}
 	else{
 		if (ssi->miter->iter_done_flag){
 			return res;
 		}
 		res=ssi->mf->iter_pick(ssi->miter);
+		if(intra_idx){
+			*intra_idx=res.piece_ppa;
+		}
+		if(ste_num){
+			*ste_num=UINT32_MAX;
+		}
 		res.piece_ppa=r->st_body->pinning_data[res.piece_ppa];
 	}
 	return res;
