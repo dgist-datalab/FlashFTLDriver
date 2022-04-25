@@ -5,6 +5,7 @@
 #include "../../include/data_struct/list.h"
 #include "../../include/sem_lock.h"
 #include "../../include/container.h"
+#include "../../include/data_struct/bitmap.h"
 #include <map>
 #include <list>
 
@@ -133,7 +134,7 @@ typedef struct gc_map_value{
 	mapping_entry pair;
 }gc_map_value;
 
-typedef struct demand_map_monitoer{
+typedef struct demand_map_moniter{
 	uint32_t hit_num;
 	uint32_t write_hit_num;
 	uint32_t read_hit_num;
@@ -160,6 +161,12 @@ typedef struct demand_map_monitoer{
 	uint32_t read_cnt;
 	uint32_t read_data[10][10][10];
 	uint64_t read_time[10][10][10];
+
+	bitmap *read_working_set;
+	uint32_t read_working_set_num;
+
+	bitmap *write_working_set;
+	uint32_t write_working_set_num;
 }dmi;
 
 uint32_t demand_argument(int argc, char **argv);

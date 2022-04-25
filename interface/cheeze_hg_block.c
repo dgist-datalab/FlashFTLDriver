@@ -39,6 +39,9 @@ void request_print_log(){
 			(float)request_monitor.read_sequential_length/request_monitor.read_sequential_cnt, request_monitor.read_sequential_cnt);
 	printf("write read random: %u %u\n", request_monitor.write_random_cnt,
 			request_monitor.read_random_cnt);
+	double total_write_length=(double)(request_monitor.write_sequential_length+request_monitor.write_random_cnt)/(request_monitor.write_sequential_cnt+request_monitor.write_random_cnt);
+	double total_read_length=(double)(request_monitor.read_sequential_length+request_monitor.read_random_cnt)/(request_monitor.read_sequential_cnt+request_monitor.read_random_cnt);
+	printf("total avg_seq w:%lf, r:%lf\n", total_write_length, total_read_length);
 }
 
 void request_memset_print_log(){
