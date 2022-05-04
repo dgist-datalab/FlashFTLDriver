@@ -59,14 +59,36 @@ uint32_t sftl_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 }
 
 uint32_t sftl_free(struct my_cache *mc){
+	uint32_t total_entry_num=0;
 	while(1){
 		sftl_cache *sc=(sftl_cache*)lru_pop(scm.lru);
 		if(!sc) break;
+		uint32_t total_head=(scm.gtd_size[sc->etr->idx]-BITMAPSIZE)/sizeof(uint32_t);
+		printf("[%u] %u\n", sc->etr->idx, total_head);
+		total_entry_num+=PAGESIZE/sizeof(DMF);
 		free(sc->head_array);
 		bitmap_free(sc->map);
 		free(sc);
 	}
 	printf("now byte:%u max_byte:%u\n", scm.now_caching_byte, scm.max_caching_byte);
+	printf("cached_entry_num:%u (%lf)\n", total_entry_num, (double)total_entry_num/RANGE);
+
+	uint32_t average_head_num=0;
+	uint32_t head_histogram[PAGESIZE/sizeof(uint32_t) + 1]={0,};
+	for(uint32_t i=0; i<GTDNUM; i++){
+		uint32_t temp_head_num=(scm.gtd_size[i]-BITMAPSIZE)/sizeof(uint32_t);
+	//	pritnf("%u -> %u\n", i, temp_head_num);
+		head_histogram[temp_head_num]++;
+		average_head_num+=temp_head_num;
+	}
+	printf("average head num:%lf\n", (double)(average_head_num)/GTDNUM);
+	
+	for(uint32_t i=0; i<=PAGESIZE/sizeof(uint32_t); i++){
+		if(head_histogram[i]){
+			printf("%u,%u\n", i, head_histogram[i]);
+		}
+	}
+
 	lru_free(scm.lru);
 	free(scm.gtd_size);
 	return 1;
@@ -231,7 +253,7 @@ inline static uint32_t expand_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 	bool is_next_do=false;
 	uint32_t next_original_ppa;
 
-	DEBUG_CNT_PRINT(test, 55622396, __FUNCTION__, __LINE__);
+	//DEBUG_CNT_PRINT(test, 55622396, __FUNCTION__, __LINE__);
 	if(ISLASTOFFSET(lba+1)){}
 	else{
 		if(!bitmap_is_set(sc->map, GETOFFSET(lba+1))){

@@ -18,6 +18,7 @@ dmi DMI;
 
 #include "./caching/sftl/sftl_cache.h"
 extern sftl_cache_monitor scm;
+fdriver_lock_t dmi_lock;
 
 extern algorithm demand_ftl;
 uint32_t cache_traverse_state(request *req, mapping_entry *now_pair, demand_param *dp, 
@@ -54,7 +55,19 @@ static void demand_cache_log(){
 	printf("\tEviction clean cnt: %u\n", DMI.clean_eviction);
 	printf("\tEviction dirty cnt: %u\n", DMI.dirty_eviction);
 	printf("===============================\n");
+
+	printf("write_working_set:%lf\n", (double)DMI.write_working_set_num/RANGE);
+	printf("read_working_set:%lf\n", (double)DMI.read_working_set_num/RANGE);
+
+	fdriver_lock(&dmi_lock);
+	bitmap_free(DMI.read_working_set);
+	bitmap_free(DMI.write_working_set);
+
 	memset(&DMI, 0, sizeof(DMI));
+	
+	DMI.read_working_set=bitmap_init(RANGE);
+	DMI.write_working_set=bitmap_init(RANGE);
+	fdriver_unlock(&dmi_lock);
 }
 
 static inline char *cache_traverse_type(MAP_ASSIGN_STATUS a){
@@ -328,6 +341,12 @@ void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *l
 	uint32_t cached_entry=dmm.cache->init(dmm.cache, dmm.max_caching_pages);
 	printf("|\tcaching percentage: %.2lf%%\n", (double)cached_entry/total_logical_page_num *100);
 	printf("--------------------\n");
+
+	DMI.read_working_set=bitmap_init(RANGE);
+	DMI.read_working_set_num=0;
+	DMI.write_working_set=bitmap_init(RANGE);
+	DMI.write_working_set_num=0;
+	fdriver_mutex_init(&dmi_lock);
 }
 
 void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
@@ -446,7 +465,6 @@ uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_par
 	}
 
 	req->type_ftl|=1;
-	
 	if(etr->status==FLYING){
 		switch(type){
 			case EVICTION_READ:
@@ -1338,11 +1356,20 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		lba=mp->lba;
 		physical=mp->physical;
 	}
+
 	for(;i<mp->max_idx; i++){
 		mp->idx=i;
 		mapping_entry *target=&dp->target;
 		target->lba=lba[i];
 		target->ppa=physical[i];
+
+		fdriver_lock(&dmi_lock);
+		if(!bitmap_is_set(DMI.write_working_set, target->lba)){
+			DMI.write_working_set_num++;
+			bitmap_set(DMI.write_working_set, target->lba);
+		}
+		fdriver_unlock(&dmi_lock);
+
 		switch((res=cache_traverse_state(req, target, dp, &mp->prefetching_info[i], true))){
 			case RETRY_END:
 				dp_status_update(dp, NONE);
@@ -1462,7 +1489,15 @@ uint32_t demand_page_read(request *const req){
 	}
 
 	//static uint32_t prev_lba=1437024
-	
+
+	fdriver_lock(&dmi_lock);
+	if(!bitmap_is_set(DMI.read_working_set, dp->target.lba)){
+		DMI.read_working_set_num++;
+		bitmap_set(DMI.read_working_set, dp->target.lba);
+	}
+	fdriver_unlock(&dmi_lock);
+
+
 	switch((res=cache_traverse_state(req, &dp->target, dp, &mp->prefetching_info[0], false))){
 		case RETRY_END:
 			dp_status_update(dp, NONE);
