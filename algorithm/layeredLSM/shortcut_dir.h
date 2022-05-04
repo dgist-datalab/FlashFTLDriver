@@ -7,7 +7,8 @@
 #include "../../include/data_struct/bitmap.h"
 
 #define SC_PER_DIR (256)
-#define MAX_TABLE_NUM (SC_PER_DIR/3)
+#define MAX_TABLE_NUM (SC_PER_DIR/5)
+//#define MAX_TABLE_NUM (SC_PER_DIR)
 /*
 typedef struct compressed_list{
 	uint8_t allocated_num;

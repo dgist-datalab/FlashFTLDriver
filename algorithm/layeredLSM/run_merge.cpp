@@ -211,6 +211,11 @@ static inline void __read_merged_data(run *r, std::list<__sorted_pair> *sorted_l
 		__sorted_pair *t_pair=&(*iter);
 		t_pair->original_psa=__get_original_psa(t_pair);
 		t_pair->free_target=false;
+
+		if(t_pair->pair.lba==test_key){
+			printf("target pair psa:%u\n", t_pair->original_psa);
+		}
+
 		if(prev_original_psa==UINT32_MAX){
 			prev_original_psa=t_pair->original_psa;
 			prev_t_pair=t_pair;

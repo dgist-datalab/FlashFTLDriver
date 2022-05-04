@@ -35,8 +35,8 @@ typedef struct shortcut_master{
 	uint32_t max_shortcut_num;
 	uint32_t now_recency;
 	fdriver_lock_t lock;
-	uint64_t max_sc_memory_usage;
-	uint64_t now_sc_memory_usage;
+	int64_t max_sc_memory_usage;
+	int64_t now_sc_memory_usage;
 	std::set<uint32_t> update_list;
 }shortcut_master;
 

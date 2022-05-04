@@ -473,7 +473,7 @@ bool cheeze_end_req(request *const req){
 			//EPRINT("%u not found!\n", false, req->key);
 #ifdef TRACE_REPLAY
 			if(req->crc_value && req->crc_value!=*(uint32_t*)req->value->value){
-				printf("not_found lba:%u data faile abort!\n", req->key);
+				printf("not_found lba:%u data fail abort!\n", req->key);
 				abort();
 			}
 #endif
@@ -492,7 +492,7 @@ bool cheeze_end_req(request *const req){
 				}
 #ifdef TRACE_REPLAY
 			if(req->crc_value!=*(uint32_t*)req->value->value){
-				printf("lba:%u data faile abort!\n", req->key);
+				printf("lba:%u data fail abort! %u --> %u\n", req->key, req->crc_value, *(uint32_t*)req->value->value);
 				abort();
 			}
 #endif

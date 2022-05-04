@@ -27,8 +27,9 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 		level *des_level = lsm->disk[des_disk_idx];
 
 		uint32_t target_src_num = last_level_compaction ? 2 : src_level->now_run_num;
+		//uint32_t target_src_num = 2;
 		run **merge_src = (run **)malloc(sizeof(run *) * target_src_num);
-		level_get_compaction_target(src_level, target_src_num, &merge_src);
+		level_get_compaction_target(src_level, target_src_num, &merge_src, !last_level_compaction);
 
 		uint32_t total_target_entry = 0;
 		for (uint32_t i = 0; i < target_src_num; i++)
@@ -46,12 +47,16 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 		lsm->monitor.compaction_output_entry_num[disk_idx+1] += des->now_entry_num;
 
 		level *new_level = level_init(src_level->level_idx, src_level->max_run_num, src_level->map_type);
-		if (last_level_compaction){
+
+		if(target_src_num!=src_level->now_run_num){
 			std::list<uint32_t>::reverse_iterator iter = src_level->recency_pointer->rbegin();
 			for (; iter != src_level->recency_pointer->rend(); iter++){
 				run *r = src_level->run_array[*iter];
 				level_insert_run(new_level, r);
 			}
+		}
+
+		if (last_level_compaction){
 			des_level = new_level;
 		}
 		else{

@@ -13,7 +13,7 @@ level *level_init(uint32_t level_idx, uint32_t max_run_num, uint32_t map_type){
 }
 extern bool running_flag;
 extern uint32_t gc_type;
-void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
+void level_get_compaction_target(level *lev, uint32_t run_num, run*** target, bool old_first){
 	run **res=*target;
 	if(run_num==lev->now_run_num){
 		std::list<uint32_t>::iterator iter=lev->recency_pointer->begin();
@@ -57,51 +57,71 @@ void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
 
 		float target_ratio=-1.0f;
 		uint32_t temp_run_num=run_num;
-		for(uint32_t round=0; round<temp_run_num; round++){
-			target_ratio=-1.0f;
-			copy_entry_num=UINT32_MAX;
-			for (uint32_t i = 0; i < lev->now_run_num; i++)
+		if (old_first == false)
+		{
+			for (uint32_t round = 0; round < temp_run_num; round++)
 			{
-				run *temp_run = lev->run_array[i];
-				if(temp_run==NULL) continue;
-				sc_info *temp_scinfo = temp_run->info;
-				float invalid_ratio = (float)(temp_scinfo->unlinked_lba_num) / temp_run->now_entry_num;
-				if (gc_type == 0)
+				target_ratio = -1.0f;
+				copy_entry_num = UINT32_MAX;
+				for (uint32_t i = 0; i < lev->now_run_num; i++)
 				{
-					if (target_ratio < invalid_ratio)
+					run *temp_run = lev->run_array[i];
+					if (temp_run == NULL)
+						continue;
+					sc_info *temp_scinfo = temp_run->info;
+					float invalid_ratio = (float)(temp_scinfo->unlinked_lba_num) / temp_run->now_entry_num;
+					if (gc_type == 0)
 					{
-						if (round == 0)
-						{
-							first_idx = i;
-							target_ratio = invalid_ratio;
-						}
-						else if (round == 1)
-						{
-							if (first_idx == i)
-							{
-								continue;
-							}
-							else
-							{
-								second_idx = i;
-								target_ratio = invalid_ratio;
-							}
-						}
-					}
-				}
-				else
-				{
-					uint32_t now_copy_entry_num = temp_run->now_entry_num - temp_scinfo->unlinked_lba_num;
-					if (round < run_num)
-					{
-						if (invalid_ratio >= first_average_inv_ratio && copy_entry_num > now_copy_entry_num)
+						if (target_ratio < invalid_ratio)
 						{
 							if (round == 0)
 							{
 								first_idx = i;
-								copy_entry_num = now_copy_entry_num;
+								target_ratio = invalid_ratio;
 							}
 							else if (round == 1)
+							{
+								if (first_idx == i)
+								{
+									continue;
+								}
+								else
+								{
+									second_idx = i;
+									target_ratio = invalid_ratio;
+								}
+							}
+						}
+					}
+					else
+					{
+						uint32_t now_copy_entry_num = temp_run->now_entry_num - temp_scinfo->unlinked_lba_num;
+						if (round < run_num)
+						{
+							if (invalid_ratio >= first_average_inv_ratio && copy_entry_num > now_copy_entry_num)
+							{
+								if (round == 0)
+								{
+									first_idx = i;
+									copy_entry_num = now_copy_entry_num;
+								}
+								else if (round == 1)
+								{
+									if (first_idx == i)
+									{
+										continue;
+									}
+									else
+									{
+										second_idx = i;
+										copy_entry_num = now_copy_entry_num;
+									}
+								}
+							}
+						}
+						else
+						{
+							if (invalid_ratio >= second_average_inv_ratio && copy_entry_num > now_copy_entry_num)
 							{
 								if (first_idx == i)
 								{
@@ -115,28 +135,17 @@ void level_get_compaction_target(level *lev, uint32_t run_num, run*** target){
 							}
 						}
 					}
-					else
-					{
-						if (invalid_ratio >= second_average_inv_ratio && copy_entry_num > now_copy_entry_num)
-						{
-							if (first_idx == i)
-							{
-								continue;
-							}
-							else
-							{
-								second_idx = i;
-								copy_entry_num = now_copy_entry_num;
-							}
-						}
-					}
+				}
+				if (round == run_num - 1 && second_idx == UINT32_MAX)
+				{
+					temp_run_num++;
 				}
 			}
-			if(round==run_num-1 && second_idx==UINT32_MAX){
-				temp_run_num++;
-			}
 		}
-		
+		else
+		{
+			target_ratio = 0;
+		}
 
 		if(target_ratio==0){
 			uint32_t idx=0;

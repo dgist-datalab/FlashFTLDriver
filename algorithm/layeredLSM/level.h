@@ -71,7 +71,7 @@ static inline void level_insert_run(level *lev, run *r){
  * run_num: the number of run in returnning set
  * target: run ptr array for compaction
  * */
-void level_get_compaction_target(level *lev, uint32_t run_num, run *** target);
+void level_get_compaction_target(level *lev, uint32_t run_num, run *** target, bool old_first);
 
 /*
  * Function:level_free
