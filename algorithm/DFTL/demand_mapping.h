@@ -171,9 +171,10 @@ typedef struct demand_map_moniter{
 
 uint32_t demand_argument(int argc, char **argv);
 void demand_map_create(uint32_t total_caching_physical_pages, lower_info *, blockmanager *);
-uint32_t demand_map_assign(request *req, KEYT *lba, KEYT *physical, uint32_t *prefetching_info);
+uint32_t demand_map_assign(request *req, KEYT *lba, KEYT *physical, uint32_t *prefetching_info, bool remove);
 uint32_t demand_map_some_update(mapping_entry *, uint32_t idx); //for gc
 uint32_t demand_page_read(request *const req);
+uint32_t demand_map_remove(request *const req);
 uint32_t demand_print_log();
 
 void demand_map_free();

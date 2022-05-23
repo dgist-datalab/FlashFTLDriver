@@ -1259,9 +1259,9 @@ hit_eviction:
 	}
 }
 
-static inline uint32_t check_flying_req(request *req, assign_param_ex *mp){
+static inline uint32_t check_flying_req(request *req, assign_param_ex *mp, bool remove){
 	return L2PGAP;
-	uint32_t res=L2PGAP;
+	uint32_t res=remove?1:L2PGAP;
 	std::map<uint32_t, request *>::iterator iter;
 	mapping_entry now_entry;
 	demand_param *tdp;
@@ -1307,7 +1307,7 @@ static inline uint32_t check_flying_req(request *req, assign_param_ex *mp){
 	return res;
 }
 
-uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *prefetching_info){
+uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *prefetching_info, bool remove){
 	uint8_t i=0;
 	demand_param *dp;
 	assign_param_ex *mp;
@@ -1326,16 +1326,26 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		//lba=_lba; physical=_physical;
 
 		mp=(assign_param_ex*)malloc(sizeof(assign_param_ex));
-		cpy_keys(&mp->lba,_lba);
-		cpy_keys(&mp->physical, _physical);
-		mp->prefetching_info=(uint32_t*)malloc(sizeof(uint32_t)*L2PGAP);
-		memcpy(mp->prefetching_info, prefetching_info, sizeof(uint32_t)*L2PGAP);
+		if(remove){
+			mp->lba=(uint32_t*)malloc(sizeof(KEYT)*L2PGAP);
+			mp->physical=(uint32_t*)malloc(sizeof(KEYT)*L2PGAP);
+			mp->lba[0]=*_lba;
+			mp->physical[0]=UINT32_MAX;
+			mp->prefetching_info=(uint32_t*)malloc(sizeof(uint32_t)*L2PGAP);
+			mp->prefetching_info[0]=0;
+		}
+		else{
+			cpy_keys(&mp->lba,_lba);
+			cpy_keys(&mp->physical, _physical);
+			mp->prefetching_info=(uint32_t*)malloc(sizeof(uint32_t)*L2PGAP);
+			memcpy(mp->prefetching_info, prefetching_info, sizeof(uint32_t)*L2PGAP);
+		}
 		i=mp->idx=0;
 		dp->param_ex=(void*)mp;
 		dp->is_hit_eviction=false;
 		dp->flying_map_read_key=UINT32_MAX;
 		req->param=(void*)dp;
-		mp->max_idx=check_flying_req(req, mp);
+		mp->max_idx=check_flying_req(req, mp, remove);
 		if(mp->max_idx==0){
 			direct_end=true;
 			goto end;

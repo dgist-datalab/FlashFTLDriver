@@ -41,7 +41,12 @@ void request_print_log(){
 			request_monitor.read_random_cnt);
 	double total_write_length=(double)(request_monitor.write_sequential_length+request_monitor.write_random_cnt)/(request_monitor.write_sequential_cnt+request_monitor.write_random_cnt);
 	double total_read_length=(double)(request_monitor.read_sequential_length+request_monitor.read_random_cnt)/(request_monitor.read_sequential_cnt+request_monitor.read_random_cnt);
+
+	uint32_t request_length=request_monitor.write_sequential_length+request_monitor.write_random_cnt+request_monitor.read_sequential_length+request_monitor.read_random_cnt;
+	printf("trim avg size: %.2lf\n", (double)request_monitor.trim_length/request_monitor.trim_length);
+	printf("trim ratio :%.2lf\n", (double)request_monitor.trim_length/(request_monitor.trim_length+request_length));
 	printf("total avg_seq w:%lf, r:%lf\n", total_write_length, total_read_length);
+
 }
 
 void request_memset_print_log(){

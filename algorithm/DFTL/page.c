@@ -132,7 +132,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 			}
 		}
 
-		demand_map_assign(req, a_buffer.key, physical, a_buffer.prefetching_info);
+		demand_map_assign(req, a_buffer.key, physical, a_buffer.prefetching_info, false);
 
 		a_buffer.idx=0;
 		return 1;
@@ -142,7 +142,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
 uint32_t page_write(request *const req){
 	if(req->param){
-		return demand_map_assign(req, NULL, NULL, NULL);
+		return demand_map_assign(req, NULL, NULL, NULL, false);
 	}
 	
 	req->write_done=false;
@@ -171,8 +171,23 @@ uint32_t page_write(request *const req){
 
 
 uint32_t page_remove(request *const req){
-	req->end_req(req);
-	return 0;
+	if(!req->param){
+		for(uint32_t i=0; i<a_buffer.idx; i++){
+			if(req->key==a_buffer.key[i]){
+				for(uint32_t j=i+1; j<a_buffer.idx; j++){
+					if(j+1!=a_buffer.idx){
+						a_buffer.key[j]=a_buffer.key[j+1];
+						a_buffer.prefetching_info[j]=a_buffer.prefetching_info[j+1];
+						memcpy(&a_buffer.value[j*LPAGESIZE], &a_buffer.value[(j+1)*LPAGESIZE], LPAGESIZE);
+					}
+				}
+				a_buffer.idx--;
+				req->end_req(req);
+				return 1;
+			}
+		}
+	}
+	return demand_map_assign(req, &req->key, NULL, NULL, true);
 }
 
 uint32_t page_flush(request *const req){
