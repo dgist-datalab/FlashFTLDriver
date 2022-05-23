@@ -1,4 +1,5 @@
 #include "plr_memory_calculator.h"
+#include "../../../include/settings.h"
 #include "../translation_functions/plr/plr.h"
 #include <stdlib.h>
 #include <set>
@@ -44,7 +45,7 @@ uint64_t plr_memory_calc(uint32_t entry_num,
 
 	PLR *plr=new PLR(8,error/2);
 	for(uint32_t i=0; i<entry_num; i++){
-		plr->insert(target[i], wiskey?i:i/4);
+		plr->insert(target[i], wiskey?i:i/L2PGAP);
 	}
 	plr->insert_end();
 	uint64_t res=plr->memory_usage(48);
@@ -64,7 +65,7 @@ double plr_memory_calc_avg(uint32_t entry_num, uint32_t target_bit,
 
 	PLR *plr=new PLR(8,error/2);
 	for(uint32_t i=0; i<entry_num; i++){
-		plr->insert(target[i], wiskey?i:i/4);
+		plr->insert(target[i], wiskey?i:i/L2PGAP);
 	}
 	plr->insert_end();
 	double res=plr->memory_usage(target_bit);

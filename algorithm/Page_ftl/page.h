@@ -5,6 +5,9 @@ typedef struct page_param{
 	request *parents;
 	uint32_t address;
 	value_set *value;
+	uint32_t rmw_bitmap;
+	char *rmw_value;
+	fdriver_lock_t *rmw_lock;
 }page_param;
 
 typedef struct align_buffer{
@@ -32,4 +35,5 @@ uint32_t page_remove(request *const);
 uint32_t page_flush(request *const);
 uint32_t page_dump(FILE *fp);
 uint32_t page_load(lower_info *li, blockmanager *bm, algorithm *algo, FILE *fp);
+uint32_t page_rmw(request *const);
 void *page_end_req(algo_req*);

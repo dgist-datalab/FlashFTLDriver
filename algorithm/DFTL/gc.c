@@ -249,7 +249,7 @@ void do_gc(){
 				}
 
 				invalidate_ppa(gv->ppa*L2PGAP+i);
-				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
+				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE*(R2LGAP/L2PGAP));
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
 

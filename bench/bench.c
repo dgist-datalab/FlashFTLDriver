@@ -601,7 +601,7 @@ void bench_reap_data(request *const req,lower_info *li){
 		if(_m->r_num%1000000==0){
 		}
 	}
-	else if(req->type==FS_SET_T){
+	else if(req->type==FS_SET_T || req->type==FS_RMW_T){
 		if(slot_num>=1000000/TIMESLOT){
 			_data->write_cdf[1000000/TIMESLOT]++;
 		}

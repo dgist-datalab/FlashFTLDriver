@@ -138,6 +138,7 @@ lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, ui
 	uint32_t shortcut_max=floor(target_avg_bit);
 	init_memory_info(fpr * 100, target_bit);
 	double bf_advance=bf_advance_ratio(target_bit);
+	GDB_MAKE_BREAKPOINT;
 	for(uint32_t j=(1<<shortcut_max); j>1; j--){
 		uint32_t bit_res=bit_calculate(j);
 		uint32_t sc_num=j-2;
@@ -208,8 +209,8 @@ lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, ui
 			temp.per_plr_bit=plr_bit;
 			temp.L0_bit=l0_bit*RANGE;
 			temp.max_memory_usage_bit=(level_avg_bit+bit_res)*RANGE;
-			//printf("level bit:%.2f remain_bit:%.2f \t", level_avg_bit, remain_avg_bit);
-			//printf("L0:%.2f BF:%.2f PLR:%.2f\n", l0_bit, bf_bit, plr_bit);
+			printf("level bit:%.2f remain_bit:%.2f \t", level_avg_bit, remain_avg_bit);
+			printf("L0:%.2f BF:%.2f PLR:%.2f\n", l0_bit, bf_bit, plr_bit);
 			if(level_avg_bit <= remain_avg_bit && temp.memtable_entry_num){
 				if(res.total_level_num > temp.total_level_num){
 					res=temp;
@@ -253,8 +254,8 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 	int c;
 	float fpr=0.1;
 	uint32_t test_flag=0;
-	uint32_t target_bit=33;//bit_calculate(RANGE);
-	uint32_t memory_usage=29;
+	uint32_t target_bit=32;//bit_calculate(RANGE);
+	uint32_t memory_usage=40;
 	while((c=getopt(argc,argv,"hHmMtTfFbBGg"))!=-1){
 		switch(c){
 			case 'h':

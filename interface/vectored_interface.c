@@ -37,6 +37,7 @@ void* inf_transaction_end_req(void *req);
 extern bool TXN_debug;
 extern char *TXN_debug_ptr;
 static uint32_t seq_val;
+
 uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark){
 	uint32_t idx=0;
 	vec_request *txn=(vec_request*)malloc(sizeof(vec_request));
@@ -118,7 +119,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 	txn->req_array[(txn->size-1)-consecutive_cnt].consecutive_length=consecutive_cnt;
 
 
-	 assign_vectored_req(txn);
+	assign_vectored_req(txn);
 	return 1;
 }
 
@@ -144,6 +145,7 @@ void *vectored_main(void *__input){
 	vec_request *vec_req;
 	request* inf_req;
 	processor *_this=NULL;
+
 	for(int i=0; i<1; i++){
 		if(pthread_self()==mp.processors[i].t_id){
 			_this=&mp.processors[i];
@@ -162,7 +164,9 @@ void *vectored_main(void *__input){
 		}
 		else if(type==1){ //rtry
 			inf_req->tag_num=tag_manager_get_tag(tm);
-			inf_algorithm_caller(inf_req);	
+			if(inf_algorithm_caller(inf_req)==UINT32_MAX){
+				continue;
+			}
 		}else{
 			uint32_t size=vec_req->size;
 			measure_init(&vec_req->latency_checker);
@@ -173,7 +177,9 @@ void *vectored_main(void *__input){
 					request *temp_req=get_retry_request(_this);
 					if(temp_req){	
 						temp_req->tag_num=tag_manager_get_tag(tm);
-						inf_algorithm_caller(temp_req);
+						if(inf_algorithm_caller(temp_req)==UINT32_MAX){
+							continue;
+						}
 					}
 					else{
 						break;
@@ -199,7 +205,9 @@ void *vectored_main(void *__input){
 					break;
 				}
 				req->tag_num=tag_manager_get_tag(tm);
-				inf_algorithm_caller(req);
+				if(inf_algorithm_caller(req)==UINT32_MAX){
+					continue;
+				}
 			}
 		}
 

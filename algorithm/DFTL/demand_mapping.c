@@ -169,6 +169,12 @@ static void write_done_check(request *req){
 	fdriver_unlock(&req->done_lock);
 	if(should_end_req){
 		fdriver_destroy(&req->done_lock);
+		if(req->type==FS_RMW_T){
+			if(req->global_seq==29726298){
+			//	printf("[%u] rmw mapping done\n",req->global_seq);
+			}
+			fdriver_unlock(req->rmw_lock);
+		}
 		req->end_req(req);
 	}
 }
@@ -305,11 +311,11 @@ static inline void update_cache_entry_wrapper(GTD_entry *target_etr, uint32_t lb
 }
 
 
-void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
+void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm, bool load){
 	uint32_t total_logical_page_num;
 	uint32_t total_translation_page_num;
 
-	total_logical_page_num=(SHOWINGSIZE/LPAGESIZE);
+	total_logical_page_num=(SHOWINGSIZE/(LPAGESIZE*(R2LGAP/L2PGAP)));
 	total_translation_page_num=total_logical_page_num/(PAGESIZE/sizeof(DMF));
 
 	if(total_caching_physical_pages!=UINT32_MAX){
@@ -336,25 +342,28 @@ void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *l
 	
 	printf("|cache type: %s\n", cache_type(dmm.c_type));
 	printf("|cache size: %.2lf(mb)\n", ((double)dmm.max_caching_pages * PAGESIZE)/M);
-	printf("|\tratio of PFTL: %.2lf%%\n", ((double)dmm.max_caching_pages * PAGESIZE)/(SHOWINGSIZE/K)*100);
+	printf("|\tratio of PFTL: %.2lf%%\n", ((double)dmm.max_caching_pages)/(total_translation_page_num)*100);
 
 	uint32_t cached_entry=dmm.cache->init(dmm.cache, dmm.max_caching_pages);
 	printf("|\tcaching percentage: %.2lf%%\n", (double)cached_entry/total_logical_page_num *100);
+	printf("cache page :%u\n", dmm.max_caching_pages);
 	printf("--------------------\n");
 
-	DMI.read_working_set=bitmap_init(RANGE);
-	DMI.read_working_set_num=0;
-	DMI.write_working_set=bitmap_init(RANGE);
-	DMI.write_working_set_num=0;
+	if(load==false){
+		DMI.read_working_set=bitmap_init(RANGE);
+		DMI.read_working_set_num=0;
+		DMI.write_working_set=bitmap_init(RANGE);
+		DMI.write_working_set_num=0;
+	}
 	fdriver_mutex_init(&dmi_lock);
 }
 
 void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
-	demand_map_create_body(total_caching_physical_pages, li, bm);
+	demand_map_create_body(total_caching_physical_pages, li, bm, false);
 
 	uint32_t total_logical_page_num;
 	uint32_t total_translation_page_num;
-	total_logical_page_num=(SHOWINGSIZE/LPAGESIZE);
+	total_logical_page_num=(SHOWINGSIZE/(LPAGESIZE*(R2LGAP/L2PGAP)));
 	total_translation_page_num=total_logical_page_num/(PAGESIZE/sizeof(DMF));
 	dmm.GTD=(GTD_entry*)calloc(total_translation_page_num,sizeof(GTD_entry));
 	for(uint32_t i=0; i<total_translation_page_num; i++){
@@ -398,11 +407,11 @@ void demand_map_free(){
 
 	printf("----- traffic result -----\n");
 
-
+/*
 	for(uint32_t i=0; i<total_translation_page_num; i++){
 		fdriver_destroy(&dmm.GTD[i].lock);
 		list_free(dmm.GTD[i].pending_req);
-	}
+	}*/
 	free(dmm.GTD);
 	dmm.cache->free(dmm.cache);
 	delete dmm.flying_map_read_req_set;
@@ -417,11 +426,20 @@ static inline void notfound_processing(request *req){
 	assign_param_ex *mp=(assign_param_ex*)dp->param_ex;
 	free(mp->prefetching_info);
 	free(mp);
-	req->type=FS_NOTFOUND_T;
+
 
 	demand_req_data_collect(dp, req->type==FS_SET_T, true);
 	free(dp);
-	req->end_req(req);
+	if(req->type!=FS_RMW_T){
+		req->type=FS_NOTFOUND_T;
+		req->end_req(req);
+	}
+	else{
+		req->rmw_state=RMW_READ_DONE;
+		if(!inf_assign_try(req)){
+			abort();
+		}
+	}
 }
 
 static inline void dp_initialize(demand_param *dp){
@@ -454,7 +472,7 @@ static uint32_t get_mapping_wrapper(request *req, uint32_t lba){
 uint32_t map_read_wrapper(GTD_entry *etr, request *req, lower_info *, demand_param *param, 
 		uint32_t target_data_lba, uint32_t type){
 	param->flying_map_read_key=target_data_lba;
-	if(req->type==FS_GET_T){
+	if(req->type==FS_GET_T || req->type==FS_RMW_T){
 		if(etr->physical_address==UINT32_MAX){
 			return NOTFOUND_END;
 		}
@@ -616,7 +634,7 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 		dp->flying_map_read_key=UINT32_MAX;
 		ap=NULL;
 
-		if(treq->type==FS_SET_T && dp->status==MISSR){
+		if((treq->type==FS_SET_T && dp->status==MISSR) || (treq->type==FS_RMW_T && treq->rmw_state==RMW_WRITING)){
 			ap=(assign_param_ex*)dp->param_ex;
 			lba=ap->lba;
 			physical=ap->physical;
@@ -674,7 +692,7 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 				}
 			}
 		}
-		else if(treq->type==FS_GET_T){
+		else if(treq->type==FS_GET_T || (treq->type==FS_RMW_T && treq->rmw_state==RMW_READING)){
 			if(req==treq){
 				res=1;			
 			}
@@ -1002,9 +1020,6 @@ retry:
 				uint32_t temp_size=dmm.eviction_hint-dp->now_eviction_hint;
 				if(dmm.cache->get_remain_space(dmm.cache, temp_size) < dp->now_eviction_hint){
 					dmm.cache->get_remain_space(dmm.cache, temp_size);
-					//print_all_processed_req();					
-				//	debug_size();
-					//abort();
 					dp_status_update(dp, NONE);
 					dp_prev_init(dp);
 					double_eviction=true;
@@ -1040,8 +1055,13 @@ retry:
 		case NONE:
 			if(dmm.cache->exist(dmm.cache, now_pair->lba)==false){ //MISS
 				/*notfound check!*/
-				if(req->type==FS_GET_T && now_etr->physical_address==UINT32_MAX){
-					return NOTFOUND_END;
+				if(now_etr->physical_address==UINT32_MAX){
+					if(req->type==FS_GET_T){
+						return NOTFOUND_END;
+					}
+					else if(req->type==FS_RMW_T && req->rmw_state==RMW_READING){
+						return NOTFOUND_END;
+					}
 				}
 				dmm.cache->update_eviction_hint(dmm.cache, now_pair->lba, prefetching_info, dmm.eviction_hint, &dp->now_eviction_hint, true);
 				if((int)dmm.eviction_hint<0){
@@ -1453,6 +1473,7 @@ uint32_t demand_page_read(request *const req){
 	assign_param_ex *mp;
 	uint32_t res;
 
+
 	if(!req->param){
 		dp=(demand_param*)calloc(1, sizeof(demand_param));
 		dp_status_update(dp, NONE);
@@ -1691,7 +1712,7 @@ uint32_t demand_argument(int argc, char **argv){
 			case 'p':
 				cache_size=true;
 				cache_percentage=atof(argv[optind])/100;
-				physical_page_num=(SHOWINGSIZE/K) * cache_percentage;
+				physical_page_num=(SHOWINGSIZE/K/(R2LGAP/L2PGAP)) * cache_percentage;
 				physical_page_num/=PAGESIZE;
 				break;
 			default:
@@ -1731,7 +1752,7 @@ uint32_t demand_argument(int argc, char **argv){
 
 	if(!cache_size){
 		//physical_page_num=((SHOWINGSIZE/K)/4)/PAGESIZE;
-		physical_page_num=(((SHOWINGSIZE/K))/100*21)/PAGESIZE;
+		physical_page_num=(((SHOWINGSIZE/K/(R2LGAP/L2PGAP)))/100*21)/PAGESIZE;
 	}
 	dmm.max_caching_pages=physical_page_num;
 	return 1;

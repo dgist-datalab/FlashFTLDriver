@@ -13,7 +13,6 @@ extern master_processor mp;
 
 #define TOTAL_SIZE (3ULL *1024L *1024L *1024L)
 #define TRACE_DEV_SIZE (128ULL * 1024L * 1024L * 1024L)
-#define CRC_BUFSIZE (2ULL * 1024L * 1024L)
 
 static uint64_t PHYS_ADDR=0x3800000000;
 static void *page_addr;
@@ -27,8 +26,6 @@ static int trace_fd = 0;
 extern uint32_t test_key;
 static volatile uint64_t issue_req_num=0;
 static volatile uint64_t end_req_num=0;
-//static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
-//static uint32_t trace_crc_buf[CRC_BUFSIZE];
 
 _request_monitor request_monitor;
 void request_print_log(){
@@ -42,6 +39,7 @@ void request_print_log(){
 	double total_write_length=(double)(request_monitor.write_sequential_length+request_monitor.write_random_cnt)/(request_monitor.write_sequential_cnt+request_monitor.write_random_cnt);
 	double total_read_length=(double)(request_monitor.read_sequential_length+request_monitor.read_random_cnt)/(request_monitor.read_sequential_cnt+request_monitor.read_random_cnt);
 	printf("total avg_seq w:%lf, r:%lf\n", total_write_length, total_read_length);
+	printf("rmw_cnt:%u normal_write_cnt:%u rmw_ratio:%.2lf\n", request_monitor.rmw_cnt, request_monitor.normal_write_cnt, (double)request_monitor.rmw_cnt/(request_monitor.normal_write_cnt+ request_monitor.rmw_cnt));
 }
 
 void request_memset_print_log(){
@@ -186,6 +184,212 @@ const char *type_to_str(uint32_t type){
 	return NULL;
 }
 
+static inline vec_request *ch_ureq2vec_req2(cheeze_ureq *creq, int id){
+	static uint32_t global_vec_seq_id=0;
+	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
+	res->tag_id=id;
+	res->seq_id=global_vec_seq_id++;
+
+	error_check(creq);
+	FSTYPE type=decode_type(creq->op);
+
+	bool first_fragmented_req=false;
+	uint32_t first_fragmented_size;
+	bool last_fragmented_req=false;
+	uint32_t last_fragmented_size;
+	uint32_t size=0;
+	uint32_t original_length=creq->len;
+
+	if(creq->pos%R2LGAP!=0){
+		size++;
+		uint32_t fragmented_length=PAGESIZE-(creq->pos%R2LGAP)*LPAGESIZE;
+		if(creq->len>fragmented_length){
+			first_fragmented_size=fragmented_length;
+			creq->len-=fragmented_length;
+		}
+		else{
+			first_fragmented_size=creq->len;
+			creq->len-=creq->len;
+		}
+
+		first_fragmented_req=true;
+	}
+
+	if(creq->len%PAGESIZE){
+		size++;
+		last_fragmented_size=creq->len%PAGESIZE;
+		last_fragmented_req=true;
+	}
+
+	size+=creq->len/PAGESIZE;
+
+	if(size==0){
+		abort();
+	}
+
+	res->origin_req=(void*)creq;
+	res->size=size;
+	res->req_array=(request*)calloc(res->size,sizeof(request));
+	res->end_req=NULL;
+	res->mark=0;
+
+	res->type=type;
+	if(type!=FS_GET_T && type!=FS_SET_T){
+		res->buf=NULL;
+	}
+	else{
+#ifdef TRACE_REPLAY
+		res->buf=NULL;	
+#else
+		res->buf=get_buf_addr(data_addr, id);
+#endif
+	}
+
+
+	uint32_t prev_lba=UINT32_MAX;
+	uint32_t consecutive_cnt=0;
+	uint32_t start_lba=creq->pos;
+	static uint32_t global_seq=0;
+	uint32_t logical_sector=0;
+	for(uint32_t i=0; i<res->size; i++){
+		request *temp=&res->req_array[i];
+		temp->parents=res;
+		temp->type=type;
+		temp->end_req=cheeze_end_req;
+		temp->seq=i;
+		temp->type_ftl=0;
+		temp->type_lower=0;
+		temp->is_sequential_start=false;
+		temp->flush_all=0;
+		temp->global_seq=global_seq++;
+
+		temp->offset=0;
+		temp->length=R2LGAP;
+		temp->key=(creq->pos+i*R2LGAP)/R2LGAP;
+		if(i==0){
+			if(res->size>1){
+				if(type==FS_GET_T){
+					request_monitor.read_sequential_cnt++;
+					request_monitor.read_sequential_length+=res->size;
+				}	
+				else if(type==FS_SET_T){
+					request_monitor.write_sequential_cnt++;
+					request_monitor.write_sequential_length+=res->size;
+				}
+			}
+			else{
+				if(type==FS_GET_T){
+					request_monitor.read_random_cnt++;
+				}	
+				else if(type==FS_SET_T){
+					request_monitor.write_random_cnt++;
+				}		
+			}
+		}
+
+		if(i==0){
+			if(first_fragmented_req){
+				temp->offset=start_lba%R2LGAP;
+				temp->length=first_fragmented_size/LPAGESIZE;
+			}
+		}
+
+		if(i==res->size-1){
+			if(last_fragmented_req){
+				temp->length=last_fragmented_size/LPAGESIZE;
+			}
+		}
+
+
+		switch(type){
+			case FS_GET_T:
+				temp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+				temp->target_buf=&res->buf[logical_sector*LPAGESIZE];
+				measure_init(&temp->latency_checker);
+				measure_start(&temp->latency_checker);
+				break;
+			case FS_SET_T:
+				if(temp->offset!=0 || temp->length!=R2LGAP){
+					temp->type=FS_RMW_T;
+					temp->rmw_state=RMW_START;
+					request_monitor.rmw_cnt++;
+				}
+				else{
+					request_monitor.normal_write_cnt++;
+				}
+#ifdef TRACE_REPLAY
+				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+#else
+				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+				memcpy(&temp->value->value[temp->offset*LPAGESIZE],&res->buf[logical_sector*LPAGESIZE],temp->length*LPAGESIZE);
+#endif
+				measure_init(&temp->latency_checker);
+				measure_start(&temp->latency_checker);
+				break;
+			case FS_FLUSH_T:
+				break;
+			case FS_DELETE_T:
+				break;
+			default:
+				printf("error type!\n");
+				abort();
+				break;
+		}
+
+		if(prev_lba==UINT32_MAX){
+			prev_lba=temp->key;
+		}
+		else{
+			if(prev_lba+1==temp->key){
+				consecutive_cnt++;
+			}
+			else{
+				res->req_array[i-consecutive_cnt-1].is_sequential_start=(consecutive_cnt!=0);
+				res->req_array[i-consecutive_cnt-1].consecutive_length=consecutive_cnt;
+				consecutive_cnt=0;
+			}
+			prev_lba=temp->key;
+			temp->consecutive_length=0;
+		}
+
+#ifdef TRACE_REPLAY
+		if(temp->type==FS_SET_T || temp->type==FS_RMW_T){
+			for(uint32_t j=0; j<temp->length; j++){
+				uint32_t LBA=temp->key*R2LGAP+temp->offset+j;
+				read(trace_fd, &CRCMAP[LBA],sizeof(uint32_t));
+				if(LBA==test_key){
+					printf("crc value:%u type:%u, seq:%u\n", CRCMAP[LBA], temp->type, temp->global_seq);
+				}
+				*(uint32_t*)&temp->value->value[(temp->offset+j)*LPAGESIZE]=CRCMAP[LBA];
+			}
+		}
+		else{
+			for(uint32_t j=0; j<temp->length; j++){
+				uint32_t LBA=temp->key*R2LGAP+temp->offset+j;
+				uint32_t temp_crc;
+				read(trace_fd, &temp_crc, sizeof(uint32_t));
+				temp->crc_value2[j] = CRCMAP[LBA];
+			}
+		}
+#endif
+
+#ifdef TRACE_COLLECT
+		if(temp->type==FS_SET_T){
+			for(uint32_t j=0; j<temp->length; j++){
+				crc_buffer[logical_sector+j]=crc32(&temp->value->value[j*LPAGESIZE], LPAGESIZE);
+			}
+		}
+#endif
+		logical_sector+=temp->length;
+
+	}
+
+	res->req_array[(res->size-1)-consecutive_cnt].is_sequential_start=(consecutive_cnt!=0);
+	res->req_array[(res->size-1)-consecutive_cnt].consecutive_length=0;//consecutive_cnt;
+	creq->len=original_length;
+	return res;
+}
+
 static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	static uint32_t global_vec_seq_id=0;
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
@@ -238,6 +442,8 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 		temp->is_sequential_start=false;
 		temp->flush_all=0;
 		temp->global_seq=global_seq++;
+		temp->offset=0;
+		temp->length=1;
 		if(i==0){
 			if(res->size>1){
 				if(type==FS_GET_T){
@@ -400,7 +606,11 @@ vec_request **get_vectored_request_arr()
 		recv = &recv_event_addr[i];
 		id = i;
 		ureq = ureq_addr + id;
+		#ifdef RMW
+		res[req_idx++] = ch_ureq2vec_req2(ureq, id);
+		#else
 		res[req_idx++] = ch_ureq2vec_req(ureq, id);
+		#endif
 		if(cnt%100000){
 			printf("%u\n", cnt++);
 		}
@@ -451,7 +661,8 @@ vec_request *get_trace_vectored_request(){
 			break;
 			abort();
 		}
-		res=ch_ureq2vec_req(&ureq, id);
+		//res=ch_ureq2vec_req(&ureq, id);
+		res=ch_ureq2vec_req2(&ureq, id);
 		cnt++;
 		if(cnt%10000==0){
 			printf("%u\n",cnt);
@@ -481,7 +692,12 @@ bool cheeze_end_req(request *const req){
 			}
 #endif
 			if(preq->buf){
-				memcpy(&preq->buf[req->seq*LPAGESIZE], null_value,LPAGESIZE);
+				if(req->length){
+					memcpy(req->target_buf, null_value, req->length*LPAGESIZE);
+				}
+				else{
+					memcpy(&preq->buf[req->seq*LPAGESIZE], null_value,LPAGESIZE);
+				}
 			}
 			inf_free_valueset(req->value,FS_MALLOC_R);
 
@@ -491,12 +707,29 @@ bool cheeze_end_req(request *const req){
 			if(req->value){
 
 				if(preq->buf){
-					memcpy(&preq->buf[req->seq*LPAGESIZE], req->value->value,LPAGESIZE);
+					if(req->length){
+						memcpy(req->target_buf, req->value->value, req->length*LPAGESIZE);
+					}
+					else{
+						memcpy(&preq->buf[req->seq*LPAGESIZE], req->value->value,LPAGESIZE);
+					}
 				}
+
 #ifdef TRACE_REPLAY
-			if(req->crc_value!=*(uint32_t*)req->value->value){
-				printf("lba:%u data fail abort! %u --> %u\n", req->key, req->crc_value, *(uint32_t*)req->value->value);
-				abort();
+			if(req->length){
+				for(uint32_t j=0; j<req->length; j++){
+					uint32_t read_data=*(uint32_t*)&req->value->value[j*LPAGESIZE];
+					if(req->crc_value2[j]!=read_data){
+						printf("lba:%u data fail abort! %u --> %u\n", req->key*4+req->offset+j, req->crc_value2[j], read_data);
+						abort();					
+					}
+				}
+			}
+			else{
+				if(req->crc_value!=*(uint32_t*)req->value->value){
+					printf("lba:%u data fail abort! %u --> %u\n", req->key, req->crc_value, *(uint32_t*)req->value->value);
+					abort();
+				}
 			}
 #endif
 
@@ -514,6 +747,7 @@ bool cheeze_end_req(request *const req){
 				inf_free_valueset(req->value,FS_MALLOC_R);
 			}
 			break;
+		case FS_RMW_T:
 		case FS_SET_T:
 			bench_reap_data(req, mp.li);
 			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);

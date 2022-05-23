@@ -3,6 +3,7 @@ SRCS +=\
 	   map.c\
 	   gc.c\
 	   data_dump.c\
+	   rmw_checker.c\
 
 OBJS :=\
 	$(patsubst %.c,%.o,$(SRCS))\

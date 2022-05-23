@@ -128,8 +128,8 @@ void do_gc(){
 	align_gc_buffer g_buffer;
 	gc_value *gv;
 
-	//static int cnt=0;
-	//printf("gc: %d\n", cnt++);
+	static int cnt=0;
+	printf("gc: %d %u\n", cnt++, target->seg_idx);
 	/*by using this for loop, you can traversal all page in block*/
 	for_each_page_in_seg(target,page,bidx,pidx){
 		//this function check the page is valid or not
@@ -152,13 +152,15 @@ void do_gc(){
 	KEYT *lbas;
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list,now,nxt){
-
 			gv=(gc_value*)now->data;
 			if(!gv->isdone) continue;
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
+				if(lbas[i]==test_key/4){
+					printf("target key moved\n");
+				}
 				if(bm->is_invalid_piece(bm,gv->ppa*L2PGAP+i)) continue;
-				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
+				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],(R2LGAP/L2PGAP)*LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
 				g_buffer.idx++;

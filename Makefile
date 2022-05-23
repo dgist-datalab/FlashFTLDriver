@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=DFTL
+export TARGET_ALGO=layeredLSM
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -29,16 +29,18 @@ export COMMONFLAGS+=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-DPARALLEL_MANAGER\
-			-DLSM_DEBUG\
-			-DTRACE_REPLAY\
 			-DPROGRESS\
-			-DMAPPING_TIME_CHECK\
-			-O3\
+			-DWRITE_STOP_READ\
+			-DRMW\
+#			-O3\
+#			-DSYNC_WRITE\
+#			-DTRACE_COLLECT\
+#			-DTRACE_REPLAY\
+#			-DPARALLEL_MANAGER\
+#			-DMAPPING_TIME_CHECK\
 #			-DLSM_DEBUG\
 #			-DMETAONLY\
 #			-DREAL_BENCH_MODE\
-#-DTRACE_COLLECT\
 #-DDFTL_DEBUG\
 
 
@@ -116,6 +118,7 @@ SRCS +=\
 	./bench/bench_demand.c\
 	./bench/bench_transaction.c\
 	./bench/bench_parsing.c\
+	./bench/bench_localized_workload.c\
 	./include/utils/thpool.c\
 	./include/utils/kvssd.c\
 	./include/utils/sha256.c\
@@ -146,7 +149,7 @@ LIBS +=\
 		-lpthread\
 		-lm\
 		-ljemalloc\
-		-ldw\
+#		-ldw\
 #	-laio\
 
 all: driver

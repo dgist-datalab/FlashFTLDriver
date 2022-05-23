@@ -35,6 +35,8 @@ typedef struct request_monitor{
 	uint32_t write_sequential_length;
 	uint32_t write_sequential_cnt;
 	uint32_t write_random_cnt;
+    uint32_t normal_write_cnt;
+    uint32_t rmw_cnt;
 
 	uint32_t read_sequential_length;
 	uint32_t read_sequential_cnt;

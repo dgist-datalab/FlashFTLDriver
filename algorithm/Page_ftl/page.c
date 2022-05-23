@@ -6,9 +6,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "../../include/data_struct/lrucache.hpp"
+#include "../../include/debug_utils.h"
 #include "page.h"
 #include "map.h"
 #include "../../bench/bench.h"
+#include "./rmw_checker.h"
 
 //#define LBA_LOGGING "/lba_log"
 
@@ -33,6 +35,7 @@ struct algorithm page_ftl={
 	.write=page_write,
 	.flush=page_flush,
 	.remove=page_remove,
+	.rmw=page_rmw,
 	.test=NULL,
 	.print_log=print_traffic,
 	.dump_prepare=NULL,
@@ -53,6 +56,7 @@ void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo){
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
+	rmw_node_init();
 
 #ifdef LBA_LOGGING
 	log_fd=open(LBA_LOGGING, 0x666, O_CREAT | O_WRONLY | O_TRUNC);
@@ -83,14 +87,23 @@ void page_destroy (lower_info* li, algorithm *algo){
 
 inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
-	
+
+#ifdef RMW
+#else
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
 			if(test_key==req->key){
 				printf("%u page hit(piece_ppa:%u)\n", req->key,value->ppa);
 			}
-			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+			if(L2PGAP==1){
+				if(req->offset!=0){
+					memmove(value->value, &rb.buffer_value[req->offset*LPAGESIZE], req->length*LPAGESIZE);
+				}
+			}
+			else{
+				memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+			}
 			req->buffer_hit++;
 			req->end_req(req);
 			fdriver_unlock(&rb.read_buffer_lock);
@@ -98,10 +111,13 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 		}
 		fdriver_unlock(&rb.read_buffer_lock);
 	}
+#endif
 
 	page_param* param=(page_param*)malloc(sizeof(page_param));
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
 	param->value=value;
+	param->rmw_value=NULL;
+	param->rmw_bitmap=0;
 	my_req->parents=req;//add the upper request
 	my_req->end_req=page_end_req;//this is callback function
 	my_req->param=(void*)param;//add your parameter structure 
@@ -109,7 +125,8 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 	my_req->type_lower=0;
 	/*you note that after read a PPA, the callback function called*/
 
-
+#ifdef RMW
+#else
 	if(type==DATAR){
 		fdriver_lock(&rb.pending_lock);
 		rb_r_iter temp_r_iter=rb.issue_req->find(ppa);
@@ -124,6 +141,21 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 			return;
 		}
 	}
+#endif
+
+
+#ifdef RMW
+	if(type==DATAR && rmw_check(req->key)){
+		param->rmw_value=NULL;
+		//param->rmw_value=(char*)malloc(PAGESIZE);
+		//param->rmw_bitmap=rmw_node_pick(req->key, req->global_seq, param->rmw_value);
+		//printf("partial read %u ppa:%u\n", req->key, ppa);
+	}
+	else{
+		param->rmw_value=NULL;
+	}
+
+#endif
 
 	switch(type){
 		case DATAR:
@@ -142,14 +174,24 @@ uint32_t page_read(request *const req){
 #ifdef LBA_LOGGING
 	dprintf(log_fd, "R %u\n",req->key);
 #endif
-
+	bool debug=false;
+	for(uint32_t i=0; i<req->length; i++){
+		uint32_t LBA=req->key*R2LGAP+req->offset+i;
+		if(LBA==test_key){
+			printf("%u read!!\n", LBA);
+			debug=true;
+		}
+	}
 	if(!testing){
 		testing_lba=req->key;
 		testing=true;
 	}
 
-//	printf("issue %u %u\n", req->seq, req->key);
+	if(req->key==0  && req->offset==0 && req->length==1){
+		//GDB_MAKE_BREAKPOINT;
+	}
 
+//	printf("issue %u %u\n", req->seq, req->key);
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		if(req->key==a_buffer.key[i]){
 			//		printf("buffered read!\n");
@@ -162,10 +204,15 @@ uint32_t page_read(request *const req){
 	//printf("read key :%u\n",req->key);
 
 	req->value->ppa=page_map_pick(req->key);
+	if(debug){
+		printf("test_key(%u) read %u\n", test_key, req->value->ppa);
+	}
 
 	//DPRINTF("\t\tmap info : %u->%u\n", req->key, req->value->ppa);
 	if(req->value->ppa==UINT32_MAX){
-		req->type=FS_NOTFOUND_T;
+		if(!rmw_node_merge(req->key, req->global_seq, req->value->value)){
+			req->type=FS_NOTFOUND_T;
+		}
 		req->end_req(req);
 	}
 	else{
@@ -207,13 +254,28 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
 	if(a_buffer.idx==L2PGAP){
 		ppa_t ppa=page_map_assign(a_buffer.key, a_buffer.idx);
-		value_set *value=inf_get_valueset(NULL,  FS_MALLOC_W, PAGESIZE);
-		for(uint32_t i=0; i<L2PGAP; i++){
-			if(a_buffer.key[i]==0){
-				printf("target key:%u->%u\n", 0,ppa*L2PGAP+i);
+		value_set *value;
+		if(L2PGAP==1){
+			value=req->value;
+		}
+		else{
+			value=inf_get_valueset(NULL,  FS_MALLOC_W, PAGESIZE);
+			for(uint32_t i=0; i<L2PGAP; i++){
+				if(a_buffer.key[i]==0){
+					printf("target key:%u->%u\n", 0,ppa*L2PGAP+i);
+				}
+				memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
+				inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 			}
-			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
-			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
+		}
+
+		if(req->key==test_key/4){
+			uint32_t value;
+			for(uint32_t i=0; i<4; i++){
+				uint32_t offset=test_key%4;
+				value=*(uint32_t*)&req->value->value[offset*LPAGESIZE];
+			}
+			printf("test_key(%u) is set to %u, crc:%u seq:%u\n", test_key, ppa,value, req->global_seq);
 		}
 		req->value=NULL;
 #ifdef WRITE_STOP_READ
@@ -231,7 +293,11 @@ uint32_t page_write(request *const req){
 #ifdef LBA_LOGGING
 	dprintf(log_fd, "W %u\n",req->key);
 #endif
-	if(align_buffering(req, 0, NULL)!=0){
+	if(req->key==0 && req->offset==0 && req->length==1){
+		//GDB_MAKE_BREAKPOINT;
+	}
+
+	if(align_buffering(req, req->key, req->value)!=0){
 #ifdef WRITE_STOP_READ
 		req->value=NULL;
 		req->end_req(req);
@@ -247,23 +313,125 @@ uint32_t page_write(request *const req){
 }
 
 uint32_t page_remove(request *const req){
-	for(uint8_t i=0; i<a_buffer.idx; i++){
-		if(a_buffer.key[i]==req->key){
-			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
-			if(i==1){
-				a_buffer.value[0]=a_buffer.value[1];
-				a_buffer.key[0]=a_buffer.key[1];
-			}
+	if (L2PGAP>1)
+	{
+		for (uint8_t i = 0; i < a_buffer.idx; i++)
+		{
+			if (a_buffer.key[i] == req->key)
+			{
+				inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
+				if (i == 1)
+				{
+					a_buffer.value[0] = a_buffer.value[1];
+					a_buffer.key[0] = a_buffer.key[1];
+				}
 
-			a_buffer.idx--;
-			goto end;
+				a_buffer.idx--;
+				goto end;
+			}
 		}
+
+		page_map_trim(req->key);
 	}
-	
-	page_map_trim(req->key);
-end:
+	end:
 	req->end_req(req);
 	return 0;
+}
+
+void *rmw_end_req(algo_req *input){
+	request *preq=input->parents;
+	page_param *param=(page_param*)input->param;
+	//preq->type=FS_SET_T;
+
+	//memcpy(&param->value->value[preq->offset*LPAGESIZE], preq->value->value, preq->length*LPAGESIZE);
+	//inf_free_valueset(preq->value, FS_MALLOC_W);
+	//preq->value=param->value;
+
+	if(param->rmw_value){
+		for(uint32_t i=0; i<R2LGAP; i++){
+			if(preq->offset<=i && i<preq->offset+preq->length) continue;
+			if((1<<i) && param->rmw_bitmap){
+				memcpy(&preq->value->value[i*LPAGESIZE], &param->rmw_value[i*LPAGESIZE], LPAGESIZE);
+			}
+		}
+		free(param->rmw_value);
+	}
+
+	if(preq->offset!=0){
+		memcpy(preq->value->value, param->value->value, preq->offset*LPAGESIZE);
+	}
+
+	if(preq->offset+preq->length!=R2LGAP){
+		memcpy(&preq->value->value[(preq->offset+preq->length)*LPAGESIZE], &param->value->value[(preq->offset+preq->length)*LPAGESIZE], (R2LGAP-preq->offset-preq->length)*LPAGESIZE);
+	}
+
+	
+
+	inf_free_valueset(param->value,FS_MALLOC_R);
+	rmw_node_read_done(preq->key, preq->global_seq);
+
+	//fdriver_unlock(param->rmw_lock);
+
+	free(param);
+	free(input);
+
+	
+	preq->rmw_state=RMW_READ_DONE;
+	if(!inf_assign_try(preq)){
+		abort();
+	}
+
+	return NULL;
+}
+uint32_t page_rmw(request *const req){
+	uint32_t ppa=page_map_pick(req->key);
+
+	for(uint32_t i=0; i<req->length; i++){
+		uint32_t LBA=req->key*R2LGAP+req->offset+i;
+		if(LBA==test_key){
+			printf("%u rmw data:%u\n", LBA, *(uint32_t*)&req->value->value[(req->offset+i)*LPAGESIZE]);
+		}
+	}/*
+	if(req->key==test_key/4){
+		printf("rmw target key set seq_id:%u\n",req->global_seq);
+	}*/
+
+	if(ppa==UINT32_MAX){
+		rmw_node_insert(req->key, req->offset, req->length, req->global_seq, req->value->value);
+		rmw_node_read_done(req->key, req->global_seq);
+		req->rmw_state=RMW_READ_DONE;
+		return page_write(req);
+		/*
+		if(!inf_assign_try(req)){
+			abort();
+		}*/
+	}
+	else if(req->rmw_state==RMW_START){
+		page_param *param=(page_param*)malloc(sizeof(page_param));
+		if(rmw_check(req->key)){
+			//printf("rmw checked! %u\n", req->global_seq);
+			param->rmw_value=(char*)malloc(PAGESIZE);
+			param->rmw_bitmap=rmw_node_pick(req->key, req->global_seq, param->rmw_value);
+		}
+		else{
+			param->rmw_value=NULL;
+		}
+		algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
+		param->value=inf_get_valueset(NULL,FS_MALLOC_R, PAGESIZE);
+		my_req->parents=req;
+		my_req->end_req=rmw_end_req;
+		my_req->param=(void*)param;
+		my_req->type=DATAR;
+		my_req->type_lower=0;
+
+		rmw_node_insert(req->key, req->offset, req->length, req->global_seq, req->value->value);
+
+		page_ftl.li->read(ppa, PAGESIZE, param->value, my_req);
+	}
+	else{
+		return page_write(req);
+	}
+	return 1;
 }
 
 uint32_t page_flush(request *const req){
@@ -274,7 +442,14 @@ uint32_t page_flush(request *const req){
 static void processing_pending_req(algo_req *req, value_set *v){
 	request *parents=req->parents;
 	page_param *param=(page_param*)req->param;
-	memcpy(param->value->value, &v->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+	if(L2PGAP==1){
+		if(parents->offset!=0){
+			memmove(parents->value->value, &v->value[parents->offset*LPAGESIZE], parents->length*LPAGESIZE);
+		}
+	}
+	else{
+		memcpy(parents->value->value, &v->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+	}
 	if(parents){
 		if(parents->type_lower < 10){
 			parents->type_lower+=req->type_lower;
@@ -287,7 +462,6 @@ static void processing_pending_req(algo_req *req, value_set *v){
 
 void *page_end_req(algo_req* input){
 	//this function is called when the device layer(lower_info) finish the request.
-	
 	rb_r_iter target_r_iter;
 	rb_r_iter target_r_iter_temp;
 	algo_req *pending_req;
@@ -298,12 +472,28 @@ void *page_end_req(algo_req* input){
 			res->type_lower+=input->type_lower;
 		}
 	}
+	uint32_t i, LBA;
 	switch(input->type){
 		case DATAW:
 			inf_free_valueset(param->value,FS_MALLOC_W);
+			if(res->offset!=0 || res->length!=R2LGAP){
+				rmw_node_delete(res->key, res->global_seq);
+			}
+			if(res->type==FS_RMW_T){
+				fdriver_unlock(res->rmw_lock);
+			}
 			break;
 		case DATAR:
-		
+			#ifdef RMW
+			if(param->rmw_value){
+				for(i=0; i<R2LGAP; i++){
+					if((1<<i) && param->rmw_bitmap){
+						memcpy(&res->value->value[i*LPAGESIZE], &param->rmw_value[i*LPAGESIZE], LPAGESIZE);
+					}
+				}
+				free(param->rmw_value);
+			}
+			#else
 			fdriver_lock(&rb.pending_lock);
 			target_r_iter=rb.pending_req->find(param->value->ppa/L2PGAP);
 			for(;target_r_iter->first==param->value->ppa/L2PGAP && 
@@ -320,16 +510,20 @@ void *page_end_req(algo_req* input){
 			rb.buffer_ppa=param->value->ppa/L2PGAP;
 			memcpy(rb.buffer_value, param->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
-
-			if(param->value->ppa%L2PGAP){
-				memmove(param->value->value, &param->value->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+			#endif
+			if(L2PGAP==1){
+				if(res->offset!=0){
+					memmove(param->value->value, &param->value->value[res->offset*LPAGESIZE], res->length*LPAGESIZE);
+				}
 			}
-
+			else{
+				if(param->value->ppa%L2PGAP){
+					memmove(param->value->value, &param->value->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+				}
+			}
 			break;
 	}
-	if(res){
-		res->end_req(res);//you should call the parents end_req like this
-	}
+	res->end_req(res);//you should call the parents end_req like this
 	free(param);
 	free(input);
 	return NULL;

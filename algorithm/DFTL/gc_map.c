@@ -58,7 +58,8 @@ ppa_t get_map_rppa(KEYT gtd_idx){
 
 	/*when the gc phase, It should get a page from the reserved block*/
 	res=demand_ftl.bm->get_page_addr(p->map_reserve);
-	KEYT temp[L2PGAP]={gtd_idx, 0};
+	KEYT temp[L2PGAP]={gtd_idx};
+
 	validate_ppa(res, temp, L2PGAP);
 	return res;
 }

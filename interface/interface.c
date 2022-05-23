@@ -178,11 +178,15 @@ void assign_req(request* req){
 
 
 extern int32_t flying_cnt;
+static uint32_t recent_rmw_seq=UINT32_MAX;
 bool inf_assign_try(request *req){
 	bool flag=false;
 	for(int i=0; i<1; i++){
 		processor *t=&mp.processors[i];
 		tag_manager_free_tag(tm, req->tag_num);
+		if(req->type==FS_RMW_T && req->global_seq==recent_rmw_seq){
+			//printf("rmw %u insert retry\n", req->global_seq);
+		}
 		while(q_enqueue((void*)req,t->retry_q)){
 			flag=true;
 			break;
@@ -217,8 +221,44 @@ static request *get_next_request(processor *pr){
 send_req:
 	return (request*)_inf_req;
 }
-
+#define RMW
+fdriver_lock_t inf_rmw_lock;
+static bool is_start_al_caller=false;
 uint32_t inf_algorithm_caller(request *const inf_req){
+	if(is_start_al_caller==false){
+		fdriver_mutex_init(&inf_rmw_lock);
+		is_start_al_caller=true;
+	}
+#ifdef RMW
+	if(inf_req->type==FS_RMW_T){
+		if(inf_req->global_seq==recent_rmw_seq){
+			
+		}
+		else if(fdriver_try_lock(&inf_rmw_lock)==0){
+			fdriver_unlock(&inf_rmw_lock);
+			inf_req->rmw_lock=&inf_rmw_lock;
+			recent_rmw_seq=inf_req->global_seq;
+			fdriver_lock(&inf_rmw_lock);
+		}
+		else{
+			inf_assign_try(inf_req);
+			return UINT32_MAX;
+		}
+	}
+	else{
+		if((fdriver_try_lock(&inf_rmw_lock))==0){
+			fdriver_unlock(&inf_rmw_lock);
+		}
+		else if(inf_req->global_seq<recent_rmw_seq){
+			//keep going;
+		}
+		else{
+			inf_assign_try(inf_req);
+			return UINT32_MAX;		
+		}
+	}
+#endif
+
 	switch(inf_req->type){
 		case FS_GET_T:
 			mp.algo->read(inf_req);
@@ -229,7 +269,7 @@ uint32_t inf_algorithm_caller(request *const inf_req){
 			mp.algo->remove(inf_req);
 			break;
 		case FS_RMW_T:
-			mp.algo->read(inf_req);
+			mp.algo->rmw(inf_req);
 			break;
 		case FS_BUSE_R:
 			mp.algo->read(inf_req);

@@ -342,6 +342,9 @@ inline uint32_t convert_ppa(uint32_t PPA){
 }
 void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const req){
 	uint32_t PPA=convert_ppa(_PPA);
+	if(PPA==32787 || PPA==32789){
+	//	GDB_MAKE_BREAKPOINT;
+	}
 	if(PPA==lower_test_ppa){
 		printf("%u (piece:%u) target write\n", lower_test_ppa, lower_test_ppa*2);
 	}

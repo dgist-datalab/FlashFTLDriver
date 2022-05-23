@@ -10,7 +10,7 @@
 #include "../../../include/settings.h"
 #include "../../../include/utils/thpool.h"
 #include "../translation_functions/bf_guard_mapping.h"
-#define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriver/algorithm/layeredLSM/design_knob"
+#define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriverC1/algorithm/layeredLSM/design_knob"
 
 double *plr_dp;
 double *line_per_chunk;
@@ -106,11 +106,11 @@ void init_memory_info(uint32_t error, uint32_t target_bit){
 		read_data(fd,(char*) chunk_cnt_dp, sizeof(uint64_t), 1001);
 	}
 
-/*
+
 	printf("opt memory usage\n");
 	for(uint32_t i=1; i<=1000; i++){
 		printf("%u\t%lf\n", i, plr_dp[i]);
-	}*/
+	}
 	/*
 	printf("normal memory usage\n");
 	for(uint32_t i=1; i<=1000; i++){

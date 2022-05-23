@@ -52,6 +52,10 @@ typedef struct vectored_request{
 	MeasureTime latency_checker;
 } vec_request;
 
+enum{
+	RMW_START,RMW_READING,RMW_READ_DONE, RMW_WRITING
+};
+
 struct request {
 	FSTYPE type;
 	KEYT key;
@@ -60,9 +64,11 @@ struct request {
 	uint32_t offset;
 	uint32_t tid;
 	uint32_t length;
-	char *buf;
+	uint32_t rmw_state;
+	char *target_buf;
 	
 	uint32_t crc_value;
+	uint32_t crc_value2[R2LGAP];
 	uint64_t ppa;/*it can be the iter_idx*/
 	uint32_t seq;
 	uint32_t global_seq;
@@ -109,6 +115,7 @@ e:for application req*/
 	MeasureTime mapping_cpu;
 
 	fdriver_lock_t done_lock;
+	fdriver_lock_t *rmw_lock;
 	bool write_done;
 	bool map_done;
 	/* HASH_KVSSD */
@@ -209,6 +216,7 @@ struct algorithm{
 	uint32_t (*write)(request *const);
 	uint32_t (*flush)(request *const);
 	uint32_t (*remove)(request *const);
+	uint32_t (*rmw)(request *const);
 	uint32_t (*test)();
 	uint32_t (*print_log)();
 	void (*dump_prepare)();

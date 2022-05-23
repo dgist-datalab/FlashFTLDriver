@@ -19,6 +19,7 @@ struct algorithm demand_ftl={
 	.write=page_write,
 	.flush=page_flush,
 	.remove=page_remove,
+	.rmw=demand_rmw,
 	.test=NULL,
 	.print_log=demand_print_log,
 	.dump_prepare=update_cache_mapping,
@@ -73,7 +74,7 @@ uint32_t page_read(request *const req){
 	if(!req->param){
 		for(uint32_t i=0; i<a_buffer.idx; i++){
 			if(req->key==a_buffer.key[i]){
-				memcpy(req->value->value, &a_buffer.value[i*LPAGESIZE], LPAGESIZE);
+				memcpy(req->value->value, &a_buffer.value[i*LPAGESIZE], LPAGESIZE * (R2LGAP/L2PGAP));
 				req->end_req(req);		
 				return 1;
 			}
@@ -81,6 +82,52 @@ uint32_t page_read(request *const req){
 	}
 
 	return demand_page_read(req);
+}
+
+static inline void rmw_update(uint32_t offset, uint32_t length, char *org_data, char *new_data){
+	memcpy(&org_data[LPAGESIZE*offset], &new_data[LPAGESIZE*offset], length*LPAGESIZE);
+	free(new_data);
+}
+
+uint32_t demand_rmw(request *const req){
+//	if(req->global_seq==32529371){
+	if(req->global_seq==1519134){
+		//GDB_MAKE_BREAKPOINT;
+	}
+	//printf("rmw global seq:%u\n", req->global_seq);
+	switch(req->rmw_state){
+		case RMW_START:
+			if(req->global_seq==29726298){
+				//printf("[%u] rmw start\n", req->global_seq);
+			}
+			req->value->rmw_value=(char*)malloc(PAGESIZE);
+			memcpy(req->value->rmw_value, req->value->value, PAGESIZE);
+			req->rmw_state=RMW_READING;
+			page_read(req);
+			break;
+		case RMW_READING:
+			if(req->global_seq==29726298){
+			//	printf("rmw global:%u reading\n", req->global_seq);
+			}
+			page_read(req);
+			break;
+		case RMW_READ_DONE:
+			if(req->global_seq==29726298){
+				//printf("rmw global:%u read done\n", req->global_seq);
+			}
+			rmw_update(req->offset, req->length, req->value->value, req->value->rmw_value);
+			req->param=NULL;
+			req->rmw_state=RMW_WRITING;
+			page_write(req);
+			break;
+		case RMW_WRITING:
+			if(req->global_seq==29726298){
+				//printf("rmw global:%u writing\n", req->global_seq);
+			}
+			page_write(req);
+			break;
+	}
+	return 1;
 }
 
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
@@ -98,12 +145,12 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
 
 	if(req){
-		memcpy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE);
+		memcpy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE * (R2LGAP/L2PGAP));
 		a_buffer.key[target_idx]=req->key;
 		a_buffer.prefetching_info[target_idx]=req->consecutive_length;
 	}
 	else{
-		memcpy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE);
+		memcpy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE * (R2LGAP/L2PGAP));
 		a_buffer.key[target_idx]=key;
 		a_buffer.prefetching_info[target_idx]=req->consecutive_length;
 	}
@@ -132,6 +179,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 			}
 		}
 
+		if(req->key==test_key/4){
+			printf("test_key assign %u\n", ppa);
+		}
 		demand_map_assign(req, a_buffer.key, physical, a_buffer.prefetching_info);
 
 		a_buffer.idx=0;
@@ -185,7 +235,8 @@ extern struct algorithm demand_ftl;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
-
+	#ifdef RMW
+	#else
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
@@ -198,6 +249,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 		}
 		fdriver_unlock(&rb.read_buffer_lock);
 	}
+	#endif
 
 	page_params* params=(page_params*)malloc(sizeof(page_params));
 	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
@@ -209,7 +261,12 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 	my_req->type_lower=0;
 	/*you note that after read a PPA, the callback function called*/
 
+	if(req->type==FS_GET_T &&req->key==test_key/4){
+		printf("target %u read at %u\n", test_key, ppa);
+	}
 
+	#ifdef RMW
+	#else
 	if(type==DATAR){
 		fdriver_lock(&rb.pending_lock);
 		rb_r_iter temp_r_iter=rb.issue_req->find(ppa);
@@ -224,6 +281,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 			return;
 		}
 	}
+	#endif
 
 	switch(type){
 		case DATAR:
@@ -265,7 +323,8 @@ void *page_end_req(algo_req* input){
 			inf_free_valueset(params->value,FS_MALLOC_W);
 			break;
 		case DATAR:
-		
+#ifdef RMW
+#else
 			fdriver_lock(&rb.pending_lock);
 			target_r_iter=rb.pending_req->find(params->value->ppa/L2PGAP);
 			for(;target_r_iter->first==params->value->ppa/L2PGAP && 
@@ -281,9 +340,21 @@ void *page_end_req(algo_req* input){
 			rb.buffer_ppa=params->value->ppa/L2PGAP;
 			memcpy(rb.buffer_value, params->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
-
-			if(params->value->ppa%L2PGAP){
-				memmove(params->value->value, &params->value->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+#endif
+			if(res->type==FS_RMW_T){
+				res->rmw_state=RMW_READ_DONE;
+			}
+			else{
+				if(L2PGAP==1){
+					if(res->offset!=0){
+						memmove(params->value->value, &params->value->value[res->offset*LPAGESIZE], res->length*LPAGESIZE);
+					}
+				}
+				else{
+					if(params->value->ppa%L2PGAP){
+						memmove(params->value->value, &params->value->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+					}
+				}
 			}
 			break;
 	}
@@ -295,7 +366,18 @@ void *page_end_req(algo_req* input){
 		fdriver_unlock(&res->done_lock);
 		if(should_end_req){
 			fdriver_destroy(&res->done_lock);
+			if(res->type==FS_RMW_T){
+				if(res->global_seq==29726298){
+					printf("[%u] rmw write done\n",res->global_seq);
+				}
+				fdriver_unlock(res->rmw_lock);
+			}
 			res->end_req(res);
+		}
+	}
+	else if(input->type==DATAR && res->type==FS_RMW_T){
+		if(!inf_assign_try(res)){
+			abort();
 		}
 	}
 	else if(res){

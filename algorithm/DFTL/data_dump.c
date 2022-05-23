@@ -8,8 +8,8 @@ extern algorithm demand_ftl;
 extern demand_map_manager dmm;
 extern dmi DMI;
 
-extern void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo);
-extern void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm);
+extern void page_create_body(lower_info *li, blockmanager *bm, algorithm *alg);
+extern void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm, bool);
 
 void* dump_end_req(algo_req *req){
 	gc_value *gv=(gc_value*)req->param;
@@ -228,7 +228,7 @@ uint32_t demand_load(lower_info *li, blockmanager *bm, struct algorithm *algo, F
 	/*read seg_type_checker*/
 	fread(p->seg_type_checker, sizeof(uint8_t), _NOS, fp);
 	
-	demand_map_create_body(UINT32_MAX, li, bm);
+	demand_map_create_body(UINT32_MAX, li, bm, false);
 
 	uint32_t total_logical_page_num;
 	uint32_t total_translation_page_num;
@@ -280,5 +280,9 @@ uint32_t demand_load(lower_info *li, blockmanager *bm, struct algorithm *algo, F
 		printf("gtd:%u -> %u\n", i, dmm.GTD[i].physical_address);
 	}*/
 	fread(&DMI, sizeof(dmi), 1, fp);
+	DMI.read_working_set=bitmap_init(RANGE);
+	DMI.read_working_set_num=0;
+	DMI.write_working_set=bitmap_init(RANGE);
+	DMI.write_working_set_num=0;
 	return 1;
 }
