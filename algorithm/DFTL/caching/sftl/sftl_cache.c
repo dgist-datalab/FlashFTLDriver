@@ -183,7 +183,7 @@ inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 	bool is_next_do=false;
 	uint32_t next_original_ppa;
 
-	if(!ISLASTOFFSET(lba+1)){
+	if(!ISLASTOFFSET(lba)){
 		if(!bitmap_is_set(sc->map, GETOFFSET(lba+1))){
 			is_next_do=true;
 			next_original_ppa=get_ppa_from_sc(sc, lba+1);
@@ -192,18 +192,22 @@ inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 
 	uint32_t old_ppa;
 	if(bitmap_is_set(sc->map, GETOFFSET(lba))){
-
 		uint32_t head_offset=get_head_offset(sc->map, lba);
 		old_ppa=sc->head_array[head_offset];
+
+		static int cnt=0;
 		uint32_t total_head=(scm.gtd_size[GETGTDIDX(lba)]-BITMAPSIZE)/sizeof(uint32_t);
 		uint32_t *new_head_array=(uint32_t*)malloc((total_head-1+(is_next_do?1:0))*sizeof(uint32_t));
 	
+		//printf("test cnt:%u %u %u %u %u\n", cnt, total_head, head_offset, lba, *should_more);
 		memcpy(new_head_array, sc->head_array, (head_offset)*sizeof(uint32_t));
 		if(is_next_do){
 			bitmap_set(sc->map, GETOFFSET(lba+1));
 			new_head_array[head_offset]=next_original_ppa;
 		}
-		
+
+
+		//printf("test cnt2:%u\n", cnt++);
 		if(total_head!=head_offset+(is_next_do?1:0)){
 			memcpy(&new_head_array[head_offset+(is_next_do?1:0)], &sc->head_array[(head_offset+1)], (total_head-1-head_offset)*sizeof(uint32_t));
 		}
@@ -211,6 +215,7 @@ inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 		sc->head_array=new_head_array;
 		scm.gtd_size[GETGTDIDX(lba)]=(total_head-1+(is_next_do?1:0))*sizeof(uint32_t)+BITMAPSIZE;
 
+		
 		bitmap_unset(sc->map, GETOFFSET(lba));
 	}
 	else{
@@ -239,6 +244,9 @@ inline static uint32_t shrink_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 			*should_more=DONE;
 		}
 	}
+	else{
+		*should_more=DONE;
+	}
 
 	return old_ppa;
 }
@@ -247,14 +255,18 @@ inline static uint32_t expand_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 	uint32_t old_ppa;	
 	uint32_t head_offset;
 	uint32_t distance=0;
-	
+
+	if(lba==5275648 && ppa==UINT32_MAX){
+		//GDB_MAKE_BREAKPOINT;
+	}
+
 	head_offset=get_head_offset(sc->map, lba);
 
 	bool is_next_do=false;
 	uint32_t next_original_ppa;
 
 	//DEBUG_CNT_PRINT(test, 55622396, __FUNCTION__, __LINE__);
-	if(ISLASTOFFSET(lba+1)){}
+	if(ISLASTOFFSET(lba)){}
 	else{
 		if(!bitmap_is_set(sc->map, GETOFFSET(lba+1))){
 			is_next_do=true;
@@ -316,9 +328,9 @@ inline static uint32_t expand_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 		}
 	}
 
-	if(GETOFFSET(lba+1)< PAGESIZE/sizeof(uint32_t)){
+	if(GETOFFSET(lba+1)< PAGESIZE/sizeof(uint32_t) && !ISLASTOFFSET(lba)){
 		if(bitmap_is_set(sc->map, GETOFFSET(lba+1))){
-			//check if it can be compressed
+
 			*more_ppa=get_ppa_from_sc(sc, lba+1);
 			if(ppa+1==(*more_ppa)){
 				*should_more=SHRINK;
@@ -331,6 +343,9 @@ inline static uint32_t expand_cache(sftl_cache *sc, uint32_t lba, uint32_t ppa, 
 			*more_ppa=get_ppa_from_sc(sc, lba+1);
 			*should_more=EXPAND;	
 		}
+	}
+	else{
+		*should_more=DONE;
 	}
 
 	return old_ppa;
@@ -367,19 +382,6 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	}
 
 	prev_gtd_size=scm.gtd_size[gtd_idx];
-/*
-	if(lba==2129921){//GETGTDIDX(lba)==520){
-		printf("prev %u-%u : ", lba, ppa);
-		sftl_print_mapping(sc);
-	}
-
-
-	if(etr->idx==535){
-		sftl_mapping_verify(sc);
-		sftl_print_mapping(sc);
-		printf("pair: %u, %u physical:%u\n", lba, ppa, etr->physical_address);
-	}
-*/
 
 	uint32_t more_lba=lba;
 	uint32_t more_ppa;
@@ -483,6 +485,9 @@ static inline sftl_cache *make_sc_from_translation(GTD_entry *etr, char *data){
 			}
 
 			if(sequential_flag){
+				if(sc->etr->idx==5275648/4096 && i==0){
+					//GDB_MAKE_BREAKPOINT;
+				}
 				bitmap_unset(sc->map, i);
 				last_ppa++;
 			}
@@ -597,12 +602,12 @@ struct GTD_entry *sftl_get_eviction_GTD_entry(struct my_cache *, uint32_t lba){
 	for_each_lru_backword(scm.lru, target){
 		sftl_cache *sc=(sftl_cache*)target->data;
 		etr=sc->etr;
-		/*
-		if(sc->etr->idx==535){
-			printf("start %u eviction \n", sc->etr->physical_address);
-			sftl_print_mapping(sc);
-			printf("end: %u eviction \n", sc->etr->physical_address);
-		}*/
+		
+		if(sc->etr->idx==0){
+			//printf("start %u eviction \n", sc->etr->physical_address);
+			//sftl_print_mapping(sc);
+			//printf("end: %u eviction \n", sc->etr->physical_address);
+		}
 		if(etr->status==FLYING || etr->status==EVICTING){
 			continue;
 		}

@@ -172,6 +172,7 @@ uint32_t page_write(request *const req){
 
 uint32_t page_remove(request *const req){
 	if(!req->param){
+	//	printf("remove start %u\n", req->global_seq);
 		for(uint32_t i=0; i<a_buffer.idx; i++){
 			if(req->key==a_buffer.key[i]){
 				for(uint32_t j=i+1; j<a_buffer.idx; j++){
@@ -186,6 +187,9 @@ uint32_t page_remove(request *const req){
 				return 1;
 			}
 		}
+	}
+	else{
+		//printf("remove retry %u\n", req->global_seq);
 	}
 	return demand_map_assign(req, &req->key, NULL, NULL, true);
 }

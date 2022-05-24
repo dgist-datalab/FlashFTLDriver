@@ -162,6 +162,11 @@ static inline void demand_req_data_collect(demand_param *dp, bool iswrite, bool 
 
 
 static void write_done_check(request *req){
+	if(req->type==FS_DELETE_T){
+		req->end_req(req);
+	//	printf("done %u\n", req->global_seq);
+		return;
+	}
 	bool should_end_req=false;
 	fdriver_lock(&req->done_lock);
 	req->map_done=true;
@@ -616,7 +621,7 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 		dp->flying_map_read_key=UINT32_MAX;
 		ap=NULL;
 
-		if(treq->type==FS_SET_T && dp->status==MISSR){
+		if((treq->type==FS_SET_T|| treq->type==FS_DELETE_T) && dp->status==MISSR){
 			ap=(assign_param_ex*)dp->param_ex;
 			lba=ap->lba;
 			physical=ap->physical;
@@ -769,7 +774,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 				abort();
 			}
 
-			if(treq->type==FS_SET_T){
+			if(treq->type==FS_SET_T || treq->type==FS_DELETE_T){
 				ap=(assign_param_ex*)dp->param_ex;
 				lba=ap->lba;
 				physical=ap->physical;
@@ -1260,7 +1265,7 @@ hit_eviction:
 }
 
 static inline uint32_t check_flying_req(request *req, assign_param_ex *mp, bool remove){
-	return L2PGAP;
+	return remove?1:L2PGAP;
 	uint32_t res=remove?1:L2PGAP;
 	std::map<uint32_t, request *>::iterator iter;
 	mapping_entry now_entry;
@@ -1372,6 +1377,10 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		mapping_entry *target=&dp->target;
 		target->lba=lba[i];
 		target->ppa=physical[i];
+
+		if(target->lba==0 && target->ppa==328916){
+			//GDB_MAKE_BREAKPOINT;
+		}
 
 		fdriver_lock(&dmi_lock);
 		if(!bitmap_is_set(DMI.write_working_set, target->lba)){

@@ -12,7 +12,7 @@
 #define BITMAPSIZE (BITMAPMEMBER/8+(BITMAPMEMBER%8?1:0))
 
 #define GETOFFSET(lba) TRANSOFFSET(lba)
-#define ISLASTOFFSET(lba) ((GETOFFSET(lba))==PAGESIZE/sizeof(uint32_t))
+#define ISLASTOFFSET(lba) ((GETOFFSET(lba))==PAGESIZE/sizeof(uint32_t)-1)
 
 typedef struct sftl_cache{
 	uint32_t *head_array;
