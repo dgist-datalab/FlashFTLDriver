@@ -283,6 +283,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 			case FS_FLUSH_T:
 				break;
 			case FS_DELETE_T:
+				temp->value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 				break;
 			default:
 				printf("error type!\n");
@@ -525,6 +526,7 @@ bool cheeze_end_req(request *const req){
 			break;
 		case FS_FLUSH_T:
 		case FS_DELETE_T:
+			inf_free_valueset(req->value, FS_MALLOC_W);
 			break;
 		default:
 			abort();
