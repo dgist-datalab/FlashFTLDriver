@@ -346,7 +346,7 @@ void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *l
 	uint32_t cached_entry=dmm.cache->init(dmm.cache, dmm.max_caching_pages);
 	printf("|\tcaching percentage: %.2lf%%\n", (double)cached_entry/total_logical_page_num *100);
 	printf("--------------------\n");
-	if(data_load){
+	if(!data_load){
 		DMI.read_working_set=bitmap_init(RANGE);
 		DMI.read_working_set_num=0;
 		DMI.write_working_set=bitmap_init(RANGE);
