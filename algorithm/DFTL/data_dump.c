@@ -267,11 +267,6 @@ uint32_t demand_load(lower_info *li, blockmanager *bm, struct algorithm *algo, F
 		}
 		list_free(temp_list);
 	}
-
-	DMI.read_working_set=bitmap_init(RANGE);
-	DMI.read_working_set_num=0;
-	DMI.write_working_set=bitmap_init(RANGE);
-	DMI.write_working_set_num=0;
 	/*
 	gc_value *temp_gv=send_dump_req(dmm.GTD[0].physical_address/L2PGAP, DUMPR, NULL, NULL);
 	uint32_t *map_data=(uint32_t*)temp_gv->value->value;
@@ -284,5 +279,10 @@ uint32_t demand_load(lower_info *li, blockmanager *bm, struct algorithm *algo, F
 		printf("gtd:%u -> %u\n", i, dmm.GTD[i].physical_address);
 	}*/
 	fread(&DMI, sizeof(dmi), 1, fp);
+
+	DMI.read_working_set=bitmap_init(RANGE);
+	DMI.read_working_set_num=0;
+	DMI.write_working_set=bitmap_init(RANGE);
+	DMI.write_working_set_num=0;
 	return 1;
 }
