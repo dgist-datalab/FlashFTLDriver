@@ -9,7 +9,7 @@ extern demand_map_manager dmm;
 extern dmi DMI;
 
 extern void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo);
-extern void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm);
+extern void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm, bool data_load);
 
 void* dump_end_req(algo_req *req){
 	gc_value *gv=(gc_value*)req->param;
@@ -228,7 +228,7 @@ uint32_t demand_load(lower_info *li, blockmanager *bm, struct algorithm *algo, F
 	/*read seg_type_checker*/
 	fread(p->seg_type_checker, sizeof(uint8_t), _NOS, fp);
 	
-	demand_map_create_body(UINT32_MAX, li, bm);
+	demand_map_create_body(UINT32_MAX, li, bm, true);
 
 	uint32_t total_logical_page_num;
 	uint32_t total_translation_page_num;

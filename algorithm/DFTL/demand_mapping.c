@@ -310,7 +310,7 @@ static inline void update_cache_entry_wrapper(GTD_entry *target_etr, uint32_t lb
 }
 
 
-void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
+void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm, bool data_load){
 	uint32_t total_logical_page_num;
 	uint32_t total_translation_page_num;
 
@@ -346,16 +346,17 @@ void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *l
 	uint32_t cached_entry=dmm.cache->init(dmm.cache, dmm.max_caching_pages);
 	printf("|\tcaching percentage: %.2lf%%\n", (double)cached_entry/total_logical_page_num *100);
 	printf("--------------------\n");
-
-	DMI.read_working_set=bitmap_init(RANGE);
-	DMI.read_working_set_num=0;
-	DMI.write_working_set=bitmap_init(RANGE);
-	DMI.write_working_set_num=0;
+	if(data_load){
+		DMI.read_working_set=bitmap_init(RANGE);
+		DMI.read_working_set_num=0;
+		DMI.write_working_set=bitmap_init(RANGE);
+		DMI.write_working_set_num=0;
+	}
 	fdriver_mutex_init(&dmi_lock);
 }
 
 void demand_map_create(uint32_t total_caching_physical_pages, lower_info *li, blockmanager *bm){
-	demand_map_create_body(total_caching_physical_pages, li, bm);
+	demand_map_create_body(total_caching_physical_pages, li, bm, false);
 
 	uint32_t total_logical_page_num;
 	uint32_t total_translation_page_num;
