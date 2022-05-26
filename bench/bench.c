@@ -142,7 +142,7 @@ void bench_make_data(){
 			vectored_rw(start,end, _m, false);
 			break;
 		case VECTOREDLOCALIZEDGET:
-			vectored_localized_get(start, end, _m);
+			//vectored_localized_get(start, end, _m);
 			break;
 #ifndef KVSSD
 		case SEQLATENCY:
@@ -567,9 +567,12 @@ void bench_vector_latency(vec_request *req){
 #endif
 }
 
-void bench_reap_data(request *const req,lower_info *li){
+void bench_reap_data(request *const req,lower_info *li, bool print_latency){
 	//for cdf
 	measure_calc(&req->latency_checker);
+	if(print_latency && (req->type==FS_GET_T || req->type==FS_NOTFOUND_T)){
+		printf("LRESULT: %u\n", req->latency_checker.micro_time);
+	}
 	pthread_mutex_lock(&bench_lock);
 	if(!req){ 
 		pthread_mutex_unlock(&bench_lock);

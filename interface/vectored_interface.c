@@ -217,14 +217,14 @@ bool vectored_end_req (request * const req){
 				__checking_data_check(req->key, req->value->value);
 			}
 		case FS_NOTFOUND_T:
-			bench_reap_data(req, mp.li);
+			bench_reap_data(req, mp.li, false);
 	//		memcpy(req->buf, req->value->value, 4096);
 	//		printf("return read break %u!\n", req->seq);
 			if(req->value)
 				inf_free_valueset(req->value,FS_MALLOC_R);
 			break;
 		case FS_SET_T:
-			bench_reap_data(req, mp.li);
+			bench_reap_data(req, mp.li, false);
 			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);
 			break;
 		default:

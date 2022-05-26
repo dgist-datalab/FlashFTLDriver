@@ -617,7 +617,7 @@ bool inf_end_req( request * const req){
 	}
 
 	if(req->isstart){
-		bench_reap_data(req,mp.li);
+		bench_reap_data(req,mp.li,false);
 	}else{
 		bench_reap_nostart(req);
 	}

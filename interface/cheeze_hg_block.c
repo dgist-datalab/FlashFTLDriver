@@ -27,6 +27,7 @@ static int trace_fd = 0;
 extern uint32_t test_key;
 static volatile uint64_t issue_req_num=0;
 static volatile uint64_t end_req_num=0;
+bool print_read_latency=false;
 //static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
 //static uint32_t trace_crc_buf[CRC_BUFSIZE];
 
@@ -478,7 +479,7 @@ bool cheeze_end_req(request *const req){
 	uint32_t temp_crc;
 	switch(req->type){
 		case FS_NOTFOUND_T:
-			bench_reap_data(req, mp.li);
+			bench_reap_data(req, mp.li, print_read_latency);
 			//EPRINT("%u not found!\n", false, req->key);
 #ifdef TRACE_REPLAY
 			if(req->crc_value && req->crc_value!=*(uint32_t*)req->value->value){
@@ -493,7 +494,7 @@ bool cheeze_end_req(request *const req){
 
 			break;
 		case FS_GET_T:
-			bench_reap_data(req, mp.li);
+			bench_reap_data(req, mp.li, print_read_latency);
 			if(req->value){
 
 				if(preq->buf){
@@ -521,7 +522,7 @@ bool cheeze_end_req(request *const req){
 			}
 			break;
 		case FS_SET_T:
-			bench_reap_data(req, mp.li);
+			bench_reap_data(req, mp.li, print_read_latency);
 			if(req->value) inf_free_valueset(req->value, FS_MALLOC_W);
 			break;
 		case FS_FLUSH_T:
