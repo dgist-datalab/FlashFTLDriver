@@ -55,4 +55,5 @@ bool sftl_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint);
 int32_t sftl_get_remain_space(struct my_cache *, uint32_t total_eviction_hint);
 bool sftl_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data);
 void sftl_load_specialized_meta(struct my_cache *, GTD_entry *etr, char *data);
+void sftl_empty_cache(struct my_cache *);
 #endif

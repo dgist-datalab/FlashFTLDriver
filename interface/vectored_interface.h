@@ -7,4 +7,6 @@ void *vectored_main(void *);
 void inf_algorithm_testing();
 void assign_vectored_req(vec_request *txn);
 void release_each_req(request *req);
+void wait_all_request();
+void wait_all_request_done();
 #endif

@@ -273,6 +273,10 @@ void inf_print_log(){
 	}
 	mp.li->print_traffic(mp.li);
 	memset(mp.li->req_type_cnt, 0, sizeof(mp.li->req_type_cnt));
+
+	if(mp.algo->empty_cache){
+		mp.algo->empty_cache();
+	}
 }
 
 void *p_main(void *__input){

@@ -30,6 +30,7 @@ uint32_t page_read(request *const);
 uint32_t page_write(request *const);
 uint32_t page_remove(request *const);
 uint32_t page_flush(request *const);
+uint32_t dftl_empty_cache();
 void *page_end_req(algo_req*);
 uint32_t demand_dump(FILE *fp);
 uint32_t demand_load(lower_info *li, blockmanager *bm, struct algorithm *algo, FILE *fp);

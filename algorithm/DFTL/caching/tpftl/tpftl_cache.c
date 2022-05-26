@@ -25,6 +25,7 @@ my_cache tp_cache_func{
 	.dump_cache_update=tp_dump_cache_update,
 	.load_specialized_meta=NULL,
 	.update_dynamic_size=tp_update_dynamic_size,
+	.empty_cache=tp_empty_cache,
 	.exist=tp_exist,
 	.print_log=tp_print_log,
 };
@@ -901,4 +902,20 @@ bool tp_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 	}
 	
 	return changed?true:false;
+}
+
+void tp_empty_cache(struct my_cache* mc){
+	while(1){
+		tp_node *tn=(tp_node*)lru_pop(tcm.lru);
+		if(!tn) break;
+		while(1){
+			tp_cache_node *tc=(tp_cache_node*)lru_pop(tn->tp_lru);
+			if(!tc) break;
+			bitmap_unset(tcm.populated_cache_entry, GETLBA(tn, tc));
+			free(tc);
+		}
+		lru_free(tn->tp_lru);
+		free(tn);
+	}
+	tcm.now_caching_byte=0;
 }
