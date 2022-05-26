@@ -150,7 +150,7 @@ bool bench_is_finish();
 
 void bench_cache_hit(int mark);
 
-void bench_reap_data(request *const,lower_info *);
+void bench_reap_data(request *const,lower_info *, bool print_latency);
 void bench_reap_nostart(request *const);
 char *bench_lower_type(int);
 

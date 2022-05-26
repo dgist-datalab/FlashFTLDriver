@@ -33,6 +33,7 @@ void log_lower_print(int sig){
 }
 
 //int MS_TIME_SL;
+extern bool print_read_latency;
 void print_temp_log(int sig){
 	struct sigaction sa2={0};
 	sa2.sa_handler = print_temp_log;
@@ -42,6 +43,7 @@ void print_temp_log(int sig){
 	request_print_log();
 	request_memset_print_log();
 	inf_print_log();
+	print_read_latency=true;
 }
 #ifdef WRITE_STOP_READ
 extern fdriver_lock_t write_check_lock;
