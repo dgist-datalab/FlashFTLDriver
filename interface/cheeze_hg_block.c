@@ -218,6 +218,10 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 #endif
 	}
 
+	if(type==FS_DELETE_T){
+		request_monitor.trim_length+=res->size;
+		request_monitor.trim_cnt++;
+	}
 
 	if(res->size > QSIZE){
 		printf("----------------number of reqs is over %u < %u\n", QSIZE, res->size);

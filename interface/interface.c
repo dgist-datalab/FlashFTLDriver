@@ -34,6 +34,7 @@ tag_manager *tm;
 bool sync_apps;
 void *p_main(void*);
 char* dump_file_name;
+char* load_file_name;
 
 #ifdef BUSE_MEASURE
 MeasureTime infTime;
@@ -385,8 +386,8 @@ void inf_parsing(int *argc, char **argv){
 			case 0:
 				switch(index){
 					case 0: //data-load
-						dump_file_name=optarg;
-						printf("load_file_name:%s\n", dump_file_name);
+						load_file_name=optarg;
+						printf("load_file_name:%s\n", load_file_name);
 						mp.data_load=true;
 						break;
 					case 1: //data-dump
@@ -445,7 +446,7 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv){
 		__checking_data_init();
 	}
 	if(mp.data_load){
-		inf_load(dump_file_name);
+		inf_load(load_file_name);
 	}
 }
 
