@@ -29,6 +29,7 @@ my_cache coarse_cache_func{
 	.dump_cache_update=coarse_dump_cache_update,
 	.load_specialized_meta=NULL,
 	.update_dynamic_size=NULL,
+	.empty_cache=coarse_empty_cache,
 	.exist=coarse_exist,
 	.print_log=NULL,
 };
@@ -246,4 +247,16 @@ bool coarse_dump_cache_update(struct my_cache *,GTD_entry *etr, char *data){
 	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
 	memcpy(data, c_data, PAGESIZE);
 	return true;
+}
+
+void coarse_empty_cache(struct my_cache *mc){
+	while(1){
+		coarse_cache *cc=(coarse_cache*)lru_pop(ccm.lru);
+		if(!cc) break;
+		cc->etr->private_data=NULL;
+		free(cc->data);
+		free(cc);
+	}
+
+	ccm.now_caching_page=0;
 }

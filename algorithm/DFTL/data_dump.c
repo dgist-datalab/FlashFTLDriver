@@ -86,7 +86,7 @@ void update_cache_mapping(){
 			gv=(gc_value*)now->data;
 			if(!gv->isdone) continue;
 
-		if(gv->gtd_idx==4095){
+			if(gv->gtd_idx==4095){
 				uint32_t *ppa_list=(uint32_t*)gv->value->value;
 				for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
 					printf("prev %u %u\n", i, ppa_list[i]);

@@ -36,6 +36,7 @@ my_cache fine_cache_func{
 	.dump_cache_update=fine_dump_cache_update,
 	.load_specialized_meta=NULL,
 	.update_dynamic_size=NULL,
+	.empty_cache=fine_empty_cache,
 	.exist=fine_exist,
 	.print_log=fine_print_log,
 };
@@ -506,4 +507,15 @@ bool fine_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 		}
 	}
 	return changed?1:0;
+}
+
+void fine_empty_cache(struct my_cache* mc){
+	while(1){
+		fine_cache *fc=(fine_cache*)lru_pop(fcm.lru);
+		if(!fc) break;
+		bitmap_unset(fcm.populated_cache_entry, fc->lba);
+		free(fc->private_data);
+		free(fc);
+	}
+	fcm.now_caching_map=0;
 }

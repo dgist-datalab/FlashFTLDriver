@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <getopt.h>
 #include "../../include/data_struct/lrucache.hpp"
+#include "../../interface/vectored_interface.h"
 #include "../../bench/bench.h"
 #include "page.h"
 #include "gc.h"
@@ -21,6 +22,7 @@ struct algorithm demand_ftl={
 	.remove=page_remove,
 	.test=NULL,
 	.print_log=demand_print_log,
+	.empty_cache=dftl_empty_cache,
 	.dump_prepare=update_cache_mapping,
 	.dump=demand_dump,
 	.load=demand_load,
@@ -324,4 +326,14 @@ void *page_end_req(algo_req* input){
 	free(params);
 	free(input);
 	return NULL;
+}
+
+extern demand_map_manager dmm;
+uint32_t dftl_empty_cache(){
+	printf("emtpy cache!!\n");
+	wait_all_request();
+	update_cache_mapping();
+	dmm.cache->empty_cache(dmm.cache);
+	wait_all_request_done();
+	return 1;
 }

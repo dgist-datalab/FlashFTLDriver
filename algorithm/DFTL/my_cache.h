@@ -40,6 +40,7 @@ typedef struct my_cache{
 	bool (*dump_cache_update)(struct my_cache *, GTD_entry *, char *data);
 	void (*load_specialized_meta)(struct my_cache *, GTD_entry *, char *data);
 	void (*update_dynamic_size)(struct my_cache *, uint32_t lba, char *data);
+	void (*empty_cache)(struct my_cache*);
 	bool (*exist)(struct my_cache *, uint32_t lba);
 	void (*print_log)(struct my_cache*);
 	CACHE_TYPE type;

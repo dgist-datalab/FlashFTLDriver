@@ -33,6 +33,7 @@ my_cache sftl_cache_func{
 	.dump_cache_update=sftl_dump_cache_update,
 	.load_specialized_meta=sftl_load_specialized_meta,
 	.update_dynamic_size=sftl_update_dynamic_size,
+	.empty_cache=sftl_empty_cache,
 	.exist=sftl_exist,
 	.print_log=NULL,
 };
@@ -765,4 +766,16 @@ void sftl_load_specialized_meta(struct my_cache *cache, GTD_entry *etr, char *da
 		}
 	}
 	scm.gtd_size[etr->idx]=head_num*sizeof(uint32_t)+BITMAPSIZE;
+}
+
+void sftl_empty_cache(struct my_cache *mc){
+	while(1){
+		sftl_cache *sc=(sftl_cache*)lru_pop(scm.lru);
+		if(!sc) break;
+		free(sc->head_array);
+		bitmap_free(sc->map);
+		sc->etr->private_data=NULL;
+		free(sc);
+	}
+	scm.now_caching_byte=0;
 }

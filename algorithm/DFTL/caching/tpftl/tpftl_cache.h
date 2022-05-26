@@ -78,3 +78,4 @@ bool tp_is_eviction_hint_full(struct my_cache*, uint32_t eviction_hint);
 int32_t tp_get_remain_space(struct my_cache *,uint32_t total_eviction_hint);
 void tp_print_log(struct my_cache *);
 bool tp_dump_cache_update(struct my_cache *, GTD_entry *, char *data);
+void tp_empty_cache(struct my_cache *);

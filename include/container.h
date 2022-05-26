@@ -211,6 +211,7 @@ struct algorithm{
 	uint32_t (*remove)(request *const);
 	uint32_t (*test)();
 	uint32_t (*print_log)();
+	uint32_t (*empty_cache)();
 	void (*dump_prepare)();
 	uint32_t (*dump)(FILE *fp);
 	uint32_t (*load)(lower_info *li, blockmanager *bm, struct algorithm *, FILE *fp);

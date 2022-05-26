@@ -58,3 +58,4 @@ bool fine_is_eviction_hint_full(struct my_cache *, uint32_t eviction_hint);
 int32_t fine_get_remain_space(struct my_cache *, uint32_t total_eviction_hint);
 void fine_print_log(struct my_cache*);
 bool fine_dump_cache_update(struct my_cache *, GTD_entry*, char *data);
+void fine_empty_cache(struct my_cache*);

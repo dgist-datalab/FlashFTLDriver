@@ -14,7 +14,7 @@
 
 extern master_processor mp;
 extern tag_manager *tm;
-int32_t flying_cnt = QDEPTH;
+volatile int32_t flying_cnt = QDEPTH;
 static pthread_mutex_t flying_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t req_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 bool vectored_end_req (request * const req);
@@ -263,7 +263,9 @@ void release_each_req(request *req){
 	tag_manager_free_tag(tm, tag_num);
 }
 
+volatile bool stop_flag=false;
 void assign_vectored_req(vec_request *txn){
+	while(stop_flag){}
 #ifdef WRITE_STOP_READ
 	for(uint32_t i=0; i<txn->size; i++){
 		request* req=&txn->req_array[i];
@@ -293,3 +295,17 @@ void assign_vectored_req(vec_request *txn){
 	}
 }
 
+void wait_all_request(){
+	stop_flag=true;
+	while(mp.processors[0].req_q->size!=0){
+
+	}
+
+	while(flying_cnt!=QDEPTH){
+
+	}
+}
+
+void wait_all_request_done(){
+	stop_flag=false;
+}
