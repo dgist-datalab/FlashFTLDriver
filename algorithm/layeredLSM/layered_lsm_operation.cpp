@@ -24,6 +24,7 @@ struct algorithm layered_lsm={
 	.remove=remove_temp,
 	.test=test_function,
 	.print_log=print_log_temp,
+	.empty_cache=NULL,
 	.dump_prepare=NULL,
 	.dump=algo_dump,
 	.load=algo_load,

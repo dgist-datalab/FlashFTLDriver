@@ -296,6 +296,9 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 				break;
 		}
 		temp->key=creq->pos+i;
+		if(print_read_latency && type==FS_GET_T){
+			printf("READ: %u\n", temp->key);
+		}
 
 		if(prev_lba==UINT32_MAX){
 			prev_lba=temp->key;

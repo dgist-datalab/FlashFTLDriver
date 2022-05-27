@@ -43,7 +43,7 @@ void print_temp_log(int sig){
 	request_print_log();
 	request_memset_print_log();
 	inf_print_log();
-	print_read_latency=true;
+//	print_read_latency=tru
 }
 #ifdef WRITE_STOP_READ
 extern fdriver_lock_t write_check_lock;

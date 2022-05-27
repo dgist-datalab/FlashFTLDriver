@@ -1045,6 +1045,7 @@ retry:
 			return res;
 		case NONE:
 			if(dmm.cache->exist(dmm.cache, now_pair->lba)==false){ //MISS
+				req->type_ftl|=1;
 				/*notfound check!*/
 				if(req->type==FS_GET_T && now_etr->physical_address==UINT32_MAX){
 					return NOTFOUND_END;
@@ -1064,7 +1065,9 @@ retry:
 							dmm.eviction_hint+=dp->now_eviction_hint;
 						}
 						else{
-							if(flying_request_hit_check(req,now_pair->lba, dp, true)) return FLYING_HIT_END;	
+							if(flying_request_hit_check(req,now_pair->lba, dp, true)){
+								return FLYING_HIT_END;	
+							}
 						}
 					}
 				}
