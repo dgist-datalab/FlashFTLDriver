@@ -34,7 +34,7 @@ static void demand_cache_log(){
 	printf("===========cache results========\n");
 	printf("Cache miss num: %u\n",DMI.miss_num);
 	printf("\tCache cold miss num: %u\n",DMI.write_cold_miss_num+DMI.read_cold_miss_num);
-	printf("\tCache capacity miss num: %u\n",DMI.miss_num - (DMI.write_cold_miss_num+DMI.ead_cold_miss_num));
+	printf("\tCache capacity miss num: %u\n",DMI.miss_num - (DMI.write_cold_miss_num+DMI.read_cold_miss_num));
 
 	printf("\tread miss num: %u\n", DMI.read_miss_num);
 	printf("\t\tread_cold_miss_num:%u\n", DMI.read_cold_miss_num);
