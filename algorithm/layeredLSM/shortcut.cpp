@@ -31,7 +31,7 @@ sc_master *shortcut_init(uint32_t max_shortcut_num, uint32_t lba_range, uint32_t
 #else
 	res->sc_map=(uint8_t*)malloc(sizeof(uint8_t)* lba_range);
 	memset(res->sc_map, NOT_ASSIGNED_SC, sizeof(uint8_t) * lba_range);
-	res->max_memory_usage=lba_range*ceil(log2(max_shortcut_num));
+	//res->max_memory_usage=lba_range*ceil(log2(max_shortcut_num));
 #endif
 	fdriver_mutex_init(&res->lock);
 	return res;
@@ -113,7 +113,7 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 			if(unlink){
 				uint32_t info_idx=sc_dir_query_lba(SC_DIR(sc, lba), SC_OFFSET(lba));
 				if(info_idx!=NOT_ASSIGNED_SC){
-					sc->info_set[info_idx].r->unlinked_lba_num++;
+					sc->info_set[info_idx].unlinked_lba_num++;
 				}
 			}
 			sc_dir_insert_lba(SC_DIR(sc, lba), SC_OFFSET(lba), t_info->idx);
@@ -132,7 +132,7 @@ void shortcut_link_bulk_lba(sc_master *sc, run *r, std::vector<uint32_t> *lba_se
 		uint32_t lba = *iter;
 		t_info->linked_lba_num++;
 		if(unlink){
-			sc->info_set[sc->sc_map[lba]].r->unlinked_lba_num++;
+			sc->info_set[sc->sc_map[lba]].unlinked_lba_num++;
 		}
 		sc->sc_map[lba] = t_info->idx;
 		if (lba == test_key || lba == test_key2)

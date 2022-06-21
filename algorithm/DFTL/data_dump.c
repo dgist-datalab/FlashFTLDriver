@@ -85,7 +85,7 @@ void update_cache_mapping(){
 		for_each_list_node_safe(temp_list, now, nxt){
 			gv=(gc_value*)now->data;
 			if(!gv->isdone) continue;
-
+/*
 			if(gv->gtd_idx==4095){
 				uint32_t *ppa_list=(uint32_t*)gv->value->value;
 				for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
@@ -93,7 +93,7 @@ void update_cache_mapping(){
 				}
 				printf("old ppa:%u\n", dmm.GTD[gv->gtd_idx].physical_address);
 			}
-
+			*/
 			dmm.cache->dump_cache_update(dmm.cache, &dmm.GTD[gv->gtd_idx], gv->value->value);
 			if(gv->ppa!=UINT32_MAX){
 				old_ppa=dmm.GTD[gv->gtd_idx].physical_address;
@@ -102,13 +102,14 @@ void update_cache_mapping(){
 			
 			new_ppa=get_map_ppa(gv->gtd_idx, NULL);
 			dmm.GTD[gv->gtd_idx].physical_address=new_ppa*L2PGAP;
+			/*
 			if(gv->gtd_idx==4095){
 				uint32_t *ppa_list=(uint32_t*)gv->value->value;
 				for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
 					printf("%u %u\n", i, ppa_list[i]);
 				}
 				printf("write to %u\n", new_ppa*L2PGAP);
-			}
+			}*/
 
 			list_insert(temp_list2, gv);
 			send_dump_req(new_ppa, DUMPW, gv->value, gv);

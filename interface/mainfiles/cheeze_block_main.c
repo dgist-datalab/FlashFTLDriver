@@ -32,6 +32,12 @@ void log_lower_print(int sig){
     printf("-------------lower print end-------------\n");
 }
 
+pthread_t thr2;
+void *thread_print(void *){
+	inf_print_log();
+	return NULL;
+}
+
 //int MS_TIME_SL;
 extern bool print_read_latency;
 void print_temp_log(int sig){
@@ -42,9 +48,12 @@ void print_temp_log(int sig){
 	printf("%d\n", pthread_self());
 	request_print_log();
 	request_memset_print_log();
-	inf_print_log();
+	//inf_print_log();
+	pthread_create(&thr2, NULL, thread_print, NULL);
+	pthread_detach(thr2);
 //	print_read_latency=tru
 }
+
 #ifdef WRITE_STOP_READ
 extern fdriver_lock_t write_check_lock;
 extern volatile uint32_t write_cnt;

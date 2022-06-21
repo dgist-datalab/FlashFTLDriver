@@ -10,8 +10,8 @@
 #include<set>
 #define NOT_ASSIGNED_SC UINT8_MAX
 #define MAX_SC_DIR_NUM (RANGE/SC_PER_DIR)
-#define SC_MEM_OPT
-#define SC_QUERY_DP
+//#define SC_MEM_OPT
+//#define SC_QUERY_DP
 
 typedef struct shortcut_info{
 	uint8_t idx;

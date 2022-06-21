@@ -35,6 +35,7 @@ struct algorithm page_ftl={
 	.remove=page_remove,
 	.test=NULL,
 	.print_log=print_traffic,
+	.empty_cache=NULL,
 	.dump_prepare=NULL,
 	.dump=page_dump,
 	.load=page_load,

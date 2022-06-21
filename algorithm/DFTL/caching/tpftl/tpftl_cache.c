@@ -905,6 +905,7 @@ bool tp_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 }
 
 void tp_empty_cache(struct my_cache* mc){
+	return;
 	while(1){
 		tp_node *tn=(tp_node*)lru_pop(tcm.lru);
 		if(!tn) break;
