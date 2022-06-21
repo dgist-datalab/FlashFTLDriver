@@ -197,7 +197,9 @@ uint32_t page_remove(request *const req){
 }
 
 uint32_t page_flush(request *const req){
-	abort();
+	wait_all_request();
+	update_cache_mapping();
+	wait_all_request_done();
 	req->end_req(req);
 	return 0;
 }

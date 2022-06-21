@@ -140,6 +140,28 @@ request *get_retry_request(processor *pr){
 	return (request*)inf_req;
 }
 
+void *vectored_read_retry_main(void* __input){
+	processor *retry_info=&mp.processors[0];
+	printf("hello!!!!!!\n");
+	while(!retry_info->retry_stop_flag){
+		request *read_retry_req=NULL;
+		pthread_mutex_lock(&retry_info->read_retry_lock);		
+		while(retry_info->read_retry_q->size()==0){
+			pthread_cond_wait(&retry_info->read_retry_cond, &retry_info->read_retry_lock);
+			if(retry_info->retry_stop_flag){
+				return NULL;
+			}
+		}
+		read_retry_req=(request*)retry_info->read_retry_q->front();
+		read_retry_req->tag_num=tag_manager_get_tag(tm);
+		retry_info->read_retry_q->pop();
+		pthread_mutex_unlock(&retry_info->read_retry_lock);
+
+		inf_algorithm_caller(read_retry_req);
+	}
+	return NULL;
+}
+
 void *vectored_main(void *__input){
 	vec_request *vec_req;
 	request* inf_req;

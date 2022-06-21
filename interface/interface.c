@@ -184,10 +184,24 @@ bool inf_assign_try(request *req){
 	for(int i=0; i<1; i++){
 		processor *t=&mp.processors[i];
 		tag_manager_free_tag(tm, req->tag_num);
-		while(q_enqueue((void*)req,t->retry_q)){
+#ifdef layeredLSM
+		if(req->type==FS_GET_T){
+			pthread_mutex_lock(&t->read_retry_lock);
+			t->read_retry_q->push((void*)req);
+			pthread_cond_signal(&t->read_retry_cond);
+			pthread_mutex_unlock(&t->read_retry_lock);
 			flag=true;
 			break;
 		}
+		else{
+#endif
+			while(q_enqueue((void*)req,t->retry_q)){
+				flag=true;
+				break;
+			}
+#ifdef layeredLSM
+		}
+#endif
 	}
 
 	if(flag==false){
@@ -432,10 +446,18 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv){
 		pthread_mutex_lock(&t->flag);
 		t->master=&mp;
 
-
 		q_init(&t->req_q,QSIZE);
 		q_init(&t->retry_q,QSIZE);
 		pthread_create(&t->t_id,NULL,&vectored_main, NULL);
+
+#ifdef layeredLSM
+		t->retry_stop_flag=false;
+		t->read_retry_q=new std::queue<void*>();
+		pthread_cond_init(&t->read_retry_cond, NULL);
+		pthread_mutex_init(&t->read_retry_lock, NULL);
+		pthread_create(&t->retry_id, NULL, &vectored_read_retry_main,NULL);
+#endif
+
 	}
 
 
@@ -705,7 +727,12 @@ void inf_free(){
 		q_free(t->req_rq);
 #endif
 
+#ifdef layeredLSM
 		pthread_mutex_destroy(&t->flag);
+		t->retry_stop_flag=true;
+		pthread_cond_signal(&t->read_retry_cond);
+		delete t->read_retry_q;
+#endif
 	}
 	free(mp.processors);
 

@@ -65,7 +65,7 @@ uint32_t sftl_free(struct my_cache *mc){
 		sftl_cache *sc=(sftl_cache*)lru_pop(scm.lru);
 		if(!sc) break;
 		uint32_t total_head=(scm.gtd_size[sc->etr->idx]-BITMAPSIZE)/sizeof(uint32_t);
-		printf("[%u] %u\n", sc->etr->idx, total_head);
+	//	printf("[%u] %u\n", sc->etr->idx, total_head);
 		total_entry_num+=PAGESIZE/sizeof(DMF);
 		free(sc->head_array);
 		bitmap_free(sc->map);
@@ -736,10 +736,6 @@ bool sftl_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 		else{
 			ppa_array[ppa_array_idx++]=++last_ppa;
 		}
-
-		if(etr->idx==4095){
-			printf("%u %u %u\n",ppa_array_idx-1, ppa_array[ppa_array_idx-1], sc->head_array[head_idx-1]);
-		}
 	}
 
 	free(sc->head_array);
@@ -769,13 +765,26 @@ void sftl_load_specialized_meta(struct my_cache *cache, GTD_entry *etr, char *da
 }
 
 void sftl_empty_cache(struct my_cache *mc){
+	uint32_t total_entry_num=0;
 	while(1){
 		sftl_cache *sc=(sftl_cache*)lru_pop(scm.lru);
 		if(!sc) break;
+		uint32_t total_head=(scm.gtd_size[sc->etr->idx]-BITMAPSIZE)/sizeof(uint32_t);
+		total_entry_num+=PAGESIZE/sizeof(DMF);
 		free(sc->head_array);
 		bitmap_free(sc->map);
 		sc->etr->private_data=NULL;
 		free(sc);
 	}
+
+	uint32_t average_head_num=0;
+	for(uint32_t i=0; i<GTDNUM; i++){
+		uint32_t temp_head_num=(scm.gtd_size[i]-BITMAPSIZE)/sizeof(uint32_t);
+	//	pritnf("%u -> %u\n", i, temp_head_num);
+		average_head_num+=temp_head_num;
+	}
+	printf("cached_entry_num:%u (%lf)\n", total_entry_num, (double)total_entry_num/RANGE);
+	printf("average head num:%lf\n", (double)(average_head_num)/GTDNUM);
+
 	scm.now_caching_byte=0;
 }

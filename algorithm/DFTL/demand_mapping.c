@@ -28,11 +28,13 @@ inline static void cpy_keys(uint32_t **des, uint32_t *src){
 	memcpy((*des), src, sizeof(KEYT)*L2PGAP);
 }
 
+pthread_mutex_t traverse_lock=PTHREAD_MUTEX_INITIALIZER;
+
 static void demand_cache_log(){
 	printf("===========cache results========\n");
 	printf("Cache miss num: %u\n",DMI.miss_num);
 	printf("\tCache cold miss num: %u\n",DMI.write_cold_miss_num+DMI.read_cold_miss_num);
-	printf("\tCache capacity miss num: %u\n",DMI.miss_num - (DMI.write_cold_miss_num+DMI.read_cold_miss_num));
+	printf("\tCache capacity miss num: %u\n",DMI.miss_num - (DMI.write_cold_miss_num+DMI.ead_cold_miss_num));
 
 	printf("\tread miss num: %u\n", DMI.read_miss_num);
 	printf("\t\tread_cold_miss_num:%u\n", DMI.read_cold_miss_num);
@@ -1393,7 +1395,11 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		}
 		fdriver_unlock(&dmi_lock);
 
-		switch((res=cache_traverse_state(req, target, dp, &mp->prefetching_info[i], true))){
+		pthread_mutex_lock(&traverse_lock);
+		res=cache_traverse_state(req, target, dp, &mp->prefetching_info[i], true);
+		pthread_mutex_unlock(&traverse_lock);
+
+		switch(res){
 			case RETRY_END:
 				dp_status_update(dp, NONE);
 				dp_prev_init(dp);
@@ -1520,8 +1526,11 @@ uint32_t demand_page_read(request *const req){
 	}
 	fdriver_unlock(&dmi_lock);
 
+	pthread_mutex_lock(&traverse_lock);
+	res=cache_traverse_state(req, &dp->target, dp, &mp->prefetching_info[0], false);
+	pthread_mutex_unlock(&traverse_lock);
 
-	switch((res=cache_traverse_state(req, &dp->target, dp, &mp->prefetching_info[0], false))){
+	switch(res){
 		case RETRY_END:
 			dp_status_update(dp, NONE);
 			dp_prev_init(dp);
