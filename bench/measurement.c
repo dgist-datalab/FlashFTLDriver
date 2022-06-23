@@ -75,6 +75,7 @@ void measure_calc(MeasureTime *m){
 	gettimeofday(&m->header->end,NULL);
 	timersub(&m->header->end,&m->header->start,&res);
 	m->micro_time=res.tv_sec*1000000+res.tv_usec;
+	m->end_time_micro=m->header->end.tv_sec*1000000+m->header->end.tv_usec;
 	linktime *t=m->header;
 	m->header=m->header->next;
 	free(t);

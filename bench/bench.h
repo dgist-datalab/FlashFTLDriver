@@ -59,6 +59,15 @@ typedef struct{
 	uint64_t min;
 }bench_ftl_time;
 
+typedef struct vector_bench_data{
+	uint32_t vec_cnt;
+	uint32_t req_cnt;
+	uint32_t hit_num;
+	uint32_t miss_num;
+	uint64_t total_latency_time;
+	uint64_t total_req_latency_time;
+}vector_bench_data;
+
 typedef struct{
 	uint64_t algo_mic_per_u100[12];
 	uint64_t lower_mic_per_u100[12];
@@ -69,7 +78,10 @@ typedef struct{
 	uint64_t read_cdf[1000000/TIMESLOT+1];
 	uint64_t vector_read_cdf[1000000/TIMESLOT+1];
 	uint64_t vector_read_cnt;
+
 	uint64_t map_cpu_time[1000000/TIMESLOT+1];
+	uint64_t start_time_micro;
+	vector_bench_data read_data_info[20000];
 #endif
 	uint64_t read_cnt,write_cnt;
 	bench_ftl_time ftl_poll[ALGOTYPE][LOWERTYPE][BUFFER_HIT];

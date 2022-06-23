@@ -11,6 +11,7 @@ typedef struct MeasureTime{
 	bool isadding;
 	linktime *header;
 	struct timeval adding;
+	uint64_t end_time_micro;
 	uint64_t micro_time;
 	uint64_t max;
 	bool isused;

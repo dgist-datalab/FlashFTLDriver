@@ -178,6 +178,13 @@ void bench_add(bench_type type, uint32_t start, uint32_t end, uint64_t number){
 			//_master->datas[i].ftl_npoll[j][k].min = UINT64_MAX;
 		}
 	}
+
+	memset(_master->datas[idx].read_data_info, 0, sizeof(_master->datas[idx].read_data_info));
+	struct timeval start_time;
+	gettimeofday(&start_time, NULL);
+	_master->datas[idx].start_time_micro=start_time.tv_sec*1000000+start_time.tv_usec;
+
+
 	if(type==NOR){
 		bench_meta *_meta=&_master->meta[idx];
 		monitor *_m=&_master->m[idx];
@@ -313,6 +320,19 @@ bool bench_is_finish(){
 	return true;
 }
 
+void bench_vector_cdf_print(bench_data *bdata){
+	printf("vector_cdf_info\n");
+	printf("TIME, V_CNT, V_AVG_LAT, R_CNT, HIT_RATIO, R_AVG_LAT\n");
+	for(uint32_t i=0; i<20000; i++){
+		vector_bench_data *vbd=&bdata->read_data_info[i];
+		if(vbd->vec_cnt==0) continue;
+		printf("%u, %u, %.2f, %u, %.2f, %.2f\n", i, vbd->vec_cnt,
+				(double)vbd->total_latency_time/vbd->vec_cnt,
+				vbd->req_cnt,
+				(double)vbd->hit_num/vbd->req_cnt,
+				(double)vbd->total_req_latency_time/vbd->req_cnt);
+	}
+}
 
 void bench_print_cdf(){
 	bench_data *bdata=&_master->datas[0];
@@ -322,7 +342,13 @@ void bench_print_cdf(){
 	_m=&_master->m[0];
 	bench_cdf_print(_m->m_num,_m->type,bdata);
 
+	bench_vector_cdf_print(bdata);
+
 	memset(bdata,0, sizeof(bench_data));
+
+	struct timeval start_time;
+	gettimeofday(&start_time, NULL);
+	bdata->start_time_micro=start_time.tv_sec*1000000+start_time.tv_usec;
 }
 
 void bench_print(){
@@ -338,6 +364,10 @@ void bench_print(){
 #endif
 		bench_type_cdf_print(bdata);
 		
+
+
+		bench_vector_cdf_print(bdata);
+
 		printf("--------------------------------------------\n");
 		printf("|            bench type:                   |\n");
 		printf("--------------------------------------------\n");
@@ -549,12 +579,44 @@ void bench_collect_map_cpu_time(bench_data *bd, request *req){
 #endif
 }
 
+void bench_vector_data_collect_sec(bench_data *bd, vec_request *vec_req){
+	uint64_t slot=vec_req->latency_checker.end_time_micro-bd->start_time_micro;
+	slot/=1000000;
+	if(slot >= 20000) return;
+	vector_bench_data *target=&bd->read_data_info[slot];
+	for(uint32_t i=0; i<vec_req->size; i++){
+		request *req=&vec_req->req_array[i];
+		target->req_cnt++;
+#ifdef layeredLSM
+		if(req->type_ftl==0 || (req->type_ftl==1 && req->buffer_hit==1)){
+			target->hit_num++;
+		}
+		else{
+			target->miss_num++;
+		}
+#else
+		if(req->type_ftl==0){
+			target->hit_num++;
+		}
+		else{
+			target->miss_num++;
+		}
+#endif
+		target->total_req_latency_time+=req->latency_checker.micro_time;
+	}
+	target->vec_cnt++;
+	target->total_latency_time+=vec_req->latency_checker.micro_time;
+}
+
 void bench_vector_latency(vec_request *req){
 #ifdef CDF
 	measure_calc(&req->latency_checker);
 	if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
 		uint32_t idx=req->mark;
 		bench_data *_data=&_master->datas[idx];
+
+		bench_vector_data_collect_sec(_data, req);
+
 		_data->vector_read_cnt++;
 		int slot_num=req->latency_checker.micro_time/TIMESLOT;
 		if(slot_num>=1000000/TIMESLOT){
