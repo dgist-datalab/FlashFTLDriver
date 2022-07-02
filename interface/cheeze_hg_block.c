@@ -23,7 +23,8 @@ static uint64_t *seq_addr; // 8KB
 struct cheeze_req_user *ureq_addr; // sizeof(req) * 1024
 static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
 static uint64_t seq = 0;
-static int trace_fd = 0;
+int trace_fd = 0;
+fdriver_lock_t trace_fd_lock;
 extern uint32_t test_key;
 static volatile uint64_t issue_req_num=0;
 static volatile uint64_t end_req_num=0;
@@ -33,6 +34,14 @@ bool print_read_latency=false;
 
 _request_monitor request_monitor;
 void request_print_log(){
+#ifdef TRACE_COLLECT
+	fdriver_lock(&trace_fd_lock);
+	cheeze_ureq temp;
+	temp.id=UINT32_MAX;
+	write(trace_fd, &temp, sizeof(cheeze_ureq));
+	fdriver_unlock(&trace_fd_lock);
+#endif
+
 	printf("requst log\n");
 	printf("write seq(avg_seq,cnt): %.2lf %u\n",
 			(float)request_monitor.write_sequential_length/request_monitor.write_sequential_cnt, request_monitor.write_sequential_cnt);
@@ -94,6 +103,7 @@ volatile uint32_t write_cnt;
 #endif
 void init_trace_cheeze(){
 #ifdef WRITE_STOP_READ
+	fdriver_mutex_init(&trace_fd_lock);
 	fdriver_mutex_init(&write_check_lock);
 #endif
 	trace_fd = open(TRACE_TARGET, O_RDONLY);
@@ -114,6 +124,7 @@ void init_trace_cheeze(){
 
 void init_cheeze(uint64_t phy_addr){
 #ifdef WRITE_STOP_READ
+	fdriver_mutex_init(&trace_fd_lock);
 	fdriver_mutex_init(&write_check_lock);
 #endif
 	printf("QSIZE:%u\n", QSIZE);
@@ -193,6 +204,7 @@ const char *type_to_str(uint32_t type){
 }
 
 static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
+
 	static uint32_t global_vec_seq_id=0;
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
 	res->tag_id=id;
@@ -419,8 +431,10 @@ vec_request **get_vectored_request_arr()
 			printf("%u\n", cnt++);
 		}
 #ifdef TRACE_COLLECT
+		fdriver_lock(&trace_fd_lock);
 		write(trace_fd, ureq, sizeof(cheeze_req_user));
 		write(trace_fd, crc_buffer, ureq->len/LPAGESIZE * sizeof(uint32_t));
+		fdriver_unlock(&trace_fd_lock);
 #endif
 		barrier();
 		*send = 0;
@@ -460,6 +474,12 @@ vec_request *get_trace_vectored_request(){
 	while(1){
 		uint32_t len=0;
 		len=read(trace_fd, &ureq, sizeof(ureq));
+#ifdef TRACE_REPLAY
+		if(creq->id==UINT32_MAX){
+			raise(SIGCONT);
+			continue;
+		}
+#endif
 		if(len!=sizeof(ureq)){
 			printf("read error!!: len:%u\n", len);
 			break;
