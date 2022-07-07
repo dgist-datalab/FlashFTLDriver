@@ -372,6 +372,7 @@ static inline uint32_t __processing_unlinked_psa(block_info *binfo, uint32_t lba
 
 static inline void copy_frag_block(L2P_bm *bm, list *frag_list){
 	if(frag_list->size==0) return;
+	//DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
 	li_node *now, *nxt, *p_now, *p_nxt;
 	blockmanager *sm=bm->segment_manager;
 	list *temp_list=list_init();
@@ -496,6 +497,7 @@ static inline bool __normal_block_valid_check(blockmanager *sm, uint32_t block_i
 
 static inline void copy_mixed_block(L2P_bm *bm, list *blk_list){
 	if(blk_list->size==0) return;
+	//DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
 	li_node *now, *nxt, *p_now, *p_nxt;
 	blockmanager *sm=bm->segment_manager;
 	list *temp_list=list_init();
@@ -641,8 +643,12 @@ static inline void copy_mixed_block(L2P_bm *bm, list *blk_list){
 }
 
 uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
-	DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
 	static uint32_t cnt=0;
+	DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
+	printf("target seg:%u\n",target->seg_idx);
+	if(cnt > 1200 && target->seg_idx==149){
+	//	GDB_MAKE_BREAKPOINT;
+	}
 	blockmanager *sm=bm->segment_manager;
 	list *normal_list=list_init();
 	list *mixed_list=list_init();

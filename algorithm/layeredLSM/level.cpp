@@ -54,7 +54,6 @@ void level_get_compaction_target(level *lev, uint32_t run_num, run*** target, bo
 		second_average_inv_ratio-=max_inv_ratio;
 		second_average_inv_ratio/=(sum_cnt-1);
 		uint32_t copy_entry_num=UINT32_MAX;
-
 		float target_ratio=-1.0f;
 		uint32_t temp_run_num=run_num;
 		if (old_first == false)

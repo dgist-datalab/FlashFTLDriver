@@ -298,7 +298,7 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 #endif
 
 	printf("compaction log\n");
-	for(uint32_t i=0; i<=lsm->param.total_level_num; i++){
+	for(uint32_t i=0; i<=lsm->param.total_level_num+1; i++){
 		if(i==0){
 			printf("\tmem -> %u : %u,%.2lf (cnt,eff)\n",i, lsm->monitor.compaction_cnt[i], (double)lsm->monitor.compaction_output_entry_num[i]/lsm->monitor.compaction_input_entry_num[i]);
 		}
