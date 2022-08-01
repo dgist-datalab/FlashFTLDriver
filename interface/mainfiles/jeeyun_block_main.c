@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <signal.h>
+#include <time.h>
 #include "../../include/FS.h"
 #include "../../include/settings.h"
 #include "../../include/types.h"
@@ -87,7 +88,8 @@ int main(int argc,char* argv[]){
 		init_cheeze(atoll(argv[1]));
 	}
 	*/
-
+	time_t begin;
+	time(&begin);
 
         pthread_create(&thr, NULL, thread_test, (void*) argv[1]);
         pthread_join(thr, NULL);
@@ -100,7 +102,9 @@ int main(int argc,char* argv[]){
         }
 
 
-
+	time_t end;
+	time(&end);
+	printf("runtime: %0.0f sec \n", difftime(end, begin));
 
 	//free_cheeze();
 	inf_free();
