@@ -32,6 +32,17 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 		uint32_t target_src_num = last_level_compaction ? 2 : src_level->now_run_num;
 		//uint32_t target_src_num = 2;
 		run **merge_src = (run **)malloc(sizeof(run *) * target_src_num);
+
+		if(last_level_compaction){
+			uint32_t first_run_idx=get_old_run_idx(src_level, 0);
+			uint32_t second_run_idx=get_old_run_idx(src_level, 1);
+			uint32_t total_run_entry=src_level->run_array[first_run_idx]->now_entry_num+src_level->run_array[second_run_idx]->now_entry_num;
+			uint32_t invalid_run_entry=src_level->run_array[first_run_idx]->info->unlinked_lba_num+src_level->run_array[second_run_idx]->info->unlinked_lba_num;
+			lsm->monitor.compaction_input_entry_num[disk_idx+2]+=total_run_entry;
+
+			lsm->monitor.compaction_output_entry_num[disk_idx+2]+=total_run_entry-invalid_run_entry;
+		}
+
 #ifdef GREEDY_GC
 		level_get_compaction_target(src_level, target_src_num, &merge_src, !last_level_compaction);
 #else
@@ -51,15 +62,6 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 		lsm->monitor.compaction_cnt[disk_idx+1]++;
 		lsm->monitor.compaction_input_entry_num[disk_idx+1] += total_target_entry;
 		lsm->monitor.compaction_output_entry_num[disk_idx+1] += des->now_entry_num;
-		if(last_level_compaction){
-			uint32_t first_run_idx=get_old_run_idx(src_level, 0);
-			uint32_t second_run_idx=get_old_run_idx(src_level, 1);
-			uint32_t total_run_entry=src_level->run_array[first_run_idx]->now_entry_num+src_level->run_array[second_run_idx]->now_entry_num;
-			uint32_t invalid_run_entry=src_level->run_array[first_run_idx]->info->unlinked_lba_num+src_level->run_array[second_run_idx]->info->unlinked_lba_num;
-			lsm->monitor.compaction_input_entry_num[disk_idx+2]+=total_run_entry;
-
-			lsm->monitor.compaction_output_entry_num[disk_idx+2]+=total_run_entry-invalid_run_entry;
-		}
 
 		level *new_level = level_init(src_level->level_idx, src_level->max_run_num, src_level->map_type);
 

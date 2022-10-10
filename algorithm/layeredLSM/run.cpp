@@ -18,8 +18,16 @@ run *run_factory(uint32_t run_idx, uint32_t map_type,
 	map_param param;
 	param.fpr=fpr;
 	param.lba_bit=lsm->param.target_bit;
-	param.map_type=map_type;
+	if(map_type==PLR_MAP && lsm->param.cache_flag){
+		param.map_type=COMP_MAP;
+		param.total_bit=lsm->param.PLR_bit;
+	}
+	else{
+		param.map_type=map_type;
+	}
+
 	res->type=type;
+
 	switch(type){
 		case RUN_NORMAL:
 			res->st_body=st_array_init(res, entry_num, bm, false, param);

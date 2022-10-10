@@ -644,6 +644,8 @@ uint64_t PLR::memory_usage(uint32_t lba_unit) {
 	return memory_usage_res;
 }
 
+
+
 uint64_t PLR::get_line_cnt(){
 	return line_cnt;
 }

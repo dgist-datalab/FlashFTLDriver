@@ -6,6 +6,7 @@ SRCS +=\
 	plr/plr.cpp\
 	./bf_guard_mapping.cpp\
 	./tree_mapping.cpp\
+	./compression_mapping.cpp\
 
 
 OBJS :=\
@@ -28,6 +29,9 @@ libnom.a : $(TARGETOBJ)
 
 plr/plr.o: ./plr/plr.cpp
 	$(CC) $(CFLAGS_ALGO) -c $< -o $@
+
+test: bf.h bf.cpp bf_test.cpp
+	g++ -o bf_test bf.cpp bf_test.cpp
 
 clean : 
 	@$(RM) *.o
