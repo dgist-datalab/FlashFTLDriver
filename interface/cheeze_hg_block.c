@@ -456,6 +456,8 @@ vec_request **get_vectored_request_arr()
 	return res;
 }
 
+extern void print_temp_log(int sig);
+
 vec_request *get_trace_vectored_request(){
 	static bool isstart=false;
 	unsigned int crc_len;
@@ -475,13 +477,14 @@ vec_request *get_trace_vectored_request(){
 		uint32_t len=0;
 		len=read(trace_fd, &ureq, sizeof(ureq));
 #ifdef TRACE_REPLAY
-		if(creq->id==UINT32_MAX){
-			raise(SIGCONT);
+		if(len !=0 && ureq.id==UINT32_MAX){
+			print_temp_log(UINT32_MAX);
 			continue;
 		}
 #endif
 		if(len!=sizeof(ureq)){
 			printf("read error!!: len:%u\n", len);
+			raise(SIGINT);
 			break;
 			abort();
 		}
