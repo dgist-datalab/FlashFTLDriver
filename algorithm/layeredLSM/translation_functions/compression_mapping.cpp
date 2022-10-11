@@ -301,6 +301,7 @@ uint32_t compression_query(map_function *m, uint32_t lba, map_read_param ** para
 
 uint32_t compression_oob_check(map_function *m, map_read_param *param){
 	if(param->retry_flag==COMP_READ_MAP){
+	//	printf("[oob]%u --> %p : %c\n", param->p_req->key, param->p_req->value->value, param->p_req->value->value[0]);
 		return NOT_FOUND;
 	}
 	else{
@@ -311,6 +312,7 @@ uint32_t compression_oob_check(map_function *m, map_read_param *param){
 uint32_t compression_retry(map_function *m, map_read_param *param){
 	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
 	param->retry_flag=COMP_READ_DATA;
+	//printf("[retry]%u --> %p : %c\n", param->p_req->key, param->p_req->value->value, param->p_req->value->value[0]);
 
 	fdriver_lock(&cache_lock);
 	if(comp_ent->list_entry){ //the prev request may insert data to cache.
