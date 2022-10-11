@@ -1,5 +1,40 @@
 #include "lru_list.h"
 
+void lru_check_error(LRU *lru){
+	lru_node *temp=lru->head;
+	int cnt=0;
+	int error_code=0;
+	while(temp){
+		if(temp==lru->head){
+			if(temp->next==NULL && temp!=lru->tail){
+				error_code=1;
+				goto err;
+			}
+		}
+		else if(temp==lru->tail){
+			if(temp->prev==NULL){
+				error_code=2;
+				goto err;
+			}
+		}
+		else{
+			if(temp->next==NULL){
+				error_code=3;
+				goto err;
+			}
+			if(temp->prev==NULL){
+				error_code=4;
+				goto err;
+			}
+		}
+		temp=temp->next;
+	}
+	return;
+err:
+	printf("break %u\n",error_code);
+	return;
+}
+
 void lru_init(LRU** lru, void (*data_free)(void*), uint32_t (*retrieve_key)(void*)){
 	*lru = (LRU*)malloc(sizeof(LRU));
 	(*lru)->size=0;
@@ -37,6 +72,7 @@ lru_node* lru_push(LRU* lru, void* table_ptr){
 		}
 	}
 
+	//lru_check_error(lru);
 	lru->size++;
 	return now;
 }
@@ -63,6 +99,7 @@ lru_node* lru_push_last(LRU* lru, void* table_ptr){
 	}
 
 	lru->size++;
+	//lru_check_error(lru);
 	return now;
 }
 
@@ -91,6 +128,7 @@ void* lru_pop(LRU* lru){
 
 	
 	free(now);
+	//lru_check_error(lru);
 	return re;
 }
 
@@ -106,6 +144,7 @@ void lru_update(LRU* lru, lru_node* now){
 		lru->tail->next = NULL;
 	}
 	else{
+		//lru_check_error(lru);
 		now->prev->next = now->next;
 		now->next->prev = now->prev;
 	}
@@ -113,6 +152,8 @@ void lru_update(LRU* lru, lru_node* now){
 	lru->head->prev = now;
 	now->next = lru->head;
 	lru->head = now;
+
+	//lru_check_error(lru);
 }
 
 void lru_delete(LRU* lru, lru_node* now){
@@ -146,6 +187,7 @@ void lru_delete(LRU* lru, lru_node* now){
 	if(lru->free_data){
 		lru->free_data(now->data);
 	}
+	//lru_check_error(lru);
 	free(now);
 }
 

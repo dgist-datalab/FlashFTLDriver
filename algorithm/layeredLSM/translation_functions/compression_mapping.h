@@ -4,9 +4,10 @@
 #include "../../../include/data_struct/lru_list.h"
 
 typedef struct compressed_form{
-	uint32_t data_size;
+	uint32_t data_size; //bit
 	uint32_t max_entry_num;
-	uint32_t *data;
+	uint8_t *data;
+	uint32_t bit_num;
 }compressed_form;
 
 typedef struct compression_ent{

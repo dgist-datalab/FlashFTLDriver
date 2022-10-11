@@ -1,6 +1,7 @@
 #include "compression_mapping.h"
 #include "../../../include/search_template.h"
 #define GET_COMP_ENT(PD) (compression_ent*)(PD)
+#define REAL_COMPRESSION
 static bool start_flag=true;
 static LRU *comp_lru;
 static uint64_t target_mem_bit;
@@ -44,6 +45,47 @@ uint32_t compression_insert(map_function *m, uint32_t lba, uint32_t offset){
 	return INSERT_SUCCESS;
 }
 
+uint32_t get_comp_lba_from_offset(compressed_form *comp_data, uint32_t i){
+	uint32_t entry_per_chunk=(CHUNKSIZE-32)/comp_data->bit_num+1;
+	uint32_t chunk_idx=i/entry_per_chunk;
+	uint32_t offset=i%entry_per_chunk;
+
+	uint8_t* data_ptr=&comp_data->data[chunk_idx*CHUNKSIZE/8];
+	if(offset==0){
+		return *(uint32_t*)data_ptr;
+	}
+	else{
+		uint32_t head_lba=*(uint32_t*)data_ptr;
+		data_ptr+=4;
+		for(uint32_t i=0; i<offset; i++){
+			uint32_t temp;
+			switch (comp_data->bit_num){
+			case 8:
+				head_lba+=*(uint8_t*)data_ptr;
+				data_ptr+=1;
+				break;	
+			case 16:
+				head_lba+=*(uint16_t*)data_ptr;
+				data_ptr+=2;
+				break;	
+			case 24:
+				memcpy(&temp, data_ptr, 3);
+				temp>>=8;
+				head_lba+=temp;
+				data_ptr+=3;
+				break;
+			case 32:
+				head_lba+=*(uint32_t*)data_ptr;
+				data_ptr+=4;
+				break;
+			default:
+				break;
+			}
+		}
+		return head_lba;
+	}
+}
+
 compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t intra_offset){
 	summary_pair *map=(summary_pair*)&data[LPAGESIZE*intra_offset];
 	uint32_t max_entry_num=0;
@@ -71,44 +113,72 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 	bit_num=CEIL(bit_num, 8)*8; //byte align
 
 	compressed_form *res=(compressed_form*)malloc(sizeof(compressed_form));
-	uint32_t entry_per_chunk=(CHUNKSIZE-32)/bit_num;
+	uint32_t entry_per_chunk=((CHUNKSIZE-32)/bit_num+1);
 	uint32_t chunk_num=CEIL(max_entry_num, entry_per_chunk);
 	res->data_size=chunk_num*CHUNKSIZE;
-	res->data=(uint32_t*)malloc(PAGESIZE/2);
+	res->data=(uint8_t*)malloc(res->data_size/8);
 	res->max_entry_num=max_entry_num;
-	memset(res->data, -1, PAGESIZE/2);
+	res->bit_num=bit_num;
+	memset(res->data, -1, res->data_size/8);
 
 	*target_bit=res->data_size;
 	//printf("%u %2.f\n", res->data_size, (double)res->data_size/max_entry_num);
-
-	/* skip compression
+#ifdef REAL_COMPRESSION
 	uint32_t map_idx=0;
 	uint32_t data_idx=0;
-	uint32_t prev_lba;
 	for(uint32_t chunk_idx=0; chunk_idx <chunk_num; chunk_idx++){
-		uint8_t *ptr=&res->data[chunk_idx*CHUNKSIZE];
+		map_idx=chunk_idx*entry_per_chunk;
+		uint32_t data_ptr=chunk_idx*CHUNKSIZE/8;
+		uint8_t *des_ptr=(uint8_t *)&res->data[data_ptr];
 		for(uint32_t i=0; i<entry_per_chunk; i++){
-			if(map_idx==max_entry_num){
-				goto done;
-			}
-			if(i=0){
-				prev_lba=map[map_idx].lba;
-				*((uint32_t*)ptr)=map[map_idx].lba;
-				data_idx+=sizeof(uint32_t);
+			if(i==0){
+				((uint32_t*)des_ptr)[0]=map[map_idx].lba;
+				des_ptr+=sizeof(uint32_t);
 			}
 			else{
 				uint32_t delta=map[map_idx].lba-prev_lba;
-				data_idx+=bit_num;
+				switch(res->bit_num){
+					case 8:
+						*(uint8_t*)des_ptr=delta;
+						des_ptr+=1;
+						break;
+					case 16:
+						*(uint16_t*)des_ptr=delta;
+						des_ptr+=2;
+						break;
+					case 24:
+						delta<<=8;
+						memcpy(des_ptr, &delta, 3);
+						des_ptr+=3;
+						break;
+					case 32:
+						*(uint32_t*)des_ptr=delta;
+						des_ptr+=4;
+						break;
+					default:
+						abort();
+						break;
+				}
 			}
+			prev_lba=map[map_idx].lba;
 			map_idx++;
+			if(map_idx==max_entry_num){
+				goto done;
+			}
 		}
 	}
-	done:
-	*/
-
+done:
+#else
 	for(uint32_t i=0; i<max_entry_num; i++){
 		res->data[i]=map[i].lba;
 	}
+#endif
+
+
+	/*debug check
+	for(uint32_t i=0; i<max_entry_num; i++){
+		printf("%u %u\n", map[i].lba, get_comp_lba_from_offset(res, i));
+	}*/
 
 	return res;
 }
@@ -121,7 +191,83 @@ int comp_pair_cmp(uint32_t p, uint32_t target){
 
 uint32_t find_offset(uint32_t lba, compressed_form *comp_data){
 	uint32_t target_idx=0;
-	bs_search(comp_data->data, 0, comp_data->max_entry_num, lba, comp_pair_cmp, target_idx);
+#ifdef REAL_COMPRESSION
+	uint32_t s=0, e=comp_data->data_size/CHUNKSIZE-1;
+	uint32_t last_entry=e;
+	uint8_t* data_ptr=comp_data->data;
+	uint32_t mid=0;
+	while(s<=e){
+		mid=(s+e)/2;
+		uint32_t target_lba=*(uint32_t*)&data_ptr[mid*CHUNKSIZE/8]; //check head
+		if(mid==last_entry){
+			if(target_lba <=lba){
+				break; //find target;
+			}
+			else{
+				e=mid-1;
+			}
+		}
+		else{
+			uint32_t target_end_lba=*(uint32_t*)&data_ptr[(mid+1)*CHUNKSIZE/8];
+			if(target_lba<= lba && target_end_lba>lba){
+				break;
+			}
+			else{
+				if(target_lba > lba){
+					e=mid-1;
+				}
+				else{
+					s=mid+1;
+				}
+			}
+		}
+	}
+
+	data_ptr=&comp_data->data[mid*CHUNKSIZE/8];
+	uint32_t head_lba=*(uint32_t*)&data_ptr[0];
+	uint32_t entry_per_chunk=((CHUNKSIZE-32)/comp_data->bit_num+1);
+	target_idx=entry_per_chunk*mid;
+	for(uint32_t i=0; i<=entry_per_chunk; i++){
+		if(i==0){
+			if(head_lba==lba){
+				break;
+			}
+			else{
+				data_ptr+=sizeof(uint32_t);
+			}
+		}
+		else{
+			uint32_t temp;
+			switch (comp_data->bit_num){
+			case 8:
+				head_lba+=*(uint8_t*)data_ptr;
+				break;	
+			case 16:
+				head_lba+=*(uint16_t*)data_ptr;
+				break;	
+			case 24:
+				memcpy(&temp, data_ptr, 3);
+				temp>>=8;
+				head_lba+=temp;
+				break;
+			case 32:
+				head_lba+=*(uint32_t*)data_ptr;
+				break;
+			default:
+				break;
+			}
+
+			if(head_lba==lba){
+				target_idx+=i;
+				break;
+			}
+			data_ptr+=comp_data->bit_num/8;
+		}
+	}
+#else
+	bs_search((uint32_t*)comp_data->data, 0, comp_data->max_entry_num, lba, comp_pair_cmp, target_idx);
+#endif
+	//printf("%u target_idx:%u\n", lba, target_idx);
 	return target_idx;
 }
 
