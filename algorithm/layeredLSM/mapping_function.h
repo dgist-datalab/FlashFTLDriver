@@ -6,8 +6,9 @@
 #include <stdint.h>
 #define NOT_FOUND UINT32_MAX
 #define INSERT_SUCCESS UINT32_MAX
+#define READ_MAP (UINT32_MAX-1)
 enum{
-	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP, EMPTY_MAP,
+	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP, COMP_MAP, EMPTY_MAP,
 };
 
 enum{
@@ -26,17 +27,20 @@ typedef struct map_read_param{
 	struct run *r;
 	uint32_t ste_num;
 	struct map_function *mf;
+	uint32_t psa;
 	uint32_t lba;
 	uint32_t retry_flag;
 	uint8_t intra_offset;
 	uint32_t prev_offset;
 	uint32_t *oob_set;
+	bool read_map;
 	void *private_data;
 } map_read_param;
 
 typedef struct {
 	uint32_t map_type;
 	uint32_t lba_bit;
+	uint32_t total_bit;
 	float fpr; 
 }map_param;
 

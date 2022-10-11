@@ -15,7 +15,6 @@ static void __check_data(algo_req *req, char *value){
 	param->oob_set=(uint32_t*)LSM->bm->segment_manager->get_oob(LSM->bm->segment_manager, req->ppa);
 	uint32_t intra_offset=param->mf->oob_check(param->mf, param);
 	if(intra_offset!=NOT_FOUND){
-
 		fdriver_lock(&LSM->read_cnt_lock);
 		LSM->now_flying_read_cnt--;
 		fdriver_unlock(&LSM->read_cnt_lock);
@@ -128,7 +127,6 @@ uint32_t run_query(run *r, request *req){
 	map_function *mf;
 	uint32_t psa;
 
-	//printf("req->key:%u\n", req->key);
 	if(r->type==RUN_LOG){
 		mf=r->run_log_mf;
 #ifdef MAPPING_TIME_CHECK
@@ -152,6 +150,7 @@ uint32_t run_query(run *r, request *req){
 #ifdef MAPPING_TIME_CHECK
 		measure_start(&req->mapping_cpu);
 #endif
+
 		ste_num = st_array_get_target_STE(r->st_body, req->key);
 
 #ifdef MAPPING_TIME_CHECK
@@ -171,6 +170,9 @@ uint32_t run_query(run *r, request *req){
 		measure_adding(&req->mapping_cpu);
 #endif
 retry:
+		if(intra_offset==READ_MAP){
+			goto read_map;
+		}
 		if (intra_offset == NOT_FOUND)
 		{
 			param->mf->query_done(param->mf, param);
@@ -186,18 +188,27 @@ retry:
 			//goto not_found_end;
 		}
 	}
+read_map:
 	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
-
-	param->intra_offset=psa%L2PGAP;
-	param->ste_num=ste_num;
-	param->r=r;
-	req->param=(void*)param;
 
 	fdriver_lock(&LSM->read_cnt_lock);
 	LSM->now_flying_read_cnt++;
 	fdriver_unlock(&LSM->read_cnt_lock);
-
-	__run_issue_read(req, psa/L2PGAP, req->value, param, false);
+	if(param->read_map){
+		param->intra_offset=r->st_body->sp_meta[ste_num].piece_ppa %L2PGAP;
+		param->ste_num=ste_num;
+		param->r=r;
+		param->psa=r->st_body->sp_meta[ste_num].piece_ppa;
+		req->param=(void*)param;
+		__run_issue_read(req, r->st_body->sp_meta[ste_num].piece_ppa/L2PGAP, req->value, param, false);
+	}
+	else{
+		param->intra_offset=psa%L2PGAP;
+		param->ste_num=ste_num;
+		param->r=r;
+		req->param=(void*)param;
+		__run_issue_read(req, psa/L2PGAP, req->value, param, false);
+	}
 	return READ_DONE;
 not_found_end:
 	//fdriver_unlock(&param->r->lock);

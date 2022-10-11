@@ -90,7 +90,7 @@ uint64_t 		bfg_get_memory_usage(map_function *mf, uint32_t target_bit){
 int bfg_cmp(uint32_t b, uint32_t target){return b-target;}
 
 uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param){
-	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
+	map_read_param *res_param=(map_read_param*)calloc(1, sizeof(map_read_param));
 	res_param->lba=lba;
 	res_param->mf=mf;
 	res_param->oob_set=NULL;

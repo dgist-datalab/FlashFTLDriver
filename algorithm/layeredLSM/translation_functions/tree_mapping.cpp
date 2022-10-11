@@ -48,7 +48,7 @@ uint64_t 		tree_get_memory_usage(map_function *m, uint32_t target_bit){
 
 uint32_t		tree_query(map_function *m, uint32_t lba, map_read_param ** param){
 	tree_map *tr_map=extract_tree(m);
-	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
+	map_read_param *res_param=(map_read_param*)calloc(1, sizeof(map_read_param));
 	res_param->lba=lba;
 	res_param->mf=m;
 	res_param->prev_offset=0;

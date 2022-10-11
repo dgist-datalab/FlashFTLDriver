@@ -29,6 +29,7 @@ void* lru_find(LRU *, uint32_t key);
 void* lru_pop(LRU*);
 void lru_update(LRU*, lru_node*);
 void lru_delete(LRU*, lru_node*);
+void lru_check_error(LRU *);
 
 #define for_each_lru_backword(lru, lru_node)\
 	for(lru_node=lru->tail; lru_node!=NULL; lru_node=lru_node->prev)

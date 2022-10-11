@@ -233,6 +233,7 @@ bool vectored_end_req (request * const req){
 	vectored_request *preq=req->parents;
 	switch(req->type){
 		case FS_GET_T:
+	//		printf("req: %u end\n", req->key);
 	//		printf("ack req->seq:%u\n", req->seq);
 	//		fprintf(stderr,"read:%u\n",req->seq);
 			if(mp._data_check_flag){

@@ -510,6 +510,7 @@ bool fine_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 }
 
 void fine_empty_cache(struct my_cache* mc){
+	return;
 	while(1){
 		fine_cache *fc=(fine_cache*)lru_pop(fcm.lru);
 		if(!fc) break;

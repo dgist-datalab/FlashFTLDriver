@@ -33,6 +33,7 @@ typedef struct run_manager{
 }run_manager;
 
 typedef struct lsmtree_parameter{
+	bool cache_flag;
 	float fpr;
 	uint32_t memtable_entry_num;
 	uint32_t target_bit;
@@ -95,7 +96,7 @@ typedef struct lsmtree{
  * memory_usage:max memory usage
  * LBA_range: the coverage 
  * */
-lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, uint64_t memory_usage, uint64_t max_LBA_num);
+lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, uint64_t memory_usage, uint64_t max_LBA_num, bool cache_flag);
 uint32_t lsmtree_argument_set(int argc, char **argv);
 
 void lsmtree_print_param(lsmtree_parameter param);

@@ -40,7 +40,7 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	g_li=li;
 	if(!target_param){
 		target_param=(lsmtree_parameter*)calloc(1, sizeof(lsmtree_parameter));
-		lsmtree_parameter default_param=lsmtree_calculate_parameter(0.1, bit_calculate(RANGE), 48*RANGE/100*30, RANGE);
+		lsmtree_parameter default_param=lsmtree_calculate_parameter(0.1, bit_calculate(RANGE), 48*RANGE/100*30, RANGE, false);
 		memcpy(target_param, &default_param, sizeof(lsmtree_parameter));
 		lsmtree_print_param(*target_param);
 	}

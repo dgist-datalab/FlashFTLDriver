@@ -27,6 +27,7 @@ void lsmtree_print_param(lsmtree_parameter param){
 			(double)temp/param.max_memory_usage_bit);
 	printf("BF level: %u~%u\n", param.BF_level_range.start, param.BF_level_range.end);
 	printf("PLR level: %u~%u\n", param.PLR_level_range.start, param.PLR_level_range.end);
+	printf("Cache flag: %s\n", param.cache_flag ? "true": "false");
 	printf("=========================\n");
 }
 
@@ -131,7 +132,7 @@ lsmtree_parameter lsmtree_calculate_parameter2(float fpr, uint32_t target_bit,
 }
 
 
-lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, uint64_t memory_usage_bit, uint64_t max_LBA_num){
+lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, uint64_t memory_usage_bit, uint64_t max_LBA_num, bool cache_flag){
 	lsmtree_parameter res;
 	res.total_level_num=100;
 	double target_avg_bit=(double)target_bit * ((double)memory_usage_bit/(RANGE*target_bit));
@@ -234,17 +235,19 @@ lsmtree_parameter lsmtree_calculate_parameter(float fpr, uint32_t target_bit, ui
 			}
 		}
 	}
+	res.cache_flag=cache_flag;
 	return res;
 }
 
 
 static void print_help(){
 	printf("-----help-----\n");
-	printf("parameters (f, m, b, t)\n");
+	printf("parameters (f, m, b, t, c)\n");
 	printf("-f: set read amplification (float type)\n");
 	printf("-m: memory usage percentage compare PageFTL\n");
 	printf("-b: target bit num for lba\n");
 	printf("-t: non zero value for parameter test\n");
+	printf("-c: cache test\n");
 }
 
 extern lsmtree_parameter *target_param;
@@ -255,7 +258,8 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 	uint32_t test_flag=0;
 	uint32_t target_bit=33;//bit_calculate(RANGE);
 	uint32_t memory_usage=29;
-	while((c=getopt(argc,argv,"hHmMtTfFbBGg"))!=-1){
+	uint32_t cache_flag=0;
+	while((c=getopt(argc,argv,"hHmMtTfFbBGgCc"))!=-1){
 		switch(c){
 			case 'h':
 			case 'H':
@@ -281,6 +285,10 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 			case 'b':
 				target_bit=atoi(argv[optind]);
 				break;
+			case 'C':
+			case 'c':
+				cache_flag=atoi(argv[optind]);
+				break;
 			default:
 				printf("invalid parameters\n");
 				print_help();
@@ -291,8 +299,9 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 	printf("gc_type:%u\n",gc_type);
 	//lsmtree_calculate_parameter2(fpr, target_bit, RANGE*target_bit/100*memory_usage,RANGE);
 
-	lsmtree_parameter param=lsmtree_calculate_parameter(fpr, target_bit, RANGE*target_bit/100*memory_usage,RANGE);
+	lsmtree_parameter param=lsmtree_calculate_parameter(fpr, target_bit, RANGE*target_bit/100*memory_usage,RANGE, cache_flag?true:false);
 	lsmtree_print_param(param);
+	//param.cache_flag=cache_flag?true:false;
 
 	if(!test_flag){
 		target_param=(lsmtree_parameter*)calloc(1, sizeof(lsmtree_parameter));
@@ -301,6 +310,5 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 	else{
 		exit(1);
 	}
-
 	return 1;
 }

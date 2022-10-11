@@ -63,7 +63,6 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 		lsm->monitor.compaction_input_entry_num[disk_idx+1] += total_target_entry;
 		lsm->monitor.compaction_output_entry_num[disk_idx+1] += des->now_entry_num;
 
-
 		level *new_level = level_init(src_level->level_idx, src_level->max_run_num, src_level->map_type);
 
 		if(target_src_num!=src_level->now_run_num){
