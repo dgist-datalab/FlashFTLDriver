@@ -731,7 +731,7 @@ bool tp_update_eviction_target_translation(struct my_cache* , uint32_t lba,
 				old_ppa=ppa_list[tc->offset];
 				ppa_list[tc->offset]=tc->ppa;
 				set_tc_flag(tc, CLEAN_FLAG);
-				if(!demand_ftl.bm->bit_query(demand_ftl.bm, tc->ppa)){
+				if(tc->ppa!=UINT32_MAX && !demand_ftl.bm->bit_query(demand_ftl.bm, tc->ppa)){
 					printf("wtf1! %lu:%u\n", GETLBA(tn, tc), tc->ppa);
 					abort();
 				}
