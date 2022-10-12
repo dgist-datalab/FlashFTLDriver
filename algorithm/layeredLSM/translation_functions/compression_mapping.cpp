@@ -1,5 +1,6 @@
 #include "compression_mapping.h"
 #include "../../../include/search_template.h"
+#include "../../../include/debug_utils.h"
 #define GET_COMP_ENT(PD) (compression_ent*)(PD)
 #define REAL_COMPRESSION
 static bool start_flag=true;
@@ -8,6 +9,7 @@ static uint64_t target_mem_bit;
 static uint64_t now_mem_bit;
 fdriver_lock_t cache_lock;
 static bool compression_df;
+extern uint32_t test_key;
 
 enum{
 	COMP_READ_DATA, COMP_READ_MAP
@@ -44,6 +46,7 @@ map_function* compression_init(uint32_t contents_num, float fpr, uint64_t total_
 }
 
 uint32_t compression_insert(map_function *m, uint32_t lba, uint32_t offset){
+	map_increase_contents_num(m);
 	return INSERT_SUCCESS;
 }
 
@@ -143,6 +146,9 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 		uint32_t data_ptr=chunk_idx*CHUNKSIZE/8;
 		uint8_t *des_ptr=(uint8_t *)&res->data[data_ptr];
 		for(uint32_t i=0; i<entry_per_chunk; i++){
+			if(map[map_idx].lba==test_key){
+				//GDB_MAKE_BREAKPOINT;
+			}
 			if(i==0){
 				((uint32_t*)des_ptr)[0]=map[map_idx].lba;
 				des_ptr+=sizeof(uint32_t);
@@ -203,6 +209,10 @@ int comp_pair_cmp(uint32_t p, uint32_t target){
 
 uint32_t find_offset(uint32_t lba, compressed_form *comp_data){
 	//printf("find lab:%u\n", lba);
+
+	if(lba==test_key){
+		//GDB_MAKE_BREAKPOINT;
+	}
 	uint32_t target_idx=0;
 #ifdef REAL_COMPRESSION
 	uint32_t s=0, e=comp_data->data_size/CHUNKSIZE-1;
@@ -250,7 +260,7 @@ uint32_t find_offset(uint32_t lba, compressed_form *comp_data){
 			}
 		}
 		else{
-			uint32_t temp;
+			uint32_t temp=0;
 			switch (comp_data->bit_num){
 			case 8:
 				head_lba+=*(uint8_t*)data_ptr;

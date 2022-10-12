@@ -120,6 +120,9 @@ uint32_t run_translate_intra_offset(run *r, uint32_t ste_num, uint32_t intra_off
 
 uint32_t run_query(run *r, request *req){
 	//fdriver_lock(&r->lock);
+	if(req->key==test_key){
+	//	GDB_MAKE_BREAKPOINT;
+	}
 	if(r->pp){
 		char *res=pp_find_value(r->pp, req->key);
 		if (res){
