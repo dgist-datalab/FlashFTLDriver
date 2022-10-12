@@ -4,6 +4,9 @@ void lru_check_error(LRU *lru){
 	lru_node *temp=lru->head;
 	int cnt=0;
 	int error_code=0;
+	if(!lru->head || !lru->tail){
+		goto err;
+	}
 	while(temp){
 		if(temp==lru->head){
 			if(temp->next==NULL && temp!=lru->tail){

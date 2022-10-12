@@ -57,8 +57,9 @@ void emptry_free(map_function *mf){
 	free(mf);
 }
 
-map_function *map_empty_copy(uint64_t _memory_usage_bit){
+map_function *map_empty_copy(uint32_t type, uint64_t _memory_usage_bit){
 	map_function *res=(map_function*)calloc(1,sizeof(map_function));
+	res->type=type;
 	res->memory_usage_bit=_memory_usage_bit;
 	res->free=emptry_free;
 	return res;

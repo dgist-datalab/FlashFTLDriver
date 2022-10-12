@@ -522,7 +522,7 @@ void st_array_copy_STE_des(st_array *sa, STE *ste,summary_page_meta *spm, uint32
 	else{
 		sa->pba_array[des_idx].mf=ste->mf;
 	}
-	ste->mf=map_empty_copy(memory_usage_bit);
+	ste->mf=map_empty_copy(mf?mf->type:ste->mf->type, memory_usage_bit);
 	
 	sa->pba_array[des_idx].max_offset=ste->max_offset;
 

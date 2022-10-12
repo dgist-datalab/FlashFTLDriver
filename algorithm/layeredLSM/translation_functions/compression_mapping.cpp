@@ -7,6 +7,7 @@ static LRU *comp_lru;
 static uint64_t target_mem_bit;
 static uint64_t now_mem_bit;
 fdriver_lock_t cache_lock;
+static bool compression_df;
 
 enum{
 	COMP_READ_DATA, COMP_READ_MAP
@@ -20,6 +21,7 @@ map_function* compression_init(uint32_t contents_num, float fpr, uint64_t total_
 		lru_init(&comp_lru, NULL, NULL);
 		fdriver_mutex_init(&cache_lock);
 		target_mem_bit=total_bit;
+		start_flag=false;
 	}
 
 	map_function *res=(map_function*)calloc(1, sizeof(map_function));
@@ -88,6 +90,9 @@ uint32_t get_comp_lba_from_offset(compressed_form *comp_data, uint32_t i){
 
 compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t intra_offset){
 	summary_pair *map=(summary_pair*)&data[LPAGESIZE*intra_offset];
+	if(compression_df){
+		//printf("break!\n");
+	}
 	uint32_t max_entry_num=0;
 	uint32_t max_delta=0;
 	uint32_t prev_lba=0;
@@ -103,6 +108,9 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 			}
 			prev_lba=map[i].lba;
 		}
+		if(compression_df){
+			printf("%u %u\n", i, map[i].lba);
+		}
 	}
 
 	uint32_t bit_num=0;
@@ -116,7 +124,11 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 	uint32_t entry_per_chunk=((CHUNKSIZE-32)/bit_num+1);
 	uint32_t chunk_num=CEIL(max_entry_num, entry_per_chunk);
 	res->data_size=chunk_num*CHUNKSIZE;
+#ifdef REAL_COMPRESSION
 	res->data=(uint8_t*)malloc(res->data_size/8);
+#else
+	res->data=(uint8_t*)malloc(PAGESIZE/2);
+#endif
 	res->max_entry_num=max_entry_num;
 	res->bit_num=bit_num;
 	memset(res->data, -1, res->data_size/8);
@@ -147,7 +159,7 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 						des_ptr+=2;
 						break;
 					case 24:
-						delta<<=8;
+	//					delta<<=8;
 						memcpy(des_ptr, &delta, 3);
 						des_ptr+=3;
 						break;
@@ -170,7 +182,7 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 done:
 #else
 	for(uint32_t i=0; i<max_entry_num; i++){
-		res->data[i]=map[i].lba;
+		((uint32_t*)res->data)[i]=map[i].lba;
 	}
 #endif
 
@@ -190,6 +202,7 @@ int comp_pair_cmp(uint32_t p, uint32_t target){
 }
 
 uint32_t find_offset(uint32_t lba, compressed_form *comp_data){
+	//printf("find lab:%u\n", lba);
 	uint32_t target_idx=0;
 #ifdef REAL_COMPRESSION
 	uint32_t s=0, e=comp_data->data_size/CHUNKSIZE-1;
@@ -247,7 +260,6 @@ uint32_t find_offset(uint32_t lba, compressed_form *comp_data){
 				break;	
 			case 24:
 				memcpy(&temp, data_ptr, 3);
-				temp>>=8;
 				head_lba+=temp;
 				break;
 			case 32:
@@ -263,15 +275,20 @@ uint32_t find_offset(uint32_t lba, compressed_form *comp_data){
 			}
 			data_ptr+=comp_data->bit_num/8;
 		}
+		if(i==entry_per_chunk){
+			return NOT_FOUND;
+		}
 	}
 #else
-	bs_search((uint32_t*)comp_data->data, 0, comp_data->max_entry_num, lba, comp_pair_cmp, target_idx);
+	uint32_t *temp_target=(uint32_t*)comp_data->data;
+	bs_search(temp_target, 0, comp_data->max_entry_num, lba, comp_pair_cmp, target_idx);
 #endif
 	//printf("%u target_idx:%u\n", lba, target_idx);
 	return target_idx;
 }
 
 uint32_t compression_query(map_function *m, uint32_t lba, map_read_param ** param){
+	fdriver_lock(&cache_lock);
 	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
 	map_read_param *res_param=(map_read_param*)calloc(1, sizeof(map_read_param));
 	res_param->lba=lba;
@@ -280,12 +297,16 @@ uint32_t compression_query(map_function *m, uint32_t lba, map_read_param ** para
 	res_param->private_data=NULL;
 	*param=res_param;
 
-	fdriver_lock(&cache_lock);
 	if(comp_ent->list_entry){ //in cache
 		res_param->retry_flag=COMP_READ_DATA;
 		res_param->read_map=false;
-		lru_update(comp_lru, (lru_node*)comp_ent->list_entry);
 		uint32_t res=find_offset(lba, comp_ent->comp_data);
+	//	printf("comp_lru->size:%u\n", comp_lru->size);
+		if(comp_lru->size==300){
+		//	printf("break!\n");
+		}
+		lru_check_error(comp_lru);
+		lru_update(comp_lru, (lru_node*)comp_ent->list_entry);
 		fdriver_unlock(&cache_lock);
 		return res;
 	}
@@ -310,30 +331,34 @@ uint32_t compression_oob_check(map_function *m, map_read_param *param){
 }
 
 uint32_t compression_retry(map_function *m, map_read_param *param){
+	fdriver_lock(&cache_lock);
 	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
 	param->retry_flag=COMP_READ_DATA;
 	//printf("[retry]%u --> %p : %c\n", param->p_req->key, param->p_req->value->value, param->p_req->value->value[0]);
 
-	fdriver_lock(&cache_lock);
 	if(comp_ent->list_entry){ //the prev request may insert data to cache.
 		/*promote cache*/
 		uint32_t res=find_offset(param->lba, comp_ent->comp_data);
 		lru_update(comp_lru, (lru_node*)comp_ent->list_entry);
+		//lru_check_error(comp_lru);
 		fdriver_unlock(&cache_lock);
 		return 	res;
 	}
-	fdriver_unlock(&cache_lock);
+
 
 	comp_ent->comp_data=compression_data((uint8_t*)param->p_req->value->value, &comp_ent->mem_bit, param->intra_offset);
+	compression_df=false;
 
 	/*check cache full*/
-	fdriver_lock(&cache_lock);
 	static int eviction_cnt=0;
 	compression_ent *temp;
 	while(now_mem_bit+comp_ent->mem_bit > target_mem_bit){
 		temp=(compression_ent*)lru_pop(comp_lru);
+		//lru_check_error(comp_lru);
 		now_mem_bit-=temp->mem_bit;
-		
+		if(now_mem_bit > target_mem_bit){
+			abort();
+		}	
 		free(temp->comp_data->data);
 		free(temp->comp_data);
 		temp->list_entry=NULL;
@@ -342,6 +367,7 @@ uint32_t compression_retry(map_function *m, map_read_param *param){
 	}
 
 	comp_ent->list_entry=lru_push(comp_lru, (void*) comp_ent);
+	//lru_check_error(comp_lru);
 	now_mem_bit+=comp_ent->mem_bit;
 	uint32_t res= find_offset(param->lba, comp_ent->comp_data);
 	fdriver_unlock(&cache_lock);
@@ -350,7 +376,12 @@ uint32_t compression_retry(map_function *m, map_read_param *param){
 }
 
 uint64_t compression_get_memory_usage(map_function *m, uint32_t target_bit){
+	fdriver_lock(&cache_lock);
 	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
+	fdriver_unlock(&cache_lock);
+	if(!comp_ent){
+		return NULL;
+	}
 	return comp_ent->mem_bit;
 }
 
@@ -359,14 +390,16 @@ void compression_make_done(map_function *m){
 }
 
 void compression_free(map_function *m){
-	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
 	fdriver_lock(&cache_lock);
+	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
 	if(comp_ent->list_entry){
 		lru_delete(comp_lru, (lru_node*)comp_ent->list_entry);
+	//	printf("comp_lru->size:%u\n", comp_lru->size);
 		now_mem_bit-=comp_ent->mem_bit;
 		if(now_mem_bit > target_mem_bit){
 			abort();
 		}
+		comp_ent->list_entry=NULL;
 	}
 	fdriver_unlock(&cache_lock);
 

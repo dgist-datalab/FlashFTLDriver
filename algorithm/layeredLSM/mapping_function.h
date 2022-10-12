@@ -161,7 +161,7 @@ typedef struct map_function{
  */
 map_function *map_function_factory(map_param param, uint32_t contents_num);
 
-map_function *map_empty_copy(uint64_t memory_usage_bit);
+map_function *map_empty_copy(uint32_t type, uint64_t memory_usage_bit);
 
 uint64_t map_memory_per_ent(uint32_t type, uint32_t target_bit, float fpr);
 

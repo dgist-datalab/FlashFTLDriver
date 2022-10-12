@@ -79,6 +79,10 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 	if (ppa == rb.buffer_ppa)
 	{
 		//memcpy(value->value, &rb.buffer_value, PAGESIZE);
+		map_read_param *param=(map_read_param*)res->param;
+		if(param->mf->type==COMP_MAP){
+			memcpy(res->value->value, rb.buffer_value, PAGESIZE);
+		}
 		req->buffer_hit++;
 		__check_data(res, rb.buffer_value);
 		fdriver_unlock(&rb.read_buffer_lock);

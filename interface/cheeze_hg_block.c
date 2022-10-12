@@ -102,8 +102,8 @@ fdriver_lock_t write_check_lock;
 volatile uint32_t write_cnt;
 #endif
 void init_trace_cheeze(){
-#ifdef WRITE_STOP_READ
 	fdriver_mutex_init(&trace_fd_lock);
+#ifdef WRITE_STOP_READ
 	fdriver_mutex_init(&write_check_lock);
 #endif
 	trace_fd = open(TRACE_TARGET, O_RDONLY);
@@ -123,8 +123,8 @@ void init_trace_cheeze(){
 }
 
 void init_cheeze(uint64_t phy_addr){
-#ifdef WRITE_STOP_READ
 	fdriver_mutex_init(&trace_fd_lock);
+#ifdef WRITE_STOP_READ
 	fdriver_mutex_init(&write_check_lock);
 #endif
 	printf("QSIZE:%u\n", QSIZE);
