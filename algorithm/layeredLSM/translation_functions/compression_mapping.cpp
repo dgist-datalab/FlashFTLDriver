@@ -11,6 +11,10 @@ fdriver_lock_t cache_lock;
 static bool compression_df;
 extern uint32_t test_key;
 
+#ifdef LOWER_MEM_DEV
+	char **mem_pool;
+#endif
+
 enum{
 	COMP_READ_DATA, COMP_READ_MAP
 };
@@ -121,6 +125,7 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 		bit_num++;
 		max_delta/=2;
 	}
+	uint32_t real_bit_num=bit_num;
 	bit_num=CEIL(bit_num, 8)*8; //byte align
 
 	compressed_form *res=(compressed_form*)malloc(sizeof(compressed_form));
@@ -134,6 +139,7 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 #endif
 	res->max_entry_num=max_entry_num;
 	res->bit_num=bit_num;
+	//res->bit_num=real_bit_num;
 	memset(res->data, -1, res->data_size/8);
 
 	*target_bit=res->data_size;
@@ -355,8 +361,12 @@ uint32_t compression_retry(map_function *m, map_read_param *param){
 		return 	res;
 	}
 
-
+#ifdef LOWER_MEM_DEV
+	uint32_t temp_ppa=param->psa/L2PGAP;
+	comp_ent->comp_data=compression_data((uint8_t*)mem_pool[temp_ppa],param->intra_offset);
+#else
 	comp_ent->comp_data=compression_data((uint8_t*)param->p_req->value->value, &comp_ent->mem_bit, param->intra_offset);
+#endif
 	compression_df=false;
 
 	/*check cache full*/

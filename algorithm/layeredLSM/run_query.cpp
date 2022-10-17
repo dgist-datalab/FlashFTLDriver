@@ -47,8 +47,6 @@ static void *__run_read_end_req(algo_req *req){
 		map_read_param *param=(map_read_param*)pending_req->param;
 		if(param->mf->type==COMP_MAP){
 			memcpy(pending_req->value->value, req->value->value, PAGESIZE);
-
-	//		printf("[hit]%u %p:%c\n", param->lba, pending_req->value->value, pending_req->value->value[0]);
 		}
 		__check_data(pending_req, req->value->value);
 		rb.pending_req->erase(target_r_iter++);

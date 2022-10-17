@@ -41,6 +41,7 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 			lsm->monitor.compaction_input_entry_num[disk_idx+2]+=total_run_entry;
 
 			lsm->monitor.compaction_output_entry_num[disk_idx+2]+=total_run_entry-invalid_run_entry;
+
 		}
 
 #ifdef GREEDY_GC
@@ -48,6 +49,11 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 #else
 		level_get_compaction_target(src_level, target_src_num, &merge_src, true);
 #endif
+
+		if(last_level_compaction){
+			printf("last: %u + %u\n", merge_src[0]->info->idx, merge_src[1]->info->idx);
+		}
+
 		uint32_t total_target_entry = 0;
 		for (uint32_t i = 0; i < target_src_num; i++)
 		{
