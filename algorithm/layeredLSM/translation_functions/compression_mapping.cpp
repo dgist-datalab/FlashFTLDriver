@@ -11,8 +11,8 @@ fdriver_lock_t cache_lock;
 static bool compression_df;
 extern uint32_t test_key;
 
-#ifdef LOWER_MEM_DEV
-	char **mem_pool;
+#ifdef AMF
+	extern char **mem_pool;
 #endif
 
 enum{
@@ -23,6 +23,9 @@ enum{
 
 map_function* compression_init(uint32_t contents_num, float fpr, uint64_t total_bit){
 	if(start_flag){
+#ifdef AMF
+		printf("LOWER_MEM_DEV!\n");
+#endif
 		/*make lru list*/
 		lru_init(&comp_lru, NULL, NULL);
 		fdriver_mutex_init(&cache_lock);
@@ -120,26 +123,36 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 		}
 	}
 
-	uint32_t bit_num=0;
-	while(max_delta){
-		bit_num++;
-		max_delta/=2;
-	}
-	uint32_t real_bit_num=bit_num;
-	bit_num=CEIL(bit_num, 8)*8; //byte align
-
 	compressed_form *res=(compressed_form*)malloc(sizeof(compressed_form));
-	uint32_t entry_per_chunk=((CHUNKSIZE-32)/bit_num+1);
-	uint32_t chunk_num=CEIL(max_entry_num, entry_per_chunk);
-	res->data_size=chunk_num*CHUNKSIZE;
+	uint32_t chunk_num=0;
+	uint32_t entry_per_chunk=0;
+	if(max_entry_num!=1){
+		uint32_t bit_num=0;
+		while(max_delta){
+			bit_num++;
+			max_delta/=2;
+		}
+		uint32_t real_bit_num=bit_num;
+		bit_num=CEIL(bit_num, 8)*8; //byte align
+
+		entry_per_chunk=((CHUNKSIZE-32)/bit_num+1);
+		chunk_num=CEIL(max_entry_num, entry_per_chunk);
+
+		res->data_size=chunk_num*CHUNKSIZE;
+		res->bit_num=bit_num;
+	}
+	else{
+		entry_per_chunk=1;
+		chunk_num=1;
+		res->bit_num=0;
+		res->data_size=CHUNKSIZE;
+	}
+	res->max_entry_num=max_entry_num;
 #ifdef REAL_COMPRESSION
 	res->data=(uint8_t*)malloc(res->data_size/8);
 #else
 	res->data=(uint8_t*)malloc(PAGESIZE/2);
 #endif
-	res->max_entry_num=max_entry_num;
-	res->bit_num=bit_num;
-	//res->bit_num=real_bit_num;
 	memset(res->data, -1, res->data_size/8);
 
 	*target_bit=res->data_size;
@@ -254,7 +267,13 @@ uint32_t find_offset(uint32_t lba, compressed_form *comp_data){
 
 	data_ptr=&comp_data->data[mid*CHUNKSIZE/8];
 	uint32_t head_lba=*(uint32_t*)&data_ptr[0];
-	uint32_t entry_per_chunk=((CHUNKSIZE-32)/comp_data->bit_num+1);
+	uint32_t entry_per_chunk=0;
+	if(comp_data->max_entry_num!=1){
+		entry_per_chunk=((CHUNKSIZE-32)/comp_data->bit_num+1);
+	}
+	else{
+		entry_per_chunk=1;
+	}
 	target_idx=entry_per_chunk*mid;
 	for(uint32_t i=0; i<=entry_per_chunk; i++){
 		if(i==0){
@@ -361,9 +380,9 @@ uint32_t compression_retry(map_function *m, map_read_param *param){
 		return 	res;
 	}
 
-#ifdef LOWER_MEM_DEV
+#ifdef AMF
 	uint32_t temp_ppa=param->psa/L2PGAP;
-	comp_ent->comp_data=compression_data((uint8_t*)mem_pool[temp_ppa],param->intra_offset);
+	comp_ent->comp_data=compression_data((uint8_t*)mem_pool[temp_ppa], &comp_ent->mem_bit, param->intra_offset);
 #else
 	comp_ent->comp_data=compression_data((uint8_t*)param->p_req->value->value, &comp_ent->mem_bit, param->intra_offset);
 #endif
