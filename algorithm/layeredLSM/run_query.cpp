@@ -25,6 +25,8 @@ static void __check_data(algo_req *req, char *value){
 		param->mf->query_done(param->mf, param);
 	}
 	else{
+	//	static int cnt=0;
+	//	printf("retry! %u\n", cnt++);
 		inf_assign_try(p_req);
 	}
 	free(req);
@@ -33,7 +35,7 @@ static void __check_data(algo_req *req, char *value){
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 static void *__run_read_end_req(algo_req *req){
 	if(req->type!=DATAR  && req->type!=MISSDATAR){
-		EPRINT("not allowed type", true);
+	//	EPRINT("not allowed type", true);
 	}
 
 	rb_r_iter target_r_iter;
@@ -46,7 +48,10 @@ static void *__run_read_end_req(algo_req *req){
 		pending_req=target_r_iter->second;
 		map_read_param *param=(map_read_param*)pending_req->param;
 		if(param->mf->type==COMP_MAP){
+#ifdef AMF
+#else
 			memcpy(pending_req->value->value, req->value->value, PAGESIZE);
+#endif
 		}
 		__check_data(pending_req, req->value->value);
 		rb.pending_req->erase(target_r_iter++);
@@ -72,14 +77,25 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 	res->end_req=__run_read_end_req;
 	res->value=value;
 	value->ppa=ppa;
+	
+	if(param->mf->type==COMP_MAP && !param->read_map && res->type==MISSDATAR){
+		res->type=DATAR;
+	}
+	else if(param->mf->type==COMP_MAP && param->read_map){
+		res->type=MAPPINGR;
+	}
 
 	fdriver_lock(&rb.read_buffer_lock);
 	if (ppa == rb.buffer_ppa)
 	{
 		//memcpy(value->value, &rb.buffer_value, PAGESIZE);
 		map_read_param *param=(map_read_param*)res->param;
+
 		if(param->mf->type==COMP_MAP){
+#ifdef AMF
+#else
 			memcpy(res->value->value, rb.buffer_value, PAGESIZE);
+#endif
 		}
 		req->buffer_hit++;
 		__check_data(res, rb.buffer_value);
@@ -102,7 +118,6 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 		fdriver_unlock(&rb.pending_lock);
 		return;
 	}
-
 	g_li->read(ppa, PAGESIZE, value, res);
 }
 
@@ -141,12 +156,12 @@ uint32_t run_query(run *r, request *req){
 	if(r->type==RUN_LOG){
 		mf=r->run_log_mf;
 #ifdef MAPPING_TIME_CHECK
-		measure_start(&req->mapping_cpu);
+	//	measure_start(&req->mapping_cpu);
 #endif
 		uint32_t global_intra_offset=mf->query_by_req(mf, req, &param);
 
 #ifdef MAPPING_TIME_CHECK
-		measure_adding(&req->mapping_cpu);
+	//	measure_adding(&req->mapping_cpu);
 #endif
 		if(global_intra_offset==NOT_FOUND){
 			param->mf->query_done(param->mf, param);
@@ -159,13 +174,13 @@ uint32_t run_query(run *r, request *req){
 	}
 	else{
 #ifdef MAPPING_TIME_CHECK
-		measure_start(&req->mapping_cpu);
+	//	measure_start(&req->mapping_cpu);
 #endif
 
 		ste_num = st_array_get_target_STE(r->st_body, req->key);
 
 #ifdef MAPPING_TIME_CHECK
-		measure_adding(&req->mapping_cpu);
+	//	measure_adding(&req->mapping_cpu);
 #endif
 		if (ste_num == UINT32_MAX)
 		{
@@ -232,15 +247,18 @@ uint32_t run_query_retry(run *r, request *req){
 	}
 
 	map_read_param *param=(map_read_param*)req->param;
+	if(param->mf->type==COMP_MAP){
+		param->read_map=false;
+	}
 	uint32_t ste_num=param->ste_num;
 	map_function *mf=r->st_body->pba_array[ste_num].mf;
 retry:
 #ifdef MAPPING_TIME_CHECK
-	measure_start(&req->mapping_cpu);
+	//measure_start(&req->mapping_cpu);
 #endif
 	uint32_t intra_offset=mf->query_retry(mf, param);
 #ifdef MAPPING_TIME_CHECK
-	measure_adding(&req->mapping_cpu);
+	//measure_adding(&req->mapping_cpu);
 #endif
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);

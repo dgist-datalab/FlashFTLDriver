@@ -9,7 +9,9 @@
 uint32_t map_query_by_req(struct map_function *m, request *req, map_read_param **param){
 	uint32_t res=m->query(m, req->key, param);
 	(*param)->p_req=req;
-	//printf("[first]%u --> %p : %c\n", req->key, req->value->value, req->value->value[0]);
+	if(res==ALREADY_FLYING){
+		compression_add_pending_req(m, req);
+	}
 	return res;
 }
 

@@ -7,6 +7,8 @@
 #define NOT_FOUND UINT32_MAX
 #define INSERT_SUCCESS UINT32_MAX
 #define READ_MAP (UINT32_MAX-1)
+#define ALREADY_FLYING (UINT32_MAX-2)
+
 enum{
 	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP, COMP_MAP, EMPTY_MAP,
 };
@@ -101,6 +103,8 @@ typedef struct map_function{
  *
  * */
 	void (*make_done)(struct map_function *m);
+
+	request *get_pending_request(struct map_function *m);
 
 /*
  * Function: map_make_summary

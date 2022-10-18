@@ -2,7 +2,7 @@
 #include "../../../include/search_template.h"
 #include "../../../include/debug_utils.h"
 #define GET_COMP_ENT(PD) (compression_ent*)(PD)
-#define REAL_COMPRESSION
+//#define REAL_COMPRESSION
 static bool start_flag=true;
 static LRU *comp_lru;
 static uint64_t target_mem_bit;
@@ -30,6 +30,7 @@ map_function* compression_init(uint32_t contents_num, float fpr, uint64_t total_
 		lru_init(&comp_lru, NULL, NULL);
 		fdriver_mutex_init(&cache_lock);
 		target_mem_bit=total_bit;
+		printf("target_mem_bit:%u\n", target_mem_bit);
 		start_flag=false;
 	}
 
@@ -43,16 +44,28 @@ map_function* compression_init(uint32_t contents_num, float fpr, uint64_t total_
 	res->get_memory_usage=compression_get_memory_usage;
 	res->show_info=NULL;
 	res->free=compression_free;
+	//res->get_pending_request=compression_get_pending_request;
 
 	compression_ent *comp_ent=(compression_ent*)malloc(sizeof(compression_ent));
 	comp_ent->list_entry=NULL;
 	comp_ent->comp_data=NULL;
+	comp_ent->temp_data=NULL;
+	comp_ent->pending_req=new std::vector<request*>();
 
 	res->private_data=(void*)comp_ent;
 	return res;
 }
 
 uint32_t compression_insert(map_function *m, uint32_t lba, uint32_t offset){
+	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
+	if(m->now_contents_num==0){
+		comp_ent->temp_data=(uint8_t*)malloc(PAGESIZE);
+		memset(comp_ent->temp_data, -1, PAGESIZE);
+	}
+	uint32_t idx=m->now_contents_num;
+	summary_pair* pair_ptr=(summary_pair*)comp_ent->temp_data;
+	pair_ptr[idx].lba=lba;
+	pair_ptr[idx].piece_ppa=offset;
 	map_increase_contents_num(m);
 	return INSERT_SUCCESS;
 }
@@ -340,18 +353,25 @@ uint32_t compression_query(map_function *m, uint32_t lba, map_read_param ** para
 		if(comp_lru->size==300){
 		//	printf("break!\n");
 		}
-		lru_check_error(comp_lru);
+	//	lru_check_error(comp_lru);
 		lru_update(comp_lru, (lru_node*)comp_ent->list_entry);
 		fdriver_unlock(&cache_lock);
 		return res;
 	}
 	else{//no cache
+		static int miss_cnt=0;
 		fdriver_unlock(&cache_lock);
-		//static uint32_t miss_cnt=0;
-		//printf("miss: %u\n", miss_cnt++);
 		res_param->retry_flag=COMP_READ_MAP;
 		res_param->read_map=true;
-		return READ_MAP;
+		if(comp_ent->flag==NO_PENDING){
+			comp_ent->flag=FLYING;
+			return READ_MAP;
+		}
+		else{
+			return READ_MAP;
+		}
+		//static uint32_t miss_cnt=0;
+		//printf("miss: %u\n", miss_cnt++);
 	}
 }
 
@@ -370,6 +390,10 @@ uint32_t compression_retry(map_function *m, map_read_param *param){
 	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
 	param->retry_flag=COMP_READ_DATA;
 	//printf("[retry]%u --> %p : %c\n", param->p_req->key, param->p_req->value->value, param->p_req->value->value[0]);
+
+	if(comp_ent->flag==FLYING){
+		comp_ent->flag=NO_PENDING;
+	}
 
 	if(comp_ent->list_entry){ //the prev request may insert data to cache.
 		/*promote cache*/
@@ -397,12 +421,12 @@ uint32_t compression_retry(map_function *m, map_read_param *param){
 		now_mem_bit-=temp->mem_bit;
 		if(now_mem_bit > target_mem_bit){
 			abort();
-		}	
+		}
 		free(temp->comp_data->data);
 		free(temp->comp_data);
 		temp->list_entry=NULL;
 		temp->mem_bit=0;
-		//printf("%u %u %u\n",target_mem_bit, eviction_cnt++, comp_lru->size);
+//		printf("%u %u %u\n",target_mem_bit, eviction_cnt++, comp_lru->size);
 	}
 
 	comp_ent->list_entry=lru_push(comp_lru, (void*) comp_ent);
@@ -425,6 +449,31 @@ uint64_t compression_get_memory_usage(map_function *m, uint32_t target_bit){
 }
 
 void compression_make_done(map_function *m){
+	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
+	comp_ent->comp_data=compression_data(comp_ent->temp_data, &comp_ent->mem_bit, 0);
+	
+	free(comp_ent->temp_data);
+
+	fdriver_lock(&cache_lock);
+	compression_ent *temp;
+	static int eviction_cnt=0;
+	while(now_mem_bit+comp_ent->mem_bit > target_mem_bit){
+		temp=(compression_ent*)lru_pop(comp_lru);
+		//lru_check_error(comp_lru);
+		now_mem_bit-=temp->mem_bit;
+		if(now_mem_bit > target_mem_bit){
+			abort();
+		}	
+		free(temp->comp_data->data);
+		free(temp->comp_data);
+		temp->list_entry=NULL;
+		temp->mem_bit=0;
+	//	printf("%u %u %u\n",target_mem_bit, eviction_cnt++, comp_lru->size);
+	}
+
+	comp_ent->list_entry=lru_push(comp_lru, (void*) comp_ent);
+	now_mem_bit+=comp_ent->mem_bit;
+	fdriver_unlock(&cache_lock);
 	return;
 }
 
@@ -439,8 +488,21 @@ void compression_free(map_function *m){
 			abort();
 		}
 		comp_ent->list_entry=NULL;
+		if(comp_ent->pending_req->size()){
+			printf("??????\n");
+			abort();
+		}
+		delete comp_ent->pending_req;
 	}
 	fdriver_unlock(&cache_lock);
 
 	free(comp_ent);
+}
+
+bool compression_add_pending_req(map_function *m, request *req){
+
+}
+
+request *compression_get_pending_request(map_function *m){
+
 }
