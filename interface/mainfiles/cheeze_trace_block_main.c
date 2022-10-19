@@ -51,9 +51,13 @@ int main(int argc,char* argv[]){
 	sigaction(SIGINT, &sa, NULL);
 	printf("signal add!\n");
 
-	struct sigaction sa2;
+	sigset_t tSigSetMask;
+	sigdelset(&tSigSetMask, SIGINT);
+	pthread_sigmask(SIG_SETMASK, &tSigSetMask, NULL);
+
+	struct sigaction sa2={0};
 	sa2.sa_handler = print_temp_log;
-	sigaction(SIGUSR1, &sa2, NULL);
+	sigaction(SIGCONT, &sa2, NULL);
 
 	inf_init(1,0,argc,argv);
 

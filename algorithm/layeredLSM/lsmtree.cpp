@@ -231,9 +231,9 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res;
 	run *r;
+	//printf("req->key read:%u\n", req->key);
 	if(req->retry==false){
 		r = shortcut_query(lsm->shortcut, req->key);
-		//printf("req->key read:%u\n", req->key);
 		if (r == NULL)
 		{
 			req->type = FS_NOTFOUND_T;
@@ -250,7 +250,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	}
 	if(res==READ_NOT_FOUND){
 		req->type=FS_NOTFOUND_T;
-		//printf("req->key :%u not found\n", req->key);
+		printf("req->key :%u not found\n", req->key);
 		req->end_req(req);
 	}
 	return res;
@@ -298,7 +298,7 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 #endif
 
 	printf("compaction log\n");
-	for(uint32_t i=0; i<=lsm->param.total_level_num; i++){
+	for(uint32_t i=0; i<=lsm->param.total_level_num+1; i++){
 		if(i==0){
 			printf("\tmem -> %u : %u,%.2lf (cnt,eff)\n",i, lsm->monitor.compaction_cnt[i], (double)lsm->monitor.compaction_output_entry_num[i]/lsm->monitor.compaction_input_entry_num[i]);
 		}

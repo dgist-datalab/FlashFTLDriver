@@ -37,7 +37,7 @@ uint64_t plr_get_memory_usage(map_function *mf, uint32_t target_bit){
 
 uint32_t plr_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	plr_map *pmap=extract_plr(mf);
-	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
+	map_read_param *res_param=(map_read_param*)calloc(1, sizeof(map_read_param));
 	res_param->lba=lba;
 	res_param->mf=mf;
 	res_param->oob_set=NULL;

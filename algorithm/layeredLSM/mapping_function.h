@@ -6,8 +6,11 @@
 #include <stdint.h>
 #define NOT_FOUND UINT32_MAX
 #define INSERT_SUCCESS UINT32_MAX
+#define READ_MAP (UINT32_MAX-1)
+#define ALREADY_FLYING (UINT32_MAX-2)
+
 enum{
-	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP, EMPTY_MAP,
+	EXACT, BF, GUARD_BF, PLR_MAP, TREE_MAP, COMP_MAP, EMPTY_MAP,
 };
 
 enum{
@@ -26,17 +29,20 @@ typedef struct map_read_param{
 	struct run *r;
 	uint32_t ste_num;
 	struct map_function *mf;
+	uint32_t psa;
 	uint32_t lba;
 	uint32_t retry_flag;
 	uint8_t intra_offset;
 	uint32_t prev_offset;
 	uint32_t *oob_set;
+	bool read_map;
 	void *private_data;
 } map_read_param;
 
 typedef struct {
 	uint32_t map_type;
 	uint32_t lba_bit;
+	uint32_t total_bit;
 	float fpr; 
 }map_param;
 
@@ -98,6 +104,8 @@ typedef struct map_function{
  * */
 	void (*make_done)(struct map_function *m);
 
+	request *get_pending_request(struct map_function *m);
+
 /*
  * Function: map_make_summary
  * -------------------------
@@ -157,7 +165,7 @@ typedef struct map_function{
  */
 map_function *map_function_factory(map_param param, uint32_t contents_num);
 
-map_function *map_empty_copy(uint64_t memory_usage_bit);
+map_function *map_empty_copy(uint32_t type, uint64_t memory_usage_bit);
 
 uint64_t map_memory_per_ent(uint32_t type, uint32_t target_bit, float fpr);
 

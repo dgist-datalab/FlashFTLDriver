@@ -62,6 +62,16 @@ static inline void level_insert_run(level *lev, run *r){
 	lev->now_run_num++;
 }
 
+static inline uint32_t get_old_run_idx(level *lev, uint32_t th){
+	uint32_t idx=0;
+	std::list<uint32_t>::iterator iter=lev->recency_pointer->begin();
+	for(uint32_t i=0; i<th; i++){
+		iter++;
+	}
+	idx=*iter;
+	return idx;
+}
+
 /*
  * Function:level_get_compaction_target
  * ------------------------------------

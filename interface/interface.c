@@ -185,6 +185,7 @@ bool inf_assign_try(request *req){
 		processor *t=&mp.processors[i];
 		tag_manager_free_tag(tm, req->tag_num);
 #ifdef layeredLSM
+/*
 		if(req->type==FS_GET_T){
 			pthread_mutex_lock(&t->read_retry_lock);
 			t->read_retry_q->push((void*)req);
@@ -194,13 +195,14 @@ bool inf_assign_try(request *req){
 			break;
 		}
 		else{
+			*/
 #endif
 			while(q_enqueue((void*)req,t->retry_q)){
 				flag=true;
 				break;
 			}
 #ifdef layeredLSM
-		}
+	//	}
 #endif
 	}
 
@@ -728,13 +730,15 @@ void inf_free(){
 #endif
 
 #ifdef layeredLSM
+/*
 		pthread_mutex_destroy(&t->flag);
 		t->retry_stop_flag=true;
 		pthread_cond_signal(&t->read_retry_cond);
 		delete t->read_retry_q;
+		*/
 #endif
 	}
-	free(mp.processors);
+	//free(mp.processors);
 
 #ifdef BUSE_MEASURE
     printf("infTime : ");

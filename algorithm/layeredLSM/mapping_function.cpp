@@ -4,10 +4,14 @@
 #include "./translation_functions/plr_mapping.h"
 #include "./translation_functions/bf_guard_mapping.h"
 #include "./translation_functions/tree_mapping.h"
+#include "./translation_functions/compression_mapping.h"
 
 uint32_t map_query_by_req(struct map_function *m, request *req, map_read_param **param){
 	uint32_t res=m->query(m, req->key, param);
 	(*param)->p_req=req;
+	if(res==ALREADY_FLYING){
+		compression_add_pending_req(m, req);
+	}
 	return res;
 }
 
@@ -28,6 +32,9 @@ map_function *map_function_factory(map_param param, uint32_t contents_num){
 			break;
 		case TREE_MAP:
 			res=tree_map_init(contents_num, param.fpr);
+			break;
+		case COMP_MAP:
+			res=compression_init(contents_num, param.fpr, param.total_bit);
 			break;
 	}
 	map_init(res, param.map_type, contents_num, param.lba_bit);
@@ -52,8 +59,9 @@ void emptry_free(map_function *mf){
 	free(mf);
 }
 
-map_function *map_empty_copy(uint64_t _memory_usage_bit){
+map_function *map_empty_copy(uint32_t type, uint64_t _memory_usage_bit){
 	map_function *res=(map_function*)calloc(1,sizeof(map_function));
+	res->type=type;
 	res->memory_usage_bit=_memory_usage_bit;
 	res->free=emptry_free;
 	return res;

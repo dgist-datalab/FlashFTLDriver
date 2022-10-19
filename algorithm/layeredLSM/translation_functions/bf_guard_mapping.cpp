@@ -8,7 +8,7 @@ static bloom_filter_meta * __global_bfm;
 float find_sub_member_num(float fpr, uint32_t member, uint32_t lba_bit_num){
 	static float target_avg_bit=0;
 	if(target_avg_bit) return target_avg_bit;
-	for(uint32_t i=2; i<member/2; i++){
+	for(uint32_t i=2; i<36; i++){
 //		uint32_t member_set_num=member/i;
 		float target_each_fpr=get_target_each_fpr(i, fpr);
 		uint32_t bit=get_number_of_bits(target_each_fpr);
@@ -21,8 +21,9 @@ float find_sub_member_num(float fpr, uint32_t member, uint32_t lba_bit_num){
 			__target_fpr=target_each_fpr;
 			__target_member=i;
 			target_avg_bit=avg_bit;
-			printf("%u -> %.2f\n", __target_member, target_avg_bit);
+			//printf("%u -> %.2f, %f, %u\n", __target_member, target_avg_bit, target_each_fpr, bit);
 		}
+		printf("%u -> %.2f, %f, %u\n", i, target_avg_bit, target_each_fpr, bit);
 	}
 	__global_bfm=bf_parameter_setting(__target_member, fpr);
 	return target_avg_bit;
@@ -89,7 +90,7 @@ uint64_t 		bfg_get_memory_usage(map_function *mf, uint32_t target_bit){
 int bfg_cmp(uint32_t b, uint32_t target){return b-target;}
 
 uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param){
-	map_read_param *res_param=(map_read_param*)malloc(sizeof(map_read_param));
+	map_read_param *res_param=(map_read_param*)calloc(1, sizeof(map_read_param));
 	res_param->lba=lba;
 	res_param->mf=mf;
 	res_param->oob_set=NULL;

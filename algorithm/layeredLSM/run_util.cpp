@@ -38,7 +38,7 @@ uint64_t run_memory_usage(run *target_run, uint32_t target_bit){
 			map_function *mf = target_run->st_body->pba_array[k].mf;
 			if (mf)
 			{
-				if(mf->memory_usage_bit){
+				if(mf->memory_usage_bit || mf->type==COMP_MAP){
 					memory_usage_run+=mf->memory_usage_bit;
 				}
 				else{
