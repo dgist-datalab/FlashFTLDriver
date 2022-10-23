@@ -59,6 +59,7 @@ void __lsm_calculate_memory_usage(lsmtree *lsm, uint64_t entry_num, int32_t memo
 				lsm->monitor.bf_memory_ent+=entry_num;
 				lsm->monitor.bf_memory_usage+=memory_usage_bit-(pinning?lsm->param.target_bit*entry_num:0);
 				break;
+			case COMP_MAP:
 			case PLR_MAP:
 				lsm->monitor.plr_memory_ent+=entry_num;
 				lsm->monitor.plr_memory_usage+=memory_usage_bit;
