@@ -296,7 +296,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 //	uint32_t tmp2_max = 100663296;
 //	uint32_t zip_08=201326592;
 	uint32_t zip_32=41943139;
-	//printf("request: %s\n", request_raw);
+	printf("request: %s\n", request_raw);
 	if (strstr(request_raw, load_sig)) {
 		load_signal=1;
 		return NULL;	

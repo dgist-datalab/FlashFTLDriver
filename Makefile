@@ -136,7 +136,7 @@ LIBS +=\
 #		-ljemalloc\
 #	-laio\
 
-all: jriver_08
+all: jriver
 
 DEBUG: debug_driver
 
@@ -154,7 +154,7 @@ cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/c
 driver: ./interface/vectored_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
-jriver_08: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+jriver: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
 jriver_11: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
