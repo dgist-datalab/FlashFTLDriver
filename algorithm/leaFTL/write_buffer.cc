@@ -82,6 +82,7 @@ char * lea_write_buffer_get(lea_write_buffer *wb, uint32_t lba){
 }
 
 void lea_write_buffer_free(lea_write_buffer *wb){
+    wb->L2P_map.clear();
     g_buffer_free(&wb->page_buf);
     for(uint32_t i=0; i<wb->max_ps_ptr; i++){
         free(wb->sector_buffer[i]);

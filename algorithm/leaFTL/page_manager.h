@@ -31,3 +31,6 @@ void g_buffer_init(align_buffer *);
 void g_buffer_free(align_buffer *);
 void g_buffer_insert(align_buffer *g_buffer, char *data, uint32_t lba);
 void g_buffer_to_temp_map(align_buffer *buf, temp_map *tmap, uint32_t *piece_ppa_res);
+
+
+void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa);

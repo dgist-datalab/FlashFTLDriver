@@ -3,6 +3,7 @@
 #include "./page_manager.h"
 #include "./lea_container.h"
 #include "./issue_io.h"
+#include "../../include/debug_utils.h"
 
 uint32_t *exact_map;
 lea_write_buffer *wb;
@@ -10,7 +11,10 @@ page_manager *pm;
 lower_info *lower;
 temp_map user_temp_map;
 temp_map gc_temp_map;
+extern uint32_t test_key;
+extern uint32_t lea_test_piece_ppa;
 #define WRITE_BUF_SIZE (32*1024*1024)
+#define INITIAL_STATE_PADDR (UINT32_MAX)
 
 struct algorithm lea_FTL={
     .argument_set=lea_argument,
@@ -110,11 +114,11 @@ uint32_t lea_read(request *const req){
     return 1;
 }
 
-void lea_mapping_update(temp_map *map){
+void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
     /*udpate mapping*/
     for (uint32_t i = 0; i < map->size; i++){
-        if(map->lba[i]==998312){
-            printf("%u -->%u\n", map->lba[i], map->piece_ppa[i]);
+        if(exact_map[map->lba[i]]!=INITIAL_STATE_PADDR && isgc==false){
+            invalidate_piece_ppa(bm, exact_map[map->lba[i]]);
         }
         exact_map[map->lba[i]]=map->piece_ppa[i];
     }
@@ -128,21 +132,18 @@ bool write_buffer_check_ignore(uint32_t lba){
 
 uint32_t lea_write(request *const req){
     lea_write_buffer_insert(wb, req->key, req->value->value);
-    if(req->key==998312){
-        printf("target insert!\n");
-    }
     if(lea_write_buffer_isfull(wb)){
         uint32_t remain_space;
 retry:
         remain_space=pm_remain_space(pm, true);
         if(lea_write_buffer_flush(wb, pm, &user_temp_map, remain_space) == false){
-            lea_mapping_update(&user_temp_map);
+            lea_mapping_update(&user_temp_map, pm->bm, false);
             if(pm_assign_new_seg(pm) == false){
                 /*gc_needed*/
                 __gsegment *gc_target=pm_get_gc_target(pm->bm);
                 if(pm->usedup_segments->find(gc_target->seg_idx) != pm->usedup_segments->end()){
                     pm_gc(pm, gc_target, &gc_temp_map, true, write_buffer_check_ignore);
-                    lea_mapping_update(&gc_temp_map);
+                    lea_mapping_update(&gc_temp_map, pm->bm, true);
                 }
                 else{
                     printf("usedup segment error!\n");
@@ -152,7 +153,7 @@ retry:
             goto retry;
         }
         else{
-            lea_mapping_update(&user_temp_map);
+            lea_mapping_update(&user_temp_map, pm->bm, false);
         }
         lea_write_buffer_clear(wb);
     }

@@ -2,12 +2,14 @@
 #include "./issue_io.h"
 #include "../../interface/interface.h"
 #include "../../include/data_struct/list.h"
+#include "../../include/debug_utils.h"
 #include <string.h>
 #include <algorithm>
+uint32_t lea_test_piece_ppa=148125;
 typedef struct io_param{
     uint32_t type;
     uint32_t ppa;
-    bool isdone;
+    volatile bool isdone;
     value_set *value;
 }io_param;
 
@@ -51,7 +53,7 @@ void g_buffer_insert(align_buffer *g_buffer, char *data, uint32_t lba){
     g_buffer->idx++;
 }
 
-static void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa){
+void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa){
     bm->bit_unset(bm, piece_ppa);
 }
 
@@ -179,6 +181,27 @@ static io_param *send_gc_req(lower_info *lower, uint32_t ppa, uint32_t type, val
     return res;
 } 
 
+
+static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *target){
+    std::set<uint32_t>::iterator iter=pm->usedup_segments->find(target->seg_idx);
+    if(iter==pm->usedup_segments->end()){
+        printf("it cannot matched! %s:%u\n", __FUNCTION__, __LINE__);
+        abort();
+    }
+    else{
+        pm->usedup_segments->erase(iter);
+    }
+
+    /*reset active segment and reserve segment*/
+    bm->trim_segment(bm ,target);
+    pm->active=pm->reserve;
+    bm->change_reserve_to_active(bm, pm->reserve);
+    pm->reserve=bm->get_segment(bm, BLOCK_RESERVE);
+    if(pm->reserve->invalidate_piece_num!=0){
+        abort();
+    }
+}
+
 void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, bool (*ignore)(uint32_t lba)){
     uint32_t page;
     uint32_t bidx, pidx;
@@ -186,6 +209,10 @@ void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, boo
     list *temp_list=list_init();
     io_param *gp; //gc_param;
 
+    if(target->all_invalid){
+        pm_gc_finish(pm, bm, target);
+        return;
+    }
     /*read phase*/
     for_each_page_in_seg(target, page, bidx, pidx){
         bool should_read=false;
@@ -202,25 +229,24 @@ void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, boo
         }
     }
 
-    
     /*converting read data*/
     li_node *now, *nxt;
     uint32_t* lba_arr;
     std::vector<gc_node> temp_vector;
     gc_node gn;
-    while(temp_list->size){
-        for_each_list_node_safe(temp_list, now, nxt){
-            gp=(io_param*)now->data;
-            if(gp->isdone==false) continue;
-            lba_arr=(uint32_t*)bm->get_oob(bm, gp->ppa);
-            for(uint32_t i=0; i<L2PGAP; i++){
-                if(bm->is_invalid_piece(bm, gp->ppa*L2PGAP+i)) continue;
-                if(ignore && ignore(lba_arr[i])) continue;
+    for_each_list_node_safe(temp_list, now, nxt){
+        gp = (io_param *)now->data;
+        while(gp->isdone==false){}
+        lba_arr = (uint32_t *)bm->get_oob(bm, gp->ppa);
+        for (uint32_t i = 0; i < L2PGAP; i++){
+            if (bm->is_invalid_piece(bm, gp->ppa * L2PGAP + i))
+                continue;
+            if (ignore && ignore(lba_arr[i]))
+                continue;
 
-                gn.lba=lba_arr[i];
-                gn.value=&gp->value->value[i*LPAGESIZE];
-                temp_vector.push_back(gn);
-            }
+            gn.lba = lba_arr[i];
+            gn.value = &gp->value->value[i * LPAGESIZE];
+            temp_vector.push_back(gn);
         }
     }
 
@@ -251,13 +277,11 @@ void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, boo
     }
     list_free(temp_list);
 
-    /*reset active segment and reserve segment*/   
-    bm->trim_segment(bm ,target);
-    pm->active=pm->reserve;
-    bm->change_reserve_to_active(bm, pm->reserve);
-    pm->reserve=bm->get_segment(bm, BLOCK_RESERVE);
+    pm_gc_finish(pm, bm, target);
+    return;
 }
 
 void pm_free(page_manager *pm){
+    delete pm->usedup_segments;
     free(pm);
 }
