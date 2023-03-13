@@ -5,6 +5,7 @@
 #include "types.h"
 #include "utils.h"
 #include "sem_lock.h"
+#include "../interface/queue.h"
 #include <stdarg.h>
 #include <pthread.h>
 
@@ -220,6 +221,7 @@ typedef struct ghostsegment{ //for gc
 
 struct blockmanager{
 	uint32_t (*create) (struct blockmanager*,lower_info *);
+	void* (*q_return) (struct blockmanager*);
 	uint32_t (*destroy) (struct blockmanager*);
 	__block* (*get_block) (struct blockmanager*,__segment*);
 	__block *(*pick_block)(struct blockmanager*, uint32_t page_num);
@@ -230,6 +232,7 @@ struct blockmanager{
 	bool (*is_gc_needed) (struct blockmanager*);
 	int (*get_free_segment_number) (struct blockmanager*);
 	__gsegment* (*get_gc_target) (struct blockmanager*);
+	__gsegment* (*jy_get_gc_target) (struct blockmanager*, queue*);
 	void (*trim_segment) (struct blockmanager*, __gsegment*, struct lower_info*);
 	void (*free_segment)(struct blockmanager *,__segment*);
 	int (*populate_bit) (struct blockmanager*, uint32_t ppa);
@@ -241,6 +244,8 @@ struct blockmanager{
 	void (*set_oob)(struct blockmanager*, char* data, int len, uint32_t ppa);
 	char *(*get_oob)(struct blockmanager*, uint32_t ppa);
 	__segment* (*change_reserve)(struct blockmanager *, __segment *reserve);
+	void (*jy_add_queue)(struct blockmanager*, queue* group_q, __segment* reserve);
+	int (*jy_move_q2h)(struct blockmanager*, queue* q, int size);
 	void (*reinsert_segment)(struct blockmanager *, uint32_t seg_idx);
 	uint32_t (*remain_free_page)(struct blockmanager *, __segment *active);
 	void (*invalidate_number_decrease)(struct blockmanager *, uint32_t ppa);

@@ -11,11 +11,37 @@ void mh_init(mh** h, int bn, void(*a)(void*,void*), void(*b)(void*a, void*), int
 	(*h)->swap_hptr=a;
 	(*h)->assign_hptr=b;
 	(*h)->get_cnt=get_cnt;
+
+	q_init(&((*h)->q), bn);
+}
+
+void mh_change_msize(int msize, mh *h) {
+	if (msize <= h->size) {
+		printf("heap max size is smaller than number of blocks\n");
+	} else {
+		hn* new_hn = (hn*)calloc(sizeof(hn), 2*(msize+1));
+		memcpy(new_hn, h->body, h->max);
+		free(h->body);
+		h->body = new_hn;
+		h->max = msize;
+	}
+}
+
+int mh_freesize(mh* h) {
+	return h->max - h->size;
 }
 
 void mh_free(mh* h){
 	free(h->body);
+	if (h->q) q_free(h->q);
 	free(h);
+}
+
+queue* mh_free_wo_queue(mh *h) {
+	free(h->body);
+	queue* res = h->q;
+	free(h);
+	return res;
 }
 
 static hn* maxchild(mh *h, hn *n){
@@ -53,6 +79,10 @@ hn* mh_internal_update(mh *h, hn* n){
 			n->data=p->data;
 			p->data=data;
 
+			node* tnode = n->qnode;
+			n->qnode = p->qnode;
+			p->qnode=tnode;
+
 			h->swap_hptr(p->data,n->data);
 			chgd=p;
 		}
@@ -76,6 +106,10 @@ hn* mh_internal_downdate(mh *h, hn *n){
 				child->data=chgd->data;
 				chgd->data=data;
 
+				node* tnode = child->qnode;
+				child->qnode = chgd->qnode;
+				chgd->qnode = tnode;
+
 				h->swap_hptr(child->data,chgd->data);
 				chgd=child;
 			}
@@ -96,6 +130,8 @@ void mh_insert(mh* h, void *data, int number){
 	hn* n=&h->body[h->size];
 	n->data=data;
 	n->cnt=number;
+
+	n->qnode = q_enqueue_node(data, h->q);
 	
 	h->assign_hptr(data,(void*)n);
 	mh_internal_update(h,n);
@@ -103,8 +139,11 @@ void mh_insert(mh* h, void *data, int number){
 
 void *mh_get_max(mh* h){
 	void *res=(void*)h->body[1].data;
+	q_delete(h->q, h->body[1].qnode);
+	
 	h->body[1].data=h->body[h->size].data;
 	h->body[1].cnt=h->body[h->size].cnt;
+	h->body[1].qnode = h->body[h->size].qnode;
 	h->body[h->size].data=NULL;
 
 	mh_internal_downdate(h,&h->body[1]);
@@ -132,6 +171,7 @@ void mh_insert_append(mh *h, void *data){
 	h->size++;
 	hn* n=&h->body[h->size];
 	n->data=data;
+	n->qnode = q_enqueue_node(data, h->q);
 	h->assign_hptr(data,(void*)n);
 }
 

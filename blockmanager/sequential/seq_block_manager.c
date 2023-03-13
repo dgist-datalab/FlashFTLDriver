@@ -7,6 +7,7 @@ static uint64_t total_invalidate_piece_ppa;
 
 struct blockmanager seq_bm={
 	.create=seq_create,
+	.q_return = return_heap_queue,
 	.destroy=seq_destroy,
 	.get_block=seq_get_block,
 	.pick_block=seq_pick_block,
@@ -19,6 +20,7 @@ struct blockmanager seq_bm={
 	.get_free_segment_number=seq_get_free_segment_number,
 
 	.get_gc_target=seq_get_gc_target,
+	.jy_get_gc_target=seq_jy_get_gc_target,
 	.trim_segment=seq_trim_segment,
 	.free_segment=seq_free_segment,
 	.populate_bit=seq_populate_bit,
@@ -30,6 +32,8 @@ struct blockmanager seq_bm={
 	.set_oob=seq_set_oob,
 	.get_oob=seq_get_oob,
 	.change_reserve=seq_change_reserve,
+	.jy_add_queue=seq_jy_add_queue,
+	.jy_move_q2h=seq_jy_move_q2h,
 	.reinsert_segment=seq_reinsert_segment,
 	.remain_free_page=seq_remain_free_page,
 	.invalidate_number_decrease=seq_invalidate_number_decrease,
@@ -114,6 +118,12 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	return 1;
 }
 
+void* return_heap_queue(struct blockmanager* bm) {
+	sbm_pri *p = (sbm_pri*)bm->private_data;
+	queue* res = p->max_heap->q;
+	return (void*)res;
+}
+
 uint32_t seq_destroy (struct blockmanager* bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	free(p->seq_block);
@@ -188,6 +198,7 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
 	uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
 	uint32_t segment_idx=segment_start_block_number/BPS;
+	if (reserve->seg_idx != segment_idx) printf("seg idx is different\n");
 	block_set *bs=&p->logical_segment[segment_idx];
 
 	mh_insert_append(p->max_heap, (void*)bs);
@@ -195,6 +206,36 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 	return seq_get_segment(bm,true);
 }
 
+void seq_jy_add_queue(struct blockmanager* bm, queue* group_q, __segment *reserve) {
+	if (group_q==NULL) printf("there is no queue: seq_jy_add_queue()\n");
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+        uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
+        uint32_t segment_idx=segment_start_block_number/BPS;
+        block_set *bs=&p->logical_segment[segment_idx];
+
+	q_enqueue((void*)bs, group_q);
+}
+
+int seq_jy_move_q2h(struct blockmanager* bm, queue* q, int size) {
+	sbm_pri *p = (sbm_pri*)bm->private_data;
+	block_set *bs;
+	if (size > q->size) {
+		printf("trying to move blocks more than existed\n");
+		return 0;
+	}
+	if (size==0) size = q->size;
+	int num=0;
+	for (int i=0;i<size;i++) {
+		num++;
+		bs = (block_set*)q_dequeue(q);
+		if (bs == NULL) {
+			printf("queue size is different with real size: seq_jy_move_q2h() in block_manager.c\n");
+			abort();
+		}
+		mh_insert_append(p->max_heap, (void*)bs);
+	}
+	return num;
+}
 
 void seq_reinsert_segment(struct blockmanager *bm, uint32_t seg_idx){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
@@ -271,6 +312,39 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 
 	return res;
 }
+
+__gsegment* seq_jy_get_gc_target (struct blockmanager* bm, queue* group_q){
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	__gsegment* res=(__gsegment*)malloc(sizeof(__gsegment));
+	res->invalidate_number=0;
+
+	block_set *target=NULL;
+	if(p->invalid_block_q->size){
+		target=(block_set*)q_dequeue(p->invalid_block_q);
+	}
+	else{
+		target=(block_set*)q_dequeue(group_q);
+	}
+
+	if(!target) return NULL;
+
+	memcpy(res->blocks, target->blocks, sizeof(__block*)*BPS);
+	res->now=res->max=0;
+	res->seg_idx=res->blocks[0]->block_num/BPS;
+
+	res->invalidate_number=target->total_invalid_number;
+	res->validate_number=target->total_valid_number;
+
+	if(target->total_invalid_number==target->total_valid_number){
+		res->all_invalid=true;
+	}
+	else{
+		res->all_invalid=false;
+	}
+
+	return res;
+}
+
 
 uint32_t seq_get_invalidate_blk_number(struct blockmanager *bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;

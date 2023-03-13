@@ -296,7 +296,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 //	uint32_t tmp2_max = 100663296;
 //	uint32_t zip_08=201326592;
 	uint32_t zip_32=41943139;
-	printf("request: %s\n", request_raw);
+	//printf("request: %s\n", request_raw);
 	if (strstr(request_raw, load_sig)) {
 		load_signal=1;
 		return NULL;	
@@ -322,6 +322,8 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		abort();
 	}
 	*/
+
+	//tmp = strtok(NULL, " \t");
 	int ttp = atoi(tmp);
 	if (ttp == 0) type=FS_GET_T;
 	else if (ttp == 1) type = FS_SET_T;

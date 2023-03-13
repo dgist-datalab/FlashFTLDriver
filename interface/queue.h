@@ -34,6 +34,7 @@ typedef struct queue{
 	node *head;
 	node *tail;
 }queue;
+
 void q_init(queue**,int);
 bool q_enqueue(void *,queue*);
 bool q_enqueue_front(void *,queue*);
@@ -42,6 +43,9 @@ void q_lock(queue*);
 void q_unlock(queue*);
 void *q_dequeue(queue*);
 void q_free(queue*);
+
+node* q_enqueue_node(void *, queue*);
+void *q_delete(queue *q, node* n);
 
 bool q_enqueue_int(int, queue*);
 int q_dequeue_int(queue*);

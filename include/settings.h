@@ -51,8 +51,8 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 128L
-#define OP 10
+#define GIGAUNIT 32L
+#define OP 90
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
 #define REALSIZE (512L*G)
@@ -84,6 +84,7 @@
 #define _NOP (_NOS*_PPS)
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
+#define LBANUM (SHOWINGSIZE/LPAGESIZE)
 
 #define RANGE (SHOWINGSIZE/LPAGESIZE)
 #define DEVFULL ((uint32_t)TOTALSIZE/LPAGESIZE)

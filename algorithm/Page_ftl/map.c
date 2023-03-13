@@ -1,5 +1,7 @@
 #include "map.h"
 #include "gc.h"
+#include "model.h"
+#include "midas.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
@@ -7,36 +9,44 @@
 extern uint32_t test_key;
 extern algorithm page_ftl;
 
-uint32_t *seg_ratio;
-uint32_t req_num=0;
-char gcur=0;
+uint32_t utilization = 0;
 FILE *vFile;
 //FILE *gFile;
 //FILE *wFile;
 
-FILE *hFile_10;
-FILE *hFile_20;
-FILE *hFile_30;
-FILE *hFile_40;
-FILE *hFile_50;
-
-FILE *tFile_10;
-FILE *tFile_20;
-FILE *tFile_30;
-FILE *tFile_40;
-FILE *tFile_50;
-
-
+G_INFO *G_info;
+extern STAT *stat;
 
 void page_map_create(){
+	model_create(TIME_WINDOW);
 	printf("NOS: %d\n", _NOS);
-	seg_ratio=(uint32_t*)calloc((GNUMBER), sizeof(uint32_t));
 	pm_body *p=(pm_body*)calloc(sizeof(pm_body),1);
 	p->mapping=(uint32_t*)malloc(sizeof(uint32_t)*_NOP*L2PGAP);
+	p->ginfo = (uint32_t*)malloc(sizeof(uint32_t)*_NOS);
+	p->gcur = 0;
+	for (int i=0;i<_NOS;i++) {
+		p->ginfo[i] = UINT_MAX;
+	}
 	for(int i=0;i<_NOP*L2PGAP; i++){
 		p->mapping[i]=UINT_MAX;
 	}
-	p->reserve=(__segment **)malloc(sizeof(__segment*)*(GNUMBER-1));
+	p->active=(__segment **)malloc(sizeof(__segment*)*GNUMBER);
+	p->group = (queue**)malloc(sizeof(queue*)*MAX_G);
+	
+	p->gnum=GNUMBER;
+
+	p->m = (midas*)malloc(sizeof(midas));
+	p->m->config = (uint32_t*)calloc(sizeof(uint32_t),MAX_G);
+	p->m->config[0]=_NOS-3;
+	p->m->vr = (double*)malloc(sizeof(double)*MAX_G);
+	p->m->status=false;
+	p->m->time_window = TIME_WINDOW;
+	q_init(&(p->active_q), 20);
+
+	p->n = (naive*)malloc(sizeof(naive));
+	p->n->naive_on=true;
+	p->n->naive_start=0;
+	p->n->naive_q = (queue*)page_ftl.bm->q_return(page_ftl.bm);
 	/*	
 	for (uint32_t i=0;i<GNUMBER-1;i++) { 
 		p->reserve[i]=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
@@ -50,70 +60,35 @@ void page_map_create(){
 	//sprintf(name, "./valid_ratio/11_valid_%d", GNUMBER);
 	//vFile = fopen(name, "w");
 
-	char *ttp=(char*)malloc(4);
-	if (BENCH_JY == 0) ttp = "08";
-	else if (BENCH_JY == 1) ttp = "11";
-	else ttp = "ran";	
-	sprintf(name, "./valid_ratio/r_%s_hot_10", ttp);
-	hFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_20", ttp);
-	hFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_30", ttp);
-	hFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_40", ttp);
-	hFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_50", ttp);
-	hFile_50 = fopen(name, "w");
-
-	sprintf(name, "./valid_ratio/tot_%s_hot_10", ttp);
-	tFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_20", ttp);
-	tFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_30", ttp);
-	tFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_40", ttp);
-	tFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_50", ttp);
-	tFile_50 = fopen(name, "w");
-
-	sprintf(name, "./valid_ratio/valid_%s", ttp);
+	sprintf(name, "./valid_ratio/valid_tmp");
 	vFile = fopen(name, "w");
 
 
-/*
-	sprintf(name, "./valid_ratio/tmp_10");
-	hFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_20");
-	hFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_30");
-	hFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_40");
-	hFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_50");
-	hFile_50 = fopen(name, "w");
-*/
-
-	setbuf(hFile_10, NULL);
-	setbuf(hFile_20, NULL);
-	setbuf(hFile_30, NULL);
-	setbuf(hFile_40, NULL);
-	setbuf(hFile_50, NULL);
-
-	setbuf(tFile_10, NULL);
-        setbuf(tFile_20, NULL);
-        setbuf(tFile_30, NULL);
-        setbuf(tFile_40, NULL);
-        setbuf(tFile_50, NULL);
-
 	setbuf(vFile, NULL);
-	p->active=page_ftl.bm->get_segment(page_ftl.bm,true); //now active block for inserted request.
+	p->active[0]=page_ftl.bm->get_segment(page_ftl.bm,true); //now active block for inserted request.
+	stat->g->gsize[0]++;
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
+	seg_assign_ginfo(p->active[0]->seg_idx, 0);
+}
+
+uint32_t seg_assign_ginfo(uint32_t seg_idx, uint32_t group_number) {
+	pm_body *p = (pm_body*)page_ftl.algo_body;
+	uint32_t tmp = p->ginfo[seg_idx];
+	p->ginfo[seg_idx] = group_number;
+	return tmp;
+}
+
+uint32_t seg_get_ginfo(uint32_t seg_idx) {
+	pm_body *p = (pm_body*)page_ftl.algo_body;
+	uint32_t res = p->ginfo[seg_idx];
+	return res;
 }
 
 uint32_t page_map_assign(KEYT* lba, uint32_t max_idx){
 	//printf("lba : %lu\n", lba);
 	uint32_t res=0;
-	req_num+=4;
+	stat->write+=4;
+	stat->tmp_write+=4;
 	res=get_ppa(lba, L2PGAP);
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	for(uint32_t i=0; i<L2PGAP; i++){
@@ -123,7 +98,7 @@ uint32_t page_map_assign(KEYT* lba, uint32_t max_idx){
 		if(p->mapping[t_lba]!=UINT_MAX){
 			/*when mapping was updated, the old one is checked as a inavlid*/
 			invalidate_ppa(p->mapping[t_lba]);
-		}
+		} else utilization++;
 		/*mapping update*/
 		p->mapping[t_lba]=res*L2PGAP+i;
 		if(t_lba==test_key){
@@ -153,6 +128,7 @@ uint32_t page_map_trim(uint32_t lba){
 	else{
 		invalidate_ppa(res);
 		p->mapping[lba]=UINT32_MAX;
+		utilization--;
 		return 1;
 	}
 }
@@ -163,20 +139,37 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx, uint32_t mig_count){
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	if (mig_count > GNUMBER) printf("mig count problem is found in gc_update******\n");
 	/*when the gc phase, It should get a page from the reserved block*/
-	uint32_t group_idx = mig_count-1;
-	if (mig_count == 0) group_idx = mig_count;
+	//if (mig_count == 0) group_idx = mig_count;
 retry:
-	if (gcur <= group_idx) {
+	//if (p->gcur < mig_count) {
+	if (p->active[mig_count]==NULL) {
 		//initialize migration group
-		p->reserve[group_idx] = page_ftl.bm->get_segment(page_ftl.bm, true);
-		++gcur;
+		p->active[mig_count] = page_ftl.bm->get_segment(page_ftl.bm, true);
+		seg_assign_ginfo(p->active[mig_count]->seg_idx, mig_count);
+		stat->g->gsize[mig_count]++;
+		++p->gcur;
 	}
-	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve[group_idx]);
+	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active[mig_count]);
 	if (res==UINT32_MAX){
-		__segment* tmp=p->reserve[group_idx];
-		seg_ratio[group_idx+1]++;
-		p->reserve[group_idx] = page_ftl.bm->change_reserve(page_ftl.bm, p->reserve[group_idx]);
+		__segment* tmp=p->active[mig_count];
+		stat->g->gsize[mig_count]++;
+		if (p->active_q->size) {
+			p->active[mig_count] = (__segment*)q_dequeue(p->active_q);
+			if (mig_count >= p->n->naive_start) {
+				page_ftl.bm->reinsert_segment(page_ftl.bm, tmp->seg_idx);
+			} else {
+				page_ftl.bm->jy_add_queue(page_ftl.bm, p->group[mig_count], tmp);	
+			}
+		} else {
+			if (mig_count >= p->n->naive_start) {
+				p->active[mig_count] = page_ftl.bm->change_reserve(page_ftl.bm, p->active[mig_count]);
+			} else {
+				p->active[mig_count] = page_ftl.bm->get_segment(page_ftl.bm,true);
+				page_ftl.bm->jy_add_queue(page_ftl.bm, p->group[mig_count], tmp);
+			}
+		}
 		page_ftl.bm->free_segment(page_ftl.bm, tmp);
+		seg_assign_ginfo(p->active[mig_count]->seg_idx, mig_count);
 		goto retry;
 	}
 
@@ -205,26 +198,11 @@ retry:
 void page_map_free(){
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	free(p->mapping);
-	free(seg_ratio);
-	free(p->reserve);
+	free(p->active);
 	free(p);
 	fclose(vFile);
 	//fclose(gFile);
 	//fclose(wFile);
-	
-	fclose(hFile_10);
-	fclose(hFile_20);
-	fclose(hFile_30);
-	fclose(hFile_40);
-	fclose(hFile_50);
-	
-	fclose(tFile_10);
-	fclose(tFile_20);
-	fclose(tFile_30);
-	fclose(tFile_40);
-	fclose(tFile_50);
-	
-
 }
 
 

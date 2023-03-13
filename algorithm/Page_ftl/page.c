@@ -8,6 +8,8 @@
 #include "../../include/data_struct/lrucache.hpp"
 #include "page.h"
 #include "map.h"
+#include "model.h"
+#include "midas.h"
 #include "../../bench/bench.h"
 
 //#define LBA_LOGGING "/lba_log"
@@ -16,7 +18,7 @@
 uint32_t log_fd;
 #endif
 
-
+STAT* stat;
 extern uint32_t test_key;
 align_buffer a_buffer;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
@@ -37,6 +39,7 @@ page_read_buffer rb;
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	algo->li=li; //lower_info means the NAND CHIP
 	algo->bm=bm; //blockmanager is managing invalidation 
+	stat_init();
 	page_map_create();
 
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
@@ -155,15 +158,30 @@ uint32_t page_read(request *const req){
 	}
 	return 1;
 }
-uint32_t size=0;
+bool naive_status = true;
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	bool overlap=false;
 
 	uint32_t overlapped_idx=UINT32_MAX;
 	
-	++size;
-	if (size%262144==0) printf("\rwrite size: %dGB", size/262144);
-	if (size%8388608==0) printf("\n");
+	if (stat->cur_req%262144==0) {
+		stat->write_gb++;
+		printf("\rwrite size: %dGB", stat->write_gb);
+		if (stat->errcheck) stat->errcheck_time++;
+	}
+	if (stat->cur_req%8388608==0) {
+		printf("\n");
+		print_stat();
+	}
+	if ((stat->write_gb%1==0) && (stat->cur_req%262144==0)) {
+                int st = check_modeling();
+		if (st) print_stat();
+	}
+	if ((stat->errcheck_time==stat->err_window) && (stat->cur_req%262144==0)) {
+		err_check();
+	}
+
+
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		if(a_buffer.key[i]==req->key){
 			overlapped_idx=i;
@@ -202,7 +220,9 @@ uint32_t page_write(request *const req){
 #ifdef LBA_LOGGING
 	dprintf(log_fd, "W %u\n",req->key);
 #endif
+	stat->cur_req++;
 	//printf("write key :%u\n",req->key);
+	check_time_window(req->key, M_WRITE);
 	align_buffering(req, 0, NULL);
 	req->value=NULL;
 	req->end_req(req);
@@ -211,6 +231,8 @@ uint32_t page_write(request *const req){
 }
 
 uint32_t page_remove(request *const req){
+	stat->cur_req++;
+	check_time_window(req->key, M_REMOVE);
 	for(uint8_t i=0; i<a_buffer.idx; i++){
 		if(a_buffer.key[i]==req->key){
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);

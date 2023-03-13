@@ -30,11 +30,35 @@ bool q_enqueue(void* req, queue* q){
 	}
 	else{
 		q->tail->next=new_node;
+		new_node->prev = q->tail;
 		q->tail=new_node;
 	}
 	q->size++;
 	pthread_mutex_unlock(&q->q_lock);
 	return true;
+}
+
+node* q_enqueue_node(void* req, queue* q){
+        pthread_mutex_lock(&q->q_lock);
+        if(q->size==q->m_size){
+                pthread_mutex_unlock(&q->q_lock);
+                return NULL;
+        }
+
+        node *new_node=(node*)malloc(sizeof(node));
+        new_node->d.req=req;
+        new_node->next=NULL;
+        if(q->size==0){
+                q->head=q->tail=new_node;
+        }
+        else{
+                q->tail->next=new_node;
+		new_node->prev = q->tail;
+                q->tail=new_node;
+        }
+        q->size++;
+        pthread_mutex_unlock(&q->q_lock);
+        return new_node;
 }
 
 bool q_enqueue_front(void *req, queue*q){
@@ -51,6 +75,7 @@ bool q_enqueue_front(void *req, queue*q){
 	}
 	else{
 		new_node->next=q->head;
+		q->head->prev = new_node;
 		q->head=new_node;
 	}
 //	printf("ef-key:%u\n",((request*)req)->key);
@@ -68,9 +93,10 @@ void* q_dequeue(queue *q){
 	node *target_node;
 	target_node=q->head;
 	q->head=q->head->next;
+	q->size--;
+	if (q->size != 0) q->head->prev = NULL;
 
 	void *res=target_node->d.req;
-	q->size--;
 //	printf("of-key:%u\n",((request*)res)->key);
 	free(target_node);
 	pthread_mutex_unlock(&q->q_lock);
@@ -111,6 +137,7 @@ bool q_enqueue_int(int req, queue* q){
 	}
 	else{
 		q->tail->next=new_node;
+		new_node->prev = q->tail;
 		q->tail=new_node;
 	}
 	q->size++;
@@ -127,6 +154,7 @@ int q_dequeue_int(queue* q){
 	node *target_node;
 	target_node=q->head;
 	q->head=q->head->next;
+	q->head->prev = NULL;
 
 	int res=target_node->d.data;
 	q->size--;
@@ -134,4 +162,21 @@ int q_dequeue_int(queue* q){
 	free(target_node);
 	pthread_mutex_unlock(&q->q_lock);
 	return res;
+}
+
+void *q_delete(queue *q, node* n) {
+        pthread_mutex_lock(&q->q_lock);
+        if (q->head == n) {
+                q->head = n->next;
+        } else if (q->tail == n) {
+                q->tail = n->prev;
+        } else {
+                n->prev->next = n->next;
+                n->next->prev = n->prev;
+        }
+        q->size--;
+        void *res = n->d.req;
+        free(n);
+        pthread_mutex_unlock(&q->q_lock);
+        return res;
 }

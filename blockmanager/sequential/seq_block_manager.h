@@ -4,16 +4,9 @@
 #include "../../interface/queue.h"
 #include "../../include/data_struct/heap.h"
 #include "../bb_checker.h"
+#include "block_str.h"
 #include <stdint.h>
 
-typedef struct block_set{
-	uint32_t total_invalid_number;
-	uint32_t total_valid_number;
-	uint32_t used_page_num;
-	uint8_t type;
-	__block *blocks[BPS];
-	void *hptr;
-}block_set;
 
 typedef struct seq_bm_private{
 	__block *seq_block;
@@ -30,6 +23,7 @@ typedef struct seq_bm_private{
 }sbm_pri;
 
 uint32_t seq_create (struct blockmanager*, lower_info *li);
+void* return_heap_queue(struct blockmanager*);
 uint32_t seq_destroy (struct blockmanager*);
 __block* seq_get_block (struct blockmanager*, __segment *);
 __block *seq_pick_block(struct blockmanager *, uint32_t page_num);
@@ -40,6 +34,7 @@ bool seq_is_gc_needed (struct blockmanager*);
 int seq_get_free_segment_number(struct blockmanager*);
 
 __gsegment* seq_get_gc_target (struct blockmanager*);
+__gsegment* seq_jy_get_gc_target (struct blockmanager*, queue* group_q);
 void seq_trim_segment (struct blockmanager*, __gsegment*, struct lower_info*);
 int seq_populate_bit (struct blockmanager*, uint32_t ppa);
 int seq_unpopulate_bit (struct blockmanager*, uint32_t ppa);
@@ -51,6 +46,8 @@ void seq_set_oob(struct blockmanager*, char *data, int len, uint32_t ppa);
 char* seq_get_oob(struct blockmanager*, uint32_t ppa);
 void seq_release_segment(struct blockmanager*, __segment *);
 __segment* seq_change_reserve(struct blockmanager* ,__segment *reserve);
+void seq_jy_add_queue(struct blockmanager*, queue* group_q, __segment* reserve);
+int seq_jy_move_q2h(struct blockmanager*, queue* q, int size);
 int seq_get_page_num(struct blockmanager* ,__segment *);
 int seq_pick_page_num(struct blockmanager* ,__segment *);
 void seq_reinsert_segment(struct blockmanager *, uint32_t seg_idx);
