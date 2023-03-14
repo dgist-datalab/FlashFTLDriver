@@ -4,13 +4,12 @@
 #include "./lea_container.h"
 #include "./page_manager.h"
 #include <map>
-using namespace std;
 
 typedef struct lea_write_buffer{
     uint32_t ps_ptr; //physical_sector_ptr;
     uint32_t max_ps_ptr;
     char **sector_buffer; //data_logger;
-    map<uint32_t, uint32_t> L2P_map; 
+    std::map<uint32_t, uint32_t> L2P_map; 
     align_buffer page_buf;
 }lea_write_buffer;
 

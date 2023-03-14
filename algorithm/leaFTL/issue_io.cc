@@ -1,4 +1,6 @@
 #include "issue_io.h"
+#include "../../include/debug_utils.h"
+extern uint32_t lea_test_piece_ppa;
 static inline algo_req *algo_req_init(request *req, uint32_t type, void *param, void *(*end_req)(algo_req *const)){
     algo_req *res=(algo_req*)malloc(sizeof(algo_req));
     res->parents=req;
@@ -18,6 +20,9 @@ algo_req *send_IO_back_req(uint32_t type, lower_info *li, uint32_t ppa, value_se
     case GCDW:
     case DATAW:
         li->write(ppa, PAGESIZE, value, res);
+        break;
+    case DATAR:
+        li->read(ppa, PAGESIZE, value, res);
         break;
     default:
         printf("not defined type %s:%u\n", __FUNCTION__, __LINE__);

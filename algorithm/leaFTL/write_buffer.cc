@@ -19,7 +19,7 @@ lea_write_buffer *lea_write_buffer_init(uint32_t max_write_buffer_byte){
 
 bool lea_write_buffer_flush(lea_write_buffer *wb, page_manager *pm, temp_map *tmap, uint32_t page_size){
     bool res;
-    map<uint32_t, uint32_t>::iterator iter;
+    std::map<uint32_t, uint32_t>::iterator iter;
     /*making map*/
     
     uint32_t target_flush_size=MIN(page_size*L2PGAP, wb->L2P_map.size());
@@ -57,7 +57,7 @@ bool lea_write_buffer_isfull(lea_write_buffer *wb){
 }
 
 uint32_t lea_write_buffer_insert(lea_write_buffer *wb, uint32_t lba, char *data){
-    map<uint32_t, uint32_t>::iterator iter=wb->L2P_map.find(lba);
+    std::map<uint32_t, uint32_t>::iterator iter=wb->L2P_map.find(lba);
     char *target_ptr;
     if(iter!=wb->L2P_map.end()){
         target_ptr=wb->sector_buffer[iter->second];
@@ -72,7 +72,7 @@ uint32_t lea_write_buffer_insert(lea_write_buffer *wb, uint32_t lba, char *data)
 }
 
 char * lea_write_buffer_get(lea_write_buffer *wb, uint32_t lba){
-    map<uint32_t, uint32_t>::iterator iter=wb->L2P_map.find(lba);
+    std::map<uint32_t, uint32_t>::iterator iter=wb->L2P_map.find(lba);
     if(iter!=wb->L2P_map.end()){
         return wb->sector_buffer[iter->second];
     }

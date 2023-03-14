@@ -5,7 +5,8 @@
 #include "../../include/debug_utils.h"
 #include <string.h>
 #include <algorithm>
-uint32_t lea_test_piece_ppa=148125;
+extern uint32_t test_key;
+uint32_t lea_test_piece_ppa=65644;
 typedef struct io_param{
     uint32_t type;
     uint32_t ppa;
@@ -42,6 +43,13 @@ void g_buffer_to_temp_map(align_buffer *g_buffer, temp_map *res, uint32_t *piece
     for(uint32_t idx=0; idx<g_buffer->idx; idx++){
         res->lba[res->size]=g_buffer->key[idx];
         res->piece_ppa[res->size]=piece_ppa_arr[idx];
+        if(res->size!=0){
+            res->interval[res->size-1]=res->lba[res->size]-res->lba[res->size-1];
+            if(res->interval[res->size-1] < 0){
+                printf("interval less than 0, not sorted set!\n");
+                abort();
+            }
+        }
         res->size++;
     }
     g_buffer->idx=0;
@@ -55,11 +63,17 @@ void g_buffer_insert(align_buffer *g_buffer, char *data, uint32_t lba){
 
 void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa){
     bm->bit_unset(bm, piece_ppa);
+    if(piece_ppa==lea_test_piece_ppa){
+        printf("%u is invalidate\n", piece_ppa);
+    }
 }
 
 static void validate_ppa(blockmanager *bm, uint32_t ppa, KEYT *lba, uint32_t max_idx){
     for(uint32_t i=0; i<max_idx; i++){
         bm->bit_set(bm, ppa*L2PGAP+i);
+        if(lba[i]==test_key){
+            printf("%u is mapped to %u\n", lba[i], ppa*L2PGAP+i);
+        }
     }
     bm->set_oob(bm, (char*)lba, sizeof(uint32_t) * max_idx, ppa);
 }
@@ -192,6 +206,10 @@ static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *
         pm->usedup_segments->erase(iter);
     }
 
+    if(target->seg_idx==lea_test_piece_ppa/4/_PPS){
+        printf("%u clear!\n", lea_test_piece_ppa);
+    }
+
     /*reset active segment and reserve segment*/
     bm->trim_segment(bm ,target);
     pm->active=pm->reserve;
@@ -239,11 +257,9 @@ void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, boo
         while(gp->isdone==false){}
         lba_arr = (uint32_t *)bm->get_oob(bm, gp->ppa);
         for (uint32_t i = 0; i < L2PGAP; i++){
-            if (bm->is_invalid_piece(bm, gp->ppa * L2PGAP + i))
+            if (bm->is_invalid_piece(bm, gp->ppa * L2PGAP + i)){
                 continue;
-            if (ignore && ignore(lba_arr[i]))
-                continue;
-
+            }
             gn.lba = lba_arr[i];
             gn.value = &gp->value->value[i * LPAGESIZE];
             temp_vector.push_back(gn);
@@ -260,6 +276,9 @@ void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, boo
     g_buffer_init(&g_buffer);
     uint32_t piece_ppa_arr[L2PGAP];
     for(uint32_t i=0; i<temp_vector.size(); i++){
+        if(temp_vector[i].lba==test_key){
+            //GDB_MAKE_BREAKPOINT;
+        }
         g_buffer_insert(&g_buffer, temp_vector[i].value, temp_vector[i].lba);
         if (g_buffer.idx == L2PGAP || (i==temp_vector.size()-1 && g_buffer.idx!=0)){
             pm_page_flush(pm, false, GCDW, g_buffer.key, g_buffer.value, g_buffer.idx, piece_ppa_arr);
