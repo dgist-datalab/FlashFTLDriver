@@ -1,10 +1,12 @@
 #include "./PLR_segment.h"
 #include "../../include/settings.h"
+#include "../../include/debug_utils.h"
 extern uint32_t test_key;
 segment *segment_make(temp_map *map, SEGMENT_TYPE type, uint32_t interval){
     segment *res=(segment *)malloc(sizeof(segment));
     res->type=type;
     res->start=map->lba[0];
+    res->original_start=res->start;
     res->end=map->lba[map->size-1];
     res->start_piece_ppa=map->piece_ppa[0];
 
@@ -46,10 +48,10 @@ uint32_t segment_get_addr(segment *seg, uint32_t lba){
     uint32_t res=UINT32_MAX;
     switch(seg->type){
         case SEGMENT_TYPE::ACCURATE:
-            res=(lba-seg->start)/(seg->body.interval<=1?1:seg->body.interval)+seg->start_piece_ppa;
+            res=(lba-seg->original_start)/(seg->body.interval<=1?1:seg->body.interval)+seg->start_piece_ppa;
             break;
         case SEGMENT_TYPE::APPROXIMATE:
-            res=seg->body.plr->get(lba-seg->start) *L2PGAP;
+            res=seg->body.plr->get(lba-seg->original_start) *L2PGAP;
             //res+=seg->start_piece_ppa;
             break;
     }
@@ -76,9 +78,49 @@ bool segment_removable(segment *old_seg, segment *new_seg){
 
     /*check all overlap*/
     if(old_seg->start >= new_seg->start && old_seg->end<=new_seg->end){
-        return true;
+        if(old_seg->body.interval==0){
+            return segment_acc_include(new_seg, old_seg->start);
+        }
+        else{
+            if(old_seg->body.interval == new_seg->body.interval && (old_seg->start-new_seg->start)%new_seg->body.interval==0){
+                return true;
+            }
+            return false;
+        }
     }
     else{
         return false;
     }
+}
+
+
+void segment_update(segment *seg, uint32_t start, uint32_t end){
+    if(seg->start <= start){
+        seg->start=start;
+    }
+    else{
+        printf("to the wide range is unavailabe!\n");
+        abort();
+    }
+
+    if(seg->end>=end){
+        seg->end=end;
+    }
+    else{
+        printf("to the wide range is unavailabe!\n");
+        abort();
+    }
+}
+
+uint64_t segment_size(segment *seg){
+    if(seg->type==SEGMENT_TYPE::ACCURATE){
+        return 8;
+    }
+    else{
+        return seg->body.plr->get_line_cnt()*8;
+    }
+}
+
+void segment_print(segment *seg){
+    printf("%u~%u,%s\n", seg->start, seg->end, seg->type==SEGMENT_TYPE::ACCURATE?"ACC":"APP");
 }

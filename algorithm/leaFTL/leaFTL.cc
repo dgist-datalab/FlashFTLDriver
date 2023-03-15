@@ -5,6 +5,7 @@
 #include "./issue_io.h"
 #include "../../include/debug_utils.h"
 #include "group.h"
+#include "../../data_struct/lru_list.h"
 #include <vector>
 
 #ifdef DEBUG
@@ -13,10 +14,26 @@ uint32_t *exact_map;
 
 lea_write_buffer *wb;
 page_manager *pm;
+page_manager *translate_pm;
 blockmanager *lea_bm;
 lower_info *lower;
 temp_map *user_temp_map;
 temp_map *gc_temp_map;
+temp_map *compaction_temp_map;
+LRU *gp_lru;
+uint64_t lru_max_byte;
+uint64_t lru_now_byte;
+uint64_t lru_reserve_byte;
+uint32_t max_cached_trans_map;
+
+typedef struct group_update_param{
+   group_read_param grp;
+   uint32_t size;
+   temp_map map;
+   group *gp;
+}group_update_param;
+
+group_update_param gup_set[TRANSMAPNUM];
 
 group main_gp[TRANSMAPNUM];
 
@@ -55,7 +72,6 @@ user_io_param* get_user_io_param(uint32_t type, uint32_t piece_ppa, value_set *v
     return res;
 }
 
-
 uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
     algo->li=li;
     algo->bm=bm;
@@ -74,8 +90,17 @@ uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
     gc_temp_map=temp_map_assign(sector_num);
     temp_map_clear(gc_temp_map);
 
-    pm=pm_init(li, bm);
+    sector_num=MAPINTRANS;
+    compaction_temp_map=temp_map_assign(sector_num);
 
+    pm=pm_init(li, bm);
+    translate_pm=pm_init(li, bm);
+    lru_init(&gp_lru, NULL, NULL);
+    max_cached_trans_map=TRANSMAPNUM*30/100;
+    lru_max_byte=max_cached_trans_map*PAGESIZE;
+    lru_now_byte=0;
+    lru_reserve_byte=0;
+    
     for(uint32_t i=0; i<TRANSMAPNUM; i++){
         group_init(&main_gp[i], i);
     }
@@ -88,6 +113,7 @@ void lea_destroy(lower_info *, algorithm *){
     free(exact_map);
     temp_map_free(user_temp_map);
     temp_map_free(gc_temp_map);
+    temp_map_free(compaction_temp_map);
 }
 
 uint32_t lea_argument(int argc, char **argv){
@@ -137,20 +163,18 @@ uint32_t lea_read(request *const req){
     group_read_param *grp;
     if(req->param){ //retry
         grp=(group_read_param*)req->param;
-        grp->piece_ppa=group_get_retry(req->key, grp);
+        group_get_retry(req->key, grp, req, lea_cache_insert);
     }
     else{
         char *data = lea_write_buffer_get(wb, req->key);
         if (!data){
-            grp=group_get(&main_gp[req->key/MAPINTRANS], req->key);
+            group *gp=&main_gp[req->key/MAPINTRANS];
+            lea_cache_evict(gp->size);
+            grp=group_get(&main_gp[req->key/MAPINTRANS], req->key, req);
             if(grp==NULL){
                 req->type=FS_NOTFOUND_T;
                 return 0;
             }
-            else{
-                req->param=grp;
-            }
-            grp->value=req->value;
         }
         else{
             memcpy(req->value->value, data, LPAGESIZE);
@@ -158,8 +182,6 @@ uint32_t lea_read(request *const req){
             return 1;
         }
     }
-
-    send_IO_user_req(DATAR, lower, grp->piece_ppa / L2PGAP, req->value, (void *)grp, req, lea_end_req);
     return 1;
 }
 
@@ -254,50 +276,95 @@ void lea_making_segment_per_gp(group *gp, uint32_t *lba, uint32_t *piece_ppa, in
     }
 }
 
-void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
-    /*udpate mapping*/
-    //figure out old mapping and invalidation it
-    if(!isgc){
-        std::list<group_read_param*> grp_list;
-        group_read_param *grp=(group_read_param*)malloc(sizeof(group_read_param)*map->size);
-        for(uint32_t i=0; i<map->size; i++){
-            if(map->lba[i]==test_key){
+void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanager *bm){
+    std::list<group_read_param*> grp_list;
+    group_read_param *grp=(group_read_param*)malloc(sizeof(group_read_param)*map->size);
+    /*do round*/
+    for(uint32_t i=0; i<map->size; i++){
+        if(map->lba[i]==test_key){
+            //GDB_MAKE_BREAKPOINT;
+        }
+        group *gp=&main_gp[map->lba[i]/MAPINTRANS];
+        if(gp->cache_flag==CACHE_FLAG::UNCACHED){
+            /*eviction*/
+            lea_cache_evict(gp->size);
+        }
+        group_get_exact_piece_ppa(gp, map->lba[i], i, &grp[i], true, lower, lea_cache_insert);
+        grp_list.push_back(&grp[i]);
+    }
+
+    while(grp_list.size()){
+        std::list<group_read_param *>::iterator list_iter = grp_list.begin();
+        for (; list_iter != grp_list.end();){
+            group_read_param *t_grp=*list_iter;
+            if(t_grp->lba==test_key){
                 //GDB_MAKE_BREAKPOINT;
             }
-            group *gp=&main_gp[map->lba[i]/MAPINTRANS];
-            group_get_exact_piece_ppa(gp, map->lba[i], i, &grp[i], true, lower);
-            grp_list.push_back(&grp[i]);
-        }
 
-        while(grp_list.size()){
-            std::list<group_read_param *>::iterator list_iter = grp_list.begin();
-            for (; list_iter != grp_list.end();){
-                group_read_param *t_grp=*list_iter;
-                if(t_grp->lba==test_key){
-                    //GDB_MAKE_BREAKPOINT;
-                }
-                if(t_grp->retry_flag==DATA_FOUND){
-                    #ifdef DEBUG
-                    if(t_grp->piece_ppa!=exact_map[t_grp->lba]){
-                        printf("address error!\n");
-                        //GDB_MAKE_BREAKPOINT;
-                    }
-                    #endif
-                    if(t_grp->piece_ppa!=INITIAL_STATE_PADDR){
-                        invalidate_piece_ppa(bm, t_grp->piece_ppa);
-                    }
-                    grp_list.erase(list_iter++);
-                }
-                else if(t_grp->read_done==false){
-                    list_iter++;
+            if(t_grp->gp->cache_flag==CACHE_FLAG::FLYING){
+                if(t_grp->read_done){
+                    /*header request*/
+                    group_get_exact_piece_ppa(t_grp->gp, t_grp->lba, t_grp->set_idx, t_grp, false, lower, lea_cache_insert);
                 }
                 else{
-                    group_get_exact_piece_ppa(t_grp->gp, t_grp->lba, t_grp->set_idx, t_grp, false, lower);
                     list_iter++;
+                    continue;
                 }
             }
-        }      
-        free(grp);
+
+            if(t_grp->retry_flag==DATA_FOUND){
+                #ifdef DEBUG
+                if(t_grp->piece_ppa!=exact_map[t_grp->lba]){
+                    printf("address error!\n");
+                    GDB_MAKE_BREAKPOINT;
+                }
+                #endif
+               if(invalidate && t_grp->piece_ppa!=INITIAL_STATE_PADDR){
+                    invalidate_piece_ppa(bm, t_grp->piece_ppa);
+                }
+                else if(invalidate==false){
+                    map->piece_ppa[t_grp->lba%MAPINTRANS]=t_grp->piece_ppa;
+                }
+                grp_list.erase(list_iter++);
+            }
+            else if(t_grp->read_done==false){
+                list_iter++;
+            }
+            else{
+                group_get_exact_piece_ppa(t_grp->gp, t_grp->lba, t_grp->set_idx, t_grp, false, lower, lea_cache_insert);
+                list_iter++;
+            }
+        }
+    }      
+    free(grp);
+}
+
+void lea_compaction(uint32_t idx){
+    group *target_gp=&main_gp[idx];
+    if(target_gp->level_list->size()<=1) return;
+    
+    for(uint32_t i=0; i<MAPINTRANS; i++){
+        compaction_temp_map->lba[i]=idx*MAPINTRANS+i;
+    }
+    lea_mapping_find_exact_piece_ppa(compaction_temp_map, false, NULL);
+    group_from_translation_map(target_gp, compaction_temp_map->lba, compaction_temp_map->piece_ppa, idx);
+}
+
+void lea_gup_init(group_update_param *t_gup, group *gp, temp_map *map, uint32_t start_ptr, uint32_t num){
+    t_gup->gp = gp;
+    t_gup->map.lba = &map->lba[start_ptr];
+    t_gup->map.piece_ppa = &map->piece_ppa[start_ptr];
+    t_gup->map.interval= &map->interval[start_ptr];
+    t_gup->size = num;
+    lea_cache_evict(gp->size);
+    group_read_from_NAND(gp, true, &t_gup->grp, lower, lea_cache_insert);
+}
+
+void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
+    /*udpate mapping*/
+    //figure out old mapping and invalidation itnnn
+    if(!isgc){
+        lea_mapping_find_exact_piece_ppa(map, true, bm);
     }
     else{
         //GDB_MAKE_BREAKPOINT;
@@ -308,9 +375,14 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
         abort();
     }
 
+
+    /*do round*/
+    uint32_t gup_idx=0;
     uint32_t start_ptr=UINT32_MAX;
     uint32_t transpage_idx=UINT32_MAX;
     uint32_t now_transpage_idx;
+    std::list<group_update_param *> gup_list;
+    group_update_param *t_gup;
     for(uint32_t i=0; i<map->size; i++){
         if(start_ptr==UINT32_MAX){
             start_ptr=i;
@@ -319,12 +391,44 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
         now_transpage_idx=map->lba[i]/MAPINTRANS;
 
         if(now_transpage_idx!=transpage_idx){
-            lea_making_segment_per_gp(&main_gp[transpage_idx], &map->lba[start_ptr], &map->piece_ppa[start_ptr], &map->interval[start_ptr], i-start_ptr);
+            t_gup=&gup_set[gup_idx++];
+            lea_gup_init(t_gup, &main_gp[transpage_idx], map, start_ptr, i-start_ptr);
+            gup_list.push_back(t_gup);
+
             start_ptr=i;
             transpage_idx=now_transpage_idx;
         }
     }
-    lea_making_segment_per_gp(&main_gp[now_transpage_idx], &map->lba[start_ptr], &map->piece_ppa[start_ptr], &map->interval[start_ptr], map->size-start_ptr);
+    t_gup=&gup_set[gup_idx++];
+    lea_gup_init(t_gup, &main_gp[transpage_idx], map, start_ptr, map->size-start_ptr);
+    gup_list.push_back(t_gup);
+
+    std::list<group_update_param*>::iterator gup_iter;
+    while(gup_list.size()){
+        for(gup_iter=gup_list.begin(); gup_iter!=gup_list.end();){
+            t_gup=*gup_iter;
+            if(t_gup->gp->cache_flag==CACHE_FLAG::CACHED){
+                lea_making_segment_per_gp(t_gup->gp, t_gup->map.lba, t_gup->map.piece_ppa, t_gup->map.interval, t_gup->map.size);
+                gup_list.erase(gup_iter++);
+            }
+            else if(t_gup->gp->cache_flag==CACHE_FLAG::UNCACHED){
+                printf("it must not be unCACHED\n");
+                abort();
+            }
+            else{
+                if(t_gup->grp.read_done){
+                    /*header*/
+                    group_read_from_NAND(t_gup->gp, false, &t_gup->grp, lower, lea_cache_insert);
+                    lea_making_segment_per_gp(t_gup->gp, t_gup->map.lba, t_gup->map.piece_ppa, t_gup->map.interval, t_gup->map.size);
+                    gup_list.erase(gup_iter++);
+                    continue;
+                }
+                else{
+                    gup_iter++;
+                }
+            }
+        }
+    }
 
 #ifdef DEBUG
     //cutting mappint into segment set
@@ -334,7 +438,7 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
 #endif
 
     /*temp_map clear*/
-    map->size = 0;
+    temp_map_clear(map);
 }
 
 bool write_buffer_check_ignore(uint32_t lba){
@@ -346,6 +450,16 @@ uint32_t lea_write(request *const req){
         printf("%u is buffered\n", test_key);
     }
     lea_write_buffer_insert(wb, req->key, req->value->value);
+
+    static int write_cnt=0;
+    write_cnt++;
+    if(write_cnt% COMPACTION_RESOLUTION ==0){
+        for(uint32_t i=0; i<TRANSMAPNUM; i++){
+            lea_compaction(i);
+        }
+        //group_monitor_print();
+    }
+
     if(lea_write_buffer_isfull(wb)){
         uint32_t remain_space;
 retry:
@@ -360,7 +474,9 @@ retry:
                 __gsegment *gc_target=pm_get_gc_target(pm->bm);
                 if(pm->usedup_segments->find(gc_target->seg_idx) != pm->usedup_segments->end()){
                     pm_gc(pm, gc_target, gc_temp_map, true, write_buffer_check_ignore);
-                    lea_mapping_update(gc_temp_map, pm->bm, true);
+                    if(gc_temp_map->size){
+                        lea_mapping_update(gc_temp_map, pm->bm, true);
+                    }
                 }
                 else{
                     printf("usedup segment error!\n");

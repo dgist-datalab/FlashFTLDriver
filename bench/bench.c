@@ -144,6 +144,9 @@ void bench_make_data(){
 		case VECTOREDLOCALIZEDGET:
 			//vectored_localized_get(start, end, _m);
 			break;
+		case VECTOREDPARTIARW:
+			vectored_partial_rw(start, end, _m);
+			break;
 #ifndef KVSSD
 		case SEQLATENCY:
 			seq_latency(start,end,50,_m);

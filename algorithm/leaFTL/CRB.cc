@@ -154,7 +154,6 @@ void crb_insert(CRB *crb, temp_map *tmap, segment *seg, std::vector<CRB_node> *u
 void crb_free(CRB *crb){
     CRB_iter iter=crb->begin();
     for(;iter!=crb->end();){
-        delete iter->second;
         free(iter->second);
         crb->erase(iter++);
     }
