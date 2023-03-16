@@ -13,6 +13,7 @@ uint32_t lea_read(request *const);
 uint32_t lea_write(request *const);
 uint32_t lea_remove(request *const);
 
+uint32_t *lea_gp_to_mapping(group *gp);
 void lea_cache_insert(group *gp, uint32_t *piece_ppa);
-void lea_cache_evict(uint32_t need_byte);
+bool lea_cache_evict(group *gp);
 void lea_cache_promote(group *gp);

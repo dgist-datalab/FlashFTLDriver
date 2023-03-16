@@ -1,12 +1,13 @@
 SRCS +=\
+	CRB.cc\
+	group.cc\
 	issue_io.cc\
+	lea_cache.cc\
 	leaFTL.cc\
 	page_manager.cc\
-	write_buffer.cc\
-	group.cc\
-	CRB.cc\
 	PLR_segment.cc\
 	./plr/plr.cc\
+	write_buffer.cc\
 
 
 OBJS :=\

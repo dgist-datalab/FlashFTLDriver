@@ -8,6 +8,31 @@ extern uint32_t test_key;
 //segment *debug_segment;
 bool leaFTL_debug;
 group_monitor gm;
+
+
+#define COMMON_GRP_INIT(grp, igp, upv, in_read_type)\
+    do{\
+        (grp)->gp=(igp);\
+        (grp)->read_done=false;\
+        (grp)->user_pass_value=(upv);\
+        (grp)->r_type=(in_read_type);\
+    }while(0)
+
+#define CACHE_GRP_INIT(grp, gp, upv, in_path_type)\
+    do{\
+        COMMON_GRP_INIT((grp), (gp), (upv), GRP_READ_TYPE::MAPREAD);\
+        (grp)->path_type=(in_path_type);\
+    }while(0)
+
+#define DATA_GRP_INIT(grp, gp, in_lba, upv, in_path_type)\
+    do{\
+        COMMON_GRP_INIT((grp), (gp), (upv), GRP_READ_TYPE::DATAREAD);\
+        (grp)->lba=lba;\
+        (grp)->path_type=(in_path_type);\
+        (grp)->retry_flag=RETRY_FLAG::INIT;\
+        (grp)->oob=NULL;\
+    }while(0)
+
 void group_init(group *res, uint32_t idx){
     res->crb=crb_init();
     res->level_list=new std::vector<level*>();
@@ -16,6 +41,7 @@ void group_init(group *res, uint32_t idx){
     res->cache_flag=CACHE_FLAG::UNCACHED;
     res->size=0;
     res->lru_node=NULL;
+    res->isclean=true;
 }
 
 void print_all_level(std::vector<level*> *level_list){
@@ -119,39 +145,73 @@ segment *group_get_segment(group *gp, uint32_t lba){
     return NULL;
 }
 
-static inline void grp_setup(group_read_param *grp, group *gp, segment *seg, uint32_t lba){
-    grp->seg=seg;
-    grp->oob=NULL;
-    grp->gp=gp;
-    grp->lba=lba;
+bool group_get(group *gp, uint32_t lba, group_read_param* grp, bool isuserreq, GRP_TYPE path_type){
+    if(grp->r_type!=GRP_READ_TYPE::DATAREAD && grp->r_type!=GRP_READ_TYPE::NOTDATAREADSTART){
+        printf("not allowed type! %s:%u\n", __FUNCTION__, __LINE__);
+        GDB_MAKE_BREAKPOINT;
+    }
 
-    grp->piece_ppa=segment_get_addr(seg, lba);
-    if(seg->type==SEGMENT_TYPE::ACCURATE){
-        grp->retry_flag=DATA_FOUND;
-        grp->read_done=true;
-        grp->set_idx=grp->piece_ppa%L2PGAP;
+    if(grp->r_type==GRP_READ_TYPE::NOTDATAREADSTART){
+        DATA_GRP_INIT(grp, gp, lba, isuserreq, path_type);
+        grp->seg=group_get_segment(gp, lba);
+        grp->r_type=GRP_READ_TYPE::DATAREAD;
+    }
+
+    if(grp->seg==NULL){ //not found data
+        goto not_found_end;
+    }
+
+    if(grp->retry_flag==RETRY_FLAG::INIT){
+        if(grp->seg->original_start==lba){
+            grp->piece_ppa=grp->seg->start_piece_ppa;
+            goto found_end;
+        }
+        else{
+            grp->piece_ppa=segment_get_addr(grp->seg, grp->lba);
+            if(grp->seg->type==SEGMENT_TYPE::ACCURATE){
+                goto found_end;
+            }
+            else{
+                grp->retry_flag=RETRY_FLAG::NOT_RETRY;
+                goto normal_end;
+            }
+        }
+    }
+    else if(grp->retry_flag==RETRY_FLAG::NOT_RETRY){
+        if (lba < grp->oob[0]){
+            grp->piece_ppa = (grp->piece_ppa / L2PGAP) * L2PGAP - 1;
+        }
+        else if (lba > grp->oob[L2PGAP - 1]){
+            grp->piece_ppa = (grp->piece_ppa / L2PGAP + 1) * L2PGAP;
+        }
+        grp->retry_flag = RETRY_FLAG::NORMAL_RETRY;
+        goto normal_end;
+    }
+    else if(grp->retry_flag==RETRY_FLAG::NORMAL_RETRY){
+        goto not_found_end;
     }
     else{
-        grp->retry_flag=NOT_RETRY;
-        grp->read_done=false;
-        grp->set_idx=UINT32_MAX;
+        printf("not allowed retry flag %s:%u\n", __FUNCTION__, __LINE__);
+        GDB_MAKE_BREAKPOINT;
     }
-    grp->value=NULL;
-}
 
-group_read_param *group_get(group *gp, uint32_t lba, request *req){
-    segment *seg=group_get_segment(gp, lba);
-    if(seg==NULL){
-        return NULL;
+not_found_end:
+    grp->piece_ppa=INITIAL_STATE_PADDR;
+    grp->read_done=true;
+    grp->retry_flag=RETRY_FLAG::DATA_FOUND;
+    return false;
+
+found_end:
+    grp->read_done=true;
+    grp->retry_flag=RETRY_FLAG::DATA_FOUND;
+    return false;
+
+normal_end:
+    if(grp->value==NULL){
+        printf("grp must have value_set!\n");
+        GDB_MAKE_BREAKPOINT;
     }
-    else{
-        group_read_param *res=(group_read_param*)malloc(sizeof(group_read_param));
-        grp_setup(res, gp, seg, lba);
-        res->value=req->value;
-        req->param=res;
-        send_IO_user_req(DATAR, lower, grp->piece_ppa / L2PGAP, req->value, (void *)grp, req, lea_end_req);
-        return res;
-    }
+    return true;
 }
 
 uint32_t group_oob_check(group_read_param *grp){
@@ -161,20 +221,6 @@ uint32_t group_oob_check(group_read_param *grp){
         }
     }
     return NOT_FOUND;
-}
-
-uint32_t group_get_retry(uint32_t lba, group_read_param *grp, request *req, void (*cache_insert)(group *gp, uint32_t *piece_ppa)){
-    if(grp->retry_flag == NORMAL_RETRY){
-        return NOT_FOUND;
-    }
-    if(lba < grp->oob[0]){
-        grp->piece_ppa=(grp->piece_ppa/L2PGAP)*L2PGAP-1;
-    }
-    else if(lba > grp->oob[L2PGAP-1]){
-        grp->piece_ppa=(grp->piece_ppa/L2PGAP+1)*L2PGAP;
-    }
-    grp->retry_flag=NORMAL_RETRY;
-    return grp->piece_ppa;
 }
 
 void *group_param_free(group_read_param * param){
@@ -241,7 +287,6 @@ static void group_segment_update(group *gp, level *lev, temp_map *tmap, segment 
     if(update_target_node.size()){
         group_update_segment(gp, &update_target_node);
     }
-
 
     std::vector<segment*> overlapped;
     overlapped.clear();
@@ -344,10 +389,12 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
 
 #ifdef DEBUG
     level_list_iter iter=gp->level_list->begin();
-    for(iter; iter!=gp->level_list->end(); iter++){
+    for(;iter!=gp->level_list->end(); iter++){
         check_level_overlap(*iter);
     }
 #endif
+
+    gp->isclean=false;
 }
 
 segment *map_make_segment_wrapper(uint32_t *lba, uint32_t *piece_ppa, uint32_t size){
@@ -472,11 +519,11 @@ void group_free(group *gp){
 
 void *group_read_end_req(algo_req *algo){
     group_read_param *grp=(group_read_param*)algo->param;
+    grp->read_done=true;
     if(algo->type==MAPPINGR){
-        grp->read_done=true;
+
     }
     else if(algo->type==DATAR){
-        grp->read_done = true;
         grp->oob = (uint32_t *)lea_bm->get_oob(lea_bm, grp->piece_ppa / L2PGAP);
         grp->set_idx = group_oob_check(grp);
         if (grp->set_idx == NOT_FOUND){
@@ -484,8 +531,10 @@ void *group_read_end_req(algo_req *algo){
         }
         else{
             grp->piece_ppa = grp->piece_ppa / L2PGAP * L2PGAP + grp->set_idx;
-            inf_free_valueset(grp->value, FS_MALLOC_R);
-            grp->retry_flag = DATA_FOUND;
+            if(grp->user_pass_value==false){
+                inf_free_valueset(grp->value, FS_MALLOC_R);
+            }
+            grp->retry_flag = RETRY_FLAG::DATA_FOUND;
         }
     }
     else{
@@ -496,6 +545,51 @@ void *group_read_end_req(algo_req *algo){
     return NULL;
 }
 
+/*issue or not issue*/
+bool group_get_map_read_grp(group *gp, bool isstart, group_read_param *grp, bool iswrite_path, bool isuserreq, void(*cache_insert)(group *gp, uint32_t *piece_ppa)){
+    if(isstart){
+        CACHE_GRP_INIT(grp, gp, isuserreq,  iswrite_path? GRP_TYPE::GP_WRITE:GRP_TYPE::GP_READ);
+    }
+
+    if(gp->cache_flag==CACHE_FLAG::CACHED){ /*already cached*/
+        grp->read_done=true;
+        grp->r_type=GRP_READ_TYPE::NOTDATAREADSTART;
+        return false;
+    }
+
+    if(gp->ppa!=INITIAL_STATE_PADDR){
+        /*not need to caching*/
+        grp->read_done=true;
+        gp->cache_flag=CACHE_FLAG::CACHED;
+        grp->r_type=GRP_READ_TYPE::NOTDATAREADSTART;
+        return false;
+    }
+
+    if(gp->cache_flag==CACHE_FLAG::UNCACHED){
+        grp->read_done=false;
+        gp->cache_flag=CACHE_FLAG::FLYING;
+        return true;
+    }
+    else{ //FLYING
+        if(grp->read_done){/*the first request to cache the mapping*/
+            gp->cache_flag=CACHE_FLAG::CACHED;
+            grp->r_type=GRP_READ_TYPE::NOTDATAREADSTART;
+            /*insert cache*/
+            cache_insert(gp, (uint32_t*)grp->value->value);
+            /*resolve peding request*/
+            pending_iter iter=gp->pending_request.begin();
+            for(;iter!=gp->pending_request.end(); iter++){
+                (*iter)->read_done=true;
+            }
+        }
+        else{
+            grp->read_done=false;
+            gp->pending_request.push_back(grp);
+        }
+    }
+    return false;
+}
+
 void group_get_exact_piece_ppa(group *gp, uint32_t lba, uint32_t set_idx, group_read_param *grp, bool isstart, lower_info *li, void (*cache_insert)(group *gp, uint32_t *piece_ppa)){
     if(lba==test_key){
         //GDB_MAKE_BREAKPOINT;
@@ -503,95 +597,35 @@ void group_get_exact_piece_ppa(group *gp, uint32_t lba, uint32_t set_idx, group_
     }
 
     if(isstart){
-        grp->gp=gp;
-        grp->lba=lba;
-        grp->value=NULL;
-        grp->read_done=false;
-        grp->seg=NULL;
-        grp->type=GRP_TYPE::GP_WRITE;
-        grp->retry_flag=NOT_RETRY;
+        memset(grp, 0, sizeof(group_read_param));
+        grp->r_type=GRP_READ_TYPE::MAPREAD;
     }
 
-    if(gp->ppa!=INITIAL_STATE_PADDR){
-        if (gp->cache_flag == CACHE_FLAG::UNCACHED){
-            gp->cache_flag == CACHE_FLAG::FLYING;
-            gp->pending_request.push_back(grp);
-            /*issue read request*/
-            grp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
-            send_IO_back_req(MAPPINGR, li, gp->ppa, grp->value, (void *)grp, group_read_end_req);
+    if(grp->r_type==GRP_READ_TYPE::MAPREAD){
+        if(group_get_map_read_grp(gp, isstart, grp, true, false, cache_insert)){
+            if(grp->value==NULL){
+                grp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+            }
+            send_IO_back_req(MAPPINGR, li, gp->ppa, grp->value, (void*)grp, group_read_end_req);
             return;
         }
-        else if (gp->cache_flag == CACHE_FLAG::FLYING){
-            if(grp->read_done){
-                /*header request*/
-                cache_insert(gp, (uint32_t*)grp->value->value);
-                gp->cache_flag=CACHE_FLAG::CACHED;
-                std::list<group_read_param*>::iterator pending_iter;
-                for(pending_iter=gp->pending_request.begin(); pending_iter!=gp->pending_request.end(); pending_iter++){
-                    if((*pending_iter)->type==GRP_TYPE::GP_READ){
-                        printf("must be GRP write type!\n");
-                        GDB_MAKE_BREAKPOINT;
-                    }
-                    (*pending_iter)->read_done=true;
-                }
-            }
-            else{
-                gp->pending_request.push_back(grp);
-                return;
-            }
-        }
     }
 
-    if(gp->ppa!=INITIAL_STATE_PADDR && gp->cache_flag!=CACHE_FLAG::CACHED){
+    if(gp->cache_flag!=CACHE_FLAG::CACHED){
         printf("gp must be in cached!\n");
         GDB_MAKE_BREAKPOINT;
     }
 
-    if(grp->seg==NULL){
-        grp->seg=group_get_segment(gp, lba);
-        grp->read_done=false;
-
-        if(grp->seg==NULL){ //not inserted
-            grp->piece_ppa=INITIAL_STATE_PADDR;
-            grp->read_done=true;
-            grp->retry_flag=DATA_FOUND;
-            if(grp->value){
-                inf_free_valueset(grp->value, FS_MALLOC_R);
-            }
+    if(group_get(gp, lba, grp, false, GRP_TYPE::GP_WRITE)){
+        if(grp->value==NULL){
+            grp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
         }
-        else{
-            if(grp->seg->original_start==lba){
-                grp->piece_ppa=grp->seg->start_piece_ppa;
-                grp->read_done=true;
-                grp->retry_flag=DATA_FOUND;
-                if(grp->value){
-                    inf_free_valueset(grp->value, FS_MALLOC_R);
-                }
-            }
-            else{
-                grp_setup(grp, gp, grp->seg, lba);
-                grp->piece_ppa = segment_get_addr(grp->seg, lba);
-                if (grp->seg->type == SEGMENT_TYPE::APPROXIMATE){
-                    if(grp->value==NULL){
-                        grp->value = inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
-                    }
-                    // issue request
-                    send_IO_back_req(DATAR, li, grp->piece_ppa / L2PGAP, grp->value, (void *)grp, group_read_end_req);
-                }
-            }
-        }
+        send_IO_back_req(DATAR, li, grp->piece_ppa/L2PGAP, grp->value, (void*)grp, group_read_end_req);
     }
     else{
-        grp->piece_ppa=group_get_retry(lba, grp);
-        if(grp->piece_ppa==NOT_FOUND){
+        //not found or found_end
+        if(grp->value){
             inf_free_valueset(grp->value, FS_MALLOC_R);
-            grp->read_done=true;
-            grp->retry_flag=DATA_FOUND;
-        }
-        else{
-            grp->read_done=false;
-            //issue request
-            send_IO_back_req(DATAR, li, grp->piece_ppa/L2PGAP, grp->value, (void*)grp, group_read_end_req);
         }
     }
 }

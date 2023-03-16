@@ -15,8 +15,8 @@ typedef std::vector<segment*> level;
 typedef std::vector<segment*>::iterator level_iter;
 typedef std::vector<level*>::iterator level_list_iter;
 
-enum{
-	NOT_RETRY, NORMAL_RETRY, FORCE_RETRY, DATA_FOUND
+enum RETRY_FLAG{
+	INIT, NOT_RETRY, NORMAL_RETRY, FORCE_RETRY, DATA_FOUND
 };
 
 enum CACHE_FLAG{
@@ -24,10 +24,16 @@ enum CACHE_FLAG{
 };
 
 enum GRP_TYPE{
-    GP_READ, GP_WRITE
+    GRP_TYPE_NONE, GP_READ, GP_WRITE
+};
+
+enum GRP_READ_TYPE{
+    GRP_READ_TYPE_NONE, DATAREAD, NOTDATAREADSTART, MAPREAD
 };
 
 struct group_read_param;
+typedef std::list<group_read_param*>::iterator pending_iter;
+
 typedef struct group{
     std::vector<level*>* level_list;
     CRB *crb;
@@ -35,9 +41,11 @@ typedef struct group{
     uint32_t map_idx;
     uint32_t ppa;
 
+    /*Cache flag*/
     uint64_t size; //byte
     CACHE_FLAG cache_flag;
     std::list<group_read_param*> pending_request;
+    bool isclean;
     void *lru_node;
 }group;
 
@@ -48,32 +56,48 @@ typedef struct group_monitor{
 }group_monitor;
 
 typedef struct group_read_param{
-    GRP_TYPE type;
+    /*COMMON flags*/
+    group *gp;
+    bool read_done;
+    bool user_pass_value;
+    GRP_READ_TYPE r_type;
+
+    /*CACHE flags*/
+    GRP_TYPE path_type;
+
+    /*DATA flags*/
+    RETRY_FLAG retry_flag;
+
+    /*target value*/
+    value_set *value; //DATA or mapping data
     segment *seg;
     uint32_t *oob;
-    group *gp;
     uint32_t lba;
-
-    uint32_t piece_ppa;
-    bool read_done;
-    uint32_t retry_flag;
     uint32_t set_idx;
-
-    value_set *value;
+    uint32_t piece_ppa;
 }group_read_param;
 
+
 void group_init(group *gp, uint32_t idx);
-group_read_param *group_get(group *gp, uint32_t lba, request *req);
-uint32_t group_get_retry(uint32_t lba, group_read_param *grp, request *req, void (*cache_insert)(group *gp, uint32_t *piece_ppa));
+bool group_get(group *gp, uint32_t lba, group_read_param* grp, bool issuerreq, GRP_TYPE path_type);
 uint32_t group_oob_check(group_read_param *grp);
 void *group_param_free(group_read_param *);
 void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval);
 void group_to_translation_map(group *gp, char *des);
 void group_free(group *gp);
 void group_get_exact_piece_ppa(group *gp, uint32_t lba, uint32_t set_idx, group_read_param *grp, bool isstart, lower_info *li, void (*cache_insert)(group *gp, uint32_t *piece_ppa));
-
-void group_read_from_NAND(group *gp, bool isstart, group_read_param *grp, lower_info *li, void(*cache_insert)(group *gp, uint32_t *piece_ppa));
-
+bool group_get_map_read_grp(group *gp, bool isstart, group_read_param *grp, bool iswrite_path, bool isuserreq, void(*cache_insert)(group *gp, uint32_t *piece_ppa));
 void group_from_translation_map(group *gp, uint32_t *lba, uint32_t *piece_ppa, uint32_t idx);
 void group_clean(group *gp, bool reinit);
 void group_monitor_print();
+static inline group_read_param *group_get_empty_grp(){
+    group_read_param *res=(group_read_param*)calloc(1, sizeof(group_read_param));
+    return res;
+}
+
+static inline bool group_cached(group *gp){
+    if(gp->cache_flag==CACHE_FLAG::CACHED || gp->ppa==INITIAL_STATE_PADDR){
+        return true;
+    }
+    return false;
+}

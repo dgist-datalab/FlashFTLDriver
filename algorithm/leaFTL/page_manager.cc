@@ -6,7 +6,12 @@
 #include <string.h>
 #include <algorithm>
 extern uint32_t test_key;
-uint32_t lea_test_piece_ppa=65644;
+uint32_t lea_test_piece_ppa=UINT32_MAX;
+enum SEGTYPE_FLAG{
+    NONE, DATA, TRANS
+};
+SEGTYPE_FLAG seg_type_flag[_NOS];
+#define TRANSLATION_MAP_FLAG (UINT32_MAX-1)
 typedef struct io_param{
     uint32_t type;
     uint32_t ppa;
@@ -85,22 +90,22 @@ page_manager *pm_init(lower_info *li, blockmanager *bm){
 
     res->reserve=res->bm->get_segment(res->bm, BLOCK_RESERVE);
     res->active=res->bm->get_segment(res->bm, BLOCK_ACTIVE);
-    res->usedup_segments=new std::set<uint32_t>();
     return res;
 }
 
-bool pm_assign_new_seg(page_manager *pm){
+bool pm_assign_new_seg(page_manager *pm, bool isdata){
     blockmanager *bm = pm->bm;
-    std::pair<std::set<uint32_t>::iterator, bool> temp = pm->usedup_segments->insert(pm->active->seg_idx);
-    if (temp.second == false){ // insert fail
-        printf("error already existing segment in the usedup set!, seg_idx:%u\n", pm->active->seg_idx);
-        abort();
-    }
+    seg_type_flag[pm->active->seg_idx]=isdata?SEGTYPE_FLAG::DATA:SEGTYPE_FLAG::TRANS;
+
     if(bm->is_gc_needed(bm)){
         return false;
     }
     
     pm->active = bm->get_segment(bm, BLOCK_ACTIVE);
+    if(seg_type_flag[pm->active->seg_idx]!=SEGTYPE_FLAG::NONE){
+        printf("not gced segment assign?!\n");
+        GDB_MAKE_BREAKPOINT;
+    }
 
     if (pm_remain_space(pm, true) == 0){
         printf("error on getting new active block, already full!\n");
@@ -122,11 +127,14 @@ static inline ppa_t get_ppa(page_manager *pm, blockmanager *bm, __segment *seg){
 void *pm_end_req(algo_req * const al_req){
     io_param *params=(io_param*)al_req->param;
     switch(params->type){
+        case MAPPINGW:
+        case GCMW:
         case GCDW:
         case DATAW:
             inf_free_valueset(params->value, FS_MALLOC_W);
             free(params);
             break;
+        case GCMR:
         case GCDR:
             params->isdone=true;
             break;
@@ -180,15 +188,12 @@ static io_param *send_gc_req(lower_info *lower, uint32_t ppa, uint32_t type, val
     value_set *target_value;
     switch(type){
         case GCMR:
-        printf("not implemented! %s:%d\n", __FUNCTION__, __LINE__);
-        abort();
+        target_value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+        res=make_io_param(type, ppa, target_value);
         break;
         case GCDR:
         target_value=inf_get_valueset(NULL,FS_MALLOC_R, PAGESIZE);
         res=make_io_param(type, ppa, target_value);
-        break;
-        case GCDW:
-        target_value=value;
         break;
     }
     send_IO_back_req(type, lower, ppa, target_value, res, pm_end_req);
@@ -197,14 +202,7 @@ static io_param *send_gc_req(lower_info *lower, uint32_t ppa, uint32_t type, val
 
 
 static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *target){
-    std::set<uint32_t>::iterator iter=pm->usedup_segments->find(target->seg_idx);
-    if(iter==pm->usedup_segments->end()){
-        printf("it cannot matched! %s:%u\n", __FUNCTION__, __LINE__);
-        abort();
-    }
-    else{
-        pm->usedup_segments->erase(iter);
-    }
+    seg_type_flag[target->seg_idx]=SEGTYPE_FLAG::NONE;
 
     if(target->seg_idx==lea_test_piece_ppa/4/_PPS){
         printf("%u clear!\n", lea_test_piece_ppa);
@@ -220,17 +218,13 @@ static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *
     }
 }
 
-void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, bool (*ignore)(uint32_t lba)){
+void pm_data_gc(page_manager *pm, __gsegment *target, temp_map *res){
     uint32_t page;
     uint32_t bidx, pidx;
     blockmanager* bm=pm->bm;
     list *temp_list=list_init();
     io_param *gp; //gc_param;
 
-    if(target->all_invalid){
-        pm_gc_finish(pm, bm, target);
-        return;
-    }
     /*read phase*/
     for_each_page_in_seg(target, page, bidx, pidx){
         bool should_read=false;
@@ -242,7 +236,7 @@ void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, boo
             }
         }
         if(should_read){
-            gp=send_gc_req(pm->lower, page, isdata? GCDR: GCMR, NULL);
+            gp=send_gc_req(pm->lower, page, GCDR, NULL);
             list_insert(temp_list, (void*)gp);
         }
     }
@@ -266,10 +260,7 @@ void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, boo
         }
     }
 
-    if(isdata){ /*preprocessing*/
-        sort(temp_vector.begin(), temp_vector.end(), gc_node_cmp);
-    }
-
+    sort(temp_vector.begin(), temp_vector.end(), gc_node_cmp);
 
     /*write_data*/
     align_buffer g_buffer;
@@ -300,7 +291,105 @@ void pm_gc(page_manager *pm, __gsegment *target, temp_map *res, bool isdata, boo
     return;
 }
 
+uint32_t get_map_ppa(page_manager *pm, bool isactive, uint32_t gp_idx){
+    ppa_t ppa=get_ppa(pm, pm->bm, isactive?pm->active: pm->reserve);
+    if(ppa==UINT32_MAX){
+        printf("you should call gc before flushing data!\n");
+        abort();
+    }
+
+    uint32_t oob[L2PGAP];
+    oob[0]=gp_idx;
+    oob[1]=TRANSLATION_MAP_FLAG;
+    validate_ppa(pm->bm, ppa, oob, L2PGAP);
+    return ppa;
+}
+
+void pm_map_gc(page_manager *pm, __gsegment *target, temp_map *res){
+    uint32_t page;
+    uint32_t bidx, pidx;
+    blockmanager* bm=pm->bm;
+    list *temp_list=list_init();
+    io_param *gp; //gc_param;
+
+    /*read phase*/
+    for_each_page_in_seg(target, page, bidx, pidx){
+        if(bm->is_invalid_piece(bm, page*L2PGAP)){
+            continue;
+        }
+        gp=send_gc_req(pm->lower, page, GCMR, NULL);
+        list_insert(temp_list, (void*)gp);
+    }
+
+    li_node *now, *nxt;
+    uint32_t* lba_arr;
+    std::vector<gc_node> temp_vector;
+    for_each_list_node_safe(temp_list, now, nxt){
+        gp = (io_param *)now->data;
+        while(gp->isdone==false){}
+        lba_arr = (uint32_t *)bm->get_oob(bm, gp->ppa);
+        if(lba_arr[1]!=TRANSLATION_MAP_FLAG){
+            printf("it is not translation page!\n");
+            GDB_MAKE_BREAKPOINT;
+        }
+
+        uint32_t new_ppa=get_map_ppa(pm, false, lba_arr[0]);
+        res->lba[res->size]=lba_arr[0];
+        res->piece_ppa[res->size]=new_ppa;
+        send_IO_back_req(GCMW, pm->lower, new_ppa, gp->value, (void*)gp, pm_end_req);
+        res->size++; 
+    }
+    pm_gc_finish(pm, pm->bm, target);
+}
+
+void temp_queue_to_heap(blockmanager *bm, std::queue<uint32_t> *temp_queue){
+
+}
+
+void pm_gc(page_manager *pm, temp_map *res, bool isdata){
+    __gsegment *gc_target=NULL;
+
+    std::queue<uint32_t> temp_queue;
+    while(gc_target!=NULL){
+        gc_target=pm_get_gc_target(pm->bm);
+        if (gc_target->all_invalid){
+            pm_gc_finish(pm, pm->bm, gc_target);
+            temp_map_clear(res);
+            temp_queue_to_heap(pm->bm, &temp_queue);
+            return;
+        }
+
+        if(isdata){
+            if(seg_type_flag[gc_target->seg_idx]==SEGTYPE_FLAG::DATA){
+                break;
+            }
+        }
+        else{
+            if(seg_type_flag[gc_target->seg_idx]==SEGTYPE_FLAG::TRANS){
+                break;
+            }
+        }
+        temp_queue.push(gc_target->seg_idx);
+        free(gc_target);
+    }
+    temp_queue_to_heap(pm->bm, &temp_queue);
+    
+    if(isdata){
+        pm_data_gc(pm, gc_target, res);
+    }
+    else{
+        pm_map_gc(pm, gc_target, res);
+    }
+}
+
+uint32_t pm_map_flush(page_manager *pm, bool isactive, char *data, uint32_t gp_idx){
+    uint32_t ppa=get_map_ppa(pm, isactive, gp_idx);
+    value_set *value=inf_get_valueset(data, FS_MALLOC_W, PAGESIZE);
+    io_param *params=make_io_param(MAPPINGW, ppa, value);
+    send_IO_back_req(MAPPINGW, pm->lower, ppa, value, (void*)params, pm_end_req);
+    return ppa;
+}
+
 void pm_free(page_manager *pm){
-    delete pm->usedup_segments;
     free(pm);
 }

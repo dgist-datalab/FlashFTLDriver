@@ -14,14 +14,18 @@ static inline algo_req *algo_req_init(request *req, uint32_t type, void *param, 
 algo_req *send_IO_back_req(uint32_t type, lower_info *li, uint32_t ppa, value_set *value, void *parameter, void *(*end_req)(algo_req * const)){
     algo_req *res=algo_req_init(NULL, type, parameter, end_req);
     switch (type){
+    case GCMR:
     case GCDR:
+    case MAPPINGR:
+    case DATAR:
         li->read(ppa, PAGESIZE, value, res);
         break;
     case GCDW:
+    case GCMW:
+    case MAPPINGW:
     case DATAW:
         li->write(ppa, PAGESIZE, value, res);
         break;
-    case DATAR:
         li->read(ppa, PAGESIZE, value, res);
         break;
     default:
