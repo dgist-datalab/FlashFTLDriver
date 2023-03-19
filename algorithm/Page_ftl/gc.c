@@ -272,6 +272,11 @@ int do_gc(){
 	stat->erase++;
 	stat->g->tmp_vr[tmp_mig_count] += (double)page_num/(double)tot_page_num;
 	stat->g->tmp_erase[tmp_mig_count]++;
+	
+	if (stat->e->collect) {
+		stat->e->vr[tmp_mig_count] += (double)page_num/(double)tot_page_num;
+		stat->e->erase[tmp_mig_count]++;
+	}
 	// print valid ratio
 	char val_buf[64];
 	sprintf(val_buf, "%d %f\n", tmp_mig_count, (float)page_num/(float)tot_page_num);
@@ -313,10 +318,10 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	while (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=2) {
 		//printf("# of Free Blocks: %d\n",page_ftl.bm->get_free_segment_number(page_ftl.bm)); 
 		gnum = do_gc();//call gc
-		if (tmp_gnum != -1 && (tmp_gnum != gnum)) {
+		if (tmp_gnum != gnum) {
 			gc_count=0;
 			tmp_gnum = gnum;
-		} else if (tmp_gnum==-1) tmp_gnum=gnum;
+		}
 		gc_count++;
 		if (gc_count > 100) {
 			printf("!!!!Infinite GC occur!!!!\n");
@@ -334,6 +339,8 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 				naive_mida_on();
 				gc_count=0;
 			}
+			stat_clear();
+			errstat_clear();
 		}
 	}
 

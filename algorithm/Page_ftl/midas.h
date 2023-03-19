@@ -8,6 +8,17 @@ typedef struct group_info {
         double *cur_vr;
 }G_VAL;
 
+typedef struct err_info {
+	bool errcheck;
+	bool collect;
+	
+	uint32_t errcheck_time;
+
+	uint32_t err_start;
+	uint32_t err_window;
+	double *vr;
+	double *erase;
+} ERR;
 
 typedef struct stats {
 	uint32_t cur_req;
@@ -21,9 +32,7 @@ typedef struct stats {
 
 	double tmp_waf;
 	
-	bool errcheck;
-	uint32_t errcheck_time;
-	uint32_t err_window;
+	ERR *e;
 	G_VAL *g;
 }STAT;
 
@@ -32,6 +41,7 @@ void naive_mida_on();
 void naive_mida_off();
 void stat_init();
 void stat_clear();
+void errstat_clear();
 void print_stat();
 
 int change_group_number(int prevnum, int newnum);

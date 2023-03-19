@@ -42,7 +42,7 @@ void model_create(int write_size) {
 	/* sampling info, unit size, time window size */
 	//test_WAF_predictor();
 	mmodel = (mini_model*)malloc(sizeof(mini_model));
-	mmodel->lba_sampling_ratio=1;
+	mmodel->lba_sampling_ratio=100;
 	mmodel->interval_unit_size=3; //segment
 	if (write_size == 0)
 		mmodel->time_window=44000*1024/(_PPS*L2PGAP)*1024/4/mmodel->interval_unit_size; //800GB/(PPB*BPS)
@@ -57,8 +57,8 @@ void model_create(int write_size) {
 	 * fnumber: # of interval to check
 	 * finterval: index of interval to check
 	 */
-	mmodel->fnumber=1; 
-	uint32_t finterval[1] = {100};
+	mmodel->fnumber=2; 
+	uint32_t finterval[2] = {100, 101};
 	/*
         uint32_t finterval[100] = {0};
 	for (int i=0;i<mmodel->fnumber; i++){	
@@ -122,6 +122,7 @@ void model_initialize() {
 	for (int i=0;i<mmodel->entry_num; i++) {
 		mmodel->model_count[i] = 0;
 	}
+	mmodel->first_count=0;
 	mm_time.current_time=0;
 	mm_time.request_time=0;
 
@@ -312,7 +313,7 @@ void *making_group_configuration(void *arg) {
 	uint32_t max_groupsize=_NOS-50;
 	uint32_t tmp_maxsize = max_groupsize;
 	/* making group configurations */
-	printf("***phase 1***\n");
+	//printf("***phase 1***\n");
 	print_config2(1, opt_config[0], opt_waf[0], opt_valid_ratio_list[0]);
 	for (int i=0; i<9; i++) {
 		gnum = i+2;
@@ -354,7 +355,7 @@ void *making_group_configuration(void *arg) {
 			}
 			free(valid_ratio_list);
 		}
-		print_config2(gnum, opt_config[i+1], opt_waf[i+1], opt_valid_ratio_list[i+1]);
+		//print_config2(gnum, opt_config[i+1], opt_waf[i+1], opt_valid_ratio_list[i+1]);
 		memcpy(group_config, opt_config[i+1], sizeof(uint32_t)*10);
 		//gnum = opt_gnum;
 		/*
@@ -380,7 +381,7 @@ void *making_group_configuration(void *arg) {
         print_config2(final_gnum, final_config, final_waf, final_valid_ratio_list);
         printf("==================\n");
 
-	printf("***phase 2***\n");
+	//printf("***phase 2***\n");
 
 	/* group configuration phase 2*/
 	for (int n=0;n<4;n++) {
@@ -427,7 +428,7 @@ void *making_group_configuration(void *arg) {
                 	}
 			
 		}
-		print_config2(final_gnum, final_config, final_waf, final_valid_ratio_list);
+		//print_config2(final_gnum, final_config, final_waf, final_valid_ratio_list);
 	}
 	printf("FINAL RESULTS\n");
 	//print_config(opt_gnum, opt_config, opt_waf, opt_valid_ratio_list);
@@ -589,8 +590,8 @@ unsigned long long resizing_model() {
 	fclose(mFile);
 
 
-	printf("total count: %llu\n", tot);
-	printf("utilization: %u\n", utilization);
+	//printf("total count: %llu\n", tot);
+	//printf("utilization: %u\n", utilization);
 	return tot;
 }
 /*
@@ -608,7 +609,7 @@ double None_FIFO_predict(double op){
 //	printf("Un-uniform FIFO prediction, tot_req_count: %lld, hot_req_count: %lld, op: %.2f, r: %.4f, f: %.4f, hot_lba_count: %.4f, tot_lba: %.4f\n", tot_req_count, hot_req_count, op, r, f, hot_lba_count, tot_lba_count);
 	
 	if (one_op == 1){
-		printf("Un-uniform FIFO prediction, op: %.2f, r: %.4f, f: %.4f\n", 1/(double)op, r, f);
+		//printf("Un-uniform FIFO prediction, op: %.2f, r: %.4f, f: %.4f\n", 1/(double)op, r, f);
 		one_op = 0;
 	}
 	double inc_waf = 1.;
@@ -661,9 +662,9 @@ double None_FIFO_predict(double op){
 double one_group_predictor(uint32_t *group_config, uint32_t group_num, unsigned long long tot_cnt) {	//input values are same as vlid_ratio_predictor, return valid ratio
 	double last_vr;
 	double last_group_vp = (double)utilization;  //global var
-	printf("op: %.4f\n", (double) last_group_vp/((double)group_config[group_num-1]*(_PPS*L2PGAP)));
+	//printf("op: %.4f\n", (double) last_group_vp/((double)group_config[group_num-1]*(_PPS*L2PGAP)));
 	double last_waf = None_FIFO_predict((double)group_config[group_num-1]*(_PPS*L2PGAP)/(double)last_group_vp);	//None_FIFO_predict()'s input is op 
-	printf("group_config[0] = %d\n", group_config[0]);
+	//printf("group_config[0] = %d\n", group_config[0]);
 	if(group_num!=1){
 		printf("Not one group, wrong function call\n");
 	}

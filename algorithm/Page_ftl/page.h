@@ -1,6 +1,8 @@
 #include "../../include/settings.h"
 #include "../../include/container.h"
 #include <map>
+
+#define GB_REQ 262144
 typedef struct page_param{
 	request *parents;
 	uint32_t address;

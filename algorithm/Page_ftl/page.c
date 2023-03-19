@@ -164,20 +164,21 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
 	uint32_t overlapped_idx=UINT32_MAX;
 	
-	if (stat->cur_req%262144==0) {
+	if (stat->cur_req%GB_REQ==0) {
 		stat->write_gb++;
 		printf("\rwrite size: %dGB", stat->write_gb);
-		if (stat->errcheck) stat->errcheck_time++;
+		if (stat->e->errcheck) {
+			stat->e->errcheck_time++;
+			if (stat->e->errcheck_time == stat->e->err_start) stat->e->collect=true;
+		}
+		int st = check_modeling();
+		if (st) printf("!!!Modeling over & adapt configuration!!!\n");
 	}
-	if (stat->cur_req%8388608==0) {
+	if ((stat->write_gb%GIGAUNIT==0) && (stat->cur_req%GB_REQ==0)) {
 		printf("\n");
 		print_stat();
 	}
-	if ((stat->write_gb%1==0) && (stat->cur_req%262144==0)) {
-                int st = check_modeling();
-		if (st) print_stat();
-	}
-	if ((stat->errcheck_time==stat->err_window) && (stat->cur_req%262144==0)) {
+	if ((stat->e->errcheck_time==stat->e->err_window) && (stat->cur_req%GB_REQ==0)) {
 		err_check();
 	}
 

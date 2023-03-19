@@ -80,7 +80,16 @@ void stat_init() {
 	stat->g->tmp_vr = (double*)calloc(sizeof(double), MAX_G);
 	stat->g->tmp_erase = (double*)calloc(sizeof(double), MAX_G);
 	stat->g->cur_vr = (double*)calloc(sizeof(double), MAX_G);
-	stat->err_window=TIME_WINDOW/2;
+	
+	stat->e = (ERR*)malloc(sizeof(ERR));
+	stat->e->errcheck=false;
+	stat->e->collect=false;
+
+	stat->e->errcheck_time=0;
+	stat->e->err_start=TIME_WINDOW/3;
+	stat->e->err_window=TIME_WINDOW/2;
+	stat->e->vr = (double*)calloc(sizeof(double), MAX_G);
+	stat->e->erase = (double*)calloc(sizeof(double), MAX_G);
 }
 
 void stat_clear() {
@@ -89,6 +98,16 @@ void stat_clear() {
 	for (int i=0;i<MAX_G;i++) {
 		stat->g->tmp_vr[i]=0.0;
 		stat->g->tmp_erase[i]=0.0;
+	}
+}
+
+void errstat_clear() {
+	stat->e->errcheck=false;
+	stat->e->collect=false;
+	stat->e->errcheck_time=0;
+	for (int i=0;i<MAX_G;i++) {
+		stat->e->vr[i]=0.0;
+		stat->e->erase[i]=0.0;
 	}
 }
 
@@ -279,9 +298,7 @@ int check_modeling() {
 	p->m->WAF = G_info->WAF;
 	p->m->status=true;
 	G_info->valid=false;
-	stat->errcheck=true;
-	stat->errcheck_time=0;
-
+	stat->e->errcheck=true;
 	//manage the size of groups
 	for (int i=0;i<p->gnum-1;i++) {
 		if (p->m->config[i] < stat->g->gsize[i]) {
@@ -292,13 +309,16 @@ int check_modeling() {
 	return 1;
 }
 
+
+
 int err_check() {
 	pm_body *p = (pm_body*)page_ftl.algo_body;
 	if (p->m->status=false) return 0;
 	printf("\n==========ERR check==========\n");
 	for (int i=0;i<p->gnum;i++) {
-		printf("[GROUP %d] calc vr: %.3f, real vr: %.3f", i, p->m->vr[i], stat->g->cur_vr[i]);
-		if ((p->m->vr[i]*1.1 > stat->g->cur_vr[i]) && (p->m->vr[i]*0.9 < stat->g->cur_vr[i])) {
+		double vr = stat->e->vr[i]/stat->e->erase[i];
+		printf("[GROUP %d] calc vr: %.3f, real vr: %.3f", i, p->m->vr[i], vr);
+		if ((p->m->vr[i]*1.1 > vr) && (p->m->vr[i]*0.9 < vr)) {
 			printf("\t(O)\n");
 			continue;
 		} else {
@@ -312,9 +332,10 @@ int err_check() {
         			merge_group(i);
 				naive_mida_on();
 			}
-			stat->errcheck=false;
-                        stat->errcheck_time=0;
+			errstat_clear();
 			return 1;
 		}
 	}
+	errstat_clear();
+	return 1;
 }
