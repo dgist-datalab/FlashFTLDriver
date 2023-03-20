@@ -1,13 +1,14 @@
 #pragma once
 #include "./CRB.h"
 #include "./PLR_segment.h"
+#include "../../include/container.h"
 #include "../../include/settings.h"
 #include "../../interface/interface.h"
 #include "./issue_io.h"
 #define NOT_FOUND UINT32_MAX
 #define INITIAL_STATE_PADDR (UINT32_MAX)
 #define MAPINTRANS ((PAGESIZE/sizeof(uint32_t)))
-#define TRANSMAPNUM ((_NOP*L2PGAP)/(MAPINTRANS))
+#define TRANSMAPNUM ((SHOWINGSIZE/PAGESIZE*L2PGAP)/(MAPINTRANS))
 
 //typedef std::map<uint32_t, segment*> level;
 //typedef std::map<uint32_t, segment*>::iterator level_iter;
@@ -61,6 +62,7 @@ typedef struct group_read_param{
     bool read_done;
     bool user_pass_value;
     GRP_READ_TYPE r_type;
+    request *user_req;
 
     /*CACHE flags*/
     GRP_TYPE path_type;
@@ -82,7 +84,7 @@ void group_init(group *gp, uint32_t idx);
 bool group_get(group *gp, uint32_t lba, group_read_param* grp, bool issuerreq, GRP_TYPE path_type);
 uint32_t group_oob_check(group_read_param *grp);
 void *group_param_free(group_read_param *);
-void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval);
+void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval, void (*cache_size_update)(group *gp, uint32_t size, bool decrease));
 void group_to_translation_map(group *gp, char *des);
 void group_free(group *gp);
 void group_get_exact_piece_ppa(group *gp, uint32_t lba, uint32_t set_idx, group_read_param *grp, bool isstart, lower_info *li, void (*cache_insert)(group *gp, uint32_t *piece_ppa));
@@ -96,7 +98,7 @@ static inline group_read_param *group_get_empty_grp(){
 }
 
 static inline bool group_cached(group *gp){
-    if(gp->cache_flag==CACHE_FLAG::CACHED || gp->ppa==INITIAL_STATE_PADDR){
+    if(gp->cache_flag==CACHE_FLAG::CACHED){
         return true;
     }
     return false;

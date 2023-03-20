@@ -39,11 +39,12 @@ algo_req *send_IO_user_req(uint32_t type, lower_info *li, uint32_t ppa, value_se
     algo_req *res=algo_req_init(req, type, parameter, end_req);
     switch (type)
     {
+    case MAPPINGR:
     case DATAR:
         li->read(ppa, PAGESIZE, value, res);
         break;
     default:
-        printf("not defined type %s:%u\n", __FUNCTION__, __LINE__);
+        printf("not defined type %u %s:%u\n",type, __FUNCTION__, __LINE__);
         break;
     }
     return res;

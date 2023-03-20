@@ -18,7 +18,7 @@ typedef struct page_manager{
     blockmanager *bm;
 }page_manager;
 
-page_manager *pm_init(lower_info *li, blockmanager *bm);
+page_manager *pm_init(lower_info *li, blockmanager *bm, bool isdata);
 void pm_page_flush(page_manager *pm, bool isactive, uint32_t type, uint32_t *lba, char **data, uint32_t size, uint32_t *piece_ppa_res);
 uint32_t pm_map_flush(page_manager *pm, bool isactive, char *data, uint32_t gp_idx);
 uint32_t pm_remain_space(page_manager *pm, bool isactive);

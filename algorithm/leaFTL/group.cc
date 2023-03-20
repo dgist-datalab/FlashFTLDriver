@@ -76,7 +76,7 @@ void check_level_overlap(level *lev){
 uint64_t group_level_size(level *lev){
     uint64_t res=0;
     level_iter iter;
-    for(iter=lev->begin()+1; iter!=lev->end(); iter++){
+    for(iter=lev->begin(); iter!=lev->end(); iter++){
         res+=segment_size(*iter);
     }
     return res;
@@ -162,6 +162,7 @@ bool group_get(group *gp, uint32_t lba, group_read_param* grp, bool isuserreq, G
     }
 
     if(grp->retry_flag==RETRY_FLAG::INIT){
+        grp->read_done=false;
         if(grp->seg->original_start==lba){
             grp->piece_ppa=grp->seg->start_piece_ppa;
             goto found_end;
@@ -178,6 +179,7 @@ bool group_get(group *gp, uint32_t lba, group_read_param* grp, bool isuserreq, G
         }
     }
     else if(grp->retry_flag==RETRY_FLAG::NOT_RETRY){
+        grp->read_done=false;
         if (lba < grp->oob[0]){
             grp->piece_ppa = (grp->piece_ppa / L2PGAP) * L2PGAP - 1;
         }
@@ -202,6 +204,7 @@ not_found_end:
     return false;
 
 found_end:
+    grp->set_idx=grp->piece_ppa%L2PGAP;
     grp->read_done=true;
     grp->retry_flag=RETRY_FLAG::DATA_FOUND;
     return false;
@@ -341,7 +344,7 @@ static void group_segment_update(group *gp, level *lev, temp_map *tmap, segment 
 #endif
 }
 
-void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval){
+void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval, void (*cache_size_update)(group *gp, uint32_t size, bool decrease)){
     /*
     static int cnt=0;
     printf("%s, %u, %lu, %u\n", __FUNCTION__, tmap->lba[0], tmap->lba[0]/MAPINTRANS, ++cnt);
@@ -359,9 +362,17 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
     }
     std::vector<segment*> godown;
     godown.clear();
-    gp->size-=group_level_size(gp->level_list->at(0));
+    uint32_t size=0;
+    size+=group_level_size(gp->level_list->at(0));
+    size+=crb_size(gp->crb);
+    gp->size-=size;
+    cache_size_update(gp, size, true);
     group_segment_update(gp, (*gp->level_list)[0], tmap, target, &godown);
-    gp->size+=group_level_size(gp->level_list->at(0));
+    size=0;
+    size+=group_level_size(gp->level_list->at(0));
+    size+=crb_size(gp->crb);
+    gp->size+=size;
+    cache_size_update(gp, size, false);
     if(godown.size()){
         //insert new level 1;
         uint64_t new_level_size=0;
@@ -372,6 +383,7 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
             lev->push_back(seg);
         }
         gp->size+=new_level_size;
+        cache_size_update(gp, new_level_size, false);
 
 
         std::vector<level*>* new_level_list=new std::vector<level*>();
@@ -482,6 +494,7 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
 
 void group_from_translation_map(group *gp, uint32_t *lba, uint32_t *piece_ppa, uint32_t idx){
     group_clean(gp, true);
+    gp->size=0;
     level *new_level=map_to_onelevel(gp, lba, piece_ppa);
     gp->size=group_level_size(new_level);
     gp->level_list->push_back(new_level);
@@ -507,8 +520,6 @@ void group_clean(group *gp, bool reinit){
         crb_free(gp->crb);
         delete gp->level_list;
     }
-    gp->size=0;
-
     gm.total_segment+=segment_num;
     gm.interval_segment=segment_num;
 }
@@ -519,7 +530,6 @@ void group_free(group *gp){
 
 void *group_read_end_req(algo_req *algo){
     group_read_param *grp=(group_read_param*)algo->param;
-    grp->read_done=true;
     if(algo->type==MAPPINGR){
 
     }
@@ -541,6 +551,7 @@ void *group_read_end_req(algo_req *algo){
         printf("not allowed type!\n");
         abort();
     }
+    grp->read_done=true;
     free(algo);
     return NULL;
 }
@@ -557,11 +568,12 @@ bool group_get_map_read_grp(group *gp, bool isstart, group_read_param *grp, bool
         return false;
     }
 
-    if(gp->ppa!=INITIAL_STATE_PADDR){
+    if(gp->ppa==INITIAL_STATE_PADDR){
         /*not need to caching*/
         grp->read_done=true;
         gp->cache_flag=CACHE_FLAG::CACHED;
         grp->r_type=GRP_READ_TYPE::NOTDATAREADSTART;
+        cache_insert(gp, NULL);
         return false;
     }
 
@@ -578,8 +590,12 @@ bool group_get_map_read_grp(group *gp, bool isstart, group_read_param *grp, bool
             cache_insert(gp, (uint32_t*)grp->value->value);
             /*resolve peding request*/
             pending_iter iter=gp->pending_request.begin();
-            for(;iter!=gp->pending_request.end(); iter++){
+            for(;iter!=gp->pending_request.end(); ){
                 (*iter)->read_done=true;
+                if((*iter)->user_req){
+                    inf_assign_try((*iter)->user_req);
+                }
+                gp->pending_request.erase(iter++);
             }
         }
         else{
@@ -616,10 +632,10 @@ void group_get_exact_piece_ppa(group *gp, uint32_t lba, uint32_t set_idx, group_
         GDB_MAKE_BREAKPOINT;
     }
 
+    if(grp->value==NULL){
+        grp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+    }
     if(group_get(gp, lba, grp, false, GRP_TYPE::GP_WRITE)){
-        if(grp->value==NULL){
-            grp->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
-        }
         send_IO_back_req(DATAR, li, grp->piece_ppa/L2PGAP, grp->value, (void*)grp, group_read_end_req);
     }
     else{

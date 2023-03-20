@@ -83,13 +83,15 @@ static void validate_ppa(blockmanager *bm, uint32_t ppa, KEYT *lba, uint32_t max
     bm->set_oob(bm, (char*)lba, sizeof(uint32_t) * max_idx, ppa);
 }
 
-page_manager *pm_init(lower_info *li, blockmanager *bm){
+page_manager *pm_init(lower_info *li, blockmanager *bm, bool isdata){
     page_manager *res=(page_manager*)malloc(sizeof(page_manager));
     res->lower=li;
     res->bm=bm;
 
     res->reserve=res->bm->get_segment(res->bm, BLOCK_RESERVE);
+    seg_type_flag[res->reserve->seg_idx]=isdata?SEGTYPE_FLAG::DATA:SEGTYPE_FLAG::TRANS;
     res->active=res->bm->get_segment(res->bm, BLOCK_ACTIVE);
+    seg_type_flag[res->active->seg_idx]=isdata?SEGTYPE_FLAG::DATA:SEGTYPE_FLAG::TRANS;
     return res;
 }
 
@@ -343,22 +345,23 @@ void pm_map_gc(page_manager *pm, __gsegment *target, temp_map *res){
 }
 
 void temp_queue_to_heap(blockmanager *bm, std::queue<uint32_t> *temp_queue){
-
+    uint32_t idx;
+    while(temp_queue->size()){
+        idx=temp_queue->front();
+        temp_queue->pop();
+        bm->insert_gc_target(bm, idx);
+    }
 }
 
 void pm_gc(page_manager *pm, temp_map *res, bool isdata){
-    __gsegment *gc_target=NULL;
-
+    __gsegment *gc_target=pm_get_gc_target(pm->bm);
+    static int cnt=0;
+    printf("gc %u cnt\n", ++cnt);
+    if(cnt==6){
+        //GDB_MAKE_BREAKPOINT;
+    }
     std::queue<uint32_t> temp_queue;
     while(gc_target!=NULL){
-        gc_target=pm_get_gc_target(pm->bm);
-        if (gc_target->all_invalid){
-            pm_gc_finish(pm, pm->bm, gc_target);
-            temp_map_clear(res);
-            temp_queue_to_heap(pm->bm, &temp_queue);
-            return;
-        }
-
         if(isdata){
             if(seg_type_flag[gc_target->seg_idx]==SEGTYPE_FLAG::DATA){
                 break;
@@ -371,10 +374,21 @@ void pm_gc(page_manager *pm, temp_map *res, bool isdata){
         }
         temp_queue.push(gc_target->seg_idx);
         free(gc_target);
+        gc_target=pm_get_gc_target(pm->bm);
+    }
+
+    if (gc_target->all_invalid){
+        pm_gc_finish(pm, pm->bm, gc_target);
+        temp_map_clear(res);
+        return;
     }
     temp_queue_to_heap(pm->bm, &temp_queue);
     
     if(isdata){
+        if(gc_target==NULL){
+            printf("data full!\n");
+            abort();
+        }
         pm_data_gc(pm, gc_target, res);
     }
     else{

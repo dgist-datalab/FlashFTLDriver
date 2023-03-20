@@ -19,3 +19,4 @@ CRB_node *crb_find_node(CRB *crb, uint32_t lba);
 void crb_insert(CRB *crb, temp_map *tmap, segment *seg, std::vector<CRB_node> *update_target); //remove overlapped lba
 void crb_free(CRB *crb);
 void crb_remove_overlap(CRB *crb, temp_map *tmap, std::vector<CRB_node>* update_target);
+uint64_t crb_size(CRB *crb);

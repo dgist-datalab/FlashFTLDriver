@@ -159,3 +159,12 @@ void crb_free(CRB *crb){
     }
     delete crb;
 }
+
+uint64_t crb_size(CRB *crb){
+    uint64_t res=0;
+    CRB_iter iter=crb->begin();
+    for(; iter!=crb->end(); iter++){
+        res+=iter->second->lba_arr->size()*4;
+    }
+    return res;
+}
