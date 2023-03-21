@@ -202,6 +202,7 @@ void vectored_get(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_rw(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_unique_rset(uint32_t, uint32_t, monitor*);
 void vectored_localized_get(uint32_t, uint32_t, monitor *);
+void vectored_partial_rw(uint32_t, uint32_t, monitor *);
 
 int my_itoa(uint32_t key, char **_target, char *buf);
 

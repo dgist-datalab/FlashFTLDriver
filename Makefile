@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=AMF
-export TARGET_ALGO=DFTL
+export TARGET_ALGO=leaFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -32,16 +32,13 @@ export COMMONFLAGS+=\
 			-DLSM_DEBUG\
 			-DPROGRESS\
 			-DPARALLEL_MANAGER\
-			-DWRITE_STOP_READ\
 			-O3\
+#			-DWRITE_STOP_READ\
 #			-DTRACE_REPLAY\
 #			-DTRACE_COLLECT\
 #			-DMAPPING_TIME_CHECK\
 #			-DTRACE_REPLAY\
-#			-DLSM_DEBUG\
-#			-DMETAONLY\
-#			-DREAL_BENCH_MODE\
-#-DDFTL_DEBUG\
+
 
 
 
@@ -148,9 +145,9 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
-		-ljemalloc\
 		-ldw\
 #	-laio\
+		-ljemalloc\
 
 all: driver
 

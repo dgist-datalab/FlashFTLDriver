@@ -14,6 +14,7 @@
 #include <cassert>
 #include <memory>
 
+#define DEBUG
 #include "./settings.h"
 
 #define EPRINT(error, isabort, ... )\

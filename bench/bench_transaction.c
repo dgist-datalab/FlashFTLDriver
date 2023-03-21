@@ -54,8 +54,8 @@ char *get_vectored_bench(uint32_t *mark){
 	m->n_num++;
 	return res->buf;
 }
-
 void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
+
 	uint32_t request_per_command=_master->trans_configure.request_num_per_command;
 	uint32_t number_of_command=(m->m_num)/request_per_command;
 	m->m_num=number_of_command*request_per_command;
@@ -93,6 +93,8 @@ void vectored_set(uint32_t start, uint32_t end, monitor* m, bool isseq){
 		}
 	}
 }
+
+
 
 void vectored_unique_rset(uint32_t start, uint32_t end, monitor* m){
 	uint32_t request_per_command=_master->trans_configure.request_num_per_command;
@@ -246,6 +248,67 @@ void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
 				(*(uint32_t*)&buf[idx])=key_buf[j];
 				idx+=sizeof(uint32_t);
 			}
+			(*(uint32_t*)&buf[idx])=0;//offset
+			idx+=sizeof(uint32_t);
+			m->read_cnt++;
+		}	
+	}
+	m->m_num=m->read_cnt+m->write_cnt;
+	free(key_buf);
+}
+
+void vectored_partial_rw(uint32_t start, uint32_t end, monitor* m){
+	//uint32_t request_per_command=_master->trans_configure.request_num_per_command;
+	uint32_t request_per_command=4;
+	uint32_t number_of_command=(m->m_num)/request_per_command;
+	m->m_num=number_of_command*request_per_command;
+	m->tbody=(transaction_bench_value*)malloc(number_of_command * sizeof(transaction_bench_value));
+
+	uint32_t request_buf_size=_master->trans_configure.request_size * request_per_command;
+	int *key_buf=(int*)malloc(sizeof(int) * request_per_command);
+	m->command_num=number_of_command;
+	m->command_issue_num=0;
+
+
+	for(uint32_t i=0; i<number_of_command/2; i++){
+		uint32_t idx=0;
+		m->tbody[i].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
+		char *buf=m->tbody[i].buf;
+
+		idx+=sizeof(uint32_t);//tid
+		(*(uint32_t*)&buf[idx])=request_per_command;
+		idx+=sizeof(uint32_t);
+
+		uint32_t start_key=start+rand()%(end-start);
+		for(uint32_t j=0; j<request_per_command; j++){
+			(*(uint8_t*)&buf[idx])=FS_SET_T;
+			idx+=sizeof(uint8_t);
+
+			key_buf[j]=start_key+j;
+			(*(uint32_t*)&buf[idx])=key_buf[j];
+			idx+=sizeof(uint32_t);
+
+			(*(uint32_t*)&buf[idx])=0;//offset
+			idx+=sizeof(uint32_t);
+			m->write_cnt++;
+		}
+
+		idx=0;
+		m->tbody[i+number_of_command/2].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
+		buf=m->tbody[i+number_of_command/2].buf;
+
+
+		idx+=sizeof(uint32_t);//tid
+		(*(uint32_t*)&buf[idx])=request_per_command;
+		idx+=sizeof(uint32_t);
+
+		for(uint32_t j=0; j<request_per_command; j++){
+			(*(uint8_t*)&buf[idx])=FS_GET_T;
+			idx+=sizeof(uint8_t);
+
+			(*(uint32_t*)&buf[idx])=key_buf[j];
+			idx+=sizeof(uint32_t);
+
 			(*(uint32_t*)&buf[idx])=0;//offset
 			idx+=sizeof(uint32_t);
 			m->read_cnt++;
