@@ -589,11 +589,12 @@ summary_write_param* st_array_get_summary_param(st_array *sa, uint32_t piece_ppa
 	swp->sa=sa;
 	swp->spm=&sa->sp_meta[sa->now_STE_num];
 	swp->oob=sa->sp_meta[sa->now_STE_num].start_lba;
+	swp->sp=sp;
 	st_array_finish_now_PBA(sa, sa->unaligned_block_write);
 
 	sa->pba_array[sa->now_STE_num].mf->make_done(sa->pba_array[sa->now_STE_num].mf);
 
-	swp->value=sp_get_data((summary_page*)(sa->sp_meta[sa->now_STE_num].private_data));
+	swp->value=sp_get_data(sp);
 	sa->now_STE_num++;
 	sa->issue_STE_num++;
 	return swp;
@@ -604,7 +605,7 @@ void st_array_summary_write_done(summary_write_param *swp){
 	fdriver_lock(&sa_m->lock);
 	sa->end_STE_num++;
 	fdriver_unlock(&sa_m->lock);
-	sp_free((summary_page*)sa->sp_meta[swp->idx].private_data);
+	sp_free(swp->sp);
 	sa->sp_meta[swp->idx].pr_type=NO_PR;
 	free(swp);
 }

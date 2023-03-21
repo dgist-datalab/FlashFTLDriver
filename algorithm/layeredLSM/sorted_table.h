@@ -80,6 +80,7 @@ typedef struct summary_write_param{
 	char *value;
 	uint32_t oob;
 	summary_page_meta *spm;
+	summary_page *sp;
 }summary_write_param;
 
 typedef struct sid_info{

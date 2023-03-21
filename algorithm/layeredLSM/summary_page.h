@@ -24,7 +24,7 @@ typedef struct summary_pair{
 
 typedef struct summary_page{
 	uint32_t write_pointer;
-	char *value;
+	//char *value;
 	bool sorted;
 	char *body;
 }summary_page;
