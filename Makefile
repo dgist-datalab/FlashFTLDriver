@@ -7,7 +7,7 @@ export CC=g++
 export CXX=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=posix_memory
+export TARGET_LOWER=AMF
 export TARGET_ALGO=DFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -29,16 +29,18 @@ export COMMONFLAGS+=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-DPARALLEL_MANAGER\
 			-DLSM_DEBUG\
-			-DTRACE_REPLAY\
 			-DPROGRESS\
-			-DMAPPING_TIME_CHECK\
+			-DPARALLEL_MANAGER\
+			-DWRITE_STOP_READ\
 			-O3\
+#			-DTRACE_REPLAY\
+#			-DTRACE_COLLECT\
+#			-DMAPPING_TIME_CHECK\
+#			-DTRACE_REPLAY\
 #			-DLSM_DEBUG\
 #			-DMETAONLY\
 #			-DREAL_BENCH_MODE\
-#-DTRACE_COLLECT\
 #-DDFTL_DEBUG\
 
 
@@ -115,6 +117,7 @@ SRCS +=\
 	./bench/bench.c\
 	./bench/bench_demand.c\
 	./bench/bench_transaction.c\
+	./bench/bench_localized_workload.c\
 	./bench/bench_parsing.c\
 	./include/utils/thpool.c\
 	./include/utils/kvssd.c\

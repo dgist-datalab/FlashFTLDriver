@@ -615,7 +615,7 @@ void bench_vector_latency(vec_request *req){
 		uint32_t idx=req->mark;
 		bench_data *_data=&_master->datas[idx];
 
-		bench_vector_data_collect_sec(_data, req);
+		//bench_vector_data_collect_sec(_data, req);
 
 		_data->vector_read_cnt++;
 		int slot_num=req->latency_checker.micro_time/TIMESLOT;
