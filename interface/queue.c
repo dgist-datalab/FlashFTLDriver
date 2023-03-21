@@ -61,6 +61,29 @@ node* q_enqueue_node(void* req, queue* q){
         return new_node;
 }
 
+node* q_enqueue_int_node(int req, queue* q){
+        pthread_mutex_lock(&q->q_lock);
+        if(q->size==q->m_size){
+                pthread_mutex_unlock(&q->q_lock);
+                return NULL;
+        }
+
+        node *new_node=(node*)malloc(sizeof(node));
+        new_node->d.data=req;
+        new_node->next=NULL;
+        if(q->size==0){
+                q->head=q->tail=new_node;
+        }
+        else{
+                q->tail->next=new_node;
+		new_node->prev = q->tail;
+                q->tail=new_node;
+        }
+        q->size++;
+        pthread_mutex_unlock(&q->q_lock);
+        return new_node;
+}
+
 bool q_enqueue_front(void *req, queue*q){
 	pthread_mutex_lock(&q->q_lock);
 	if(q->size==q->m_size){	
@@ -116,6 +139,37 @@ void* q_pick(queue *q){
 	return res;
 }
 
+int q_pick_int(queue *q){
+	pthread_mutex_lock(&q->q_lock);
+	if(!q->head || q->size==0){
+		pthread_mutex_unlock(&q->q_lock);
+		return NULL;
+	}
+	node *target_node;
+	target_node=q->head;
+	int res=target_node->d.data;
+	pthread_mutex_unlock(&q->q_lock);
+	return res;
+}
+
+
+node* q_dequeue_node(queue* q) {
+	pthread_mutex_lock(&q->q_lock);
+	if(!q->head || q->size==0){
+		pthread_mutex_unlock(&q->q_lock);
+		return NULL;
+	}
+	node *target_node;
+	target_node=q->head;
+	q->head=q->head->next;
+	q->size--;
+	if (q->size != 0) q->head->prev = NULL;
+
+//	printf("of-key:%u\n",((request*)res)->key);
+	pthread_mutex_unlock(&q->q_lock);
+	return target_node;
+}
+
 void q_free(queue* q){
 	while(q_dequeue(q)){}
 	pthread_mutex_destroy(&q->q_lock);
@@ -149,13 +203,17 @@ int q_dequeue_int(queue* q){
 	pthread_mutex_lock(&q->q_lock);
 	if(!q->head || q->size==0){
 		pthread_mutex_unlock(&q->q_lock);
-		return 0;
+		return -1;
 	}
 	node *target_node;
 	target_node=q->head;
-	q->head=q->head->next;
-	q->head->prev = NULL;
-
+	if (q->size == 1) {
+		q->head=NULL;
+		q->tail=NULL;
+	} else {
+		q->head=q->head->next;
+		q->head->prev=NULL;
+	}
 	int res=target_node->d.data;
 	q->size--;
 //	printf("of-key:%u\n",((request*)res)->key);

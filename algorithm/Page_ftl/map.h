@@ -7,7 +7,7 @@
 #define BENCH_JY 1
 #define MAX_G 15
 //0 is zip08, 1 is zip11, 2 is random
-#define TIME_WINDOW 100
+#define TIME_WINDOW GIGAUNIT*4
 #endif
 
 typedef struct naive_mida {

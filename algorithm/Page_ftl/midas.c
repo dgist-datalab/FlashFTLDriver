@@ -164,6 +164,7 @@ int change_group_number(int prevnum, int newnum) {
 	if (prevnum != 0) {
 		p->active[newnum] = p->active[prevnum];
 		p->active[prevnum] = NULL;
+		seg_assign_ginfo(p->active[newnum]->seg_idx, newnum);
 	} else {
 		stat->g->gsize[newnum]--;
 		stat->g->gsize[prevnum]++;
@@ -274,11 +275,12 @@ int check_applying_config(double calc_waf) {
 
 int check_modeling() {
 	if (G_info->valid==false) return 0;
+	pm_body *p = (pm_body*)page_ftl.algo_body;
 	if (check_applying_config(G_info->WAF)==0) {
 		G_info->valid=false;
+		if (!p->n->naive_on) stat->e->errcheck=true;
 		return 0;
 	}
-	pm_body *p = (pm_body*)page_ftl.algo_body;
 
 	if (p->n->naive_on) naive_mida_off();
 

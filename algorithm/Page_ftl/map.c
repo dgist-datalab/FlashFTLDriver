@@ -30,7 +30,8 @@ void page_map_create(){
 	for(int i=0;i<_NOP*L2PGAP; i++){
 		p->mapping[i]=UINT_MAX;
 	}
-	p->active=(__segment **)malloc(sizeof(__segment*)*GNUMBER);
+	p->active=(__segment **)malloc(sizeof(__segment*)*MAX_G);
+	for (int i=0;i<MAX_G;i++) p->active[i]=NULL;
 	p->group = (queue**)malloc(sizeof(queue*)*MAX_G);
 	
 	p->gnum=GNUMBER;
@@ -137,7 +138,7 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx, uint32_t mig_count){
 	//printf("mig_count: %d\n", mig_count);
 	uint32_t res=0;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
-	if (mig_count > GNUMBER) printf("mig count problem is found in gc_update******\n");
+	//if (mig_count > GNUMBER) printf("mig count problem is found in gc_update******\n");
 	/*when the gc phase, It should get a page from the reserved block*/
 	//if (mig_count == 0) group_idx = mig_count;
 retry:

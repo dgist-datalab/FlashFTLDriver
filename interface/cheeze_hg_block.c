@@ -323,7 +323,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	}
 	*/
 
-	//tmp = strtok(NULL, " \t");
+	tmp = strtok(NULL, " \t");
 	int ttp = atoi(tmp);
 	if (ttp == 0) type=FS_GET_T;
 	else if (ttp == 1) type = FS_SET_T;
