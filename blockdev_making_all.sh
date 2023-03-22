@@ -14,4 +14,8 @@ make TARGET_ALGO=layeredLSM cheeze_block_driver -j
 mv cheeze_block_driver ./result/cheeze_lsmftl_driver
 make clean
 
+make TARGET_ALGO=leaFTL cheeze_block_driver -j
+mv cheeze_block_driver ./result/cheeze_leaftl_driver
+make clean
+
 ls -al ./result

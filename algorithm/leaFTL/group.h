@@ -43,6 +43,7 @@ typedef struct group{
     uint32_t max_height;
     uint32_t map_idx;
     uint32_t ppa;
+    uint32_t segment_num;
 
     /*Cache flag*/
     uint64_t size; //byte

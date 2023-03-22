@@ -5,6 +5,7 @@
 #include <algorithm>
 extern blockmanager *lea_bm;
 extern uint32_t test_key;
+extern uint32_t now_segment_num;
 //segment *debug_segment;
 bool leaFTL_debug;
 group_monitor gm;
@@ -53,6 +54,7 @@ void group_init(group *res, uint32_t idx){
     res->size=0;
     res->lru_node=NULL;
     res->isclean=true;
+    res->segment_num=0;
 }
 
 void print_all_level(std::vector<level*> *level_list){
@@ -378,11 +380,18 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
     size+=crb_size(gp->crb);
     gp->size-=size;
     cache_size_update(gp, size, true);
+
+    gp->segment_num-=gp->level_list->at(0)->size();
+    now_segment_num-=gp->level_list->at(0)->size();
+
     group_segment_update(gp, (*gp->level_list)[0], tmap, target, &godown);
     size=0;
     size+=group_level_size(gp->level_list->at(0));
     size+=crb_size(gp->crb);
     gp->size+=size;
+    gp->segment_num+=gp->level_list->at(0)->size();
+    now_segment_num+=gp->level_list->at(0)->size();
+
     cache_size_update(gp, size, false);
     if(godown.size()){
         //insert new level 1;
@@ -396,6 +405,8 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
         gp->size+=new_level_size;
         cache_size_update(gp, new_level_size, false);
 
+        gp->segment_num+=lev->size();
+        now_segment_num+=lev->size();
 
         std::vector<level*>* new_level_list=new std::vector<level*>();
         new_level_list->reserve(gp->level_list->size()+1);
@@ -505,7 +516,10 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
 
 void group_from_translation_map(group *gp, uint32_t *lba, uint32_t *piece_ppa, uint32_t idx){
     group_clean(gp, true, false);
+    now_segment_num-=gp->segment_num;
     level *new_level=map_to_onelevel(gp, lba, piece_ppa);
+    gp->segment_num=new_level->size();
+    now_segment_num+=gp->segment_num;
     gp->size=group_level_size(new_level);
     gp->level_list->push_back(new_level);
 }

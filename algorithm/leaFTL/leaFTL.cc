@@ -27,6 +27,7 @@ int64_t lru_max_byte;
 int64_t lru_now_byte;
 int64_t lru_reserve_byte;
 uint32_t max_cached_trans_map;
+uint32_t now_segment_num;
 page_read_buffer rb;
 uint32_t read_buffer_hit_cnt;
 
@@ -44,6 +45,7 @@ extern uint32_t test_key;
 extern uint32_t lea_test_piece_ppa;
 #define WRITE_BUF_SIZE (2*1024*1024)
 #define INITIAL_STATE_PADDR (UINT32_MAX)
+uint32_t lea_print_log();
 
 struct algorithm lea_FTL={
     .argument_set=lea_argument,
@@ -54,7 +56,7 @@ struct algorithm lea_FTL={
     .flush=NULL,
     .remove=lea_remove,
     .test=NULL,
-    .print_log=NULL,
+    .print_log=lea_print_log,
     .empty_cache=NULL,
     .dump_prepare=NULL,
     .dump=NULL,
@@ -66,6 +68,14 @@ typedef struct user_io_param{
     uint32_t piece_ppa;
     value_set *value;
 }user_io_param;
+
+
+uint32_t lea_print_log(){
+    printf("===========LEA LOG===============\n");
+    printf("target cache_memory:%u/%u\n", lru_now_byte, lru_max_byte);
+    printf("segment_num: %u, average:%.2lf\n", now_segment_num, (double)now_segment_num/TRANSMAPNUM);
+    return 1;
+}
 
 user_io_param* get_user_io_param(uint32_t type, uint32_t piece_ppa, value_set *value){
     user_io_param *res=(user_io_param*)malloc(sizeof(user_io_param));
@@ -704,5 +714,6 @@ retry:
 }
 
 uint32_t lea_remove(request *const req){
+    req->end_req(req);
     return 1;
 }
