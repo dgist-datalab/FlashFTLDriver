@@ -27,6 +27,8 @@ int64_t lru_max_byte;
 int64_t lru_now_byte;
 int64_t lru_reserve_byte;
 uint32_t max_cached_trans_map;
+page_read_buffer rb;
+uint32_t read_buffer_hit_cnt;
 
 typedef struct group_update_param{
    group_read_param grp;
@@ -40,7 +42,7 @@ group main_gp[TRANSMAPNUM];
 
 extern uint32_t test_key;
 extern uint32_t lea_test_piece_ppa;
-#define WRITE_BUF_SIZE (32*1024*1024)
+#define WRITE_BUF_SIZE (2*1024*1024)
 #define INITIAL_STATE_PADDR (UINT32_MAX)
 
 struct algorithm lea_FTL={
@@ -107,6 +109,12 @@ uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
     for(uint32_t i=0; i<TRANSMAPNUM; i++){
         group_init(&main_gp[i], i);
     }
+
+    rb.pending_req=new std::multimap<uint32_t, algo_req *>();
+	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
+	fdriver_mutex_init(&rb.pending_lock);
+	fdriver_mutex_init(&rb.read_buffer_lock);
+	rb.buffer_ppa=UINT32_MAX;
     return 1;
 }
 
@@ -120,49 +128,49 @@ void lea_destroy(lower_info *, algorithm *){
     temp_map_free(gc_translate_map);
     temp_map_free(compaction_temp_map);
     lru_free(gp_lru);
+
+	delete rb.pending_req;
+	delete rb.issue_req;
 }
 
 uint32_t lea_argument(int argc, char **argv){
     return 1;
 }
 
-void *lea_read_end_req(algo_req* const req){
+void processing_pending_req(algo_req *req, value_set *value){
     group_read_param *grp=(group_read_param*)req->param;
-    bool data_found=false;
     grp->oob=(uint32_t*)lea_bm->get_oob(lea_bm, grp->piece_ppa/L2PGAP);
+    bool data_found=false;
     bool isretry=false;
     bool data_retry=false;
-    if(req->type==MAPPINGR){
-        isretry=true;
-        grp->read_done=true;
+    if(grp->lba==test_key){
+        GDB_MAKE_BREAKPOINT;
     }
-    else{
-        switch (grp->retry_flag){
-        case RETRY_FLAG::NORMAL_RETRY:
-        case RETRY_FLAG::NOT_RETRY:
-            grp->set_idx = group_oob_check(grp);
-            if (grp->set_idx == NOT_FOUND){
-                isretry=true;
-                data_retry=true;
-            }
-            else{
-                data_found = true;
-            }
-            break;
-        case RETRY_FLAG::DATA_FOUND:
+    switch (grp->retry_flag){
+    case RETRY_FLAG::NORMAL_RETRY:
+    case RETRY_FLAG::NOT_RETRY:
+        grp->set_idx = group_oob_check(grp);
+        if (grp->set_idx == NOT_FOUND){
+            isretry=true;
+            data_retry=true;
+        }
+        else{
             data_found = true;
-            break;
-        default:
-            printf("not allowed type! %s:%u\n",__FUNCTION__, __LINE__);
-            GDB_MAKE_BREAKPOINT;
-            break;
         }
-        grp->read_done=true;
-        if (data_found){
-            memmove(grp->value->value, &grp->value->value[(grp->set_idx) * LPAGESIZE], LPAGESIZE);
-            req->parents->end_req(req->parents);
-            free(grp);
-        }
+        break;
+    case RETRY_FLAG::DATA_FOUND:
+        data_found = true;
+        break;
+    default:
+        printf("not allowed type! %s:%u\n",__FUNCTION__, __LINE__);
+        GDB_MAKE_BREAKPOINT;
+        break;
+    }
+    grp->read_done=true;
+    if (data_found){
+        memmove(grp->value->value, &value->value[(grp->set_idx) * LPAGESIZE], LPAGESIZE);
+        req->parents->end_req(req->parents);
+        free(grp);
     }
     if(isretry){
         if(data_retry){
@@ -170,7 +178,38 @@ void *lea_read_end_req(algo_req* const req){
         }
         inf_assign_try(req->parents);
     }
-    free(req);
+}
+
+void *lea_read_end_req(algo_req* const req){
+    group_read_param *grp=(group_read_param*)req->param;
+	algo_req *pending_req;
+    if(req->type==MAPPINGR){
+        grp->read_done=true;
+        inf_assign_try(req->parents);
+        free(req);
+    }
+    else{   
+	    rb_r_iter target_r_iter;
+        fdriver_lock(&rb.pending_lock);
+        target_r_iter = rb.pending_req->find(grp->piece_ppa/ L2PGAP);
+        for (; target_r_iter->first == grp->piece_ppa / L2PGAP &&
+               target_r_iter != rb.pending_req->end();){
+            pending_req = target_r_iter->second;
+            pending_req->type_lower = req->type_lower;
+            processing_pending_req(pending_req, grp->value);
+            rb.pending_req->erase(target_r_iter++);
+        }
+        rb.issue_req->erase(grp->piece_ppa / L2PGAP);
+        fdriver_unlock(&rb.pending_lock);
+
+        fdriver_lock(&rb.read_buffer_lock);
+        rb.buffer_ppa = grp->piece_ppa / L2PGAP;
+        memcpy(rb.buffer_value, grp->value->value, PAGESIZE);
+        fdriver_unlock(&rb.read_buffer_lock);
+
+        processing_pending_req(req, grp->value);
+    }
+
     return NULL;
 }
 
@@ -178,9 +217,8 @@ uint32_t lea_read(request *const req){
     group_read_param *grp;
     group *gp;
     char *data;
-
     if(req->key==test_key){
-        //GDB_MAKE_BREAKPOINT;
+        GDB_MAKE_BREAKPOINT;
     }
     //printf("req->key:%u\n", req->key);
 
@@ -245,15 +283,12 @@ uint32_t lea_read(request *const req){
     lea_cache_promote(gp);
     group_get(grp->gp, grp->lba, grp, true, GRP_TYPE::GP_READ);
 
-#ifdef DEBUG
-    if(grp->piece_ppa!=exact_map[grp->lba]){
-        printf("address miss!\n");
-        GDB_MAKE_BREAKPOINT;
-    }
-#endif
-
     if(grp->piece_ppa!=INITIAL_STATE_PADDR){
-        send_IO_user_req(DATAR, lower, grp->piece_ppa / L2PGAP, req->value, (void *)grp, req, lea_read_end_req);
+        algo_req *hit_check=send_IO_user_req(DATAR, lower, grp->piece_ppa / L2PGAP, req->value, (void *)grp, req, lea_read_end_req);
+        if(hit_check){
+            //buffer hit
+            processing_pending_req(hit_check, req->value);
+        }
     }
     else{
         //not found data
@@ -370,10 +405,15 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
     group_read_param *grp=(group_read_param*)malloc(sizeof(group_read_param)*map->size);
     std::list<group_read_param*> cached_grp_list;
     std::list<group_read_param*> uncached_grp_list;
+    
+    //static int debug_cnt=0;
+    //bool debug_flag=false;
+
     for(uint32_t i=0; i<map->size; i++){
         group *gp=&main_gp[map->lba[i]/MAPINTRANS];
         grp[i].gp=gp;
         grp[i].lba=map->lba[i];
+
         if(evict_path && !group_cached(gp)){
             printf("wtf??\n");
             GDB_MAKE_BREAKPOINT;
@@ -398,6 +438,7 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
             std::list<group_read_param*> grp_list;
             for(;master_iter!=target_grp_list.end(); master_iter++){
                 t_grp=*master_iter;
+
                 if(lea_cache_evict(t_grp->gp)==false){
                     break;
                 }
@@ -452,12 +493,17 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
 }
 
 uint32_t *lea_gp_to_mapping(group *gp){
+#ifdef FAST_LOAD_STORE
+    group_store_levellist(gp);
+    return &exact_map[gp->map_idx*MAPINTRANS];
+#else
     for(uint32_t i=0; i<MAPINTRANS; i++){
         compaction_temp_map->lba[i]=gp->map_idx*MAPINTRANS+i;
     }
     lea_mapping_find_exact_piece_ppa(compaction_temp_map, false, NULL, true);
     group_from_translation_map(gp, compaction_temp_map->lba, compaction_temp_map->piece_ppa, gp->map_idx);
     return compaction_temp_map->piece_ppa;
+#endif
 }
 
 void lea_compaction(){
@@ -476,9 +522,7 @@ void lea_compaction(){
         }
         lea_mapping_find_exact_piece_ppa(compaction_temp_map, false, NULL, false);
 
-        //lea_cache_size_update(gp, gp->size, true);
         group_from_translation_map(gp, compaction_temp_map->lba, compaction_temp_map->piece_ppa, gp->map_idx);
-        //lea_cache_size_update(gp, gp->size, false);
         new_lru_now_byte+=gp->size;
     }
     lru_now_byte=new_lru_now_byte;
@@ -505,8 +549,11 @@ group_update_param * lea_gup_setup(group_update_param *t_gup, group *gp, temp_ma
 void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
     /*udpate mapping*/
     //figure out old mapping and invalidation itnnn
+
     static uint32_t cnt=0;
-    printf("%s log: %u\n", __FUNCTION__, ++cnt);
+    if(++cnt%1000==0){
+        printf("%s log: %u\n", __FUNCTION__, cnt);
+    }
     if(map->size==0){
         printf("sorted buffer size is 0\n");
         abort();

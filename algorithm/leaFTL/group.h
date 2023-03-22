@@ -5,6 +5,7 @@
 #include "../../include/settings.h"
 #include "../../interface/interface.h"
 #include "./issue_io.h"
+#define FAST_LOAD_STORE
 #define NOT_FOUND UINT32_MAX
 #define INITIAL_STATE_PADDR (UINT32_MAX)
 #define MAPINTRANS ((PAGESIZE/sizeof(uint32_t)))
@@ -34,9 +35,10 @@ enum GRP_READ_TYPE{
 
 struct group_read_param;
 typedef std::list<group_read_param*>::iterator pending_iter;
+typedef std::vector<level*> level_list_t;
 
 typedef struct group{
-    std::vector<level*>* level_list;
+    level_list_t* level_list;
     CRB *crb;
     uint32_t max_height;
     uint32_t map_idx;
@@ -90,8 +92,10 @@ void group_free(group *gp);
 void group_get_exact_piece_ppa(group *gp, uint32_t lba, uint32_t set_idx, group_read_param *grp, bool isstart, lower_info *li, void (*cache_insert)(group *gp, uint32_t *piece_ppa));
 bool group_get_map_read_grp(group *gp, bool isstart, group_read_param *grp, bool iswrite_path, bool isuserreq, void(*cache_insert)(group *gp, uint32_t *piece_ppa));
 void group_from_translation_map(group *gp, uint32_t *lba, uint32_t *piece_ppa, uint32_t idx);
-void group_clean(group *gp, bool reinit);
+void group_clean(group *gp, bool reinit, bool byecivtion);
 void group_monitor_print();
+void group_load_levellist(group *gp);
+void group_store_levellist(group *gp);
 static inline group_read_param *group_get_empty_grp(){
     group_read_param *res=(group_read_param*)calloc(1, sizeof(group_read_param));
     return res;

@@ -26,7 +26,11 @@ void lea_cache_insert(group *gp, uint32_t *piece_ppa){
     }*/
         
     if(piece_ppa){
+    #ifdef FAST_LOAD_STORE
+        group_load_levellist(gp);
+    #else
         group_from_translation_map(gp, NULL, piece_ppa, gp->map_idx);
+    #endif
         if (lru_reserve_byte < 0){
             //printf("what happend?\n");
             //abort();
@@ -61,7 +65,8 @@ void __lea_cache_evict_body(uint32_t size){
 
         if(victim->isclean){
             victim->isclean=true;
-            group_clean(victim, true);
+            group_store_levellist(victim);
+            group_clean(victim, true, true);
             victim->cache_flag=CACHE_FLAG::UNCACHED;
             continue;
         }
@@ -87,7 +92,7 @@ retry:
         victim->ppa=pm_map_flush(translate_pm, true, (char*)piece_ppa_set, victim->map_idx);
 
         victim->isclean=true;
-        group_clean(victim, true);
+        group_clean(victim, true, true);
         victim->cache_flag=CACHE_FLAG::UNCACHED;
         victim->lru_node=NULL;
     }

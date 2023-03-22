@@ -3,8 +3,18 @@
 #include "../../include/container.h"
 #include "../../include/debug_utils.h"
 #include "./group.h"
+#include <map>
 
 #define COMPACTION_RESOLUTION 1000000
+typedef struct page_read_buffer{
+	std::multimap<uint32_t, algo_req *> * pending_req;
+	std::multimap<uint32_t, algo_req *>* issue_req;
+	fdriver_lock_t pending_lock;
+	fdriver_lock_t read_buffer_lock;
+	uint32_t buffer_ppa;
+	char buffer_value[PAGESIZE];
+}page_read_buffer;
+typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 
 uint32_t lea_create(lower_info *, blockmanager *, algorithm *);
 void lea_destroy(lower_info *, algorithm *);

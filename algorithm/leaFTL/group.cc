@@ -8,7 +8,13 @@ extern uint32_t test_key;
 //segment *debug_segment;
 bool leaFTL_debug;
 group_monitor gm;
-
+extern uint32_t *exact_map;
+bool temporal_storage_init_flag;
+typedef struct storage_node{
+    level_list_t * level_list;
+    CRB *crb;
+}storage_node;
+std::vector<storage_node> temporal_storage;
 
 #define COMMON_GRP_INIT(grp, igp, upv, in_read_type)\
     do{\
@@ -34,6 +40,11 @@ group_monitor gm;
     }while(0)
 
 void group_init(group *res, uint32_t idx){
+    if(temporal_storage_init_flag==false){
+        temporal_storage_init_flag=true;
+        temporal_storage.clear();
+        temporal_storage.reserve(TRANSMAPNUM);
+    }
     res->crb=crb_init();
     res->level_list=new std::vector<level*>();
     res->ppa=UINT32_MAX;
@@ -493,39 +504,78 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
 }
 
 void group_from_translation_map(group *gp, uint32_t *lba, uint32_t *piece_ppa, uint32_t idx){
-    group_clean(gp, true);
-    gp->size=0;
+    group_clean(gp, true, false);
     level *new_level=map_to_onelevel(gp, lba, piece_ppa);
     gp->size=group_level_size(new_level);
     gp->level_list->push_back(new_level);
 }
 
-void group_clean(group *gp, bool reinit){
-    uint32_t segment_num=0;
-    level_list_iter iter=gp->level_list->begin();
-    for(;iter!=gp->level_list->end(); iter++){
+static inline uint32_t __clean_levellist(level_list_t *l_list){
+    uint32_t res=0;
+    level_list_iter iter=l_list->begin();
+    for(;iter!=l_list->end(); iter++){
         level_iter lev_iter=(*iter)->begin();
         for(;lev_iter!=(*iter)->end(); lev_iter++){
             segment_free(*lev_iter);
-            segment_num++;
+            res++;
         }
         delete (*iter);
     }
+    return res;
+}
+
+void group_clean(group *gp, bool reinit, bool byeviction){
+    uint32_t segment_num=0;
+#ifdef FAST_LOAD_STORE
+    if(gp->level_list){
+        if(byeviction){
+            printf("not allowed: in the eviction the PLR must be moved to temporal storage\n");
+            abort();
+        }
+        segment_num=__clean_levellist(gp->level_list);
+    }
+#else
+    segment_num=__clean_levellist(gp->level_list);
+#endif
+
     if(reinit){
+#ifdef FAST_LOAD_STORE
+        if(gp->level_list){
+            if(byeviction){
+                printf("not allowed: in the eviction the PLR must be moved to temporal storage\n");
+                abort();
+            }
+            gp->level_list->clear();
+            crb_free(gp->crb);
+            gp->crb=crb_init();
+        }
+#else
         gp->level_list->clear();
         crb_free(gp->crb);
         gp->crb=crb_init();
+#endif
     }
     else{
-        crb_free(gp->crb);
-        delete gp->level_list;
+        #ifdef FAST_LOAD_STORE
+        if(gp->level_list){
+            if(byeviction){
+                printf("not allowed: in the eviction the PLR must be moved to temporal storage\n");
+                abort();
+            }
+            crb_free(gp->crb);
+            delete gp->level_list;
+        }
+        #else
+            crb_free(gp->crb);
+            delete gp->level_list;
+        #endif
     }
     gm.total_segment+=segment_num;
     gm.interval_segment=segment_num;
 }
 
 void group_free(group *gp){
-    group_clean(gp, false);
+    group_clean(gp, false, false);
 }
 
 void *group_read_end_req(algo_req *algo){
@@ -649,4 +699,20 @@ void group_get_exact_piece_ppa(group *gp, uint32_t lba, uint32_t set_idx, group_
 void group_monitor_print(){
     printf("total created segment: %lu\n", gm.total_segment);
     printf("average compaction segment:%.2lf\n", (double)gm.total_segment/ gm.compaction_cnt);
+}
+
+void group_load_levellist(group *gp){
+    if(gp->level_list || gp->crb){
+        printf("must be empty before load!\n");
+        GDB_MAKE_BREAKPOINT;
+    }
+    gp->level_list=temporal_storage[gp->map_idx].level_list;
+    gp->crb=temporal_storage[gp->map_idx].crb;
+}
+
+void group_store_levellist(group *gp){
+    temporal_storage[gp->map_idx].level_list=gp->level_list;
+    temporal_storage[gp->map_idx].crb=gp->crb;
+    gp->level_list=NULL;
+    gp->crb=NULL;
 }

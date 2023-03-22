@@ -5,8 +5,15 @@
 #include "../../include/debug_utils.h"
 #include <string.h>
 #include <algorithm>
+#include "./group.h"
+
 extern uint32_t test_key;
+bool setup_minimum_mapseg=false;
+uint32_t minimum_number_map_seg=CEIL((TRANSMAPNUM+1), _PPS);
 uint32_t lea_test_piece_ppa=UINT32_MAX;
+uint32_t map_seg_number;
+uint32_t data_seg_number;
+
 enum SEGTYPE_FLAG{
     NONE, DATA, TRANS
 };
@@ -84,9 +91,21 @@ static void validate_ppa(blockmanager *bm, uint32_t ppa, KEYT *lba, uint32_t max
 }
 
 page_manager *pm_init(lower_info *li, blockmanager *bm, bool isdata){
+    if(setup_minimum_mapseg==false){
+        setup_minimum_mapseg=true;
+        minimum_number_map_seg=CEIL((TRANSMAPNUM),_PPS)+1;//reserve
+    }
+
     page_manager *res=(page_manager*)malloc(sizeof(page_manager));
     res->lower=li;
     res->bm=bm;
+    
+    if(isdata){
+        data_seg_number+=2;
+    }
+    else{
+        map_seg_number+=2;
+    }
 
     res->reserve=res->bm->get_segment(res->bm, BLOCK_RESERVE);
     seg_type_flag[res->reserve->seg_idx]=isdata?SEGTYPE_FLAG::DATA:SEGTYPE_FLAG::TRANS;
@@ -103,6 +122,13 @@ bool pm_assign_new_seg(page_manager *pm, bool isdata){
         return false;
     }
     
+    if(isdata){
+        data_seg_number++;
+    }
+    else{
+        map_seg_number++;
+    }
+
     pm->active = bm->get_segment(bm, BLOCK_ACTIVE);
     if(seg_type_flag[pm->active->seg_idx]!=SEGTYPE_FLAG::NONE){
         printf("not gced segment assign?!\n");
@@ -203,7 +229,7 @@ static io_param *send_gc_req(lower_info *lower, uint32_t ppa, uint32_t type, val
 } 
 
 
-static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *target){
+static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *target, bool isdata){
     seg_type_flag[target->seg_idx]=SEGTYPE_FLAG::NONE;
 
     if(target->seg_idx==lea_test_piece_ppa/4/_PPS){
@@ -215,6 +241,22 @@ static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *
     pm->active=pm->reserve;
     bm->change_reserve_to_active(bm, pm->reserve);
     pm->reserve=bm->get_segment(bm, BLOCK_RESERVE);
+    if(seg_type_flag[pm->reserve->seg_idx]==SEGTYPE_FLAG::DATA){
+        data_seg_number--;
+    }
+    else{
+        map_seg_number--;
+    }
+
+    if(isdata){
+        seg_type_flag[pm->reserve->seg_idx]=SEGTYPE_FLAG::DATA;
+        data_seg_number++;
+    }
+    else{
+        seg_type_flag[pm->reserve->seg_idx]=SEGTYPE_FLAG::TRANS;
+        map_seg_number++;
+    }
+
     if(pm->reserve->invalidate_piece_num!=0){
         abort();
     }
@@ -289,7 +331,7 @@ void pm_data_gc(page_manager *pm, __gsegment *target, temp_map *res){
     }
     list_free(temp_list);
 
-    pm_gc_finish(pm, bm, target);
+    pm_gc_finish(pm, bm, target, true);
     return;
 }
 
@@ -341,7 +383,7 @@ void pm_map_gc(page_manager *pm, __gsegment *target, temp_map *res){
         send_IO_back_req(GCMW, pm->lower, new_ppa, gp->value, (void*)gp, pm_end_req);
         res->size++; 
     }
-    pm_gc_finish(pm, pm->bm, target);
+    pm_gc_finish(pm, pm->bm, target, false);
 }
 
 void temp_queue_to_heap(blockmanager *bm, std::queue<uint32_t> *temp_queue){
@@ -357,19 +399,28 @@ void pm_gc(page_manager *pm, temp_map *res, bool isdata){
     __gsegment *gc_target=pm_get_gc_target(pm->bm);
     static int cnt=0;
     printf("gc %u cnt\n", ++cnt);
-    if(cnt==6){
-        //GDB_MAKE_BREAKPOINT;
-    }
+    //printf("\tmap_seg_number:%u\n", map_seg_number);
+    //printf("\tdata_seg_number:%u\n", data_seg_number);
     std::queue<uint32_t> temp_queue;
     while(gc_target!=NULL){
         if(isdata){
             if(seg_type_flag[gc_target->seg_idx]==SEGTYPE_FLAG::DATA){
                 break;
             }
+            else{
+                if(gc_target->all_invalid && map_seg_number > minimum_number_map_seg){
+                    break;
+                }
+            }
         }
         else{
             if(seg_type_flag[gc_target->seg_idx]==SEGTYPE_FLAG::TRANS){
                 break;
+            }
+            else{
+                if(gc_target->all_invalid && map_seg_number < minimum_number_map_seg){
+                    break;
+                }
             }
         }
         temp_queue.push(gc_target->seg_idx);
@@ -377,12 +428,13 @@ void pm_gc(page_manager *pm, temp_map *res, bool isdata){
         gc_target=pm_get_gc_target(pm->bm);
     }
 
+    temp_queue_to_heap(pm->bm, &temp_queue);
+
     if (gc_target->all_invalid){
-        pm_gc_finish(pm, pm->bm, gc_target);
+        pm_gc_finish(pm, pm->bm, gc_target, isdata);
         temp_map_clear(res);
         return;
     }
-    temp_queue_to_heap(pm->bm, &temp_queue);
     
     if(isdata){
         if(gc_target==NULL){
