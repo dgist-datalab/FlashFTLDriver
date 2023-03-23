@@ -14,6 +14,8 @@ uint32_t lea_test_piece_ppa=UINT32_MAX;
 uint32_t map_seg_number;
 uint32_t data_seg_number;
 
+bool gc_debug_flag;
+
 enum SEGTYPE_FLAG{
     NONE, DATA, TRANS
 };
@@ -311,7 +313,7 @@ void pm_data_gc(page_manager *pm, __gsegment *target, temp_map *res){
     g_buffer_init(&g_buffer);
     uint32_t piece_ppa_arr[L2PGAP];
     for(uint32_t i=0; i<temp_vector.size(); i++){
-        if(temp_vector[i].lba==test_key){
+        if(gc_debug_flag && (temp_vector[i].lba==test_key-1 || temp_vector[i].lba==test_key)){
             //GDB_MAKE_BREAKPOINT;
         }
         g_buffer_insert(&g_buffer, temp_vector[i].value, temp_vector[i].lba);
@@ -368,20 +370,31 @@ void pm_map_gc(page_manager *pm, __gsegment *target, temp_map *res){
     li_node *now, *nxt;
     uint32_t* lba_arr;
     std::vector<gc_node> temp_vector;
-    for_each_list_node_safe(temp_list, now, nxt){
-        gp = (io_param *)now->data;
-        while(gp->isdone==false){}
-        lba_arr = (uint32_t *)bm->get_oob(bm, gp->ppa);
-        if(lba_arr[1]!=TRANSLATION_MAP_FLAG){
-            printf("it is not translation page!\n");
-            GDB_MAKE_BREAKPOINT;
-        }
+    while(temp_list->size){
+        for_each_list_node_safe(temp_list, now, nxt){
+            gp = (io_param *)now->data;
+            while(gp->isdone==false){}
+            lba_arr = (uint32_t *)bm->get_oob(bm, gp->ppa);
+            if(lba_arr[1]!=TRANSLATION_MAP_FLAG){
+                printf("it is not translation page!\n");
+                GDB_MAKE_BREAKPOINT;
+            }
 
-        uint32_t new_ppa=get_map_ppa(pm, false, lba_arr[0]);
-        res->lba[res->size]=lba_arr[0];
-        res->piece_ppa[res->size]=new_ppa;
-        send_IO_back_req(GCMW, pm->lower, new_ppa, gp->value, (void*)gp, pm_end_req);
-        res->size++; 
+            uint32_t new_ppa=get_map_ppa(pm, false, lba_arr[0]);
+            res->lba[res->size]=lba_arr[0];
+            res->piece_ppa[res->size]=new_ppa;
+            send_IO_back_req(GCMW, pm->lower, new_ppa, gp->value, (void*)gp, pm_end_req);
+            res->size++; 
+
+            free(gp);
+            list_delete_node(temp_list, now);
+        }
+    }
+    list_free(temp_list);
+    
+    if(res->size>_PPS){
+        printf("the translation mapping should be lower than _PPS\n");
+        GDB_MAKE_BREAKPOINT;
     }
     pm_gc_finish(pm, pm->bm, target, false);
 }
@@ -399,6 +412,10 @@ void pm_gc(page_manager *pm, temp_map *res, bool isdata){
     __gsegment *gc_target=pm_get_gc_target(pm->bm);
     static int cnt=0;
     printf("gc %u cnt\n", ++cnt);
+    if(cnt==2479){
+        //gc_debug_flag=true;
+        //GDB_MAKE_BREAKPOINT;
+    }
     //printf("\tmap_seg_number:%u\n", map_seg_number);
     //printf("\tdata_seg_number:%u\n", data_seg_number);
     std::queue<uint32_t> temp_queue;

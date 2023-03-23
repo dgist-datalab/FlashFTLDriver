@@ -10,17 +10,27 @@ segment *segment_make(temp_map *map, SEGMENT_TYPE type, uint32_t interval){
     res->end=map->lba[map->size-1];
     res->start_piece_ppa=map->piece_ppa[0];
 
+    if(map->lba[0]==test_key-1 && map->piece_ppa[0]==3874){
+        GDB_MAKE_BREAKPOINT;
+        /*
+        printf("test debug\n");
+        for(uint32_t i=0; i<map->size; i++){
+            printf("\t%u:%u\n", map->lba[i], map->piece_ppa[i]);
+        }
+        */
+    }
+
     if(type==SEGMENT_TYPE::ACCURATE){
         res->body.interval=interval;
         if(segment_acc_include(res, test_key)){
-            printf("[DEBUG] %u is ACC type, original_start:%u\n", test_key, res->original_start);
+            printf("[DEBUG] %u is ACC type, original_start:%u (%p)\n", test_key, res->original_start, res);
         }
     }
     else{
         res->body.plr=new PLR(7, 5);
         for(uint32_t i=0; i<map->size; i++){
            if(map->lba[i]==test_key){
-                printf("[DEBUG] %u is APP type, original_start:%u\n", test_key, res->original_start);
+                printf("[DEBUG] %u is APP type, original_start:%u (%p)\n", test_key, res->original_start, res);
             }
             res->body.plr->insert(map->lba[i]-res->start, map->piece_ppa[i]/L2PGAP);
         }

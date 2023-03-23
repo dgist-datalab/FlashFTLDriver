@@ -31,6 +31,9 @@ uint32_t now_segment_num;
 page_read_buffer rb;
 uint32_t read_buffer_hit_cnt;
 
+uint32_t lea_mapping_update_cnt;
+uint32_t find_exact_piece_ppa_cnt;
+
 typedef struct group_update_param{
    group_read_param grp;
    temp_map map;
@@ -103,7 +106,7 @@ uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
     gc_temp_map=temp_map_assign(sector_num);
     temp_map_clear(gc_temp_map);
     gc_translate_map=temp_map_assign(sector_num);
-    temp_map_clear(gc_temp_map);
+    temp_map_clear(gc_translate_map);
 
     sector_num=MAPINTRANS;
     compaction_temp_map=temp_map_assign(sector_num);
@@ -154,7 +157,7 @@ void processing_pending_req(algo_req *req, value_set *value){
     bool isretry=false;
     bool data_retry=false;
     if(grp->lba==test_key){
-        GDB_MAKE_BREAKPOINT;
+        //GDB_MAKE_BREAKPOINT;
     }
     switch (grp->retry_flag){
     case RETRY_FLAG::NORMAL_RETRY:
@@ -228,7 +231,7 @@ uint32_t lea_read(request *const req){
     group *gp;
     char *data;
     if(req->key==test_key){
-        GDB_MAKE_BREAKPOINT;
+        //GDB_MAKE_BREAKPOINT;
     }
     //printf("req->key:%u\n", req->key);
 
@@ -417,7 +420,9 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
     std::list<group_read_param*> uncached_grp_list;
     
     //static int debug_cnt=0;
+    //debug_cnt++;
     //bool debug_flag=false;
+    find_exact_piece_ppa_cnt++;
 
     for(uint32_t i=0; i<map->size; i++){
         group *gp=&main_gp[map->lba[i]/MAPINTRANS];
@@ -479,7 +484,7 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
                     found_end:
                         #ifdef DEBUG
                         if(t_grp->piece_ppa!=exact_map[t_grp->lba]){
-                            printf("address error!\n");
+                            printf("address error find_ppa:%u lea_mapping_update:%u!\n", find_exact_piece_ppa_cnt, lea_mapping_find_exact_piece_ppa);
                             GDB_MAKE_BREAKPOINT;
                         }
                         #endif
@@ -561,9 +566,11 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
     //figure out old mapping and invalidation itnnn
 
     static uint32_t cnt=0;
-    if(++cnt%1000==0){
-        printf("%s log: %u\n", __FUNCTION__, cnt);
+    if(++cnt%1==0){
+        //printf("%s log: %u\n", __FUNCTION__, cnt);
     }
+
+    lea_mapping_update_cnt++;
     if(map->size==0){
         printf("sorted buffer size is 0\n");
         abort();
