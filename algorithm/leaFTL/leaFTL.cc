@@ -46,7 +46,7 @@ group main_gp[TRANSMAPNUM];
 
 extern uint32_t test_key;
 extern uint32_t lea_test_piece_ppa;
-#define WRITE_BUF_SIZE (2*1024*1024)
+#define WRITE_BUF_SIZE (1*1024*1024)
 #define INITIAL_STATE_PADDR (UINT32_MAX)
 uint32_t lea_print_log();
 
@@ -523,6 +523,7 @@ uint32_t *lea_gp_to_mapping(group *gp){
 
 void lea_compaction(){
     int64_t new_lru_now_byte=0;
+	printf("compaction start!\n");
     for(uint32_t idx=0; idx<TRANSMAPNUM ;idx++){
         group *gp=&main_gp[idx];
         if(gp->cache_flag==CACHE_FLAG::UNCACHED){
@@ -531,7 +532,8 @@ void lea_compaction(){
         if(gp->level_list->size()<=1){
             continue;
         }
-    
+	
+		printf("\tcompaction:%u!\n",idx);
         for(uint32_t i=0; i<MAPINTRANS; i++){
             compaction_temp_map->lba[i]=gp->map_idx*MAPINTRANS+i;
         }
@@ -542,6 +544,7 @@ void lea_compaction(){
     }
     lru_now_byte=new_lru_now_byte;
     lea_cache_evict_force();
+	printf("compaction end!\n");
 }
 
 void *lea_update_end_req(algo_req *al_req){
