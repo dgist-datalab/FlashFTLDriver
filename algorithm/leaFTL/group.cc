@@ -124,6 +124,9 @@ segment *group_get_segment(group *gp, uint32_t lba){
     if(lba==test_key){
         //GDB_MAKE_BREAKPOINT;
     }
+    if(gp->level_list==NULL){
+        return NULL;
+    }
     level_list_iter iter=gp->level_list->begin();
     CRB_node *app_target=crb_find_node(gp->crb, lba);
     segment temp;
@@ -368,6 +371,11 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
 
     segment *target=segment_make(tmap, type, interval);
     bool isfirst=false;
+
+    if(gp->level_list==NULL){
+        gp->level_list=new level_list_t();
+    }
+
     if(gp->level_list->empty()){
         level *lev=new level();
         gp->level_list->push_back(lev);

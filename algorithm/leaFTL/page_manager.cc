@@ -373,7 +373,10 @@ void pm_map_gc(page_manager *pm, __gsegment *target, temp_map *res){
     while(temp_list->size){
         for_each_list_node_safe(temp_list, now, nxt){
             gp = (io_param *)now->data;
-            while(gp->isdone==false){}
+            if(gp->isdone==false){
+                continue;
+            }
+
             lba_arr = (uint32_t *)bm->get_oob(bm, gp->ppa);
             if(lba_arr[1]!=TRANSLATION_MAP_FLAG){
                 printf("it is not translation page!\n");
@@ -385,8 +388,6 @@ void pm_map_gc(page_manager *pm, __gsegment *target, temp_map *res){
             res->piece_ppa[res->size]=new_ppa;
             send_IO_back_req(GCMW, pm->lower, new_ppa, gp->value, (void*)gp, pm_end_req);
             res->size++; 
-
-            free(gp);
             list_delete_node(temp_list, now);
         }
     }

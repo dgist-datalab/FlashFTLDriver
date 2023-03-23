@@ -46,7 +46,7 @@ group main_gp[TRANSMAPNUM];
 
 extern uint32_t test_key;
 extern uint32_t lea_test_piece_ppa;
-#define WRITE_BUF_SIZE (1*1024*1024)
+#define WRITE_BUF_SIZE (16*1024*1024)
 #define INITIAL_STATE_PADDR (UINT32_MAX)
 uint32_t lea_print_log();
 
