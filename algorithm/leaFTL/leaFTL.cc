@@ -46,7 +46,7 @@ group main_gp[TRANSMAPNUM];
 
 extern uint32_t test_key;
 extern uint32_t lea_test_piece_ppa;
-#define WRITE_BUF_SIZE (1*1024*1024)
+#define WRITE_BUF_SIZE (2*1024*1024)
 #define INITIAL_STATE_PADDR (UINT32_MAX)
 uint32_t lea_print_log();
 
@@ -625,6 +625,9 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
             std::list<group_update_param *> gup_list;
             for(; master_iter!=target_gup_list.end(); master_iter++){
                 t_gup=*master_iter;
+                if(t_gup->map.lba[0]==11147012 && lea_mapping_update_cnt==182943){
+                    GDB_MAKE_BREAKPOINT;
+                }
                 if(lea_cache_evict(t_gup->gp)==false){
                     break;
                 }
@@ -642,6 +645,10 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
                         //printf("%u\n", ++small_cnt);
                     }
                     t_gup=*gup_iter;
+
+                    if(t_gup->map.lba[0]==11147012 && lea_mapping_update_cnt==182943){
+                        GDB_MAKE_BREAKPOINT;
+                    }
                     if(cnt==94 && t_gup->gp->map_idx==510){
                         //GDB_MAKE_BREAKPOINT;
                     }
