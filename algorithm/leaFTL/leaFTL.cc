@@ -46,7 +46,7 @@ group main_gp[TRANSMAPNUM];
 
 extern uint32_t test_key;
 extern uint32_t lea_test_piece_ppa;
-#define WRITE_BUF_SIZE (2*1024*1024)
+#define WRITE_BUF_SIZE (1*1024*1024)
 #define INITIAL_STATE_PADDR (UINT32_MAX)
 uint32_t lea_print_log();
 
@@ -533,7 +533,7 @@ void lea_compaction(){
             continue;
         }
 	
-		printf("\tcompaction:%u!\n",idx);
+		//printf("\tcompaction:%u!\n",idx);
         for(uint32_t i=0; i<MAPINTRANS; i++){
             compaction_temp_map->lba[i]=gp->map_idx*MAPINTRANS+i;
         }
@@ -625,9 +625,6 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
             std::list<group_update_param *> gup_list;
             for(; master_iter!=target_gup_list.end(); master_iter++){
                 t_gup=*master_iter;
-                if(t_gup->map.lba[0]==11147012 && lea_mapping_update_cnt==182943){
-                    GDB_MAKE_BREAKPOINT;
-                }
                 if(lea_cache_evict(t_gup->gp)==false){
                     break;
                 }
@@ -646,9 +643,6 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
                     }
                     t_gup=*gup_iter;
 
-                    if(t_gup->map.lba[0]==11147012 && lea_mapping_update_cnt==182943){
-                        GDB_MAKE_BREAKPOINT;
-                    }
                     if(cnt==94 && t_gup->gp->map_idx==510){
                         //GDB_MAKE_BREAKPOINT;
                     }
@@ -727,7 +721,12 @@ retry:
         lea_write_buffer_clear(wb);
     }
     req->end_req(req);
-    return 1;
+    if(wb->ps_ptr+1==wb->max_ps_ptr){
+        return UINT32_MAX;
+    }
+    else{
+        return 1;
+    }
 }
 
 uint32_t lea_remove(request *const req){

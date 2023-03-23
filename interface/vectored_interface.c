@@ -18,6 +18,8 @@ volatile int32_t flying_cnt = QDEPTH;
 static pthread_mutex_t flying_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t req_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
 bool vectored_end_req (request * const req);
+pthread_mutex_t req_read_cnt_lock=PTHREAD_MUTEX_INITIALIZER;
+int64_t flying_read_req;
 
 /*request-length request-size tid*/
 /*type key-len key offset length value*/
@@ -118,7 +120,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 	txn->req_array[(txn->size-1)-consecutive_cnt].consecutive_length=consecutive_cnt;
 
 
-	 assign_vectored_req(txn);
+	assign_vectored_req(txn);
 	return 1;
 }
 
@@ -175,6 +177,7 @@ void *vectored_main(void *__input){
 	sprintf(thread_name,"%s","vecotred_main_thread");
 	pthread_setname_np(pthread_self(),thread_name);
 	uint32_t type;
+	bool next_flush=false;
 	while(1){
 		if(mp.stopflag)
 			break;
@@ -189,6 +192,7 @@ void *vectored_main(void *__input){
 			uint32_t size=vec_req->size;
 			measure_init(&vec_req->latency_checker);
 			measure_start(&vec_req->latency_checker);
+
 			for(uint32_t i=0; i<size; i++){
 				/*retry queue*/
 				while(1){
@@ -207,6 +211,9 @@ void *vectored_main(void *__input){
 				req->mapping_cpu_check=false;
 				switch(req->type){
 					case FS_GET_T:
+						pthread_mutex_lock(&req_read_cnt_lock);
+						flying_read_req++;
+						pthread_mutex_unlock(&req_read_cnt_lock);
 #ifdef MAPPING_TIME_CHECK
 						req->mapping_cpu_check=true;
 						measure_init(&req->mapping_cpu);
@@ -220,9 +227,30 @@ void *vectored_main(void *__input){
 #endif
 					break;
 				}
+				if(req->type==FS_SET_T && next_flush){
+					while(1){
+						bool escape=false;
+						pthread_mutex_lock(&req_read_cnt_lock);
+						escape=flying_read_req==0;
+						pthread_mutex_unlock(&req_read_cnt_lock);
+						request *temp_req=get_retry_request(_this);
+						if(temp_req){	
+							temp_req->tag_num=tag_manager_get_tag(tm);
+							inf_algorithm_caller(temp_req);
+						}
+						if(escape){
+							break;
+						}
+					}
+					next_flush=false;
+				}
+
 				req->tag_num=tag_manager_get_tag(tm);
-				inf_algorithm_caller(req);
+				if(inf_algorithm_caller(req)==UINT32_MAX){
+					next_flush=true;
+				}
 			}
+
 		}
 
 	}
@@ -276,6 +304,14 @@ void inf_algorithm_testing(){
 void release_each_req(request *req){
 	uint32_t tag_num=req->tag_num;
 	pthread_mutex_lock(&flying_cnt_lock);
+	
+
+	if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
+		pthread_mutex_lock(&req_read_cnt_lock);
+		flying_read_req--;
+		pthread_mutex_unlock(&req_read_cnt_lock);
+	}
+
 	flying_cnt++;
 	if(flying_cnt > QDEPTH){
 		printf("???\n");
@@ -311,7 +347,7 @@ void assign_vectored_req(vec_request *txn){
 			pthread_mutex_unlock(&flying_cnt_lock);
 		}
 	//	printf("flying tagnum %u, txn->size %u, req_q->size:%u\n", QDEPTH-flying_cnt, txn->size, mp.processors[0].req_q->size);
-		
+
 		if(q_enqueue((void*)txn, mp.processors[0].req_q)){
 			break;
 		}

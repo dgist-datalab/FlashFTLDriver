@@ -374,6 +374,7 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
 
     if(gp->level_list==NULL){
         gp->level_list=new level_list_t();
+        gp->crb=crb_init();
     }
 
     if(gp->level_list->empty()){
