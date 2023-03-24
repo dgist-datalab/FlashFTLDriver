@@ -75,20 +75,6 @@ lba_buffer* remove_overlap_CRBnode(lba_buffer *lba_arr, temp_map *tmap){
         res->push_back(*iter);
     }
 
-#ifdef DEBUG
-    //overlap re-check
-    uint32_t j=0;
-    for(uint32_t i=0; i<tmap->size; i++){
-        uint32_t target_lba=tmap->lba[i];
-        for(;j<res->size(); j++){
-            if(res->at(j) > target_lba) break;
-            if(res->at(j)==target_lba){
-                printf("the overlap does not removed! %s:%d\n", __FUNCTION__, __LINE__);
-                abort();
-            } 
-        }
-    }
-#endif
     return res;
 }
 

@@ -355,9 +355,6 @@ static void group_segment_update(group *gp, level *lev, temp_map *tmap, segment 
         }
     }
     lev->insert(iter, new_seg);
-#ifdef DEBUG
-    check_level_overlap(lev);
-#endif
 }
 
 void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval, void (*cache_size_update)(group *gp, uint32_t size, bool decrease)){
@@ -374,7 +371,6 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
 
     if(gp->level_list==NULL){
         gp->level_list=new level_list_t();
-        gp->crb=crb_init();
     }
 
     if(gp->level_list->empty()){
@@ -429,13 +425,6 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
         delete gp->level_list;
         gp->level_list=new_level_list;
     }
-
-#ifdef DEBUG
-    level_list_iter iter=gp->level_list->begin();
-    for(;iter!=gp->level_list->end(); iter++){
-        check_level_overlap(*iter);
-    }
-#endif
 
     gp->isclean=false;
 }
@@ -512,14 +501,6 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
         res->push_back(target);
     }
 
-#ifdef DEBUG
-    /*
-    level_iter iter=res->begin();
-    for(iter; iter!=res->end(); iter++){
-        segment_print(*iter);
-    }*/
-    check_level_overlap(res);
-#endif
     return res;
 }
 

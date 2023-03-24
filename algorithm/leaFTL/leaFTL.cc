@@ -529,7 +529,7 @@ void lea_compaction(){
         if(gp->cache_flag==CACHE_FLAG::UNCACHED){
             continue;
         }
-        if(gp->level_list->size()<=1){
+        if(gp->level_list==NULL || gp->level_list->size()<=1){
             continue;
         }
 	
