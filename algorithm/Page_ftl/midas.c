@@ -1,6 +1,7 @@
 #include "midas.h"
 #include "map.h"
 #include "model.h"
+#include "page.h"
 #include "../../blockmanager/sequential/block_str.h"
 
 extern algorithm page_ftl;
@@ -278,7 +279,7 @@ int check_modeling() {
 	pm_body *p = (pm_body*)page_ftl.algo_body;
 	if (check_applying_config(G_info->WAF)==0) {
 		G_info->valid=false;
-		if (!p->n->naive_on) stat->e->errcheck=true;
+		stat->e->errcheck=true;
 		return 0;
 	}
 
@@ -318,9 +319,10 @@ int err_check() {
 	if (p->m->status=false) return 0;
 	printf("\n==========ERR check==========\n");
 	for (int i=0;i<p->gnum;i++) {
+		if ((p->n->naive_on == true) && (i == p->n->naive_start)) break;
 		double vr = stat->e->vr[i]/stat->e->erase[i];
 		printf("[GROUP %d] calc vr: %.3f, real vr: %.3f", i, p->m->vr[i], vr);
-		if ((p->m->vr[i]*1.1 > vr) && (p->m->vr[i]*0.9 < vr)) {
+		if ((p->m->vr[i]+0.1 > vr) && (p->m->vr[i]-0.1 < vr)) {
 			printf("\t(O)\n");
 			continue;
 		} else {
@@ -331,7 +333,8 @@ int err_check() {
 			} else {
 				if (p->n->naive_on) naive_mida_off();
        				printf("=> MERGE GROUP : G%d ~ G%d\n", i, p->gnum-1);
-        			merge_group(i);
+        			for (int j=i+1;j<p->gnum;j++) p->m->config[i] += p->m->config[j];
+				merge_group(i);
 				naive_mida_on();
 			}
 			errstat_clear();
@@ -341,3 +344,44 @@ int err_check() {
 	errstat_clear();
 	return 1;
 }
+
+int check_configuration_apply() {
+	pm_body *p = (pm_body*)page_ftl.algo_body;
+	for (int i=0;i<p->gnum-1;i++) {
+		if (stat->g->gsize[i] != p->m->config[i]) {
+			if (stat->g->gsize[i]-1 != p->m->config[i]) return 0;
+		}
+	}
+	return 1;
+}
+
+
+int do_modeling() {
+	if (stat->cur_req%GB_REQ==0) {
+                stat->write_gb++;
+                printf("\rwrite size: %dGB", stat->write_gb);
+                if (stat->e->errcheck) {
+                        if (stat->e->errcheck_time == stat->e->err_start) {
+				if (check_configuration_apply()) {
+					printf("\n=> CONFIGURATION check: OK, ((error check on))\n");
+					stat->e->collect=true;
+					stat->e->errcheck_time++;
+				}else printf("\n=> CONFIGURATION check: NO\n");
+			} else {
+				stat->e->errcheck_time++;
+			}
+                }
+                int st = check_modeling();
+                if (st) printf("!!!Modeling over & adapt configuration!!!\n");
+        }
+        if ((stat->write_gb%GIGAUNIT==0) && (stat->cur_req%GB_REQ==0)) {
+                printf("\n");
+                print_stat();
+        }
+        if ((stat->e->errcheck_time==stat->e->err_window) && (stat->cur_req%GB_REQ==0)) {
+                err_check();
+        }
+
+	return 0;
+}
+

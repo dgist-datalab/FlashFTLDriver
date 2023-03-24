@@ -29,6 +29,9 @@ typedef struct miniature_model {
 	unsigned long long* time_stamp; //time stamp
 	int* hot_lba; //hot lba bitmap for Desnoyer
 	unsigned long long* model_count; // counting update count per intervals
+	
+	uint32_t fnumber;
+	uint32_t *checking_first_interval;
 	Redblack rb_lbas; // for first interval's LBAs
 	queue *fqueue; //insert LBAS for first interval thread
 	pthread_t fthread;

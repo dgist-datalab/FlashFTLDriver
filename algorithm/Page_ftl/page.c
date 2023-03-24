@@ -164,24 +164,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
 	uint32_t overlapped_idx=UINT32_MAX;
 	
-	if (stat->cur_req%GB_REQ==0) {
-		stat->write_gb++;
-		printf("\rwrite size: %dGB", stat->write_gb);
-		if (stat->e->errcheck) {
-			stat->e->errcheck_time++;
-			if (stat->e->errcheck_time == stat->e->err_start) stat->e->collect=true;
-		}
-		int st = check_modeling();
-		if (st) printf("!!!Modeling over & adapt configuration!!!\n");
-	}
-	if ((stat->write_gb%GIGAUNIT==0) && (stat->cur_req%GB_REQ==0)) {
-		printf("\n");
-		print_stat();
-	}
-	if ((stat->e->errcheck_time==stat->e->err_window) && (stat->cur_req%GB_REQ==0)) {
-		err_check();
-	}
-
+	do_modeling();
 
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		if(a_buffer.key[i]==req->key){
@@ -234,6 +217,7 @@ uint32_t page_write(request *const req){
 uint32_t page_remove(request *const req){
 	stat->cur_req++;
 	check_time_window(req->key, M_REMOVE);
+	do_modeling();
 	for(uint8_t i=0; i<a_buffer.idx; i++){
 		if(a_buffer.key[i]==req->key){
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);

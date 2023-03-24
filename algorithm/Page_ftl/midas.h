@@ -51,3 +51,4 @@ int decrease_group_size(int gnum, int block_num);
 int check_applying_config(double calc_waf);
 int check_modeling();
 int err_check();
+int do_modeling();

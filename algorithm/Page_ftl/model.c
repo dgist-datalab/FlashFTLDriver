@@ -57,22 +57,22 @@ void model_create(int write_size) {
 	 * fnumber: # of interval to check
 	 * finterval: index of interval to check
 	 */
-	//mmodel->fnumber=2; 
-	//uint32_t finterval[2] = {100, 101};
+	mmodel->fnumber=2; 
+	uint32_t finterval[2] = {100, 105};
 	/*
         uint32_t finterval[100] = {0};
 	for (int i=0;i<mmodel->fnumber; i++){	
 		finterval[i] = i+100; //CHECK: change index like fnumber!!!!!!!
 	}
 	*/
-	//mmodel->checking_first_interval = (uint32_t*)calloc(mmodel->fnumber, sizeof(uint32_t));
-	//memcpy(mmodel->checking_first_interval, finterval, sizeof(uint32_t)*mmodel->fnumber);
+	mmodel->checking_first_interval = (uint32_t*)calloc(mmodel->fnumber, sizeof(uint32_t));
+	memcpy(mmodel->checking_first_interval, finterval, sizeof(uint32_t)*mmodel->fnumber);
 	if (mmodel->lba_sampling_ratio > 1) {
 		mmodel->first_count = 0;
 		q_init(&(mmodel->fqueue), _PPS*L2PGAP*mmodel->interval_unit_size);
 		mmodel->live_lba=0;
-		int stf = pthread_create(&mmodel->fthread, NULL, first_interval_analyzer, NULL);
-		if (stf != 0) perror("model can't make first interval thread\n");
+		//int stf = pthread_create(&mmodel->fthread, NULL, first_interval_analyzer, NULL);
+		//if (stf != 0) perror("model can't make first interval thread\n");
 	}
 	/* real or not */
 	mm_time.is_real=false;
@@ -130,8 +130,8 @@ void model_initialize() {
 	if (mmodel->lba_sampling_ratio > 1) {
 		mmodel->first_count=0;
 		q_init(&(mmodel->fqueue), _PPS*L2PGAP*mmodel->interval_unit_size);
-		int stf = pthread_create(&mmodel->fthread, NULL, first_interval_analyzer, NULL);
-		if (stf != 0) perror("model can't make first interval thread\n");
+		//int stf = pthread_create(&mmodel->fthread, NULL, first_interval_analyzer, NULL);
+		//if (stf != 0) perror("model can't make first interval thread\n");
 	}
 
 	mm_time.current_time=0;
@@ -193,18 +193,31 @@ int check_time_window(uint32_t lba, char mode) {
 int check_interval(uint32_t lba, char mode) {
 	/* fixing first interval's count
 	 * in this time, we only check one interval unit */
-	/*
+	
+
 	for (int i=0; i<mmodel->fnumber; i++) {
 		if (mm_time.current_time < mmodel->checking_first_interval[i]) break;
-		if (mm_time.current_time == mmodel->checking_first_interval[i]) check_first_interval(lba, mode);
+		if (mm_time.current_time == mmodel->checking_first_interval[i]) {
+			//check_first_interval(lba, mode);
+			bool st = false;
+                	while (!st) {
+	                        st = q_enqueue_int(lba, mmodel->fqueue);
+	                }
+			if (mm_time.request_time == 1) {
+				int stf = pthread_create(&mmodel->fthread, NULL, first_interval_analyzer, NULL);
+       	         		if (stf != 0) perror("model can't make first interval thread\n");
+			}
+		}
 	}
-	*/
+
+	/*	
 	if (mmodel->lba_sampling_ratio > 1) {
 		bool st = false;
 		while (!st) {
 			st = q_enqueue_int(lba, mmodel->fqueue);
 		}
 	}
+	*/
 
 	if (mm_time.current_time >= mm_time.time_window) {
 		/* collecting count is done
@@ -589,7 +602,7 @@ unsigned long long resizing_model() {
 		printf("first interval analyzer check: ");
 		while (!(mmodel->first_done)) {}
 		printf("DONE\n");
-		mmodel->model_count[0] = mmodel->first_count / mmodel->lba_sampling_ratio;
+		mmodel->model_count[0] = mmodel->first_count*mmodel->time_window/mmodel->fnumber/mmodel->lba_sampling_ratio;
 	}
 	tot += mmodel->model_count[0];
 	fprintf(mFile, "0 %llu\n", mmodel->model_count[0]);
@@ -932,7 +945,7 @@ END:
 /*initialize data structures for first interval search*/
 void initialize_first_interval() {
 	mmodel->rb_lbas = rb_create();
-	q_init(&(mmodel->latest_lbas), _PPS*L2PGAP*mm_time.interval_unit_size);
+	//q_init(&(mmodel->latest_lbas), _PPS*L2PGAP*mm_time.interval_unit_size);
 	mmodel->first_done = false;
 }
 
@@ -952,12 +965,13 @@ void *first_interval_analyzer(void* arg) {
 
 	initialize_first_interval();
 	while (true) {
-		if (unitnum == mm_time.time_window) break;
+		if (request_time == one_unit) break;
 
 		lba = q_dequeue_int(mmodel->fqueue);
 		if (lba == -1) continue;
 		request_time++;
 	
+		/*
 		nd = q_enqueue_int_node(lba, mmodel->latest_lbas);
 		if (nd == NULL) {
 			//latest queue is full!
@@ -974,16 +988,12 @@ void *first_interval_analyzer(void* arg) {
 			}
 			nd = q_enqueue_int_node(lba, mmodel->latest_lbas);
 		}
+		*/
 		status = rb_find_int(mmodel->rb_lbas, lba, &cur_rb);
 		if (status) {
 			mmodel->first_count++;
 			cur_rb->item = (void*)nd;
 		} else rb_insert_int(mmodel->rb_lbas, lba, (void*)nd);
-		
-		if (request_time == one_unit) {
-			request_time=0;
-			unitnum++;
-		}
 	}
 	remove_first_interval();
 }
@@ -1019,8 +1029,8 @@ int check_first_interval(uint32_t lba, char mode) {
 
 void remove_first_interval() {
 	rb_destroy(mmodel->rb_lbas, 1, 1, true);
-	q_free(mmodel->fqueue);
-	mmodel->fqueue=NULL;
+	//q_free(mmodel->fqueue);
+	//mmodel->fqueue=NULL;
 	mmodel->first_done = true;
 }
 

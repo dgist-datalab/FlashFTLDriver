@@ -335,6 +335,7 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 			} else {
 				if (p->n->naive_on) naive_mida_off();
 				printf("=> MERGE GROUP : G%d ~ G%d\n", gnum, p->gnum-1);
+				for (int j=gnum+1;j<p->gnum;j++) p->m->config[gnum] += p->m->config[j];
 				merge_group(gnum);
 				naive_mida_on();
 				gc_count=0;
