@@ -10,7 +10,7 @@ extern FILE *vFile;
 //extern FILE *gFile;
 //extern FILE *wFile;
 
-extern STAT *stat;
+extern STAT *midas_stat;
 extern algorithm page_ftl;
 
 void invalidate_ppa(uint32_t t_ppa){
@@ -154,7 +154,7 @@ int do_gc(){
 	//1. check MiDAS groups
 	int victim_seg = -1;
 	for (int i=0;i<p->n->naive_start;i++) {
-		if (p->m->config[i] < stat->g->gsize[i]) {
+		if (p->m->config[i] < midas_stat->g->gsize[i]) {
 			victim_seg = i;
 			break;
 		}
@@ -238,8 +238,8 @@ int do_gc(){
 			for(uint32_t i=0; i<L2PGAP; i++){
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
 				++page_num;
-				stat->copy++;
-				stat->tmp_copy++;
+				midas_stat->copy++;
+				midas_stat->tmp_copy++;
 				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 				g_buffer.idx++;
@@ -268,14 +268,14 @@ int do_gc(){
 		g_buffer.idx=0;	
 	}
 	bm->trim_segment(bm,target,page_ftl.li); //erase a block
-	stat->g->gsize[tmp_mig_count]--;
-	stat->erase++;
-	stat->g->tmp_vr[tmp_mig_count] += (double)page_num/(double)tot_page_num;
-	stat->g->tmp_erase[tmp_mig_count]++;
+	midas_stat->g->gsize[tmp_mig_count]--;
+	midas_stat->erase++;
+	midas_stat->g->tmp_vr[tmp_mig_count] += (double)page_num/(double)tot_page_num;
+	midas_stat->g->tmp_erase[tmp_mig_count]++;
 	
-	if (stat->e->collect) {
-		stat->e->vr[tmp_mig_count] += (double)page_num/(double)tot_page_num;
-		stat->e->erase[tmp_mig_count]++;
+	if (midas_stat->e->collect) {
+		midas_stat->e->vr[tmp_mig_count] += (double)page_num/(double)tot_page_num;
+		midas_stat->e->erase[tmp_mig_count]++;
 	}
 	// print valid ratio
 	char val_buf[64];
@@ -358,7 +358,7 @@ retry:
 		}
 		*/
 		//printf("free segment: %u\n", page_ftl.bm->get_free_segment_number(page_ftl.bm));
-		++stat->g->gsize[0];
+		++midas_stat->g->gsize[0];
 		__segment *tmp = p->active[0];
 		if (p->active_q->size) {
 			p->active[0] = (__segment*)q_dequeue(p->active_q);

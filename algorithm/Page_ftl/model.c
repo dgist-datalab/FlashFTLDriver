@@ -967,7 +967,7 @@ void *first_interval_analyzer(void* arg) {
 	while (true) {
 		if (request_time == one_unit) break;
 
-		lba = q_dequeue_int(mmodel->fqueue);
+		lba = q_dequeue_int_lba(mmodel->fqueue);
 		if (lba == -1) continue;
 		request_time++;
 	

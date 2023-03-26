@@ -53,4 +53,5 @@ void *q_delete(queue *q, node* n);
 
 bool q_enqueue_int(int, queue*);
 int q_dequeue_int(queue*);
+int q_dequeue_int_lba(queue*);
 #endif

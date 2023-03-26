@@ -18,7 +18,7 @@
 uint32_t log_fd;
 #endif
 
-STAT* stat;
+STAT* midas_stat;
 extern uint32_t test_key;
 align_buffer a_buffer;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
@@ -205,7 +205,7 @@ uint32_t page_write(request *const req){
 #ifdef LBA_LOGGING
 	dprintf(log_fd, "W %u\n",req->key);
 #endif
-	stat->cur_req++;
+	midas_stat->cur_req++;
 	//printf("write key :%u\n",req->key);
 	check_time_window(req->key, M_WRITE);
 	align_buffering(req, 0, NULL);
@@ -216,7 +216,7 @@ uint32_t page_write(request *const req){
 }
 
 uint32_t page_remove(request *const req){
-	stat->cur_req++;
+	midas_stat->cur_req++;
 	check_time_window(req->key, M_REMOVE);
 	do_modeling();
 	for(uint8_t i=0; i<a_buffer.idx; i++){

@@ -3,13 +3,13 @@
 #override export AR=gcc-ar
 #override export NM=gcc-nm
 
-override export CC=clang++-16
-override export CXX=clang++-16
-override export AR=llvm-ar-16
-override export NM=llvm-nm-16
+#override export CC=clang++-16
+#override export CXX=clang++-16
+#override export AR=llvm-ar-16
+#override export NM=llvm-nm-16
 
-#export CC=g++
-#export CXX=g++
+export CC=g++
+export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=AMF
@@ -23,7 +23,8 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
--fsanitize=address -static-libsan\
+#-fsanitize=address \
+# -static-libsan\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\

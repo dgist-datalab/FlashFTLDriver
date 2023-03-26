@@ -15,7 +15,7 @@ FILE *vFile;
 //FILE *wFile;
 
 G_INFO *G_info;
-extern STAT *stat;
+extern STAT *midas_stat;
 
 void page_map_create(){
 	model_create(TIME_WINDOW);
@@ -67,7 +67,7 @@ void page_map_create(){
 
 	setbuf(vFile, NULL);
 	p->active[0]=page_ftl.bm->get_segment(page_ftl.bm,true); //now active block for inserted request.
-	stat->g->gsize[0]++;
+	midas_stat->g->gsize[0]++;
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
 	seg_assign_ginfo(p->active[0]->seg_idx, 0);
 }
@@ -88,8 +88,8 @@ uint32_t seg_get_ginfo(uint32_t seg_idx) {
 uint32_t page_map_assign(KEYT* lba, uint32_t max_idx){
 	//printf("lba : %lu\n", lba);
 	uint32_t res=0;
-	stat->write+=4;
-	stat->tmp_write+=4;
+	midas_stat->write+=4;
+	midas_stat->tmp_write+=4;
 	res=get_ppa(lba, L2PGAP);
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	for(uint32_t i=0; i<L2PGAP; i++){
@@ -147,13 +147,13 @@ retry:
 		//initialize migration group
 		p->active[mig_count] = page_ftl.bm->get_segment(page_ftl.bm, true);
 		seg_assign_ginfo(p->active[mig_count]->seg_idx, mig_count);
-		stat->g->gsize[mig_count]++;
+		midas_stat->g->gsize[mig_count]++;
 		++p->gcur;
 	}
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active[mig_count]);
 	if (res==UINT32_MAX){
 		__segment* tmp=p->active[mig_count];
-		stat->g->gsize[mig_count]++;
+		midas_stat->g->gsize[mig_count]++;
 		if (p->active_q->size) {
 			p->active[mig_count] = (__segment*)q_dequeue(p->active_q);
 			if (mig_count >= p->n->naive_start) {

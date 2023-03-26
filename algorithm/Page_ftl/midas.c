@@ -4,7 +4,7 @@
 #include "page.h"
 
 extern algorithm page_ftl;
-extern STAT* stat;
+extern STAT* midas_stat;
 extern G_INFO *G_info;
 
 void naive_mida_on() {
@@ -21,7 +21,7 @@ void naive_mida_on() {
 			abort();
 		}
 		p->active[p->n->naive_start+1+i] = (__segment*)q_dequeue(p->active_q);
-		stat->g->gsize[p->n->naive_start+1+i]++;
+		midas_stat->g->gsize[p->n->naive_start+1+i]++;
 		uint32_t res = seg_assign_ginfo(p->active[p->n->naive_start+1+i]->seg_idx, p->n->naive_start+1+i);
 		p->gcur++;
 		if (res != UINT_MAX) {
@@ -45,7 +45,7 @@ void naive_mida_off() {
 	uint32_t seg_idx;
 	uint32_t tsize = 0;
 	for (int i=p->n->naive_start;i<p->gnum;i++) {
-		tsize += stat->g->gsize[i];
+		tsize += midas_stat->g->gsize[i];
 		if (p->active[i] != NULL) tsize -= 1;
 	}
 	if (q->size != tsize) {
@@ -59,67 +59,67 @@ void naive_mida_off() {
 	}
 
 	for (int i=p->n->naive_start+1;i<p->n->naive_start+GNUMBER;i++) {
-		stat->g->gsize[p->n->naive_start] += stat->g->gsize[i];
-		stat->g->gsize[i]=0;
+		midas_stat->g->gsize[p->n->naive_start] += midas_stat->g->gsize[i];
+		midas_stat->g->gsize[i]=0;
 		if (p->active[i] == NULL) continue;
 		q_enqueue((void*)p->active[i], p->active_q);
 		seg_assign_ginfo(p->active[i]->seg_idx, UINT_MAX);
 		p->active[i]=NULL;
-		stat->g->gsize[p->n->naive_start]--; //active block
+		midas_stat->g->gsize[p->n->naive_start]--; //active block
 	}
 	if (p->gcur > p->n->naive_start) p->gcur = p->n->naive_start;
 	p->gnum = p->gnum-3;
 }
 
 void stat_init() {
-	stat = (STAT*)calloc(sizeof(STAT), 1);
-	stat->tmp_waf=0.0;
+	midas_stat = (STAT*)calloc(sizeof(STAT), 1);
+	midas_stat->tmp_waf=0.0;
 
-	stat->g = (G_VAL*)malloc(sizeof(G_VAL));
-	stat->g->gsize = (uint32_t*)calloc(sizeof(uint32_t), MAX_G);
-	stat->g->tmp_vr = (double*)calloc(sizeof(double), MAX_G);
-	stat->g->tmp_erase = (double*)calloc(sizeof(double), MAX_G);
-	stat->g->cur_vr = (double*)calloc(sizeof(double), MAX_G);
+	midas_stat->g = (G_VAL*)malloc(sizeof(G_VAL));
+	midas_stat->g->gsize = (uint32_t*)calloc(sizeof(uint32_t), MAX_G);
+	midas_stat->g->tmp_vr = (double*)calloc(sizeof(double), MAX_G);
+	midas_stat->g->tmp_erase = (double*)calloc(sizeof(double), MAX_G);
+	midas_stat->g->cur_vr = (double*)calloc(sizeof(double), MAX_G);
 	
-	stat->e = (ERR*)malloc(sizeof(ERR));
-	stat->e->errcheck=false;
-	stat->e->collect=false;
+	midas_stat->e = (ERR*)malloc(sizeof(ERR));
+	midas_stat->e->errcheck=false;
+	midas_stat->e->collect=false;
 
-	stat->e->errcheck_time=0;
-	stat->e->err_start=TIME_WINDOW/3;
-	stat->e->err_window=TIME_WINDOW/2;
-	stat->e->vr = (double*)calloc(sizeof(double), MAX_G);
-	stat->e->erase = (double*)calloc(sizeof(double), MAX_G);
+	midas_stat->e->errcheck_time=0;
+	midas_stat->e->err_start=TIME_WINDOW/3;
+	midas_stat->e->err_window=TIME_WINDOW/2;
+	midas_stat->e->vr = (double*)calloc(sizeof(double), MAX_G);
+	midas_stat->e->erase = (double*)calloc(sizeof(double), MAX_G);
 }
 
 void stat_clear() {
-	stat->tmp_write=0;
-	stat->tmp_copy=0;
+	midas_stat->tmp_write=0;
+	midas_stat->tmp_copy=0;
 	for (int i=0;i<MAX_G;i++) {
-		stat->g->tmp_vr[i]=0.0;
-		stat->g->tmp_erase[i]=0.0;
+		midas_stat->g->tmp_vr[i]=0.0;
+		midas_stat->g->tmp_erase[i]=0.0;
 	}
 }
 
 void errstat_clear() {
-	stat->e->errcheck=false;
-	stat->e->collect=false;
-	stat->e->errcheck_time=0;
+	midas_stat->e->errcheck=false;
+	midas_stat->e->collect=false;
+	midas_stat->e->errcheck_time=0;
 	for (int i=0;i<MAX_G;i++) {
-		stat->e->vr[i]=0.0;
-		stat->e->erase[i]=0.0;
+		midas_stat->e->vr[i]=0.0;
+		midas_stat->e->erase[i]=0.0;
 	}
 }
 
 void print_stat() {
 	pm_body *p = (pm_body*)page_ftl.algo_body;
 	printf("===============================\n");
-	printf("[progress: %dGB]\n", stat->write_gb);
-	stat->tmp_waf = (double)(stat->tmp_write+stat->tmp_copy)/(double)(stat->tmp_write);
-	printf("TOTAL WAF:\t%.3f, TMP WAF:\t%.3f\n", (double)(stat->write+stat->copy)/(double)stat->write, stat->tmp_waf);
+	printf("[progress: %dGB]\n", midas_stat->write_gb);
+	midas_stat->tmp_waf = (double)(midas_stat->tmp_write+midas_stat->tmp_copy)/(double)(midas_stat->tmp_write);
+	printf("TOTAL WAF:\t%.3f, TMP WAF:\t%.3f\n", (double)(midas_stat->write+midas_stat->copy)/(double)midas_stat->write, midas_stat->tmp_waf);
 	for (int i=0;i<p->gnum; i++) {
-		stat->g->cur_vr[i] = stat->g->tmp_vr[i]/stat->g->tmp_erase[i];
-		printf("  GROUP %d[%d]: %.4f (ERASE:%.0f)\n", i, stat->g->gsize[i], stat->g->cur_vr[i], stat->g->tmp_erase[i]);
+		midas_stat->g->cur_vr[i] = midas_stat->g->tmp_vr[i]/midas_stat->g->tmp_erase[i];
+		printf("  GROUP %d[%d]: %.4f (ERASE:%.0f)\n", i, midas_stat->g->gsize[i], midas_stat->g->cur_vr[i], midas_stat->g->tmp_erase[i]);
 	}
 	stat_clear();
 }
@@ -127,7 +127,7 @@ void print_stat() {
 //TODO change naive_start and max group number before using this function
 int change_group_number(int prevnum, int newnum) {
 	//change group size
-	if (stat->g->gsize[newnum] != 0) {
+	if (midas_stat->g->gsize[newnum] != 0) {
 		printf("there is still some blocks in Group %d\n", newnum);
 		return 1;
 	}
@@ -141,7 +141,7 @@ int change_group_number(int prevnum, int newnum) {
 	queue* q=p->n->naive_q;
 
 	//change group number info
-        if (q->size != (stat->g->gsize[prevnum]-1)) {
+        if (q->size != (midas_stat->g->gsize[prevnum]-1)) {
                 printf("queue size err in change_group_number()\n");
                 abort();
         }
@@ -159,15 +159,15 @@ int change_group_number(int prevnum, int newnum) {
 		printf("there is a active block : change_group_number() in midas.c\n");
 		abort();
 	}
-	stat->g->gsize[newnum] = stat->g->gsize[prevnum];
-        stat->g->gsize[prevnum]=0;
+	midas_stat->g->gsize[newnum] = midas_stat->g->gsize[prevnum];
+        midas_stat->g->gsize[prevnum]=0;
 	if (prevnum != 0) {
 		p->active[newnum] = p->active[prevnum];
 		p->active[prevnum] = NULL;
 		seg_assign_ginfo(p->active[newnum]->seg_idx, newnum);
 	} else {
-		stat->g->gsize[newnum]--;
-		stat->g->gsize[prevnum]++;
+		midas_stat->g->gsize[newnum]--;
+		midas_stat->g->gsize[prevnum]++;
 	}
 	p->n->naive_start = newnum;
 	p->gnum = newnum+1;
@@ -187,7 +187,7 @@ int merge_group(int group_num) {
 	        if (j==last_g) q=p->n->naive_q;
 		else q=p->group[j];
 		cur = q->head;
-        	if ((q->size+1) != stat->g->gsize[j]) {
+        	if ((q->size+1) != midas_stat->g->gsize[j]) {
 			printf("queue size err in merge_group()\n");
 	                abort();
 	        }
@@ -202,20 +202,20 @@ int merge_group(int group_num) {
 	int size;
 	for (int i=group_num;i<last_g;i++) {
 		size = page_ftl.bm->jy_move_q2h(page_ftl.bm, p->group[i], 0);
-		if ((size+1) != stat->g->gsize[i]) {
+		if ((size+1) != midas_stat->g->gsize[i]) {
 			printf("size miss: stat->gsize and real queue size is different\n : midas.cpp merge_group()\n");
 			abort();
 		}
 		//edit size
-        	stat->g->gsize[last_g] += stat->g->gsize[i];
-        	stat->g->gsize[i]=0;
+        	midas_stat->g->gsize[last_g] += midas_stat->g->gsize[i];
+        	midas_stat->g->gsize[i]=0;
 		//free queue
 		q_free(p->group[i]);
 		p->group[i] = NULL;
 	}
 	//final size edit
-	stat->g->gsize[group_num] = stat->g->gsize[last_g];
-	stat->g->gsize[last_g]=0;
+	midas_stat->g->gsize[group_num] = midas_stat->g->gsize[last_g];
+	midas_stat->g->gsize[last_g]=0;
 	
 	//save active block
 	for (int i=group_num+1;i<last_g+1;i++) {
@@ -223,7 +223,7 @@ int merge_group(int group_num) {
                 q_enqueue((void*)p->active[i], p->active_q);
                 seg_assign_ginfo(p->active[i]->seg_idx, UINT_MAX);
                 p->active[i]=NULL;
-                stat->g->gsize[group_num]--; //active block
+                midas_stat->g->gsize[group_num]--; //active block
 	}
 	//change group number
 	p->gnum = group_num+1;
@@ -238,13 +238,13 @@ int decrease_group_size(int gnum, int block_num) {
         queue* q = p->group[gnum];
 
         //change group number info
-        if ((q->size+1) != stat->g->gsize[gnum]) {
+        if ((q->size+1) != midas_stat->g->gsize[gnum]) {
                 printf("queue size err in naive_mida_off()\n");
                 abort();
         }
 
-	stat->g->gsize[last_g] += block_num;
-        stat->g->gsize[gnum] -= block_num;
+	midas_stat->g->gsize[last_g] += block_num;
+        midas_stat->g->gsize[gnum] -= block_num;
         node *cur = q->head;
         uint32_t seg_idx;
         for (int i=0;i<block_num;i++) {
@@ -264,11 +264,11 @@ int decrease_group_size(int gnum, int block_num) {
 
 int check_applying_config(double calc_waf) {
 	printf("\n");
-	if (stat->tmp_waf-stat->tmp_waf*0.1 < calc_waf) {
-		printf("NOT NEED TO CHANGE:: NEW: %.3f, CUR: %.3f\n", calc_waf, stat->tmp_waf);
+	if (midas_stat->tmp_waf-midas_stat->tmp_waf*0.1 < calc_waf) {
+		printf("NOT NEED TO CHANGE:: NEW: %.3f, CUR: %.3f\n", calc_waf, midas_stat->tmp_waf);
 		return 0;
 	} else {
-		printf("NEED TO CHANGE:: NEW: %.3f, CUR: %.3f\n", calc_waf, stat->tmp_waf);
+		printf("NEED TO CHANGE:: NEW: %.3f, CUR: %.3f\n", calc_waf, midas_stat->tmp_waf);
                 return 1;
 	}
 }
@@ -278,7 +278,7 @@ int check_modeling() {
 	pm_body *p = (pm_body*)page_ftl.algo_body;
 	if (check_applying_config(G_info->WAF)==0) {
 		G_info->valid=false;
-		stat->e->errcheck=true;
+		midas_stat->e->errcheck=true;
 		return 0;
 	}
 
@@ -300,12 +300,12 @@ int check_modeling() {
 	p->m->WAF = G_info->WAF;
 	p->m->status=true;
 	G_info->valid=false;
-	stat->e->errcheck=true;
+	midas_stat->e->errcheck=true;
 	//manage the size of groups
 	for (int i=0;i<p->gnum-1;i++) {
-		if (p->m->config[i] < stat->g->gsize[i]) {
-			printf("=> MANAGE GROUP SIZE: G%d (size %u -> %u)\n", i, stat->g->gsize[i], p->m->config[i]);
-			decrease_group_size(i, stat->g->gsize[i]-p->m->config[i]);
+		if (p->m->config[i] < midas_stat->g->gsize[i]) {
+			printf("=> MANAGE GROUP SIZE: G%d (size %u -> %u)\n", i, midas_stat->g->gsize[i], p->m->config[i]);
+			decrease_group_size(i, midas_stat->g->gsize[i]-p->m->config[i]);
 		}
 	}	
 	return 1;
@@ -319,7 +319,7 @@ int err_check() {
 	printf("\n==========ERR check==========\n");
 	for (int i=0;i<p->gnum;i++) {
 		if ((p->n->naive_on == true) && (i == p->n->naive_start)) break;
-		double vr = stat->e->vr[i]/stat->e->erase[i];
+		double vr = midas_stat->e->vr[i]/midas_stat->e->erase[i];
 		printf("[GROUP %d] calc vr: %.3f, real vr: %.3f", i, p->m->vr[i], vr);
 		if ((p->m->vr[i]+0.1 > vr) && (p->m->vr[i]-0.1 < vr)) {
 			printf("\t(O)\n");
@@ -346,9 +346,10 @@ int err_check() {
 
 int check_configuration_apply() {
 	pm_body *p = (pm_body*)page_ftl.algo_body;
-	for (int i=0;i<p->gnum-1;i++) {
-		if (stat->g->gsize[i] != p->m->config[i]) {
-			if (stat->g->gsize[i]-1 != p->m->config[i]) return 0;
+	if (p->n->naive_start==0) return 1;
+	for (int i=0;i<p->n->naive_start;i++) {
+		if (midas_stat->g->gsize[i] != p->m->config[i]) {
+			if (midas_stat->g->gsize[i]-1 != p->m->config[i]) return 0;
 		}
 	}
 	return 1;
@@ -356,28 +357,28 @@ int check_configuration_apply() {
 
 
 int do_modeling() {
-	if (stat->cur_req%GB_REQ==0) {
-                stat->write_gb++;
-                printf("\rwrite size: %dGB", stat->write_gb);
-                if (stat->e->errcheck) {
-                        if (stat->e->errcheck_time == stat->e->err_start) {
+	if (midas_stat->cur_req%GB_REQ==0) {
+                midas_stat->write_gb++;
+                printf("\rwrite size: %dGB", midas_stat->write_gb);
+                if (midas_stat->e->errcheck) {
+                        if (midas_stat->e->errcheck_time == midas_stat->e->err_start) {
 				if (check_configuration_apply()) {
 					printf("\n=> CONFIGURATION check: OK, ((error check on))\n");
-					stat->e->collect=true;
-					stat->e->errcheck_time++;
+					midas_stat->e->collect=true;
+					midas_stat->e->errcheck_time++;
 				}else printf("\n=> CONFIGURATION check: NO\n");
 			} else {
-				stat->e->errcheck_time++;
+				midas_stat->e->errcheck_time++;
 			}
                 }
                 int st = check_modeling();
                 if (st) printf("!!!Modeling over & adapt configuration!!!\n");
         }
-        if ((stat->write_gb%GIGAUNIT==0) && (stat->cur_req%GB_REQ==0)) {
+        if ((midas_stat->write_gb%GIGAUNIT==0) && (midas_stat->cur_req%GB_REQ==0)) {
                 printf("\n");
                 print_stat();
         }
-        if ((stat->e->errcheck_time==stat->e->err_window) && (stat->cur_req%GB_REQ==0)) {
+        if ((midas_stat->e->errcheck_time==midas_stat->e->err_window) && (midas_stat->cur_req%GB_REQ==0)) {
                 err_check();
         }
 
