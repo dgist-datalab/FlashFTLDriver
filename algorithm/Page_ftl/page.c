@@ -37,6 +37,7 @@ struct algorithm page_ftl={
 page_read_buffer rb;
 
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
+	printf("page create\n");
 	algo->li=li; //lower_info means the NAND CHIP
 	algo->bm=bm; //blockmanager is managing invalidation 
 	stat_init();

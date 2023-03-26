@@ -5,18 +5,19 @@
 static uint64_t total_validate_piece_ppa;
 static uint64_t total_invalidate_piece_ppa;
 
-struct blockmanager seq_bm={
+struct blockmanager seq_bm = {
 	.create=seq_create,
 	.q_return = return_heap_queue,
 	.destroy=seq_destroy,
 	.get_block=seq_get_block,
 	.pick_block=seq_pick_block,
 	.get_segment=seq_get_segment,
+	.jy_get_block_idx=seq_jy_get_block_idx,
 	.get_page_num=seq_get_page_num,
 	.pick_page_num=seq_pick_page_num,
 	.check_full=seq_check_full,
-	.is_gc_needed=seq_is_gc_needed,
 
+	.is_gc_needed=seq_is_gc_needed,
 	.get_free_segment_number=seq_get_free_segment_number,
 
 	.get_gc_target=seq_get_gc_target,
@@ -49,6 +50,10 @@ struct blockmanager seq_bm={
 	.pt_isgc_needed=seq_pt_isgc_needed,
 	.change_pt_reserve=seq_change_pt_reserve,
 	.pt_reserve_to_free=seq_pt_reserve_to_free,
+
+	.li = NULL,
+	.private_data = NULL,
+	.assigned_page = 0,
 };
 
 void seq_mh_swap_hptr(void *a, void *b){
@@ -138,6 +143,11 @@ uint32_t seq_destroy (struct blockmanager* bm){
 __block* seq_get_block (struct blockmanager* bm, __segment* s){
 	if(s->now+1>s->max) abort();
 	return s->blocks[s->now++];
+}
+
+uint32_t seq_jy_get_block_idx(struct blockmanager* bm, void* b) {
+	block_set *bs = (block_set*)b;
+	return bs->blocks[0]->block_num/BPS;
 }
 
 __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){

@@ -66,16 +66,16 @@ kmem_cache_grow(kmem_cache_t cp) {
             return;
 
         // positioning slab at the end of the page
-        slab = (kmem_slab_t)(mem + PAGE_SZ - sizeof(struct kmem_slab));
+        slab = (kmem_slab_t)((char*)mem + PAGE_SZ - sizeof(struct kmem_slab));
 
         slab->next = slab->prev = slab;        
         slab->bufcount = 0;
         slab->free_list = mem;
         
         // creating linkage
-        lastbuf = mem + (cp->effsize * (cp->slab_maxbuf-1));
-        for (p=mem; p < lastbuf; p+=cp->effsize) 
-             *((void **)p) = p + cp->effsize;
+        lastbuf = (char*)mem + (cp->effsize * (cp->slab_maxbuf-1));
+        for (p=mem; p < lastbuf; p = (char*)p + cp->effsize) 
+             *((void **)p) = (char*)p + cp->effsize;
 
         // complete slab at the front...
         __slab_move_to_front(cp, slab);
@@ -105,7 +105,7 @@ kmem_cache_grow(kmem_cache_t cp) {
         // creating addtl bufctls
         for (i=1; i < cp->slab_maxbuf; i++) {
             bufctl[i].next = (kmem_bufctl_t)slab->free_list;
-            bufctl[i].buf = mem + (i*cp->effsize + (PAGE_SZ%cp->effsize * (((i+1)*cp->effsize)/PAGE_SZ)));
+            bufctl[i].buf = (char*)mem + (i*cp->effsize + (PAGE_SZ%cp->effsize * (((i+1)*cp->effsize)/PAGE_SZ)));
             bufctl[i].slab = slab;
             slab->free_list = &bufctl[i];
         }
@@ -169,7 +169,7 @@ kmem_cache_free(kmem_cache_t cp, void *buf) {
         // compute slab position
         // TODO: DO IT GENERIC (PAGE_SZ != 0x1000)
         mem = (void*)((long)buf >> 12 << 12); 
-        slab =(kmem_slab_t)(mem + PAGE_SZ - sizeof(struct kmem_slab));
+        slab =(kmem_slab_t)((char*)mem + PAGE_SZ - sizeof(struct kmem_slab));
 
         // put buffer back in the slab free list
         *((void **)buf) = slab->free_list;
@@ -223,7 +223,7 @@ kmem_cache_destroy(kmem_cache_t cp) {
         while (cp->slabs) {
             slab = cp->slabs;
             __slab_remove(cp, slab);
-            mem = (void*)slab - PAGE_SZ + sizeof(struct kmem_slab);
+            mem = (char*)slab - PAGE_SZ + sizeof(struct kmem_slab);
             free(mem);
         }
     }

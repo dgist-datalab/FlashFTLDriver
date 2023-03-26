@@ -2,7 +2,6 @@
 #include "map.h"
 #include "model.h"
 #include "page.h"
-#include "../../blockmanager/sequential/block_str.h"
 
 extern algorithm page_ftl;
 extern STAT* stat;
@@ -54,7 +53,7 @@ void naive_mida_off() {
 		abort();
 	}
 	for (int i=0;i<q->size;i++) {
-		seg_idx = ((block_set*)cur->d.req)->blocks[0]->block_num/BPS;
+		seg_idx = page_ftl.bm->jy_get_block_idx(page_ftl.bm, cur->d.req);
 		seg_assign_ginfo(seg_idx, p->n->naive_start);
 		cur = cur->next;
 	}
@@ -149,7 +148,7 @@ int change_group_number(int prevnum, int newnum) {
 	node *cur = q->head;
 	uint32_t seg_idx;
 	for (int i=0;i<q->size;i++) {
-		seg_idx = ((block_set*)cur->d.req)->blocks[0]->block_num/BPS;
+		seg_idx = page_ftl.bm->jy_get_block_idx(page_ftl.bm, cur->d.req);
                 seg_assign_ginfo(seg_idx, newnum);
                 cur = cur->next;
 	}
@@ -193,7 +192,7 @@ int merge_group(int group_num) {
 	                abort();
 	        }
 		for (int i=0;i<q->size;i++) {
-	                seg_idx = ((block_set*)cur->d.req)->blocks[0]->block_num/BPS;
+	                seg_idx = page_ftl.bm->jy_get_block_idx(page_ftl.bm, cur->d.req);
 	                seg_assign_ginfo(seg_idx, group_num);
                 	cur = cur->next;
         	}
@@ -249,7 +248,7 @@ int decrease_group_size(int gnum, int block_num) {
         node *cur = q->head;
         uint32_t seg_idx;
         for (int i=0;i<block_num;i++) {
-                seg_idx = ((block_set*)cur->d.req)->blocks[0]->block_num/BPS;
+                seg_idx = page_ftl.bm->jy_get_block_idx(page_ftl.bm, cur->d.req);
                 seg_assign_ginfo(seg_idx, last_g);
                 cur = cur->next;
         }
@@ -316,7 +315,7 @@ int check_modeling() {
 
 int err_check() {
 	pm_body *p = (pm_body*)page_ftl.algo_body;
-	if (p->m->status=false) return 0;
+	if (p->m->status==false) return 0;
 	printf("\n==========ERR check==========\n");
 	for (int i=0;i<p->gnum;i++) {
 		if ((p->n->naive_on == true) && (i == p->n->naive_start)) break;

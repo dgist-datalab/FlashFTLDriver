@@ -4,9 +4,16 @@
 #include "../../interface/queue.h"
 #include "../../include/data_struct/heap.h"
 #include "../bb_checker.h"
-#include "block_str.h"
 #include <stdint.h>
 
+typedef struct block_set{
+        uint32_t total_invalid_number;
+        uint32_t total_valid_number;
+        uint32_t used_page_num;
+        uint8_t type;
+        __block *blocks[BPS];
+        void *hptr;
+}block_set;
 
 typedef struct seq_bm_private{
 	__block *seq_block;
@@ -28,6 +35,7 @@ uint32_t seq_destroy (struct blockmanager*);
 __block* seq_get_block (struct blockmanager*, __segment *);
 __block *seq_pick_block(struct blockmanager *, uint32_t page_num);
 __segment* seq_get_segment (struct blockmanager*, bool isreserve);
+uint32_t seq_jy_get_block_idx (struct blockmanager*, void* b);
 bool seq_check_full(struct blockmanager *,__segment *active, uint8_t type);
 bool seq_is_gc_needed (struct blockmanager*);
 

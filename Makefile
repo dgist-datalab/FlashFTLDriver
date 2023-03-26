@@ -3,11 +3,16 @@
 #override export AR=gcc-ar
 #override export NM=gcc-nm
 
-export CC=g++
-export CXX=g++
+override export CC=clang++-16
+override export CXX=clang++-16
+override export AR=llvm-ar-16
+override export NM=llvm-nm-16
+
+#export CC=g++
+#export CXX=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=posix_memory
+export TARGET_LOWER=AMF
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -18,7 +23,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
-#-fsanitize=address\
+-fsanitize=address -static-libsan\
 
 export COMMONFLAGS=\
 			-Wno-write-strings\
@@ -28,7 +33,7 @@ export COMMONFLAGS=\
 			-D_GNU_SOURCE\
 			-DSLC\
 			-D$(TARGET_BM)\
-			-Wno-unused-but-set-variable\
+			-Wno-unused-but-set-variable -Wno-unused-command-line-argument -Wno-deprecated\
 #	-O3 -march=native -mtune=native -flto=20 \
 #-DLSM_DEBUG\
 #-DDFTL_DEBUG\

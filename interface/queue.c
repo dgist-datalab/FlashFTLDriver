@@ -30,7 +30,7 @@ bool q_enqueue(void* req, queue* q){
 	}
 	else{
 		q->tail->next=new_node;
-		new_node->prev = q->tail;
+		//new_node->prev = q->tail;
 		q->tail=new_node;
 	}
 	q->size++;
@@ -98,7 +98,7 @@ bool q_enqueue_front(void *req, queue*q){
 	}
 	else{
 		new_node->next=q->head;
-		q->head->prev = new_node;
+		//q->head->prev = new_node;
 		q->head=new_node;
 	}
 //	printf("ef-key:%u\n",((request*)req)->key);
@@ -117,7 +117,7 @@ void* q_dequeue(queue *q){
 	target_node=q->head;
 	q->head=q->head->next;
 	q->size--;
-	if (q->size != 0) q->head->prev = NULL;
+	//if (q->size != 0) q->head->prev = NULL;
 
 	void *res=target_node->d.req;
 //	printf("of-key:%u\n",((request*)res)->key);
@@ -191,7 +191,7 @@ bool q_enqueue_int(int req, queue* q){
 	}
 	else{
 		q->tail->next=new_node;
-		new_node->prev = q->tail;
+		//new_node->prev = q->tail;
 		q->tail=new_node;
 	}
 	q->size++;
@@ -203,10 +203,13 @@ int q_dequeue_int(queue* q){
 	pthread_mutex_lock(&q->q_lock);
 	if(!q->head || q->size==0){
 		pthread_mutex_unlock(&q->q_lock);
-		return -1;
+		return 0;
 	}
 	node *target_node;
 	target_node=q->head;
+	q->head=q->head->next;
+        //q->head->prev=NULL;
+	/*
 	if (q->size == 1) {
 		q->head=NULL;
 		q->tail=NULL;
@@ -214,6 +217,7 @@ int q_dequeue_int(queue* q){
 		q->head=q->head->next;
 		q->head->prev=NULL;
 	}
+	*/
 	int res=target_node->d.data;
 	q->size--;
 //	printf("of-key:%u\n",((request*)res)->key);

@@ -226,6 +226,7 @@ struct blockmanager{
 	__block* (*get_block) (struct blockmanager*,__segment*);
 	__block *(*pick_block)(struct blockmanager*, uint32_t page_num);
 	__segment* (*get_segment) (struct blockmanager*, bool isreserve);
+	uint32_t (*jy_get_block_idx) (struct blockmanager*, void* b);
 	int (*get_page_num)(struct blockmanager*, __segment*);
 	int (*pick_page_num)(struct blockmanager*, __segment*);
 	bool (*check_full)(struct blockmanager*, __segment*, uint8_t type);

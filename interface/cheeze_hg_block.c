@@ -39,10 +39,10 @@ static inline char *get_buf_addr(char **pdata_addr, int id) {
 
 static void shm_meta_init(void *ppage_addr) {
     memset(ppage_addr, 0, (1ULL * 1024 * 1024 * 1024));
-    send_event_addr = (uint8_t*)(ppage_addr + SEND_OFF); // CHEEZE_QUEUE_SIZE ==> 16B
-    recv_event_addr =(uint8_t*)(ppage_addr + RECV_OFF); // 16B
-    seq_addr = (uint64_t*)(ppage_addr + SEQ_OFF); // 8KB
-    ureq_addr = (cheeze_req_user*)(ppage_addr + REQS_OFF); // sizeof(req) * 1024
+    send_event_addr = (uint8_t*)((char*)ppage_addr + SEND_OFF); // CHEEZE_QUEUE_SIZE ==> 16B
+    recv_event_addr =(uint8_t*)((char*)ppage_addr + RECV_OFF); // 16B
+    seq_addr = (uint64_t*)((char*)ppage_addr + SEQ_OFF); // 8KB
+    ureq_addr = (cheeze_req_user*)((char*)ppage_addr + REQS_OFF); // sizeof(req) * 1024
 }
 
 static void shm_data_init(void *ppage_addr) {
@@ -162,7 +162,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	res->tag_id=id;
 
 	error_check(creq);
-++
+//++
 	res->origin_req=(void*)creq;
 	res->size=creq->len/LPAGESIZE;
 	res->req_array=(request*)calloc(res->size,sizeof(request));
@@ -376,7 +376,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		}
 		temp->key=lba_r+i;
 
-		if (prev_lba = UINT32_MAX) {
+		if (prev_lba == UINT32_MAX) {
 			prev_lba = temp->key;
 		} else {
 			if (prev_lba+1==temp->key) {

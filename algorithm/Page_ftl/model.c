@@ -959,7 +959,7 @@ void *first_interval_analyzer(void* arg) {
 	int lba=-1;
 	int status=0;
 
-	node *nd;
+	node *nd = NULL;
 	int tmp_lba=0;
 	Redblack cur_rb;
 

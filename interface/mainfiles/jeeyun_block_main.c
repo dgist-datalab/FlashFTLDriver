@@ -25,7 +25,7 @@ void log_print(int sig){
 	exit(1);
 }
 
-char* argv2=NULL;
+//char* argv2=NULL;
 void * thread_test(void * argv){
 	/*
 	vec_request **req_arr=NULL;
@@ -48,21 +48,6 @@ void * thread_test(void * argv){
         }
 
         fclose(pFile);
-
-	if (argv2) {
-		pFile = fopen(argv2, "r");
-	        char tmp[128];
-
-	        while(fgets(tmp, 128, pFile)) {
-	                vec_request *req=jy_ureq2vec_req(tmp);
-	                if (!req) continue;
-                	assign_vectored_req(req);
-
-        	        //free(req_arr);
-	        }
-	
-	        fclose(pFile);
-	}
 
 	return NULL;
 }
@@ -107,7 +92,6 @@ int main(int argc,char* argv[]){
 	time_t begin;
 	time(&begin);
 
-	if (argc > 2) argv2 = argv[2];
         pthread_create(&thr, NULL, thread_test, (void*) argv[1]);
         pthread_join(thr, NULL);
         
