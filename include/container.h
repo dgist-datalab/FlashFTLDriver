@@ -41,6 +41,7 @@ typedef struct vectored_request{
 	uint32_t done_cnt;
 	uint32_t tid;
 	char* buf;
+	double time_stamp;
 
 	request *req_array;
 	uint32_t mark;
@@ -51,6 +52,7 @@ typedef struct vectored_request{
 struct request {
 	FSTYPE type;
 	KEYT key;
+	double timestamp;
 	uint32_t tag_num;
 	uint32_t offset;
 	uint32_t tid;
@@ -224,6 +226,7 @@ struct blockmanager{
 	__block* (*get_block) (struct blockmanager*,__segment*);
 	__block *(*pick_block)(struct blockmanager*, uint32_t page_num);
 	__segment* (*get_segment) (struct blockmanager*, bool isreserve);
+	__segment* (*jy_get_time_segment) (struct blockmanager*, bool isreserve, double time_stamp);
 	int (*get_page_num)(struct blockmanager*, __segment*);
 	int (*pick_page_num)(struct blockmanager*, __segment*);
 	bool (*check_full)(struct blockmanager*, __segment*, uint8_t type);
@@ -241,6 +244,7 @@ struct blockmanager{
 	void (*set_oob)(struct blockmanager*, char* data, int len, uint32_t ppa);
 	char *(*get_oob)(struct blockmanager*, uint32_t ppa);
 	__segment* (*change_reserve)(struct blockmanager *, __segment *reserve);
+	__segment* (*jy_change_reserve)(struct blockmanager *, __segment *reserve, double time_stamp);
 	void (*reinsert_segment)(struct blockmanager *, uint32_t seg_idx);
 	uint32_t (*remain_free_page)(struct blockmanager *, __segment *active);
 	void (*invalidate_number_decrease)(struct blockmanager *, uint32_t ppa);

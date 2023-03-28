@@ -18,8 +18,10 @@ uint32_t log_fd;
 
 
 extern uint32_t test_key;
-align_buffer a_buffer;
+align_buffer a_buffer[2];
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
+extern double cur_timestamp;
+unsigned long req_num=0;
 
 extern MeasureTime mt;
 struct algorithm page_ftl={
@@ -39,6 +41,7 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	algo->bm=bm; //blockmanager is managing invalidation 
 	page_map_create();
 
+	//a_buffer = (align_buffer*)malloc(sizeof(align_buffer)*2);
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
 	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
 	fdriver_mutex_init(&rb.pending_lock);
@@ -132,12 +135,14 @@ uint32_t page_read(request *const req){
 
 //	printf("issue %u %u\n", req->seq, req->key);
 
-	for(uint32_t i=0; i<a_buffer.idx; i++){
-		if(req->key==a_buffer.key[i]){
-			//		printf("buffered read!\n");
-			memcpy(req->value->value, a_buffer.value[i]->value, LPAGESIZE);
-			req->end_req(req);		
-			return 1;
+	for (int j=0;j<2;j++) {
+		for(uint32_t i=0; i<a_buffer[j].idx; i++){
+			if(req->key==a_buffer[j].key[i]){
+				//		printf("buffered read!\n");
+				memcpy(req->value->value, a_buffer[j].value[i]->value, LPAGESIZE);
+				req->end_req(req);		
+				return 1;
+			}
 		}
 	}
 
@@ -155,45 +160,74 @@ uint32_t page_read(request *const req){
 	}
 	return 1;
 }
-uint32_t size=0;
+unsigned long size=0;
+unsigned long write_gb=0;
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
+	req_num++;
 	bool overlap=false;
 
 	uint32_t overlapped_idx=UINT32_MAX;
+	int bidx = INT_MAX;
 	
 	++size;
-	if (size%262144==0) printf("\rwrite size: %dGB", size/262144);
-	if (size%8388608==0) printf("\n");
-	for(uint32_t i=0; i<a_buffer.idx; i++){
-		if(a_buffer.key[i]==req->key){
-			overlapped_idx=i;
-			overlap=true;
-			break;
+	if (size%GB_REQ==0) {
+		write_gb++;
+		printf("\rwrite size: %ldGB", write_gb);
+	}
+	if ((write_gb%32==0)&&(size%GB_REQ==0)) print_stat();
+	if ((write_gb%GIGAUNIT==0)&&(size%GB_REQ==0)) {
+		printf("\n");
+		//print_stat();
+	}
+	cur_timestamp = req->timestamp;
+	for (int j=0;j<2;j++) {
+		for(uint32_t i=0; i<a_buffer[j].idx; i++){
+			if(a_buffer[j].key[i]==req->key){
+				overlapped_idx=i;
+				bidx=j;
+				overlap=true;
+				break;
+			}
 		}
 	}
 
-	uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
-	if (overlap) inf_free_valueset(a_buffer.value[target_idx], FS_MALLOC_W);
+	uint32_t target_idx;
+	if (overlap) inf_free_valueset(a_buffer[bidx].value[overlapped_idx], FS_MALLOC_W);
+	int hc_cnt;
 	if(req){
-		a_buffer.value[target_idx]=req->value;
-		a_buffer.key[target_idx]=req->key;
+		if (overlap) {
+			hc_cnt = bidx;
+			target_idx = overlapped_idx;
+		} else {
+			hc_cnt = is_lba_hot(req->key);
+			target_idx=a_buffer[hc_cnt].idx;
+		}
+		a_buffer[hc_cnt].value[target_idx]=req->value;
+		a_buffer[hc_cnt].key[target_idx]=req->key;
 	}
 	else{
-		a_buffer.value[target_idx]=value;
-		a_buffer.key[target_idx]=key;
+		if (overlap) {
+                        hc_cnt = bidx;
+                        target_idx = overlapped_idx;
+                } else {
+                        hc_cnt = is_lba_hot(key);
+                        target_idx=a_buffer[hc_cnt].idx;
+                }
+		a_buffer[hc_cnt].value[target_idx]=value;
+		a_buffer[hc_cnt].key[target_idx]=key;
 	}
+	a_buffer[hc_cnt].timestamp[target_idx]=req_num;
+	if(!overlap){ a_buffer[hc_cnt].idx++;}
 
-	if(!overlap){ a_buffer.idx++;}
-
-	if(a_buffer.idx==L2PGAP){
-		ppa_t ppa=page_map_assign(a_buffer.key, a_buffer.idx);
+	if(a_buffer[hc_cnt].idx==L2PGAP){
+		ppa_t ppa=page_map_assign(a_buffer[hc_cnt].key, a_buffer[hc_cnt].idx, hc_cnt, a_buffer[hc_cnt].timestamp);
 		value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
 		for(uint32_t i=0; i<L2PGAP; i++){
-			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
-			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
+			memcpy(&value->value[i*LPAGESIZE], a_buffer[hc_cnt].value[i]->value, LPAGESIZE);
+			inf_free_valueset(a_buffer[hc_cnt].value[i], FS_MALLOC_W);
 		}
 		send_user_req(NULL, DATAW, ppa, value);
-		a_buffer.idx=0;
+		a_buffer[hc_cnt].idx=0;
 	}
 	return 1;
 }
@@ -211,16 +245,19 @@ uint32_t page_write(request *const req){
 }
 
 uint32_t page_remove(request *const req){
-	for(uint8_t i=0; i<a_buffer.idx; i++){
-		if(a_buffer.key[i]==req->key){
-			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
-			if(i==1){
-				a_buffer.value[0]=a_buffer.value[1];
-				a_buffer.key[0]=a_buffer.key[1];
+	req_num++;
+	for (int j=0;j<2;j++) {
+		for(uint8_t i=0; i<a_buffer[j].idx; i++){
+			if(a_buffer[j].key[i]==req->key){
+				inf_free_valueset(a_buffer[j].value[i], FS_MALLOC_W);
+				if(i==1){
+					a_buffer[j].value[0]=a_buffer[j].value[1];
+					a_buffer[j].key[0]=a_buffer[j].key[1];
+				}
+	
+				a_buffer[j].idx--;
+				goto end;
 			}
-
-			a_buffer.idx--;
-			goto end;
 		}
 	}
 	

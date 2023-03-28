@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void mh_init(mh** h, int bn, void(*a)(void*,void*), void(*b)(void*a, void*), int (*get_cnt)(void *a)){
+void mh_init(mh** h, int bn, void(*a)(void*,void*), void(*b)(void*a, void*), float (*get_cnt)(void *a)){
 	*h=(mh*)malloc(sizeof(mh));
 	(*h)->size=0;
 	(*h)->max=bn;

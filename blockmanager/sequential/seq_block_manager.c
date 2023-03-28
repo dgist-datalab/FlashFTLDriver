@@ -11,6 +11,7 @@ struct blockmanager seq_bm={
 	.get_block=seq_get_block,
 	.pick_block=seq_pick_block,
 	.get_segment=seq_get_segment,
+	.jy_get_time_segment=seq_jy_get_time_segment,
 	.get_page_num=seq_get_page_num,
 	.pick_page_num=seq_pick_page_num,
 	.check_full=seq_check_full,
@@ -30,6 +31,7 @@ struct blockmanager seq_bm={
 	.set_oob=seq_set_oob,
 	.get_oob=seq_get_oob,
 	.change_reserve=seq_change_reserve,
+	.jy_change_reserve=seq_jy_change_reserve,
 	.reinsert_segment=seq_reinsert_segment,
 	.remain_free_page=seq_remain_free_page,
 	.invalidate_number_decrease=seq_invalidate_number_decrease,
@@ -61,7 +63,8 @@ void seq_mh_assign_hptr(void *a, void *hn){
 	aa->hptr=hn;
 }
 
-int seq_get_cnt(void *a){
+double cur_timestamp=0;
+float seq_get_cnt(void *a){
 	block_set *aa=(block_set*)a;
 	/*
 	if(aa->total_invalid_number==UINT_MAX){
@@ -71,9 +74,27 @@ int seq_get_cnt(void *a){
 		aa->total_invalid_number=res;
 	}
 	else res=aa->total_invalid_number;*/
+        int interval_t =(int)(cur_timestamp - aa->timestamp);
+	if (interval_t < 0) EPRINT("how this time can it be!\n", true);
 
-	return aa->total_invalid_number;
+        float interval=0;
+        if (interval_t < 10) interval=1;
+        else if (interval_t < 20) interval=2;
+        else if (interval_t < 45) interval=3;
+        else if (interval_t < 90) interval=4;
+        else if (interval_t < 180) interval=5;
+        else if (interval_t < 360) interval=6;
+        else interval=7;
+
+        //float cleaning = (float) (_PPS*L2PGAP-aa->total_invalid_number) / (float)((aa->total_invalid_number)*interval);
+	float cleaning;
+	if (aa->total_invalid_number == _PPS*L2PGAP) cleaning= 10000;
+	else cleaning = (float)((aa->total_invalid_number)*interval)/ (float) (_PPS*L2PGAP-aa->total_invalid_number);
+        //printf("victim selection: %f\n", (cleaning*interval));
+        //printf("cleaning: %.3f\n");
+	return (cleaning);
 }
+
 
 uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	bm->li=li;
@@ -183,6 +204,60 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	return res;
 }
 
+__segment* seq_jy_get_time_segment (struct blockmanager* bm, bool isreserve, double time_stamp){
+	__segment* res=(__segment*)malloc(sizeof(__segment));
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	
+	block_set *free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
+	
+	if(!free_block_set){
+		EPRINT("dev full??", false);
+		return NULL;
+	}
+
+	if(free_block_set->total_invalid_number || free_block_set->total_valid_number){
+		EPRINT("how can it be!\n", true);
+	}
+
+	if(!free_block_set){
+		printf("new block is null!\n");
+		abort();
+	}
+	free_block_set->timestamp = time_stamp;
+
+	if(isreserve){
+
+	}
+	else{
+		mh_insert_append(p->max_heap, (void*)free_block_set);
+	}
+
+	memcpy(res->blocks, free_block_set->blocks, sizeof(__block*)*BPS);
+
+	res->now=0;
+	res->max=BPS;
+	res->invalid_blocks=0;
+	res->used_page_num=0;
+	res->seg_idx=res->blocks[0]->block_num/BPS;
+	
+	p->assigned_block++;
+	p->free_block--;
+
+
+	if(p->assigned_block+p->free_block!=_NOS){
+		printf("missing segment error\n");
+		abort();
+	}
+/*
+	if(p->seg_populate_bit[res->seg_idx/8] & (1<<(res->seg_idx%8))){
+		EPRINT("already populate!\n", true);
+	}
+
+	p->seg_populate_bit[res->seg_idx/8] |=(1<<(res->seg_idx%8));*/
+	return res;
+}
+
+
 __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 
 	sbm_pri *p=(sbm_pri*)bm->private_data;
@@ -194,6 +269,19 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 
 	return seq_get_segment(bm,true);
 }
+
+__segment* seq_jy_change_reserve(struct blockmanager* bm,__segment *reserve, double time_stamp){
+
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
+	uint32_t segment_idx=segment_start_block_number/BPS;
+	block_set *bs=&p->logical_segment[segment_idx];
+
+	mh_insert_append(p->max_heap, (void*)bs);
+
+	return seq_jy_get_time_segment(bm,true,time_stamp);
+}
+
 
 
 void seq_reinsert_segment(struct blockmanager *bm, uint32_t seg_idx){
@@ -387,7 +475,7 @@ bool seq_query_bit(struct blockmanager *bm, uint32_t ppa){
 	uint32_t pn=ppa%(_PPB * L2PGAP);
 	uint32_t bt=pn/8;
 	uint32_t of=pn%8;
-	__block *b=&p->seq_block[bn];
+	//__block *b=&p->seq_block[bn];
 
 	return p->seq_block[bn].bitset[bt]&(1<<of);
 }

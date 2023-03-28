@@ -11,8 +11,10 @@ typedef struct align_buffer{
 	uint8_t idx;
 	value_set *value[L2PGAP];
 	KEYT key[L2PGAP];
+	unsigned long timestamp[L2PGAP];
 }align_buffer;
 
+#define GB_REQ 262144
 
 typedef struct page_read_buffer{
 	std::multimap<uint32_t, algo_req *> * pending_req;

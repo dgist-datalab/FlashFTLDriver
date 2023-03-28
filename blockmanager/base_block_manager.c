@@ -59,6 +59,11 @@ int base_get_cnt(void *a){
 	return aa->invalidate_number;
 }
 
+float jy_base_get_cnt(void *a) {
+	__block *aa=(__block*)a;
+        return (float)aa->invalidate_number;
+}
+
 uint32_t base_create (struct blockmanager* bm, lower_info *li){
 	bm->li=li;
 	bb_checker_start(bm->li);/*check if the block is badblock*/
@@ -83,7 +88,7 @@ uint32_t base_create (struct blockmanager* bm, lower_info *li){
 	for(int i=0; i<PUNIT; i++){ //assign block to channel
 		channel *c=&p->base_channel[i];
 		q_init(&c->free_block,_NOB/BPS);
-		mh_init(&c->max_heap,_NOB/BPS,base_mh_swap_hptr,base_mh_assign_hptr,base_get_cnt);
+		mh_init(&c->max_heap,_NOB/BPS,base_mh_swap_hptr,base_mh_assign_hptr,jy_base_get_cnt);
 		for(int j=0; j<_NOB/BPS; j++){
 			__block *n=&p->base_block[j*BPS+i%BPS];
 			q_enqueue((void*)n,c->free_block);

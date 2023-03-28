@@ -6,120 +6,69 @@
 
 extern uint32_t test_key;
 extern algorithm page_ftl;
+extern double cur_timestamp;
 
 uint32_t *seg_ratio;
-uint32_t req_num=0;
+extern unsigned long req_num;
 char gcur=0;
-FILE *vFile;
-//FILE *gFile;
-//FILE *wFile;
-
-FILE *hFile_10;
-FILE *hFile_20;
-FILE *hFile_30;
-FILE *hFile_40;
-FILE *hFile_50;
-
-FILE *tFile_10;
-FILE *tFile_20;
-FILE *tFile_30;
-FILE *tFile_40;
-FILE *tFile_50;
-
-
 
 void page_map_create(){
-	printf("NOS: %d\n", _NOS);
+	printf("NOS: %ld\n", _NOS);
 	seg_ratio=(uint32_t*)calloc((GNUMBER), sizeof(uint32_t));
 	pm_body *p=(pm_body*)calloc(sizeof(pm_body),1);
 	p->mapping=(uint32_t*)malloc(sizeof(uint32_t)*_NOP*L2PGAP);
 	for(int i=0;i<_NOP*L2PGAP; i++){
 		p->mapping[i]=UINT_MAX;
 	}
-	p->reserve=(__segment **)malloc(sizeof(__segment*)*(GNUMBER-1));
+	p->active=(__segment**)malloc(sizeof(__segment*)*2);
+	p->reserve=(__segment **)malloc(sizeof(__segment*)*4);
 	/*	
 	for (uint32_t i=0;i<GNUMBER-1;i++) { 
 		p->reserve[i]=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
 	}
 	*/	
-	char name[32];
-	//sprintf(name, "./valid_ratio/ran_WAF_%d", GNUMBER);
-	//wFile = fopen(name, "w");
-	//sprintf(name, "./valid_ratio/ran_block_num_%d", GNUMBER);
-	//gFile = fopen(name, "w");
-	//sprintf(name, "./valid_ratio/11_valid_%d", GNUMBER);
-	//vFile = fopen(name, "w");
-
-	char *ttp=(char*)malloc(4);
-	if (BENCH_JY == 0) ttp = "08";
-	else if (BENCH_JY == 1) ttp = "11";
-	else ttp = "ran";	
-	sprintf(name, "./valid_ratio/r_%s_hot_10", ttp);
-	hFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_20", ttp);
-	hFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_30", ttp);
-	hFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_40", ttp);
-	hFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_50", ttp);
-	hFile_50 = fopen(name, "w");
-
-	sprintf(name, "./valid_ratio/tot_%s_hot_10", ttp);
-	tFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_20", ttp);
-	tFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_30", ttp);
-	tFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_40", ttp);
-	tFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_50", ttp);
-	tFile_50 = fopen(name, "w");
-
-	sprintf(name, "./valid_ratio/valid_%s", ttp);
-	vFile = fopen(name, "w");
-
-
-/*
-	sprintf(name, "./valid_ratio/tmp_10");
-	hFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_20");
-	hFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_30");
-	hFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_40");
-	hFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_50");
-	hFile_50 = fopen(name, "w");
-*/
-
-	setbuf(hFile_10, NULL);
-	setbuf(hFile_20, NULL);
-	setbuf(hFile_30, NULL);
-	setbuf(hFile_40, NULL);
-	setbuf(hFile_50, NULL);
-
-	setbuf(tFile_10, NULL);
-        setbuf(tFile_20, NULL);
-        setbuf(tFile_30, NULL);
-        setbuf(tFile_40, NULL);
-        setbuf(tFile_50, NULL);
-
-	setbuf(vFile, NULL);
-	p->active=page_ftl.bm->get_segment(page_ftl.bm,true); //now active block for inserted request.
+	p->stat = (STAT*)calloc(sizeof(STAT), 1);
+	p->stat->user_write=0;
+	p->stat->gc_write=0;
+	for (int i=0;i<6;i++) {
+		p->stat->vr[i]=0.0;
+		p->stat->erase[i]=0.0;
+		p->stat->gsize[i]=0;
+	}
+	
+	p->active[0]=page_ftl.bm->get_segment(page_ftl.bm,true);	//now active block for inserted request.
+	p->active[1]=page_ftl.bm->get_segment(page_ftl.bm, true);
+	p->stat->gsize[0]++;
+	p->stat->gsize[1]++;
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
+	p->seg_timestamp = (unsigned long*)calloc(_NOS, sizeof(unsigned long));
+	p->avg_segage=ULONG_MAX;
+	p->tmp_avg=0;
+	p->gc_seg=0;
+	p->rb_lbas = rb_create();
+	q_init(&(p->q_lbas), _PPS*L2PGAP);
 }
 
-uint32_t page_map_assign(KEYT* lba, uint32_t max_idx){
+void print_stat() {
+	pm_body *p = (pm_body*)page_ftl.algo_body;
+	printf("\n======================================\n");
+	printf("total WAF: %.3f\n", ((double)(p->stat->user_write+p->stat->gc_write)/(double)p->stat->user_write));
+	for (int i=0;i<6;i++) {
+		printf("=> group %d[%d]: %.3f (erase: %lu)\n", i, p->stat->gsize[i], p->stat->vr[i]/p->stat->erase[i], (unsigned long)p->stat->erase[i]);
+	}
+	printf("======================================\n");
+}
+
+uint32_t page_map_assign(KEYT* lba, uint32_t max_idx, int hc_cnt, unsigned long *timestamp){
 	//printf("lba : %lu\n", lba);
 	uint32_t res=0;
-	req_num+=4;
-	res=get_ppa(lba, L2PGAP);
+	res=get_ppa(lba, L2PGAP, hc_cnt, timestamp);
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	for(uint32_t i=0; i<L2PGAP; i++){
 		KEYT t_lba=lba[i];
+		p->stat->user_write++;
 		//printf("key: %lu\n", t_lba);
-		uint32_t previous_ppa=p->mapping[t_lba];
+		//uint32_t previous_ppa=p->mapping[t_lba];
 		if(p->mapping[t_lba]!=UINT_MAX){
 			/*when mapping was updated, the old one is checked as a inavlid*/
 			invalidate_ppa(p->mapping[t_lba]);
@@ -163,25 +112,25 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx, uint32_t mig_count){
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	if (mig_count > GNUMBER) printf("mig count problem is found in gc_update******\n");
 	/*when the gc phase, It should get a page from the reserved block*/
-	uint32_t group_idx = mig_count-1;
-	if (mig_count == 0) group_idx = mig_count;
 retry:
-	if (gcur <= group_idx) {
+	if (p->reserve[mig_count] == NULL) {
 		//initialize migration group
-		p->reserve[group_idx] = page_ftl.bm->get_segment(page_ftl.bm, true);
-		++gcur;
+		p->reserve[mig_count] = page_ftl.bm->jy_get_time_segment(page_ftl.bm, true, cur_timestamp);
+		p->stat->gsize[mig_count+2]++;
 	}
-	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve[group_idx]);
+	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve[mig_count]);
 	if (res==UINT32_MAX){
-		__segment* tmp=p->reserve[group_idx];
-		seg_ratio[group_idx+1]++;
-		p->reserve[group_idx] = page_ftl.bm->change_reserve(page_ftl.bm, p->reserve[group_idx]);
+		__segment* tmp=p->reserve[mig_count];
+		seg_ratio[mig_count+2]++;
+		p->stat->gsize[mig_count+2]++;
+		p->reserve[mig_count] = page_ftl.bm->jy_change_reserve(page_ftl.bm, p->reserve[mig_count], cur_timestamp);
 		page_ftl.bm->free_segment(page_ftl.bm, tmp);
 		goto retry;
 	}
 
-	uint32_t old_ppa, new_ppa;
+	//uint32_t old_ppa, new_ppa;
 	for(uint32_t i=0; i<idx; i++){
+		p->stat->gc_write++;
 		KEYT t_lba=lba[i];
 		if(p->mapping[t_lba]!=UINT_MAX){
 			/*when mapping was updated, the old one is checked as a inavlid*/
@@ -202,29 +151,78 @@ retry:
 	return res;
 }
 
+int is_lba_hot(uint32_t lba) {
+        pm_body *p = (pm_body*)page_ftl.algo_body;
+        int status=0;
+        Redblack cur_rb;
+        node* nd;
+        int res=-1;
+        uint32_t tmp_lba;
+
+        nd = q_enqueue_int_node(lba, p->q_lbas);
+        if (nd == NULL) {
+                //queue is full
+                tmp_lba = q_pick_int(p->q_lbas);
+                status = rb_find_int(p->rb_lbas, tmp_lba, &cur_rb);
+                if (status==0) perror("first interval analyzer, why there is no node in redblack???\n");
+                        //the victim lba was the only lba in the queue
+                if (cur_rb->item == (void*)q_dequeue_node(p->q_lbas)) {
+                        rb_delete_item(cur_rb, 0, 1);
+                } else if (((node*)(cur_rb->item))->d.data != tmp_lba) {
+                        perror("first interval analyzer\n");
+                        abort();
+                }
+                nd = q_enqueue_int_node(lba, p->q_lbas);
+        }
+
+        status = rb_find_int(p->rb_lbas, lba, &cur_rb);
+        if (status) {
+                //this is hot lba
+                res=0;
+                cur_rb->item = (void*)nd;
+        } else {
+                res=1;
+                rb_insert_int(p->rb_lbas, lba, (void*)nd);
+        }
+        return res;
+}
+
+void q_size_down(int nsize) {
+	pm_body *p = (pm_body*)page_ftl.algo_body;
+	Redblack cur_rb;
+	uint32_t tmp_lba;
+	int status=0;
+	if (nsize < p->q_lbas->size) {
+		for (int i=0;i<2;i++) {
+			tmp_lba = q_pick_int(p->q_lbas);
+	                status = rb_find_int(p->rb_lbas, tmp_lba, &cur_rb);
+	                if (status==0) perror("q_size_Down, why there is no node in redblack???\n");
+	                        //the victim lba was the only lba in the queue
+	                if (cur_rb->item == (void*)q_dequeue_node(p->q_lbas)) {
+	                        rb_delete_item(cur_rb, 0, 1);
+	                } else if (((node*)(cur_rb->item))->d.data != tmp_lba) {
+	                        perror("q_Size_down\n");
+	                        abort();
+                	}
+			if (p->q_lbas->size==nsize) break;
+		}
+		p->q_lbas->m_size = p->q_lbas->size;
+	} else p->q_lbas->m_size = nsize;
+	if (p->q_lbas->m_size < p->q_lbas->size) {
+		perror("q_size_Down err\n");
+		abort();
+	}
+	
+}
+
+
 void page_map_free(){
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	free(p->mapping);
 	free(seg_ratio);
 	free(p->reserve);
 	free(p);
-	fclose(vFile);
-	//fclose(gFile);
-	//fclose(wFile);
 	
-	fclose(hFile_10);
-	fclose(hFile_20);
-	fclose(hFile_30);
-	fclose(hFile_40);
-	fclose(hFile_50);
-	
-	fclose(tFile_10);
-	fclose(tFile_20);
-	fclose(tFile_30);
-	fclose(tFile_40);
-	fclose(tFile_50);
-	
-
 }
 
 

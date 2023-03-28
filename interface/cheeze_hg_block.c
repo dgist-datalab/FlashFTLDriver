@@ -20,7 +20,7 @@ static uint8_t *recv_event_addr; // 16B
 static uint64_t *seq_addr; // 8KB
 struct cheeze_req_user *ureq_addr; // sizeof(req) * 1024
 static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
-static uint64_t seq = 0;
+//static uint64_t seq = 0;
 static int trace_fd = 0;
 
 static uint32_t jy_req_start=0;
@@ -283,6 +283,7 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 	return res;
 }
 
+extern double time_adapt;
 char load_signal=0;
 vec_request *jy_ureq2vec_req(char* request_raw) {
 	uint32_t lba_r=0;
@@ -296,12 +297,13 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 //	uint32_t tmp2_max = 100663296;
 //	uint32_t zip_08=201326592;
 	uint32_t zip_32=41943139;
-	printf("request: %s\n", request_raw);
+	//printf("request: %s\n", request_raw);
 	if (strstr(request_raw, load_sig)) {
 		load_signal=1;
 		return NULL;	
 	}
-	char *tmp=strtok(request_raw, " \t");
+	char *tmp;
+	//tmp=strtok(request_raw, " \t");
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
 	res->tag_id=id_req++;
 	//cheeze_ureq *creq = ureq_addr+id_req;
@@ -310,7 +312,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	//char *write="W";
 	//char *read="R";
 	//printf("type: %s\n", tmp);
-	float perct = (float)id_req*(float)100/(float)zip_32;
+	//float perct = (float)id_req*(float)100/(float)zip_32;
 	//if (id_req%1000==0) printf("\rpercent: %f%%", perct);
 	//if (perct > 40) exit(0);
 	//if (id_req%10000000==0) printf("\n");
@@ -322,6 +324,9 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		abort();
 	}
 	*/
+	char *ptr;
+	double timestamp = strtod(request_raw, &ptr)*time_adapt;
+	tmp = strtok(ptr, " \t");
 	int ttp = atoi(tmp);
 	if (ttp == 0) type=FS_GET_T;
 	else if (ttp == 1) type = FS_SET_T;
@@ -351,6 +356,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		request *temp=&res->req_array[i];
 		temp->parents=res;
 		temp->type=type;
+		temp->timestamp = timestamp;
 		//TODO make end request
 		temp->end_req=jeeyun_end_req;
 		temp->isAsync=ASYNC;
@@ -374,7 +380,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		}
 		temp->key=lba_r+i;
 
-		if (prev_lba = UINT32_MAX) {
+		if (prev_lba == UINT32_MAX) {
 			prev_lba = temp->key;
 		} else {
 			if (prev_lba+1==temp->key) {
@@ -529,7 +535,7 @@ vec_request **get_vectored_request_arr()
 
 vec_request *get_trace_vectored_request(){
 	static bool isstart=false;
-	unsigned int crc_len;
+	//unsigned int crc_len;
 
 	
 	if(!isstart){
@@ -565,7 +571,7 @@ vec_request *get_trace_vectored_request(){
 
 bool cheeze_end_req(request *const req){
 	vectored_request *preq=req->parents;
-	uint32_t temp_crc;
+	//uint32_t temp_crc;
 	switch(req->type){
 		case FS_NOTFOUND_T:
 			bench_reap_data(req, mp.li);

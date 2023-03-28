@@ -13,6 +13,7 @@ typedef struct block_set{
 	uint8_t type;
 	__block *blocks[BPS];
 	void *hptr;
+	double timestamp;
 }block_set;
 
 typedef struct seq_bm_private{
@@ -34,6 +35,7 @@ uint32_t seq_destroy (struct blockmanager*);
 __block* seq_get_block (struct blockmanager*, __segment *);
 __block *seq_pick_block(struct blockmanager *, uint32_t page_num);
 __segment* seq_get_segment (struct blockmanager*, bool isreserve);
+__segment* seq_jy_get_time_segment(struct blockmanager*, bool isreserve, double time_stamp);
 bool seq_check_full(struct blockmanager *,__segment *active, uint8_t type);
 bool seq_is_gc_needed (struct blockmanager*);
 
@@ -51,6 +53,7 @@ void seq_set_oob(struct blockmanager*, char *data, int len, uint32_t ppa);
 char* seq_get_oob(struct blockmanager*, uint32_t ppa);
 void seq_release_segment(struct blockmanager*, __segment *);
 __segment* seq_change_reserve(struct blockmanager* ,__segment *reserve);
+__segment* seq_jy_change_reserve(struct blockmanager*, __segment *reserve, double time_stamp);
 int seq_get_page_num(struct blockmanager* ,__segment *);
 int seq_pick_page_num(struct blockmanager* ,__segment *);
 void seq_reinsert_segment(struct blockmanager *, uint32_t seg_idx);
@@ -76,6 +79,6 @@ uint32_t seq_pt_reserve_to_free(struct blockmanager*, int pt_num, __segment *res
 
 void seq_mh_swap_hptr(void *a, void *b);
 void seq_mh_assign_hptr(void *a, void *hn);
-int seq_get_cnt(void *a);
+float seq_get_cnt(void *a);
 
 #endif

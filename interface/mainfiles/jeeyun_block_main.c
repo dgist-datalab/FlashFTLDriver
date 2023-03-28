@@ -25,6 +25,7 @@ void log_print(int sig){
 	exit(1);
 }
 
+double time_adapt = 0.0;
 void * thread_test(void * argv){
 	/*
 	vec_request **req_arr=NULL;
@@ -90,6 +91,9 @@ int main(int argc,char* argv[]){
 	*/
 	time_t begin;
 	time(&begin);
+
+	char *ptr;
+	if (argc>2) time_adapt = strtod(argv[2], &ptr);
 
         pthread_create(&thr, NULL, thread_test, (void*) argv[1]);
         pthread_join(thr, NULL);
