@@ -138,8 +138,12 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,algo_req * co
 
 	req->test_ppa=ppa;
 	req->type_lower=0;
+	if(ppa>=_NOP){
 
-	memcpy(mem_pool[ppa], value->value, PAGESIZE);
+	}
+	else{
+		memcpy(mem_pool[ppa], value->value, PAGESIZE);
+	}
 #if BPS!=AMF_PUNIT
 	p_bbuf_issue(LOWER_WRITE, ppa, temp_mem_buf, req);
 #else

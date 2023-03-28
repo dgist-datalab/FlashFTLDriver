@@ -1,6 +1,8 @@
 #include "issue_io.h"
 #include "../../include/debug_utils.h"
 #include "./leaFTL.h"
+#include <pthread.h>
+
 extern uint32_t lea_test_piece_ppa;
 extern uint32_t read_buffer_hit_cnt;
 extern page_read_buffer rb;
@@ -74,5 +76,23 @@ algo_req *send_IO_user_req(uint32_t type, lower_info *li, uint32_t ppa, value_se
         printf("not defined type %u %s:%u\n",type, __FUNCTION__, __LINE__);
         break;
     }
+    return NULL;
+}
+
+
+void *temp_write_end_req(algo_req *const req){
+    req->parents->end_req(req->parents);
+    free(req);
+    return NULL;
+}
+
+algo_req *send_IO_temp_write(lower_info *li, request *req){
+    static int cnt=0;
+    algo_req *temp_algo_req;
+    temp_algo_req=(algo_req*)malloc(sizeof(algo_req));
+    temp_algo_req->end_req=temp_write_end_req;
+    temp_algo_req->parents=req;
+    uint32_t ppa=_NOP+(cnt++%(33554432-_NOP));
+    li->write(ppa, PAGESIZE, req->value, temp_algo_req);
     return NULL;
 }

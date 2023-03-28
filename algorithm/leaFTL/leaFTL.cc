@@ -697,7 +697,6 @@ uint32_t lea_write(request *const req){
         lea_compaction();
         //group_monitor_print();
     }
-
     if(lea_write_buffer_isfull(wb)){
         uint32_t remain_space;
 retry:
@@ -722,7 +721,17 @@ retry:
         }
         lea_write_buffer_clear(wb);
     }
-    req->end_req(req);
+
+    #ifdef WRITE_STOP_READ
+        if(write_cnt%L2PGAP==0){
+            send_IO_temp_write(lower, req);
+        }
+        else{
+            req->end_req(req);
+        }
+    #else
+        req->end_req(req);
+    #endif
     if(wb->ps_ptr+1==wb->max_ps_ptr){
         return UINT32_MAX;
     }

@@ -346,21 +346,26 @@ void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const
 		printf("%u (piece:%u) target write\n", lower_test_ppa, lower_test_ppa*2);
 	}
 	if(PPA>_NOP){
-		printf("address error!\n");
-		abort();
+		//printf("address error!\n");
+		//abort();
 	}
-	if(value->dmatag==-1){
-		printf("dmatag -1 error!\n");
-		abort();
-	}
+	else{
+		if (value->dmatag == -1)
+		{
+			printf("dmatag -1 error!\n");
+			abort();
+		}
 
-	if(my_posix.SOP*PPA >= my_posix.TS){
-		printf("\nwrite error\n");
-		abort();
-	}
+		if (my_posix.SOP * PPA >= my_posix.TS)
+		{
+			printf("\nwrite error\n");
+			abort();
+		}
 
-	if(collect_io_type(req->type, &my_posix)){
-		data_copy_to(PPA, value->value);
+		if (collect_io_type(req->type, &my_posix))
+		{
+			data_copy_to(PPA, value->value);
+		}
 	}
 
 	req->end_req(req);
