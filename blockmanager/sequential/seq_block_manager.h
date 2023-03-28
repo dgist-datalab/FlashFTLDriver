@@ -13,7 +13,6 @@ typedef struct block_set{
 	uint8_t type;
 	__block *blocks[BPS];
 	void *hptr;
-	double timestamp;
 }block_set;
 
 typedef struct seq_bm_private{
@@ -28,6 +27,7 @@ typedef struct seq_bm_private{
 	queue *invalid_block_q;
 	uint8_t *seg_populate_bit;
 	mh **max_heap_pt;
+	double *timestamp;
 }sbm_pri;
 
 uint32_t seq_create (struct blockmanager*, lower_info *li);
@@ -79,6 +79,6 @@ uint32_t seq_pt_reserve_to_free(struct blockmanager*, int pt_num, __segment *res
 
 void seq_mh_swap_hptr(void *a, void *b);
 void seq_mh_assign_hptr(void *a, void *hn);
-float seq_get_cnt(void *a);
+float seq_get_cnt(void *a, void *b);
 
 #endif

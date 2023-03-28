@@ -25,7 +25,7 @@ void log_print(int sig){
 	exit(1);
 }
 
-double time_adapt = 0.0;
+double time_adapt = 1.0;
 void * thread_test(void * argv){
 	/*
 	vec_request **req_arr=NULL;

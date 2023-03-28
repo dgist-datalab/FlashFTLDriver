@@ -41,7 +41,6 @@ typedef struct vectored_request{
 	uint32_t done_cnt;
 	uint32_t tid;
 	char* buf;
-	double time_stamp;
 
 	request *req_array;
 	uint32_t mark;

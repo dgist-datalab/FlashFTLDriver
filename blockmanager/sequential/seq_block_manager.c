@@ -64,8 +64,10 @@ void seq_mh_assign_hptr(void *a, void *hn){
 }
 
 double cur_timestamp=0;
-float seq_get_cnt(void *a){
+float seq_get_cnt(void *a, void* b){
 	block_set *aa=(block_set*)a;
+	struct blockmanager* bm = (struct blockmanager*) b;
+	sbm_pri *p=(sbm_pri*)bm->private_data;
 	/*
 	if(aa->total_invalid_number==UINT_MAX){
 		for(uint32_t i=0; i<BPS; i++){
@@ -74,7 +76,9 @@ float seq_get_cnt(void *a){
 		aa->total_invalid_number=res;
 	}
 	else res=aa->total_invalid_number;*/
-        int interval_t =(int)(cur_timestamp - aa->timestamp);
+
+	int idx = aa->blocks[0]->block_num/BPS;
+        int interval_t =(int)(cur_timestamp - p->timestamp[idx]);
 	if (interval_t < 0) EPRINT("how this time can it be!\n", true);
 
         float interval=0;
@@ -108,6 +112,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	p->logical_segment=(block_set*)calloc(sizeof(block_set), _NOS);
 	p->assigned_block=p->free_block=0;
 	p->seg_populate_bit=(uint8_t*)calloc(_NOS/8+(_NOS%8?1:0), sizeof(uint8_t));
+	p->timestamp = (double*)calloc(sizeof(double), _NOS);
 
 	int glob_block_idx=0;
 	for(int i=0; i<_NOS; i++){
@@ -122,7 +127,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 		p->logical_segment[i].total_valid_number=0;
 	}
 
-	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt);
+	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt, bm);
 	q_init(&p->free_logical_segment_q, _NOS);
 	q_init(&p->invalid_block_q, _NOS);
 	
@@ -223,7 +228,6 @@ __segment* seq_jy_get_time_segment (struct blockmanager* bm, bool isreserve, dou
 		printf("new block is null!\n");
 		abort();
 	}
-	free_block_set->timestamp = time_stamp;
 
 	if(isreserve){
 
@@ -239,7 +243,8 @@ __segment* seq_jy_get_time_segment (struct blockmanager* bm, bool isreserve, dou
 	res->invalid_blocks=0;
 	res->used_page_num=0;
 	res->seg_idx=res->blocks[0]->block_num/BPS;
-	
+	p->timestamp[res->seg_idx] = time_stamp;
+
 	p->assigned_block++;
 	p->free_block--;
 

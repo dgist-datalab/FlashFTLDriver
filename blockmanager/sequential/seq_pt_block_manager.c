@@ -25,7 +25,7 @@ uint32_t seq_pt_create(struct blockmanager *bm, int pnum, int *epn, lower_info *
 
 	int global_seg_idx=0;
 	for(int i=pnum-1; i>=0; i--){
-		mh_init(&p->max_heap_pt[i], epn[i], seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt);
+		mh_init(&p->max_heap_pt[i], epn[i], seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt, NULL);
 		q_init(&p->free_logical_seg_q_pt[i], epn[i]);
 		for(int j=0; j<epn[i]; j++){
 			p->logical_segment[global_seg_idx].type=i;

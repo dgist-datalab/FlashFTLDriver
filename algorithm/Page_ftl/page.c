@@ -174,10 +174,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		write_gb++;
 		printf("\rwrite size: %ldGB", write_gb);
 	}
-	if ((write_gb%32==0)&&(size%GB_REQ==0)) print_stat();
 	if ((write_gb%GIGAUNIT==0)&&(size%GB_REQ==0)) {
 		printf("\n");
-		//print_stat();
+		print_stat();
 	}
 	cur_timestamp = req->timestamp;
 	for (int j=0;j<2;j++) {

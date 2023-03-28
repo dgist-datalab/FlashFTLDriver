@@ -8,6 +8,7 @@ struct blockmanager base_bm={
 	.get_block=base_get_block,
 	.pick_block=base_pick_block,
 	.get_segment=base_get_segment,
+	.jy_get_time_segment=NULL,
 	.get_page_num=base_get_page_num,
 	.pick_page_num=base_pick_page_num,
 	.check_full=base_check_full,
@@ -27,6 +28,7 @@ struct blockmanager base_bm={
 	.set_oob=base_set_oob,
 	.get_oob=base_get_oob,
 	.change_reserve=base_change_reserve,
+	.jy_change_reserve=NULL,
 	.reinsert_segment=NULL,
 	.remain_free_page=NULL,
 	.invalidate_number_decrease=NULL,
@@ -59,7 +61,7 @@ int base_get_cnt(void *a){
 	return aa->invalidate_number;
 }
 
-float jy_base_get_cnt(void *a) {
+float jy_base_get_cnt(void *a, void *b) {
 	__block *aa=(__block*)a;
         return (float)aa->invalidate_number;
 }
@@ -88,7 +90,7 @@ uint32_t base_create (struct blockmanager* bm, lower_info *li){
 	for(int i=0; i<PUNIT; i++){ //assign block to channel
 		channel *c=&p->base_channel[i];
 		q_init(&c->free_block,_NOB/BPS);
-		mh_init(&c->max_heap,_NOB/BPS,base_mh_swap_hptr,base_mh_assign_hptr,jy_base_get_cnt);
+		mh_init(&c->max_heap,_NOB/BPS,base_mh_swap_hptr,base_mh_assign_hptr,jy_base_get_cnt, NULL);
 		for(int j=0; j<_NOB/BPS; j++){
 			__block *n=&p->base_block[j*BPS+i%BPS];
 			q_enqueue((void*)n,c->free_block);

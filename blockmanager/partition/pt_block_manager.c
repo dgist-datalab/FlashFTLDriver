@@ -55,6 +55,12 @@ int pt_get_cnt(void *a){
 	__block *aa=(__block*)a;
 	return aa->age;
 }
+
+int pt_get_cnt_2(void *a, void *b){
+        __block *aa=(__block*)a;
+        return aa->age;
+}
+
 void pbm_create_print(blockmanager *bm, int pnum){
 /*
 	bbm_pri *p=(bbm_pri*)bm->private_data;
@@ -139,7 +145,7 @@ uint32_t pbm_create(blockmanager *bm, int pnum, int *epn, lower_info *li){
 		for(int j=0; j<PUNIT; j++){
 			channel *c=&pinfo->p_channel[i][j];
 			q_init(&c->free_block,end-start);
-			mh_init(&c->max_heap,end-start,pt_mh_swap_hptr,pt_mh_assign_hptr,pt_get_cnt);
+			mh_init(&c->max_heap,end-start,pt_mh_swap_hptr,pt_mh_assign_hptr,pt_get_cnt_2, NULL);
 			for(int k=start; k<end;k++){
 				__block *n=&p->base_block[k*BPS+j%BPS];
 				q_enqueue((void*)n,c->free_block);

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void mh_init(mh** h, int bn, void(*a)(void*,void*), void(*b)(void*a, void*), float (*get_cnt)(void *a)){
+void mh_init(mh** h, int bn, void(*a)(void*,void*), void(*b)(void*a, void*), float (*get_cnt)(void *a, void* b), void* bm){
 	*h=(mh*)malloc(sizeof(mh));
 	(*h)->size=0;
 	(*h)->max=bn;
@@ -11,6 +11,7 @@ void mh_init(mh** h, int bn, void(*a)(void*,void*), void(*b)(void*a, void*), flo
 	(*h)->swap_hptr=a;
 	(*h)->assign_hptr=b;
 	(*h)->get_cnt=get_cnt;
+	(*h)->bm=bm;
 }
 
 void mh_free(mh* h){
@@ -22,15 +23,15 @@ static hn* maxchild(mh *h, hn *n){
 	hn *res=NULL;
 	int idx=(n-h->body);
 	if(!n->data) return res;
-	n->cnt=h->get_cnt(n->data);
+	n->cnt=h->get_cnt(n->data, h->bm);
 	
 	hn *lc=MHL_CHIPTR(h,idx);
 	if(lc->data)
-		lc->cnt=h->get_cnt(lc->data);
+		lc->cnt=h->get_cnt(lc->data, h->bm);
 
 	hn *rc=MHR_CHIPTR(h,idx);
 	if(rc->data)
-		rc->cnt=h->get_cnt(rc->data);
+		rc->cnt=h->get_cnt(rc->data, h->bm);
 
 	if(lc->data && !rc->data) res=lc;
 	else if(!lc->data && rc->data) res=rc;
