@@ -314,7 +314,7 @@ void bench_print(){
 		_m=&_master->m[i];
 		bdata=&_master->datas[i];
 #ifdef CDF
-		bench_cdf_print(_m->m_num,_m->type,bdata);
+		//bench_cdf_print(_m->m_num,_m->type,bdata);
 #endif
 		bench_type_cdf_print(bdata);
 		

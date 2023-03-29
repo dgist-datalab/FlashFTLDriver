@@ -8,6 +8,7 @@ extern uint32_t *seg_ratio;
 uint32_t gc_norm_count=0;
 extern double cur_timestamp;
 extern unsigned long long req_num;
+extern int* debug_gnum;
 
 extern algorithm page_ftl;
 void invalidate_ppa(uint32_t t_ppa){
@@ -166,7 +167,7 @@ int calculating_segment_age(__gsegment* target) {
         p->gc_seg++;
         if (p->gc_seg == 16) {
                 unsigned long new_age = p->tmp_avg/p->gc_seg;
-                //printf("new_age: %lu\n", new_age);
+                //printf("new_age: %lu, queuesize: %d\n", new_age, p->q_lbas->m_size);
 		p->tmp_avg=0;
                 p->gc_seg=0;
                 if (p->avg_segage > new_age) {
@@ -179,17 +180,14 @@ int calculating_segment_age(__gsegment* target) {
                         p->q_lbas->m_size = new_age;
                 }
                 p->avg_segage = new_age;
-        } else {
-		if (p->avg_segage < p->q_lbas->m_size) {
-			q_size_down((int)p->avg_segage);
-		}
-	}
+        }
 	return 0;
 }
 
 void do_gc(){
 	/*this function return a block which have the most number of invalidated page*/
 	__gsegment *target=page_ftl.bm->get_gc_target(page_ftl.bm);
+	int debug_gnum_info = debug_gnum[target->seg_idx];
 	uint32_t page;
 	uint32_t bidx, pidx;
 	blockmanager *bm=page_ftl.bm;
@@ -225,7 +223,8 @@ void do_gc(){
 	char* oobs;
 	KEYT *lbas;
 	uint32_t mig_count;
-	uint32_t tmp_mig_count;
+	uint32_t tmp_mig_count = debug_gnum_info;
+	int debug_migcount=-1;
 	unsigned long *t_timestamp;
 	unsigned long calc_age;
 	uint32_t page_num=0;
@@ -238,6 +237,16 @@ void do_gc(){
 			oobs=bm->get_oob(bm, gv->ppa);
 			lbas=(KEYT*)get_lbas(bm, oobs, sizeof(KEYT)*L2PGAP);
 			tmp_mig_count = get_migration_count(bm, oobs, sizeof(KEYT)*L2PGAP);
+			if (debug_migcount == -1) debug_migcount = tmp_mig_count;
+			else if (debug_migcount != tmp_mig_count) {
+				printf("oob has wrong migration count info: do_gc\n");
+				abort();
+			}
+			if (debug_gnum_info != tmp_mig_count) {
+				printf("oob info wrong in do_gc\n");
+				abort();
+			}
+			
 			t_timestamp = (unsigned long *)get_time_stamp(bm, oobs, sizeof(KEYT)*L2PGAP);
 			if (tmp_mig_count == 0) mig_count=0;
 			else {
@@ -249,6 +258,10 @@ void do_gc(){
 				++page_num;
 				if (mig_count) {
 					calc_age = req_num-t_timestamp[i];
+					if (req_num < t_timestamp[i]) {
+						printf("timestamp problem in do_gc\n");
+						abort();
+					}
 					if (calc_age < p->avg_segage*4) mig_count=1;
 					else if (calc_age < p->avg_segage*16) mig_count=2;
 					else mig_count=3;
@@ -323,10 +336,12 @@ retry:
 		//printf("free segment: %u\n", page_ftl.bm->get_free_segment_number(page_ftl.bm));
 		++seg_ratio[hc_stat];
 		p->stat->gsize[hc_stat]++;
+		//print_stat();
 		__segment *tmp = p->active[hc_stat];
 		p->active[hc_stat] = page_ftl.bm->jy_change_reserve(page_ftl.bm, p->active[hc_stat], cur_timestamp);
 		page_ftl.bm->free_segment(page_ftl.bm,tmp); //get a new block
 		p->seg_timestamp[p->active[hc_stat]->seg_idx] = req_num;
+		debug_gnum[p->active[hc_stat]->seg_idx]=hc_stat;
 		goto retry;
 	}
 

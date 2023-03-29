@@ -11,8 +11,10 @@ extern double cur_timestamp;
 uint32_t *seg_ratio;
 extern unsigned long req_num;
 char gcur=0;
+int *debug_gnum;
 
 void page_map_create(){
+	debug_gnum=(int*)calloc(sizeof(int), _NOS);
 	printf("NOS: %ld\n", _NOS);
 	seg_ratio=(uint32_t*)calloc((GNUMBER), sizeof(uint32_t));
 	pm_body *p=(pm_body*)calloc(sizeof(pm_body),1);
@@ -40,13 +42,16 @@ void page_map_create(){
 	p->active[1]=page_ftl.bm->get_segment(page_ftl.bm, true);
 	p->stat->gsize[0]++;
 	p->stat->gsize[1]++;
+	debug_gnum[p->active[0]->seg_idx]=0;
+	debug_gnum[p->active[1]->seg_idx]=1;
+
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
 	p->seg_timestamp = (unsigned long*)calloc(_NOS, sizeof(unsigned long));
 	p->avg_segage=ULONG_MAX;
 	p->tmp_avg=0;
 	p->gc_seg=0;
 	p->rb_lbas = rb_create();
-	q_init(&(p->q_lbas), _PPS*L2PGAP);
+	q_init(&(p->q_lbas), _PPS*L2PGAP*_NOS);
 }
 
 void print_stat() {
@@ -117,6 +122,7 @@ retry:
 		//initialize migration group
 		p->reserve[mig_count] = page_ftl.bm->jy_get_time_segment(page_ftl.bm, true, cur_timestamp);
 		p->stat->gsize[mig_count+2]++;
+		debug_gnum[p->reserve[mig_count]->seg_idx]=mig_count+2;
 	}
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve[mig_count]);
 	if (res==UINT32_MAX){
@@ -125,6 +131,7 @@ retry:
 		p->stat->gsize[mig_count+2]++;
 		p->reserve[mig_count] = page_ftl.bm->jy_change_reserve(page_ftl.bm, p->reserve[mig_count], cur_timestamp);
 		page_ftl.bm->free_segment(page_ftl.bm, tmp);
+		debug_gnum[p->reserve[mig_count]->seg_idx]=mig_count+2;
 		goto retry;
 	}
 

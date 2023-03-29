@@ -163,6 +163,7 @@ uint32_t page_read(request *const req){
 unsigned long size=0;
 unsigned long write_gb=0;
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
+	pm_body *p = (pm_body*)page_ftl.algo_body;
 	req_num++;
 	bool overlap=false;
 
@@ -174,9 +175,10 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 		write_gb++;
 		printf("\rwrite size: %ldGB", write_gb);
 	}
+	if ((write_gb%32==0)&&(size%GB_REQ==0)) print_stat();
 	if ((write_gb%GIGAUNIT==0)&&(size%GB_REQ==0)) {
 		printf("\n");
-		print_stat();
+		//print_stat();
 	}
 	cur_timestamp = req->timestamp;
 	for (int j=0;j<2;j++) {
@@ -193,10 +195,14 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	uint32_t target_idx;
 	if (overlap) inf_free_valueset(a_buffer[bidx].value[overlapped_idx], FS_MALLOC_W);
 	int hc_cnt;
+	if (p->avg_segage < p->q_lbas->m_size) {
+                q_size_down((int)p->avg_segage);
+        }
 	if(req){
 		if (overlap) {
 			hc_cnt = bidx;
 			target_idx = overlapped_idx;
+			is_lba_hot(key);
 		} else {
 			hc_cnt = is_lba_hot(req->key);
 			target_idx=a_buffer[hc_cnt].idx;
@@ -207,7 +213,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	else{
 		if (overlap) {
                         hc_cnt = bidx;
+			if (hc_cnt == 1) printf("allign_buffering, hot is in cold block\n");
                         target_idx = overlapped_idx;
+			is_lba_hot(key);
                 } else {
                         hc_cnt = is_lba_hot(key);
                         target_idx=a_buffer[hc_cnt].idx;
