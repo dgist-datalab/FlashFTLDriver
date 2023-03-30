@@ -79,7 +79,10 @@ float seq_get_cnt(void *a, void* b){
 
 	int idx = aa->blocks[0]->block_num/BPS;
         int interval_t =(int)(cur_timestamp - p->timestamp[idx]);
-	if (interval_t < 0) EPRINT("how this time can it be!\n", true);
+	if (interval_t < 0) {
+		//EPRINT("how this time can it be!\n", true);
+		printf("minus interval in %lu: %.4f - %.4f\n");
+	}
 
         float interval=0;
         if (interval_t < 10) interval=1;
