@@ -723,12 +723,15 @@ retry:
     }
 
     #ifdef WRITE_STOP_READ
+        req->end_req(req);
+    /*
         if(write_cnt%L2PGAP==0){
             send_IO_temp_write(lower, req);
         }
         else{
             req->end_req(req);
         }
+    */
     #else
         req->end_req(req);
     #endif

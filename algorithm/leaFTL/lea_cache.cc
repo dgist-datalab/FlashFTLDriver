@@ -144,6 +144,6 @@ void lea_cache_size_update(group *gp, uint32_t size, bool decrease){
     }
 
     if(lru_now_byte<0){
-        GDB_MAKE_BREAKPOINT;
+        //GDB_MAKE_BREAKPOINT;
     }
 }

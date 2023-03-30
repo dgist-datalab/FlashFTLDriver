@@ -87,8 +87,9 @@ void *temp_write_end_req(algo_req *const req){
 }
 
 algo_req *send_IO_temp_write(lower_info *li, request *req){
-    static int cnt=0;
+    static uint32_t cnt=0;
     algo_req *temp_algo_req;
+    temp_algo_req->type=TEST_IO;
     temp_algo_req=(algo_req*)malloc(sizeof(algo_req));
     temp_algo_req->end_req=temp_write_end_req;
     temp_algo_req->parents=req;
