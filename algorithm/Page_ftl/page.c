@@ -195,9 +195,9 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
-		send_user_req(NULL, DATAW, ppa, value);
+		send_user_req(req, DATAW, ppa, value);
 		a_buffer.idx=0;
-	}
+	} else req->end_req(req);
 	return 1;
 }
 
@@ -210,7 +210,7 @@ uint32_t page_write(request *const req){
 	check_time_window(req->key, M_WRITE);
 	align_buffering(req, 0, NULL);
 	req->value=NULL;
-	req->end_req(req);
+	//req->end_req(req);
 	//send_user_req(req, DATAW, page_map_assign(req->key), req->value);
 	return 0;
 }

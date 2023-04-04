@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 uint32_t gc_norm_count=0;
-extern FILE *vFile;
 //extern FILE *gFile;
 //extern FILE *wFile;
 
@@ -278,9 +277,6 @@ int do_gc(){
 		midas_stat->e->erase[tmp_mig_count]++;
 	}
 	// print valid ratio
-	char val_buf[64];
-	sprintf(val_buf, "%d %f\n", tmp_mig_count, (float)page_num/(float)tot_page_num);
-	fputs(val_buf, vFile);
 	
 	//printf("gc occurs, valid page: %f%%\n", (float)page_num/(float)tot_page_num*(float)100);
 	

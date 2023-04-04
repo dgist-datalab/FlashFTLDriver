@@ -456,16 +456,17 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 	uint64_t cumulate_number=0;
 	if(type>RANDSET)
 		nor/=2;
-/*	if((type>RANDSET || type%2==1) || type==NOR){
+	if((type>RANDSET || type%2==1) || type==NOR){
 		printf("\n[cdf]write---\n");
 		for(int i=0; i<1000000/TIMESLOT+1; i++){
 			cumulate_number+=_d->write_cdf[i];
 			if(_d->write_cdf[i]==0) continue;
-			//printf("%d\t%ld\t%f\n",i * 10,_d->write_cdf[i],(float)cumulate_number/_d->write_cnt);
+			printf("%d\t%ld\t%f\n",i * 10,_d->write_cdf[i],(float)cumulate_number/_d->write_cnt);
 			if(nor==cumulate_number)
 				break;
 		}	
-	} */
+	} 
+	/*
 	static int cnt=0;
 	cumulate_number=0;
 	if((type>RANDSET || type%2==0)|| type==RANDGET || type==NOR || type==FILLRAND){
@@ -473,11 +474,13 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 		for(int i=0; i<1000000/TIMESLOT+1; i++){
 			cumulate_number+=_d->read_cdf[i];
 			if(_d->read_cdf[i]==0) continue;
-			fprintf(stderr,"%d,%ld,%f\n",i * 10,_d->read_cdf[i],(float)cumulate_number/_d->read_cnt);	
+			//fprintf(stderr,"%d,%ld,%f\n",i * 10,_d->read_cdf[i],(float)cumulate_number/_d->read_cnt);	
+			printf("%d,%ld,%f\n",i * 10,_d->read_cdf[i],(float)cumulate_number/_d->read_cnt);
 			if(nor==cumulate_number)
 				break;
 		}
 	}
+	*/
 }
 #endif
 void bench_reap_nostart(request *const req){

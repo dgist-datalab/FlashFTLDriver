@@ -464,7 +464,7 @@ void *making_group_configuration(void *arg) {
 	}
 	printf("FINAL RESULTS\n");
 	//print_config(opt_gnum, opt_config, opt_waf, opt_valid_ratio_list);
-	print_config_into_log(final_gnum, final_config, final_waf, final_valid_ratio_list);
+	//print_config_into_log(final_gnum, final_config, final_waf, final_valid_ratio_list);
 	//abort();
 
 	//set group information
@@ -575,12 +575,9 @@ unsigned long long resizing_model() {
 
 	/* first interval unit */
 	printf("here\n");	
-	char m1[128] = "modeling/modeling_";
 	//char m2[128] = "modeling/modeling_prev_";
-	strcat(m1, workload_name);
 	
 	//strcat(m2, workload_name);
-	FILE* mFile = fopen(m1, "w");
 	/* before resizing
 	for (int i=0;i<mmodel->entry_num-1;i++) {
 		fprintf(pFile, "%d %llu\n", i, mmodel->model_count[i]);
@@ -605,7 +602,6 @@ unsigned long long resizing_model() {
 		mmodel->model_count[0] = mmodel->first_count*mmodel->time_window/mmodel->fnumber/mmodel->lba_sampling_ratio;
 	}
 	tot += mmodel->model_count[0];
-	fprintf(mFile, "0 %llu\n", mmodel->model_count[0]);
 	printf("first interval calculate done\n");
 	double left_time = 0.0;
 	//tot += mmodel->model_count[mmodel->time_window-1];
@@ -616,15 +612,9 @@ unsigned long long resizing_model() {
 		mmodel->model_count[i] = mmodel->model_count[i] + (int)((left_time*mmodel->model_count[i])/((double)mmodel->time_window/(double)(i)));
 		//mmodel->model_count[i] = mmodel->model_count[i] + (int)((0.5*mmodel->model_count[i])/((double)mmodel->time_window/(double)(i)));
 		tot += mmodel->model_count[i];
-		fprintf(mFile, "%d %llu\n", i, mmodel->model_count[i]);
 	}
 	//fprintf(mFile, "%d %u\n", mmodel->time_window-1, mmodel->model_count[mmodel->time_window-1]);
 
-	fprintf(mFile, "%u\n", utilization);
-	fprintf(mFile, "hot_count %f\n", hot_lba_count); //maybe not used in future... 
-	fprintf(mFile, "hot_req_count %lld\n", hot_req_count);
-	fprintf(mFile, "tot_req_count %lld\n", tot_req_count);
-	fclose(mFile);
 
 
 	//printf("total count: %llu\n", tot);

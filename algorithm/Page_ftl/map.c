@@ -10,7 +10,6 @@ extern uint32_t test_key;
 extern algorithm page_ftl;
 
 uint32_t utilization = 0;
-FILE *vFile;
 //FILE *gFile;
 //FILE *wFile;
 
@@ -61,11 +60,8 @@ void page_map_create(){
 	//sprintf(name, "./valid_ratio/11_valid_%d", GNUMBER);
 	//vFile = fopen(name, "w");
 
-	sprintf(name, "./valid_ratio/valid_tmp");
-	vFile = fopen(name, "w");
 
 
-	setbuf(vFile, NULL);
 	p->active[0]=page_ftl.bm->get_segment(page_ftl.bm,true); //now active block for inserted request.
 	midas_stat->g->gsize[0]++;
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
@@ -201,7 +197,6 @@ void page_map_free(){
 	free(p->mapping);
 	free(p->active);
 	free(p);
-	fclose(vFile);
 	//fclose(gFile);
 	//fclose(wFile);
 }
