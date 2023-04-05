@@ -70,7 +70,7 @@ void page_destroy (lower_info* li, algorithm *algo){
 	return;
 }
 
-inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
+inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value, request **preq){
 	/*you can implement your own structur for your specific FTL*/
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
@@ -109,6 +109,8 @@ inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set
 			fdriver_unlock(&rb.pending_lock);
 			return;
 		}
+	} else if (type == DATAW) {
+		my_req->preq = preq;
 	}
 
 	switch(type){
@@ -155,12 +157,12 @@ uint32_t page_read(request *const req){
 		req->end_req(req);
 	}
 	else{
-		send_user_req(req, DATAR, req->value->ppa/L2PGAP, req->value);
+		send_user_req(req, DATAR, req->value->ppa/L2PGAP, req->value, NULL);
 	}
 	return 1;
 }
 bool naive_status = true;
-uint32_t align_buffering(request *const req, KEYT key, value_set *value){
+uint32_t align_buffering(request *req, KEYT key, value_set *value){
 	bool overlap=false;
 
 	uint32_t overlapped_idx=UINT32_MAX;
@@ -176,10 +178,15 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	}
 
 	uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
-	if (overlap) inf_free_valueset(a_buffer.value[target_idx], FS_MALLOC_W);
+	if (overlap) {
+		inf_free_valueset(a_buffer.value[target_idx], FS_MALLOC_W);
+		a_buffer.preq[target_idx]->end_req(a_buffer.preq[target_idx]);
+	}
 	if(req){
 		a_buffer.value[target_idx]=req->value;
 		a_buffer.key[target_idx]=req->key;
+		a_buffer.preq[target_idx]=req;
+		req->value=NULL;
 	}
 	else{
 		a_buffer.value[target_idx]=value;
@@ -190,15 +197,18 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 
 	if(a_buffer.idx==L2PGAP){
 		ppa_t ppa=page_map_assign(a_buffer.key, a_buffer.idx);
+		//req->value->ppa = ppa*L2PGAP+3;
 		value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
+		request** preq = (request**)malloc(sizeof(request*)*L2PGAP);
 		for(uint32_t i=0; i<L2PGAP; i++){
 			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
+			preq[i] = a_buffer.preq[i];
 		}
-		send_user_req(req, DATAW, ppa, value);
+		send_user_req(NULL, DATAW, ppa, value, preq);
 		a_buffer.idx=0;
-	} else req->end_req(req);
-	return 1;
+		return 0;
+	} else return 1;
 }
 
 uint32_t page_write(request *const req){
@@ -208,9 +218,18 @@ uint32_t page_write(request *const req){
 	midas_stat->cur_req++;
 	//printf("write key :%u\n",req->key);
 	check_time_window(req->key, M_WRITE);
-	align_buffering(req, 0, NULL);
-	req->value=NULL;
+	int status = align_buffering(req, 0, NULL);
+	
 	//req->end_req(req);
+	/*
+	if (status) {
+		req->end_req(req);
+	}
+	*/
+	/*
+	req->value=NULL;
+	req->end_req(req);
+	*/
 	//send_user_req(req, DATAW, page_map_assign(req->key), req->value);
 	return 0;
 }
@@ -288,9 +307,15 @@ void *page_end_req(algo_req* input){
 	}
 	request *res=input->parents;
 	if(res){
+		printf("there is res?\n");
 		res->type_ftl=res->type_lower=0;
 		res->end_req(res);//you should call the parents end_req like this
 	}
+	for (int i=0;i<L2PGAP; i++) {
+		input->preq[i]->value=NULL;
+		input->preq[i]->end_req(input->preq[i]);
+	}
+	free(input->preq);
 	free(param);
 	free(input);
 	return NULL;

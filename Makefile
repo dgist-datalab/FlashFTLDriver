@@ -23,7 +23,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
-#-fsanitize=address \
+-fsanitize=address \
 # -static-libsan\
 
 export COMMONFLAGS=\
@@ -35,7 +35,7 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable -Wno-unused-command-line-argument -Wno-deprecated\
-			-O3\
+			#-O3\
 
 #-O3 -march=native -mtune=native -flto=20 \
 #-DLSM_DEBUG\

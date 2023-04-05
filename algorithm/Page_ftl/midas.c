@@ -129,6 +129,7 @@ int change_group_number(int prevnum, int newnum) {
 	//change group size
 	if (midas_stat->g->gsize[newnum] != 0) {
 		printf("there is still some blocks in Group %d\n", newnum);
+		abort();
 		return 1;
 	}
 	
@@ -136,6 +137,7 @@ int change_group_number(int prevnum, int newnum) {
 	pm_body *p = (pm_body*)page_ftl.algo_body;
 	if (p->group[newnum] != NULL) {
 		printf("there is still queue in Group %d\n", newnum);
+		abort();
 		return 1;
 	}
 	queue* q=p->n->naive_q;

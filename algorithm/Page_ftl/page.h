@@ -13,6 +13,7 @@ typedef struct align_buffer{
 	uint8_t idx;
 	value_set *value[L2PGAP];
 	KEYT key[L2PGAP];
+	request *preq[L2PGAP];
 }align_buffer;
 
 

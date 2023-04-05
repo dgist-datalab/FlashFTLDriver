@@ -32,7 +32,8 @@ void page_map_create(){
 	p->active=(__segment **)malloc(sizeof(__segment*)*MAX_G);
 	for (int i=0;i<MAX_G;i++) p->active[i]=NULL;
 	p->group = (queue**)malloc(sizeof(queue*)*MAX_G);
-	
+	for (int i=0;i<MAX_G;i++)p->group[i]=NULL;
+
 	p->gnum=GNUMBER;
 
 	p->m = (midas*)malloc(sizeof(midas));

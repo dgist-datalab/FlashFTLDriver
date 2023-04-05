@@ -323,7 +323,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	}
 	*/
 
-	tmp = strtok(NULL, " \t");
+	//tmp = strtok(NULL, " \t");
 	int ttp = atoi(tmp);
 	if (ttp == 0) type=FS_GET_T;
 	else if (ttp == 1) type = FS_SET_T;
@@ -376,7 +376,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		}
 		temp->key=lba_r+i;
 
-		if (prev_lba == UINT32_MAX) {
+		if (prev_lba = UINT32_MAX) {
 			prev_lba = temp->key;
 		} else {
 			if (prev_lba+1==temp->key) {
