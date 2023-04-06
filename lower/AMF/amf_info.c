@@ -114,12 +114,12 @@ void* amf_info_destroy(lower_info *li){
 	amf_flying_req_wait();
 
 	for(int i=0; i<LREQ_TYPE_NUM;i++){
-		fprintf(stderr,"%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
+		fprintf(stdout,"%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
 	}
 
-    fprintf(stderr,"Total Read Traffic : %lu\n", li->req_type_cnt[1]+li->req_type_cnt[3]+li->req_type_cnt[5]+li->req_type_cnt[7]);
-    fprintf(stderr,"Total Write Traffic: %lu\n\n", li->req_type_cnt[2]+li->req_type_cnt[4]+li->req_type_cnt[6]+li->req_type_cnt[8]);
-    fprintf(stderr,"Total WAF: %.2f\n\n", (float)(li->req_type_cnt[2]+li->req_type_cnt[4]+li->req_type_cnt[6]+li->req_type_cnt[8]) / li->req_type_cnt[6]);
+    fprintf(stdout,"Total Read Traffic : %lu\n", li->req_type_cnt[1]+li->req_type_cnt[3]+li->req_type_cnt[5]+li->req_type_cnt[7]);
+    fprintf(stdout,"Total Write Traffic: %lu\n\n", li->req_type_cnt[2]+li->req_type_cnt[4]+li->req_type_cnt[6]+li->req_type_cnt[8]);
+    fprintf(stdout,"Total WAF: %.2f\n\n", (float)(li->req_type_cnt[2]+li->req_type_cnt[4]+li->req_type_cnt[6]+li->req_type_cnt[8]) / li->req_type_cnt[6]);
 
 	li->write_op=li->read_op=li->trim_op=0;
 	AmfClose(am);

@@ -38,8 +38,8 @@ void page_map_create(){
 		p->stat->gsize[i]=0;
 	}
 	
-	p->active[0]=page_ftl.bm->get_segment(page_ftl.bm,true);	//now active block for inserted request.
-	p->active[1]=page_ftl.bm->get_segment(page_ftl.bm, true);
+	p->active[1]=page_ftl.bm->get_segment(page_ftl.bm,true);	//now active block for inserted request.
+	p->active[0]=page_ftl.bm->get_segment(page_ftl.bm, true);
 	p->stat->gsize[0]++;
 	p->stat->gsize[1]++;
 	debug_gnum[p->active[0]->seg_idx]=0;
