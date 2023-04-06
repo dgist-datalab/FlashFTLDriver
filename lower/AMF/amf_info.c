@@ -238,7 +238,6 @@ void amf_call_back_w(void *_req){
 }
 
 void amf_call_back_e(void *_req){
-
 }
 
 void amf_error_call_back_r(void *_req){

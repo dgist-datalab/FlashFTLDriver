@@ -106,9 +106,9 @@ void model_create(int write_size) {
 	G_info->valid=false;
 	G_info->gnum = 0;
 	G_info->commit_g = 19;
-	G_info->vr = (double*)calloc(10, sizeof(double));
-	G_info->commit_vr = (double*)calloc(10, sizeof(double));
-	G_info->gsize = (uint32_t*)calloc(10, sizeof(uint32_t));
+	G_info->vr = (double*)calloc(15, sizeof(double));
+	G_info->commit_vr = (double*)calloc(15, sizeof(double));
+	G_info->gsize = (uint32_t*)calloc(15, sizeof(uint32_t));
 	G_info->app_size = (int*)calloc(20, sizeof(int));
 	memset(G_info->app_size, -1, sizeof(int)*20);
 	G_info->app_flag = (int*)calloc(20, sizeof(int));
@@ -129,7 +129,6 @@ void model_initialize() {
 	
 	if (mmodel->lba_sampling_ratio > 1) {
 		mmodel->first_count=0;
-		q_init(&(mmodel->fqueue), _PPS*L2PGAP*mmodel->interval_unit_size);
 		//int stf = pthread_create(&mmodel->fthread, NULL, first_interval_analyzer, NULL);
 		//if (stf != 0) perror("model can't make first interval thread\n");
 	}
@@ -409,6 +408,8 @@ void *making_group_configuration(void *arg) {
                         free(opt_valid_ratio_list[i]);
                 }
         }
+	free(opt_config);
+	free(opt_valid_ratio_list);
         printf("==phase 1 result==\n");
         print_config2(final_gnum, final_config, final_waf, final_valid_ratio_list);
         printf("==================\n");
@@ -468,6 +469,8 @@ void *making_group_configuration(void *arg) {
 	//abort();
 
 	//set group information
+	free(group_config);
+	free(valid_ratio_list);
 	printf("ginfo check: ");
 	while(G_info->valid == true) {}
 	printf("DONE\n");
@@ -780,6 +783,7 @@ double *valid_ratio_predictor(uint32_t *group_config, uint32_t group_num, unsign
 			//printf("something's wrong in valid ratio predictor: time window over\n");
 			//printf("index: %d, configuration: [", i);
 			//for
+			free(valid_ratio_list);
 			free(invalid_cnt_list);
 			free(last_vr_list);
 			return NULL;
@@ -872,6 +876,7 @@ double *valid_ratio_predictor(uint32_t *group_config, uint32_t group_num, unsign
 	if (last_group_vr > 1.0) {
 		//printf("last group vr is over 1\nlast-group vr: %.2f, spare space: %d\n", last_group_vp,(group_config[group_num-1])*(_PPS*L2PGAP));
 		//printf("group confi: %d\n", group_config[group_num-1]);
+		free(valid_ratio_list);
 		free(invalid_cnt_list);
 		free(last_vr_list);
 		return NULL;
@@ -883,6 +888,7 @@ double *valid_ratio_predictor(uint32_t *group_config, uint32_t group_num, unsign
 	
 	if (last_vr > 1.0) {
 		//printf("last group vr is over 1 after Desnoyer\nlast-group vr: %.2f, spare space: %d\n", last_group_vp,(group_config[group_num-1])*(_PPS*L2PGAP));
+		free(valid_ratio_list);
 		free(invalid_cnt_list);
 		free(last_vr_list);
 		return NULL;
@@ -907,6 +913,7 @@ END:
 	for(int k = 0; k < group_num; k++){
 		if (valid_ratio_list[k] <= 0.){	
 			//printf("exit\n");
+			free(valid_ratio_list);
 			free(invalid_cnt_list);
 			free(last_vr_list);
 			return NULL;
