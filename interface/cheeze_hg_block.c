@@ -485,6 +485,8 @@ vec_request *get_trace_vectored_request(){
 		if(len!=sizeof(ureq)){
 			printf("read error!!: len:%u\n", len);
 			raise(SIGINT);
+			exit(1);
+			while(1){}
 			break;
 			abort();
 		}

@@ -114,7 +114,8 @@ uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
     pm=pm_init(li, bm, true);
     translate_pm=pm_init(li, bm, false);
     lru_init(&gp_lru, NULL, NULL);
-    max_cached_trans_map=TRANSMAPNUM*30/100;
+    //max_cached_trans_map=TRANSMAPNUM*30/100;
+    printf("cache size:%lf\n", (double)max_cached_trans_map/TRANSMAPNUM);
     lru_max_byte=max_cached_trans_map*PAGESIZE;
     lru_now_byte=0;
     lru_reserve_byte=0;
@@ -146,7 +147,63 @@ void lea_destroy(lower_info *, algorithm *){
 	delete rb.issue_req;
 }
 
+inline uint32_t xx_to_byte(char *a){
+	switch(a[0]){
+		case 'K':
+			return 1024;
+		case 'M':
+			return 1024*1024;
+		case 'G':
+			return 1024*1024*1024;
+		default:
+			break;
+	}
+	return 1;
+}
+
 uint32_t lea_argument(int argc, char **argv){
+    bool cache_size=false;
+	bool cache_type_set=false;
+	uint32_t len;
+	int c;
+	char temp;
+	uint32_t gran=1;
+	uint64_t base;
+	uint32_t physical_page_num;
+	double cache_percentage;
+	while((c=getopt(argc,argv,"cp"))!=-1){
+		switch(c){
+			case 'c':
+				cache_size=true;
+				len=strlen(argv[optind]);
+				temp=argv[optind][len-1];
+				if(temp < '0' || temp >'9'){
+					argv[optind][len-1]=0;
+					gran=xx_to_byte(&temp);
+				}
+				base=atoi(argv[optind]);
+				physical_page_num=base*gran/PAGESIZE;
+				break;
+			case 'p':
+				cache_size=true;
+				cache_percentage=atof(argv[optind])/100;
+				physical_page_num=(SHOWINGSIZE/K) * cache_percentage;
+				physical_page_num/=PAGESIZE;
+				break;
+			default:
+				printf("not invalid parameter!!\n");
+				abort();
+				break;
+		}
+	}
+
+    if(!cache_size){
+        max_cached_trans_map=TRANSMAPNUM*30/100;
+    }
+    else{
+        max_cached_trans_map=physical_page_num;
+    }
+
     return 1;
 }
 

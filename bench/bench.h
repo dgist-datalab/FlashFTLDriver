@@ -14,7 +14,7 @@
 
 #define REQSIZE (sizeof(uint8_t)+sizeof(uint8_t)+sizeof(uint32_t)+sizeof(uint32_t))
 #define TXNHEADERSIZE (sizeof(uint32_t)+sizeof(uint32_t))
-#define REQPERCOMMAND QSIZE
+#define REQPERCOMMAND QDEPTH
 #if REQPERCOMMAND!=0
 	#define MAXBUFSIZE (REQPERCOMMAND*REQSIZE+TXNHEADERSIZE)
 #else
