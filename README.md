@@ -90,5 +90,5 @@ FlahsDriver$ ./driver
 ```
 
 ## Help
-Contact to ```junsu_im@dgist.ac.kr``` or ```jinwook.bae@dgist.ac.kr```  
+Contact to ```junsu_im@dgist.ac.kr``` 
 README would be updated someday
