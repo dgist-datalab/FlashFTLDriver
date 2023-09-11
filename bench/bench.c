@@ -456,6 +456,7 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 	uint64_t cumulate_number=0;
 	if(type>RANDSET)
 		nor/=2;
+	/*
 	if((type>RANDSET || type%2==1) || type==NOR){
 		printf("\n[cdf]write---\n");
 		for(int i=0; i<1000000/TIMESLOT+1; i++){
@@ -466,7 +467,8 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 				break;
 		}	
 	} 
-	/*
+	*/
+	
 	static int cnt=0;
 	cumulate_number=0;
 	if((type>RANDSET || type%2==0)|| type==RANDGET || type==NOR || type==FILLRAND){
@@ -480,7 +482,7 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 				break;
 		}
 	}
-	*/
+	
 }
 #endif
 void bench_reap_nostart(request *const req){
@@ -527,11 +529,13 @@ void bench_reap_data(request *const req,lower_info *li){
 		}
 	}
 	else if(req->type==FS_SET_T){
-		if(slot_num>=1000000/TIMESLOT){
-			_data->write_cdf[1000000/TIMESLOT]++;
-		}
-		else{
-			_data->write_cdf[slot_num]++;
+		if (req->is_board) {
+			if(slot_num>=1000000/TIMESLOT){
+				_data->write_cdf[1000000/TIMESLOT]++;
+			}
+			else{
+				_data->write_cdf[slot_num]++;
+			}
 		}
 	}
 #endif
@@ -541,8 +545,10 @@ void bench_reap_data(request *const req,lower_info *li){
 			_data->read_cnt++;
 		}
 		else if(req->type==FS_SET_T){
-			_m->write_cnt++;
-			_data->write_cnt++;
+			if (req->is_board) {
+				_m->write_cnt++;
+				_data->write_cnt++;
+			}
 		}
 		_m->r_num++;
 		_m->m_num++;

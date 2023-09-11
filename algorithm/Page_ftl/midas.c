@@ -266,7 +266,7 @@ int decrease_group_size(int gnum, int block_num) {
 
 int check_applying_config(double calc_waf) {
 	printf("\n");
-	if (midas_stat->tmp_waf-midas_stat->tmp_waf*0.1 < calc_waf) {
+	if (midas_stat->tmp_waf-midas_stat->tmp_waf*0.05 < calc_waf) {
 		printf("NOT NEED TO CHANGE:: NEW: %.3f, CUR: %.3f\n", calc_waf, midas_stat->tmp_waf);
 		return 0;
 	} else {

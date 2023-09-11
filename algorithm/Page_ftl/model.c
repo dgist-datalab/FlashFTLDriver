@@ -57,8 +57,8 @@ void model_create(int write_size) {
 	 * fnumber: # of interval to check
 	 * finterval: index of interval to check
 	 */
-	mmodel->fnumber=2; 
-	uint32_t finterval[2] = {100, 105};
+	mmodel->fnumber=10; 
+	uint32_t finterval[10] = {100, 105, 110, 115, 120, 125, 130,135, 140,145};
 	/*
         uint32_t finterval[100] = {0};
 	for (int i=0;i<mmodel->fnumber; i++){	
@@ -386,7 +386,7 @@ void *making_group_configuration(void *arg) {
 			}
 			free(valid_ratio_list);
 		}
-		//print_config2(gnum, opt_config[i+1], opt_waf[i+1], opt_valid_ratio_list[i+1]);
+		print_config2(gnum, opt_config[i+1], opt_waf[i+1], opt_valid_ratio_list[i+1]);
 		memcpy(group_config, opt_config[i+1], sizeof(uint32_t)*10);
 		//gnum = opt_gnum;
 		/*
@@ -470,7 +470,7 @@ void *making_group_configuration(void *arg) {
 
 	//set group information
 	free(group_config);
-	free(valid_ratio_list);
+	//free(valid_ratio_list);
 	printf("ginfo check: ");
 	while(G_info->valid == true) {}
 	printf("DONE\n");

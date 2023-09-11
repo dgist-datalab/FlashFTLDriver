@@ -106,6 +106,7 @@ e:for application req*/
 	void *hash_param;
 #endif
 	struct vectored_request *parents;
+	bool is_board;
 };
 
 struct algo_req{

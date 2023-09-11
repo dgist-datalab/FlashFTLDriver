@@ -222,6 +222,7 @@ uint32_t page_write(request *const req){
 	
 	
 	if (status) {
+		req->is_board=false;
 		req->end_req(req);
 	}
 	
@@ -309,6 +310,7 @@ void *page_end_req(algo_req* input){
 		//printf("there is res?\n");
 		res->type_ftl=res->type_lower=0;
 		if (input->type == DATAW) res->value=NULL;
+		res->is_board=true;
 		res->end_req(res);//you should call the parents end_req like this
 	}
 	for (int i=0;i<L2PGAP; i++) {
