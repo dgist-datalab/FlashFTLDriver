@@ -20,7 +20,7 @@ void validate_ppa(uint32_t t_ppa, KEYT *lbas, uint32_t max_idx);
 
 char* get_lbas(struct blockmanager* bm, char *oob_data, int len);
 
-ppa_t get_ppa(KEYT* lba, uint32_t max_idx);
+ppa_t get_ppa(KEYT* lba, uint32_t max_idx, int gnum);
 int do_gc();
 
 

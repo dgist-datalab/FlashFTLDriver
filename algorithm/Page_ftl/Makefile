@@ -4,6 +4,7 @@ SRCS +=\
 	   gc.c\
 	   model.c\
 	   midas.c\
+	   hot.c\
 
 OBJS :=\
 	$(patsubst %.c,%.o,$(SRCS))\

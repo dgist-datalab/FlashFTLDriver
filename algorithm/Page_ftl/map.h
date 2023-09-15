@@ -3,9 +3,10 @@
 
 #ifndef __grouping__
 #define __grouping__
-#define GNUMBER 4
+#define GNUMBER 5
 #define BENCH_JY 1
-#define MAX_G 15
+#define FREENUM 4
+#define MAX_G 19
 //0 is zip08, 1 is zip11, 2 is random
 #define TIME_WINDOW GIGAUNIT*4
 #endif
@@ -46,7 +47,7 @@ typedef struct page_map_body{
 
 
 void page_map_create();
-uint32_t page_map_assign(KEYT *lba, uint32_t max_idx);
+uint32_t page_map_assign(KEYT *lba, uint32_t max_idx, int gnum);
 uint32_t page_map_pick(uint32_t lba);
 uint32_t page_map_trim(uint32_t lba);
 uint32_t page_map_gc_update(KEYT* lba, uint32_t idx, uint32_t mig_count);

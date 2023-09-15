@@ -301,7 +301,6 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		load_signal=1;
 		return NULL;	
 	}
-	char *tmp=strtok(request_raw, " \t");
 	vec_request *res=(vec_request *)calloc(1, sizeof(vec_request));
 	res->tag_id=id_req++;
 	//cheeze_ureq *creq = ureq_addr+id_req;
@@ -322,8 +321,8 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		abort();
 	}
 	*/
-
-	tmp = strtok(NULL, " \t");
+	char *tmp=strtok(request_raw, " \t");
+	//tmp = strtok(NULL, " \t");
 	int ttp = atoi(tmp);
 	if (ttp == 0) type=FS_GET_T;
 	else if (ttp == 1) type = FS_SET_T;

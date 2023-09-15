@@ -227,7 +227,9 @@ struct blockmanager{
 	__block* (*get_block) (struct blockmanager*,__segment*);
 	__block *(*pick_block)(struct blockmanager*, uint32_t page_num);
 	__segment* (*get_segment) (struct blockmanager*, bool isreserve);
+	__segment* (*jy_get_time_segment) (struct blockmanager*, bool isreserve, double time_stamp);
 	uint32_t (*jy_get_block_idx) (struct blockmanager*, void* b);
+	long (*jy_get_timestamp)(struct blockmanager* bm, uint32_t lba);
 	int (*get_page_num)(struct blockmanager*, __segment*);
 	int (*pick_page_num)(struct blockmanager*, __segment*);
 	bool (*check_full)(struct blockmanager*, __segment*, uint8_t type);
@@ -246,9 +248,12 @@ struct blockmanager{
 	void (*set_oob)(struct blockmanager*, char* data, int len, uint32_t ppa);
 	char *(*get_oob)(struct blockmanager*, uint32_t ppa);
 	__segment* (*change_reserve)(struct blockmanager *, __segment *reserve);
+	__segment* (*jy_change_reserve)(struct blockmanager *, __segment *reserve, double time_stamp);
 	void (*jy_add_queue)(struct blockmanager*, queue* group_q, __segment* reserve);
+	void (*jy_add_time_queue)(struct blockmanager* bm, queue* group_q, __segment *reserve, double timestamp);
 	int (*jy_move_q2h)(struct blockmanager*, queue* q, int size);
 	void (*reinsert_segment)(struct blockmanager *, uint32_t seg_idx);
+	void (*jy_time_reinsert_segment)(struct blockmanager *, uint32_t seg_idx, double timestamp);
 	uint32_t (*remain_free_page)(struct blockmanager *, __segment *active);
 	void (*invalidate_number_decrease)(struct blockmanager *, uint32_t ppa);
 	uint32_t (*get_invalidate_number)(struct blockmanager *, uint32_t seg_idx);

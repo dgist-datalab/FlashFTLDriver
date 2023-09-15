@@ -10,6 +10,7 @@
 #include "map.h"
 #include "model.h"
 #include "midas.h"
+#include "hot.h"
 #include "../../bench/bench.h"
 
 //#define LBA_LOGGING "/lba_log"
@@ -20,8 +21,11 @@ uint32_t log_fd;
 
 STAT* midas_stat;
 extern uint32_t test_key;
-align_buffer a_buffer;
+extern long cur_timestamp;
+align_buffer a_buffer[2];
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
+HF* hotfilter;
+HF_Q* hot_q;
 
 extern MeasureTime mt;
 struct algorithm page_ftl={
@@ -42,6 +46,7 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	algo->bm=bm; //blockmanager is managing invalidation 
 	stat_init();
 	page_map_create();
+	hf_init(&hotfilter);
 
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
 	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
@@ -138,12 +143,14 @@ uint32_t page_read(request *const req){
 
 //	printf("issue %u %u\n", req->seq, req->key);
 
-	for(uint32_t i=0; i<a_buffer.idx; i++){
-		if(req->key==a_buffer.key[i]){
-			//		printf("buffered read!\n");
-			memcpy(req->value->value, a_buffer.value[i]->value, LPAGESIZE);
-			req->end_req(req);		
-			return 1;
+	for (int j=0;j<2;j++) {
+		for(uint32_t i=0; i<a_buffer[j].idx; i++){
+			if(req->key==a_buffer[j].key[i]){
+				//		printf("buffered read!\n");
+				memcpy(req->value->value, a_buffer[j].value[i]->value, LPAGESIZE);
+				req->end_req(req);		
+				return 1;
+			}
 		}
 	}
 
@@ -167,46 +174,71 @@ uint32_t align_buffering(request *req, KEYT key, value_set *value){
 
 	uint32_t overlapped_idx=UINT32_MAX;
 	
+	//global time variable!!!
+	cur_timestamp++;
 	do_modeling();
 
-	for(uint32_t i=0; i<a_buffer.idx; i++){
-		if(a_buffer.key[i]==req->key){
-			overlapped_idx=i;
-			overlap=true;
-			break;
+	int bidx=INT_MAX;
+	for (int j=0;j<2;j++) {
+		for(uint32_t i=0; i<a_buffer[j].idx; i++){
+			if(a_buffer[j].key[i]==req->key){
+				overlapped_idx=i;
+				bidx=j;
+				overlap=true;
+				break;
+			}
 		}
 	}
 
-	uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
+	//uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
+	/*
 	if (overlap) {
 		inf_free_valueset(a_buffer.value[target_idx], FS_MALLOC_W);
 		//a_buffer.preq[target_idx]->end_req(a_buffer.preq[target_idx]);
 	}
+	*/
+	int hc_cnt;
+	int target_idx;
 	if(req){
-		a_buffer.value[target_idx]=req->value;
-		a_buffer.key[target_idx]=req->key;
+		if (overlap) {
+			midas_stat->write++;
+			midas_stat->tmp_write++;
+			hc_cnt=bidx;
+			target_idx = overlapped_idx;
+		} else {
+			hc_cnt=hf_check(req->key, hotfilter);
+			target_idx = a_buffer[hc_cnt].idx;
+		}
+		a_buffer[hc_cnt].value[target_idx]=req->value;
+		a_buffer[hc_cnt].key[target_idx]=req->key;
 		//a_buffer.preq[target_idx]=req;
 		req->value=NULL;
-	}
-	else{
-		a_buffer.value[target_idx]=value;
-		a_buffer.key[target_idx]=key;
+	} else{
+		if (overlap) {
+			midas_stat->write++;
+			midas_stat->tmp_write++;
+			hc_cnt=bidx;
+			if (hc_cnt==1) printf("!!!!align buffering, hot is in cold block\n");
+			target_idx = overlapped_idx;
+		} else {
+			hc_cnt=hf_check(key, hotfilter);
+			target_idx = a_buffer[hc_cnt].idx;
+		}
+		a_buffer[hc_cnt].value[target_idx]=value;
+		a_buffer[hc_cnt].key[target_idx]=key;
 	}
 
-	if(!overlap){ a_buffer.idx++;}
+	if(!overlap){ a_buffer[hc_cnt].idx++;}
 
-	if(a_buffer.idx==L2PGAP){
-		ppa_t ppa=page_map_assign(a_buffer.key, a_buffer.idx);
-		//req->value->ppa = ppa*L2PGAP+3;
+	if(a_buffer[hc_cnt].idx==L2PGAP){
+		ppa_t ppa=page_map_assign(a_buffer[hc_cnt].key, a_buffer[hc_cnt].idx, hc_cnt);
 		value_set *value=inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
-		//request** preq = (request**)malloc(sizeof(request*)*L2PGAP);
 		for(uint32_t i=0; i<L2PGAP; i++){
-			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
-			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
-			//preq[i] = a_buffer.preq[i];
+			memcpy(&value->value[i*LPAGESIZE], a_buffer[hc_cnt].value[i]->value, LPAGESIZE);
+			inf_free_valueset(a_buffer[hc_cnt].value[i], FS_MALLOC_W);
 		}
 		send_user_req(req, DATAW, ppa, value);
-		a_buffer.idx=0;
+		a_buffer[hc_cnt].idx=0;
 		return 0;
 	} else return 1;
 }
@@ -238,16 +270,18 @@ uint32_t page_remove(request *const req){
 	midas_stat->cur_req++;
 	check_time_window(req->key, M_REMOVE);
 	do_modeling();
-	for(uint8_t i=0; i<a_buffer.idx; i++){
-		if(a_buffer.key[i]==req->key){
-			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
-			if(i==1){
-				a_buffer.value[0]=a_buffer.value[1];
-				a_buffer.key[0]=a_buffer.key[1];
+	for (int j=0;j<2;j++) {
+		for(uint8_t i=0; i<a_buffer[j].idx; i++){
+			if(a_buffer[j].key[i]==req->key){
+				inf_free_valueset(a_buffer[j].value[i], FS_MALLOC_W);
+				if(i==1){
+					a_buffer[j].value[0]=a_buffer[j].value[1];
+					a_buffer[j].key[0]=a_buffer[j].key[1];
+				}
+	
+				a_buffer[j].idx--;
+				goto end;
 			}
-
-			a_buffer.idx--;
-			goto end;
 		}
 	}
 	

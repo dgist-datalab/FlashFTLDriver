@@ -27,6 +27,7 @@ typedef struct seq_bm_private{
 	queue *invalid_block_q;
 	uint8_t *seg_populate_bit;
 	mh **max_heap_pt;
+	long *timestamp;
 }sbm_pri;
 
 uint32_t seq_create (struct blockmanager*, lower_info *li);
@@ -35,7 +36,9 @@ uint32_t seq_destroy (struct blockmanager*);
 __block* seq_get_block (struct blockmanager*, __segment *);
 __block *seq_pick_block(struct blockmanager *, uint32_t page_num);
 __segment* seq_get_segment (struct blockmanager*, bool isreserve);
+__segment* seq_jy_get_time_segment (struct blockmanager* bm, bool isreserve, double time_stamp);
 uint32_t seq_jy_get_block_idx (struct blockmanager*, void* b);
+long jy_get_timestamp(struct blockmanager* bm, uint32_t lba);
 bool seq_check_full(struct blockmanager *,__segment *active, uint8_t type);
 bool seq_is_gc_needed (struct blockmanager*);
 
@@ -54,11 +57,14 @@ void seq_set_oob(struct blockmanager*, char *data, int len, uint32_t ppa);
 char* seq_get_oob(struct blockmanager*, uint32_t ppa);
 void seq_release_segment(struct blockmanager*, __segment *);
 __segment* seq_change_reserve(struct blockmanager* ,__segment *reserve);
+__segment* seq_jy_change_reserve(struct blockmanager* bm,__segment *reserve, double time_stamp);
 void seq_jy_add_queue(struct blockmanager*, queue* group_q, __segment* reserve);
+void seq_jy_add_time_queue(struct blockmanager* bm, queue* group_q, __segment *reserve, double timestamp);
 int seq_jy_move_q2h(struct blockmanager*, queue* q, int size);
 int seq_get_page_num(struct blockmanager* ,__segment *);
 int seq_pick_page_num(struct blockmanager* ,__segment *);
 void seq_reinsert_segment(struct blockmanager *, uint32_t seg_idx);
+void seq_time_reinsert_segment(struct blockmanager *bm, uint32_t seg_idx, double timestamp);
 uint32_t seq_remain_free_page(struct blockmanager *, __segment *);
 
 uint32_t seq_map_ppa(struct blockmanager* , uint32_t lpa);

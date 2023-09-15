@@ -1,9 +1,11 @@
 #include "seq_block_manager.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 static uint64_t total_validate_piece_ppa;
 static uint64_t total_invalidate_piece_ppa;
+long cur_timestamp=1;
 
 struct blockmanager seq_bm = {
 	.create=seq_create,
@@ -12,7 +14,9 @@ struct blockmanager seq_bm = {
 	.get_block=seq_get_block,
 	.pick_block=seq_pick_block,
 	.get_segment=seq_get_segment,
+	.jy_get_time_segment=seq_jy_get_time_segment,
 	.jy_get_block_idx=seq_jy_get_block_idx,
+	.jy_get_timestamp=jy_get_timestamp,
 	.get_page_num=seq_get_page_num,
 	.pick_page_num=seq_pick_page_num,
 	.check_full=seq_check_full,
@@ -33,9 +37,13 @@ struct blockmanager seq_bm = {
 	.set_oob=seq_set_oob,
 	.get_oob=seq_get_oob,
 	.change_reserve=seq_change_reserve,
+	.jy_change_reserve=seq_jy_change_reserve,
 	.jy_add_queue=seq_jy_add_queue,
+	.jy_add_time_queue=seq_jy_add_time_queue,
 	.jy_move_q2h=seq_jy_move_q2h,
 	.reinsert_segment=seq_reinsert_segment,
+	.jy_time_reinsert_segment=seq_time_reinsert_segment,
+	
 	.remain_free_page=seq_remain_free_page,
 	.invalidate_number_decrease=seq_invalidate_number_decrease,
 	.get_invalidate_number=seq_get_invalidate_number,
@@ -84,6 +92,24 @@ int seq_get_cnt(void *a){
 	return aa->total_invalid_number;
 }
 
+float seq_get_cnt_new(void *a, void *b) {
+        block_set *aa = (block_set*)a;
+        struct blockmanager* bm = (struct blockmanager*) b;
+        sbm_pri *p = (sbm_pri*)bm->private_data;
+
+        int idx = aa->blocks[0]->block_num/BPS;
+        if (p->timestamp[idx] == 0) {
+		printf("timestamp of segment is null\n");
+		abort();
+	}
+	long interval_t = (long)(cur_timestamp - p->timestamp[idx]);
+        double int_t = sqrt(interval_t); //age value
+
+        float cand_value = (float)int_t*(double)aa->total_invalid_number/((double)_PPS*L2PGAP-aa->total_invalid_number);
+	return cand_value;
+}
+
+
 uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	bm->li=li;
 	//bb_checker_start(bm->li);/*check if the block is badblock*/
@@ -96,6 +122,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	p->logical_segment=(block_set*)calloc(sizeof(block_set), _NOS);
 	p->assigned_block=p->free_block=0;
 	p->seg_populate_bit=(uint8_t*)calloc(_NOS/8+(_NOS%8?1:0), sizeof(uint8_t));
+	p->timestamp = (long*)calloc(sizeof(long), _NOS);
 
 	int glob_block_idx=0;
 	for(int i=0; i<_NOS; i++){
@@ -110,7 +137,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 		p->logical_segment[i].total_valid_number=0;
 	}
 
-	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt);
+	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt_new, bm);
 	q_init(&p->free_logical_segment_q, _NOS);
 	q_init(&p->invalid_block_q, _NOS);
 	
@@ -148,6 +175,19 @@ __block* seq_get_block (struct blockmanager* bm, __segment* s){
 uint32_t seq_jy_get_block_idx(struct blockmanager* bm, void* b) {
 	block_set *bs = (block_set*)b;
 	return bs->blocks[0]->block_num/BPS;
+}
+
+long jy_get_timestamp(struct blockmanager* bm, uint32_t seg_idx) {
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	//int seg_idx = lba/_PPS/L2PGAP;
+	long age = cur_timestamp - p->timestamp[seg_idx];
+	if (p->timestamp[seg_idx] == 0) abort();
+	//printf("%ld - %ld = %ld\n", cur_timestamp, p->timestamp[seg_idx], age);
+	if (age < 0) {
+		printf("age of the segment is below 0: %ld\n", age);
+		abort();
+	}
+	return age;
 }
 
 __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
@@ -203,6 +243,61 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	return res;
 }
 
+__segment* seq_jy_get_time_segment (struct blockmanager* bm, bool isreserve, double time_stamp){
+	__segment* res=(__segment*)malloc(sizeof(__segment));
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	
+	block_set *free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
+	
+	if(!free_block_set){
+		EPRINT("dev full??", false);
+		return NULL;
+	}
+
+	if(free_block_set->total_invalid_number || free_block_set->total_valid_number){
+		EPRINT("how can it be!\n", true);
+	}
+
+	if(!free_block_set){
+		printf("new block is null!\n");
+		abort();
+	}
+
+
+	if(isreserve){
+
+	}
+	else{
+		mh_insert_append(p->max_heap, (void*)free_block_set);
+	}
+
+	memcpy(res->blocks, free_block_set->blocks, sizeof(__block*)*BPS);
+
+	res->now=0;
+	res->max=BPS;
+	res->invalid_blocks=0;
+	res->used_page_num=0;
+	res->seg_idx=res->blocks[0]->block_num/BPS;
+	
+	p->assigned_block++;
+	p->free_block--;
+	p->timestamp[res->seg_idx] = time_stamp;
+
+
+	if(p->assigned_block+p->free_block!=_NOS){
+		printf("missing segment error\n");
+		abort();
+	}
+/*
+	if(p->seg_populate_bit[res->seg_idx/8] & (1<<(res->seg_idx%8))){
+		EPRINT("already populate!\n", true);
+	}
+
+	p->seg_populate_bit[res->seg_idx/8] |=(1<<(res->seg_idx%8));*/
+	return res;
+}
+
+
 __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 
 	sbm_pri *p=(sbm_pri*)bm->private_data;
@@ -216,6 +311,20 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 	return seq_get_segment(bm,true);
 }
 
+__segment* seq_jy_change_reserve(struct blockmanager* bm,__segment *reserve, double time_stamp){
+
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
+	uint32_t segment_idx=segment_start_block_number/BPS;
+	if (reserve->seg_idx != segment_idx) printf("seg idx is different\n");
+	block_set *bs=&p->logical_segment[segment_idx];
+
+	mh_insert_append(p->max_heap, (void*)bs);
+
+	return seq_jy_get_time_segment(bm,true, time_stamp);
+}
+
+
 void seq_jy_add_queue(struct blockmanager* bm, queue* group_q, __segment *reserve) {
 	if (group_q==NULL) printf("there is no queue: seq_jy_add_queue()\n");
 	sbm_pri *p=(sbm_pri*)bm->private_data;
@@ -225,6 +334,18 @@ void seq_jy_add_queue(struct blockmanager* bm, queue* group_q, __segment *reserv
 
 	q_enqueue((void*)bs, group_q);
 }
+
+void seq_jy_add_time_queue(struct blockmanager* bm, queue* group_q, __segment *reserve, double timestamp) {
+	if (group_q==NULL) printf("there is no queue: seq_jy_add_queue()\n");
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+        uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
+        uint32_t segment_idx=segment_start_block_number/BPS;
+        block_set *bs=&p->logical_segment[segment_idx];
+	p->timestamp[segment_idx] = timestamp;
+
+	q_enqueue((void*)bs, group_q);
+}
+
 
 int seq_jy_move_q2h(struct blockmanager* bm, queue* q, int size) {
 	sbm_pri *p = (sbm_pri*)bm->private_data;
@@ -253,6 +374,13 @@ void seq_reinsert_segment(struct blockmanager *bm, uint32_t seg_idx){
 	mh_insert_append(p->max_heap, (void*)bs);
 }
 
+void seq_time_reinsert_segment(struct blockmanager *bm, uint32_t seg_idx, double timestamp) {
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+        block_set *bs=&p->logical_segment[seg_idx];
+        mh_insert_append(p->max_heap, (void*)bs);
+	int idx = bs->blocks[0]->block_num/BPS;
+	p->timestamp[idx] = timestamp;
+}
 
 bool seq_is_gc_needed (struct blockmanager* bm){
 	sbm_pri *p=(sbm_pri*)bm->private_data;
@@ -297,6 +425,8 @@ __gsegment* seq_get_gc_target (struct blockmanager* bm){
 
 	res->invalidate_number=target->total_invalid_number;
 	res->validate_number=target->total_valid_number;
+
+	//p->timestamp[res->seg_idx]=0;
 
 	if(target->total_invalid_number==target->total_valid_number){
 		res->all_invalid=true;
@@ -344,6 +474,8 @@ __gsegment* seq_jy_get_gc_target (struct blockmanager* bm, queue* group_q){
 
 	res->invalidate_number=target->total_invalid_number;
 	res->validate_number=target->total_valid_number;
+
+	p->timestamp[res->seg_idx]=0;
 
 	if(target->total_invalid_number==target->total_valid_number){
 		res->all_invalid=true;

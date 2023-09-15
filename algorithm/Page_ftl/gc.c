@@ -1,6 +1,7 @@
 #include "gc.h"
 #include "map.h"
 #include "midas.h"
+#include "hot.h"
 #include "../../include/data_struct/list.h"
 #include <stdlib.h>
 #include <stdint.h>
@@ -11,6 +12,8 @@ uint32_t gc_norm_count=0;
 
 extern STAT *midas_stat;
 extern algorithm page_ftl;
+extern long cur_timestamp;
+extern HF *hotfilter;
 
 void invalidate_ppa(uint32_t t_ppa){
 	/*when the ppa is invalidated this function must be called*/
@@ -242,7 +245,9 @@ int do_gc(){
 				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 				g_buffer.idx++;
-				 
+
+				if (tmp_mig_count == 0 || tmp_mig_count==1) hf_generate(lbas[i], tmp_mig_count, hotfilter, 0);
+
 				if(g_buffer.idx==L2PGAP){
 					//if (g_buffer.mig_count >= GNUMBER) printf("problem 1: %d\n", g_buffer.mig_count);
 					uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP, mig_count);
@@ -266,6 +271,22 @@ int do_gc(){
 		send_req(res, GCDW, inf_get_valueset(g_buffer.value, FS_MALLOC_W, PAGESIZE));
 		g_buffer.idx=0;	
 	}
+	if ((tmp_mig_count == 0) && (hotfilter->make_flag==1)) {
+		long seg_age = page_ftl.bm->jy_get_timestamp(page_ftl.bm, target->seg_idx);
+		//printf("\nseg age: %ld (%.3f%%)\n", seg_age, (double)seg_age/(double)_PPS/(double)L2PGAP);
+		hotfilter->seg_age += seg_age;
+		hotfilter->seg_num++;
+		hotfilter->G0_vr_sum += (double)page_num/(double)tot_page_num;
+		hotfilter->G0_vr_num++;
+	}
+	/*
+	if (tmp_mig_count==1) {
+		long seg_age=page_ftl.bm->jy_get_timestamp(page_ftl.bm, target->seg_idx);
+		//printf("G1 seg age: %ld (%.3f%%)\n", seg_age, (double)seg_age/(double)(_PPS*L2PGAP));
+	}
+	*/
+
+	
 	bm->trim_segment(bm,target,page_ftl.li); //erase a block
 	midas_stat->g->gsize[tmp_mig_count]--;
 	midas_stat->erase++;
@@ -276,6 +297,7 @@ int do_gc(){
 		midas_stat->e->vr[tmp_mig_count] += (double)page_num/(double)tot_page_num;
 		midas_stat->e->erase[tmp_mig_count]++;
 	}
+
 	// print valid ratio
 	
 	//printf("gc occurs, valid page: %f%%\n", (float)page_num/(float)tot_page_num*(float)100);
@@ -300,7 +322,7 @@ int do_gc(){
 }
 
 
-ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
+ppa_t get_ppa(KEYT *lbas, uint32_t max_idx, int gnum){
 	uint32_t res;
 	pm_body *p=(pm_body*)page_ftl.algo_body;
 	/*you can check if the gc is needed or not, using this condition*/
@@ -309,19 +331,23 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	
 	
 	int gc_count=0;
-	int gnum=-1;
-	int tmp_gnum=-1;
+	int gc_num = -1;
+	int tmp_gnum = -1;
+	if ((gnum != 0) && (gnum != 1)) {
+		printf("gnum: %d\n", gnum);
+		abort();
+	}
 	while (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=2) {
 		//printf("# of Free Blocks: %d\n",page_ftl.bm->get_free_segment_number(page_ftl.bm)); 
-		gnum = do_gc();//call gc
-		if (tmp_gnum != gnum) {
+		gc_num = do_gc();//call gc
+		if (tmp_gnum != gc_num) {
 			gc_count=0;
-			tmp_gnum = gnum;
+			tmp_gnum = gc_num;
 		}
 		gc_count++;
 		if (gc_count > 100) {
 			printf("!!!!Infinite GC occur!!!!\n");
-			if (gnum == p->n->naive_start) {
+			if (gc_num == p->n->naive_start) {
 				printf("=> infinite GC in last group...\n");
 				if (p->n->naive_on == false) naive_mida_on();
 				else {
@@ -330,9 +356,9 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 				}
 			} else {
 				if (p->n->naive_on) naive_mida_off();
-				printf("=> MERGE GROUP : G%d ~ G%d\n", gnum, p->gnum-1);
-				for (int j=gnum+1;j<p->gnum;j++) p->m->config[gnum] += p->m->config[j];
-				merge_group(gnum);
+				printf("=> MERGE GROUP : G%d ~ G%d\n", gc_num, p->gnum-1);
+				for (int j=gc_num+1;j<p->gnum;j++) p->m->config[gnum] += p->m->config[j];
+				merge_group(gc_num);
 				naive_mida_on();
 				gc_count=0;
 			}
@@ -341,9 +367,18 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 		}
 	}
 
+	if (p->active[gnum]==NULL) {
+                //initialize migration group
+                //p->active[mig_count] = page_ftl.bm->get_segment(page_ftl.bm, true);
+                p->active[gnum] = page_ftl.bm->jy_get_time_segment(page_ftl.bm,true, cur_timestamp);
+                seg_assign_ginfo(p->active[gnum]->seg_idx, gnum);
+                midas_stat->g->gsize[gnum]++;
+                ++p->gcur;
+        }
+
 retry:
 	/*get a page by bm->get_page_num, when the active block doesn't have block, return UINT_MAX*/
-	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active[0]);
+	res=page_ftl.bm->get_page_num(page_ftl.bm,p->active[gnum]);
 
 	if(res==UINT32_MAX){
 		/*
@@ -354,25 +389,26 @@ retry:
 		}
 		*/
 		//printf("free segment: %u\n", page_ftl.bm->get_free_segment_number(page_ftl.bm));
-		++midas_stat->g->gsize[0];
-		__segment *tmp = p->active[0];
+		++midas_stat->g->gsize[gnum];
+		__segment *tmp = p->active[gnum];
+		//set timestamp for new segment
 		if (p->active_q->size) {
-			p->active[0] = (__segment*)q_dequeue(p->active_q);
-			if (p->n->naive_start==0) {
-                                page_ftl.bm->reinsert_segment(page_ftl.bm, tmp->seg_idx);
+			p->active[gnum] = (__segment*)q_dequeue(p->active_q);
+			if (p->n->naive_start==1) {
+                                page_ftl.bm->jy_time_reinsert_segment(page_ftl.bm, tmp->seg_idx, cur_timestamp);
                         } else {
-				page_ftl.bm->jy_add_queue(page_ftl.bm, p->group[0], tmp);
+				page_ftl.bm->jy_add_time_queue(page_ftl.bm, p->group[gnum], tmp, cur_timestamp);
                         }
 		} else {
-			if (p->n->naive_start==0) {
-                                p->active[0] = page_ftl.bm->change_reserve(page_ftl.bm, p->active[0]);
+			if (p->n->naive_start==1) {
+                                p->active[gnum] = page_ftl.bm->jy_change_reserve(page_ftl.bm, p->active[gnum], cur_timestamp);
                         } else {
-                                p->active[0] = page_ftl.bm->get_segment(page_ftl.bm,true);
-                                page_ftl.bm->jy_add_queue(page_ftl.bm, p->group[0], tmp);
+                                p->active[gnum] = page_ftl.bm->jy_get_time_segment(page_ftl.bm,true, cur_timestamp);
+                                page_ftl.bm->jy_add_queue(page_ftl.bm, p->group[gnum], tmp);
                         }
 		}
-		page_ftl.bm->free_segment(page_ftl.bm,tmp); //get a new block
-		seg_assign_ginfo(p->active[0]->seg_idx, 0);
+		page_ftl.bm->free_segment(page_ftl.bm,tmp);
+		seg_assign_ginfo(p->active[gnum]->seg_idx, gnum);
 		goto retry;
 	}
 
