@@ -290,7 +290,7 @@ void hf_generate(uint32_t lba, int gnum, HF* hotf, int hflag) {
 		if (hotf->cur_hf[lba]>0) {
 			hotf->cur_hf[lba]--;
 			if (hotf->cur_hf[lba] == hotf->hot_val-1) hotf->hot_lba_num--;
-			uint32_t gnum = seg_get_ginfo(p->mapping[lba]/_PPS);
+			uint32_t gnum = seg_get_ginfo(p->mapping[lba]/_PPS/L2PGAP);
 			if (gnum == 0) hotf->cur_hf[lba]--;
 		}
 	}	

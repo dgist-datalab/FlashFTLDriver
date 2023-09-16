@@ -199,12 +199,12 @@ uint32_t align_buffering(request *req, KEYT key, value_set *value){
 	}
 
 	//uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
-	/*
+	
 	if (overlap) {
-		inf_free_valueset(a_buffer.value[target_idx], FS_MALLOC_W);
+		inf_free_valueset(a_buffer[bidx].value[overlapped_idx], FS_MALLOC_W);
 		//a_buffer.preq[target_idx]->end_req(a_buffer.preq[target_idx]);
 	}
-	*/
+	
 	int hc_cnt;
 	int target_idx;
 	if(req){

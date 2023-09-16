@@ -51,6 +51,11 @@ void naive_mida_off() {
 		tsize += midas_stat->g->gsize[i];
 		if (p->active[i] != NULL) tsize -= 1;
 	}
+	if (p->n->naive_start == 1) {
+		tsize += midas_stat->g->gsize[0];
+		if (p->active[0] != NULL) tsize--;
+	}
+	
 	if (q->size != tsize) {
 		printf("queue size err in naive_mida_off()\n");
 		abort();
