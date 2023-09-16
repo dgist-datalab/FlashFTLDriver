@@ -66,6 +66,7 @@ typedef struct group_configuration{
 	int commit_g;
 	uint32_t* gsize;
 	double WAF;
+	double g0_traffic;
 }G_INFO;
 
 
@@ -80,12 +81,14 @@ int check_interval(uint32_t lba, char mode);
 void *first_interval_analyzer(void* arg);
 //int check_first_interval(uint32_t lba, char mode);
 void *making_group_configuration(void *arg);
-void print_config(int, uint32_t*, double, double*);
+void print_config(int, uint32_t*, double, double*, double);
 void print_config_into_log(int, uint32_t*, double, double*);
 void print_config2(int, uint32_t*, double, double*);
 double WAF_predictor(double *, int);
+double hot_WAF_predictor(double *valid_ratio_list, int group_num);
 unsigned long long resizing_model();
 double *valid_ratio_predictor(uint32_t*, uint32_t, unsigned long long);
+double *hot_valid_ratio_predictor(uint32_t*, uint32_t, unsigned long long, int);
 void initialize_first_interval();
 void remove_first_interval();
 void model_destroy();

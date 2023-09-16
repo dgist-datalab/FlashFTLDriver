@@ -2,6 +2,7 @@
 #include "map.h"
 #include "model.h"
 #include "page.h"
+#include "hot.h"
 
 extern algorithm page_ftl;
 extern STAT* midas_stat;
@@ -11,10 +12,12 @@ void naive_mida_on() {
 	printf("=> NAIVE ON!!!!\n");
 	pm_body *p = (pm_body*)page_ftl.algo_body;
 	p->n->naive_on=true;
-	p->gnum = p->gnum+3;
+	p->gnum = p->gnum+GNUMBER-1;
 
 	p->gcur = p->n->naive_start;
+	//use active segment
 	for (int i=0;i<p->active_q->size;i++) {
+		if (i == GNUMBER) break;
 		if (p->active[p->n->naive_start+1+i] != NULL) {
 			printf("why there is active block? \n");
 			printf("in midas.c file\n");
@@ -52,12 +55,14 @@ void naive_mida_off() {
 		printf("queue size err in naive_mida_off()\n");
 		abort();
 	}
+	//assign ginfo to naive_start
 	for (int i=0;i<q->size;i++) {
 		seg_idx = page_ftl.bm->jy_get_block_idx(page_ftl.bm, cur->d.req);
 		seg_assign_ginfo(seg_idx, p->n->naive_start);
 		cur = cur->next;
 	}
 
+	//add active to queue
 	for (int i=p->n->naive_start+1;i<p->n->naive_start+GNUMBER;i++) {
 		midas_stat->g->gsize[p->n->naive_start] += midas_stat->g->gsize[i];
 		midas_stat->g->gsize[i]=0;
@@ -67,8 +72,20 @@ void naive_mida_off() {
 		p->active[i]=NULL;
 		midas_stat->g->gsize[p->n->naive_start]--; //active block
 	}
+
+	//move G0 size to G0 queue
+	if (p->n->naive_start == 1) {
+		midas_stat->g->gsize[p->n->naive_start] += midas_stat->g->gsize[0];
+		midas_stat->g->gsize[0]=0;
+		if (p->active[0] != NULL) {
+			midas_stat->g->gsize[0]++;
+			midas_stat->g->gsize[p->n->naive_start]--;
+		}
+		q_init(&(p->group[0]), _NOS);
+	}	
+
 	if (p->gcur > p->n->naive_start) p->gcur = p->n->naive_start;
-	p->gnum = p->gnum-3;
+	p->gnum = p->gnum-(GNUMBER-1);
 }
 
 void stat_init() {
@@ -163,7 +180,7 @@ int change_group_number(int prevnum, int newnum) {
 	}
 	midas_stat->g->gsize[newnum] = midas_stat->g->gsize[prevnum];
         midas_stat->g->gsize[prevnum]=0;
-	if (prevnum != 0) {
+	if (prevnum != 1) {
 		p->active[newnum] = p->active[prevnum];
 		p->active[prevnum] = NULL;
 		seg_assign_ginfo(p->active[newnum]->seg_idx, newnum);
@@ -230,6 +247,11 @@ int merge_group(int group_num) {
 	//change group number
 	p->gnum = group_num+1;
 	p->n->naive_start = group_num;
+
+	if (p->n->naive_start == 1) {
+		hot_merge();
+	}
+
 	return group_num;
 }
 
@@ -241,7 +263,7 @@ int decrease_group_size(int gnum, int block_num) {
 
         //change group number info
         if ((q->size+1) != midas_stat->g->gsize[gnum]) {
-                printf("queue size err in naive_mida_off()\n");
+                printf("queue size err in naive mida off()\n");
                 abort();
         }
 
@@ -272,6 +294,7 @@ int check_applying_config(double calc_waf) {
 	} else {
 		printf("NEED TO CHANGE:: NEW: %.3f, CUR: %.3f\n", calc_waf, midas_stat->tmp_waf);
                 return 1;
+		//return 0;
 	}
 }
 
@@ -360,7 +383,9 @@ int check_configuration_apply() {
 
 int do_modeling() {
 	if (midas_stat->cur_req%GB_REQ==0) {
-                midas_stat->write_gb++;
+                //errcheck timing
+		//ginfo valid check timing
+		midas_stat->write_gb++;
                 printf("\rwrite size: %dGB", midas_stat->write_gb);
                 if (midas_stat->e->errcheck) {
                         if (midas_stat->e->errcheck_time == midas_stat->e->err_start) {

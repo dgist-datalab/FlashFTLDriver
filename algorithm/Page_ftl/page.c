@@ -27,6 +27,8 @@ typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 HF* hotfilter;
 HF_Q* hot_q;
 
+int jy_LBANUM=0;
+
 extern MeasureTime mt;
 struct algorithm page_ftl={
 	.argument_set=page_argument,
@@ -42,6 +44,12 @@ page_read_buffer rb;
 
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	printf("page create\n");
+	if (GIGAUNIT==128) {
+		jy_LBANUM = 128*1000/1024*1000/4*1000;
+	} else jy_LBANUM = LBANUM;
+	printf("LBA NUMBER: %d\n", jy_LBANUM);
+
+	
 	algo->li=li; //lower_info means the NAND CHIP
 	algo->bm=bm; //blockmanager is managing invalidation 
 	stat_init();

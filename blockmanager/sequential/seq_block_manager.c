@@ -475,7 +475,7 @@ __gsegment* seq_jy_get_gc_target (struct blockmanager* bm, queue* group_q){
 	res->invalidate_number=target->total_invalid_number;
 	res->validate_number=target->total_valid_number;
 
-	p->timestamp[res->seg_idx]=0;
+	//p->timestamp[res->seg_idx]=0;
 
 	if(target->total_invalid_number==target->total_valid_number){
 		res->all_invalid=true;

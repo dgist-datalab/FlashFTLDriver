@@ -7,6 +7,7 @@ extern algorithm page_ftl;
 extern STAT* midas_stat;
 extern mini_model *mmodel;
 extern HF_Q* hot_q; 
+extern int jy_LBANUM;
 
 void hf_init(HF **hotf) {
 	(*hotf) = (HF*)malloc(sizeof(HF));
@@ -17,9 +18,9 @@ void hf_init(HF **hotf) {
 	(*hotf)->make_flag=1;
 	(*hotf)->use_flag=1;
 
-	(*hotf)->tw = (long)LBANUM;
+	(*hotf)->tw = (long)jy_LBANUM;
 	(*hotf)->left_tw = (*hotf)->tw;
-	(*hotf)->cold_tw = (long)LBANUM;
+	(*hotf)->cold_tw = (long)jy_LBANUM;
 
 	(*hotf)->G0_vr_sum=0.0;
 	(*hotf)->G0_vr_num=0.0;
@@ -36,8 +37,8 @@ void hf_init(HF **hotf) {
 	(*hotf)->err_cnt=0;
 	(*hotf)->tmp_err_cnt=0;
 
-	(*hotf)->cur_hf = (int*)malloc(sizeof(int)*LBANUM);
-	memset((*hotf)->cur_hf, 0, sizeof(int)*LBANUM);
+	(*hotf)->cur_hf = (int*)malloc(sizeof(int)*jy_LBANUM);
+	memset((*hotf)->cur_hf, 0, sizeof(int)*jy_LBANUM);
 
 	hf_q_init();
 }
@@ -114,7 +115,6 @@ void hf_q_calculate() {
 	hot_q->g0_size = hot_q->g0_size/hfq_cnt;
 	hot_q->g0_valid = hot_q->g0_valid/hfq_cnt;
 
-	hot_q->g0_size++; //active segment
 	hot_q->g0_size = floor(hot_q->g0_size+0.5);
 	
 	if ((hot_q->g0_valid > 0.2) || (hot_q->g0_traffic < 0.15)) {
@@ -156,6 +156,7 @@ void hf_metadata_reset(HF* hotf) {
 void hot_merge() {
 	pm_body *p = (pm_body*)page_ftl.algo_body;
 
+	printf("NAIVE_START is 1!!! HOT MERGE on\n");
 	//0: move the whole queue to the heap
 	int size = page_ftl.bm->jy_move_q2h(page_ftl.bm, p->group[0], 0);
 	if ((size+1) != midas_stat->g->gsize[0]) {
@@ -163,13 +164,19 @@ void hot_merge() {
 		printf("in hot merge function\n");
 		abort();
 	}
+	midas_stat->g->gsize[p->n->naive_start] += midas_stat->g->gsize[0];
+	midas_stat->g->gsize[0]=0;
+	if (p->active[0] != NULL) {
+		midas_stat->g->gsize[p->n->naive_start]--;
+		midas_stat->g->gsize[0]=1;
+	}
 	q_free(p->group[0]);
 	p->group[0] = NULL;
 	//TODO p->m->config[i]?
 }
 
 void hf_reset(int flag, HF* hotf) {
-	memset(hotf->cur_hf, 0, sizeof(int)*LBANUM);
+	memset(hotf->cur_hf, 0, sizeof(int)*jy_LBANUM);
 	hotf->left_tw = hotf->tw;
 	if (flag==1) hotf->make_flag=1;
 	hotf->use_flag=0;
@@ -196,7 +203,7 @@ void hf_update(HF* hotf) {
 		hotf->left_tw=0;
 	}
 	if (hf_cnt==print_cond) printf("[HF-NOTICE] HOT LBA NUM: %d (%.2f%%)\n", 
-			hotf->hot_lba_num, (double)hotf->hot_lba_num/(double)LBANUM*100.0);
+			hotf->hot_lba_num, (double)hotf->hot_lba_num/(double)jy_LBANUM*100.0);
 	double prev_seg_age=0.0;
 	double tr=0.0;
 	tr = hotf->G0_traffic/hotf->tot_traffic;

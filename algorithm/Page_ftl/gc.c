@@ -155,10 +155,12 @@ int do_gc(){
 	//find victim segment
 	//1. check MiDAS groups
 	int victim_seg = -1;
-	for (int i=0;i<p->n->naive_start;i++) {
-		if (p->m->config[i] < midas_stat->g->gsize[i]) {
-			victim_seg = i;
-			break;
+	if (p->n->naive_start != 1) {
+		for (int i=0;i<p->n->naive_start;i++) {
+			if (p->m->config[i] < midas_stat->g->gsize[i]) {
+				victim_seg = i;
+				break;
+			}
 		}
 	}
 	if (victim_seg==-1) victim_seg = p->n->naive_start;
@@ -337,7 +339,7 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx, int gnum){
 		printf("gnum: %d\n", gnum);
 		abort();
 	}
-	while (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=2) {
+	while (page_ftl.bm->get_free_segment_number(page_ftl.bm)<=FREENUM) {
 		//printf("# of Free Blocks: %d\n",page_ftl.bm->get_free_segment_number(page_ftl.bm)); 
 		gc_num = do_gc();//call gc
 		if (tmp_gnum != gc_num) {
