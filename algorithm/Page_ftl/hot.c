@@ -183,7 +183,6 @@ void hf_reset(int flag, HF* hotf) {
 }
 
 void hf_update_model(double traffic, HF *hotf) {
-	double tmp;
 	if (traffic==0.0) return;
 	hot_q->g0_traffic_queue[hot_q->queue_idx] = traffic;
 	hot_q->g0_size_queue[hot_q->queue_idx] = midas_stat->g->gsize[0];
@@ -199,16 +198,16 @@ int print_cond=1;
 void hf_update(HF* hotf) {
 	hf_cnt++;
 	if (hotf->left_tw < 0) {
-		if (hf_cnt==print_cond) printf("wait more time window for hotfilter: %ld\n", -hotf->left_tw);
+		//if (hf_cnt==print_cond) printf("wait more time window for hotfilter: %ld\n", -hotf->left_tw);
 		hotf->left_tw=0;
 	}
-	if (hf_cnt==print_cond) printf("[HF-NOTICE] HOT LBA NUM: %d (%.2f%%)\n", 
-			hotf->hot_lba_num, (double)hotf->hot_lba_num/(double)jy_LBANUM*100.0);
+	//if (hf_cnt==print_cond) printf("[HF-NOTICE] HOT LBA NUM: %d (%.2f%%)\n", 
+	//		hotf->hot_lba_num, (double)hotf->hot_lba_num/(double)jy_LBANUM*100.0);
 	double prev_seg_age=0.0;
 	double tr=0.0;
 	tr = hotf->G0_traffic/hotf->tot_traffic;
-	if (hf_cnt==print_cond) printf("[HF-NOTICE] HOT FILTER traffic: %.3f%% (%d / %d)\n",
-			tr*100, (int)hotf->G0_traffic, (int)hotf->tot_traffic);
+	//if (hf_cnt==print_cond) printf("[HF-NOTICE] HOT FILTER traffic: %.3f%% (%d / %d)\n",
+	//		tr*100, (int)hotf->G0_traffic, (int)hotf->tot_traffic);
 	hotf->G0_traffic_ratio=tr;
 
 	if (hotf->G0_traffic != 0) hf_update_model(tr, hotf);
@@ -218,7 +217,7 @@ void hf_update(HF* hotf) {
 	hotf->avg_seg_age=(double)hotf->seg_age/(double)hotf->seg_num;
 	avg_g0 = hotf->avg_seg_age/(double)_PPS/L2PGAP;
 
-	if (hf_cnt==print_cond) printf("[HF-NOTICE] Calculated avg G0: %.3f%% (num of victim: %d)\n", avg_g0, (int)hotf->seg_num);
+	//if (hf_cnt==print_cond) printf("[HF-NOTICE] Calculated avg G0: %.3f%% (num of victim: %d)\n", avg_g0, (int)hotf->seg_num);
 	if (prev_seg_age != 0.0) {
 		if (hotf->avg_seg_age >= prev_seg_age*2) {
 			hotf->avg_seg_age = prev_seg_age*1.5;
@@ -228,7 +227,7 @@ void hf_update(HF* hotf) {
 	}
 	avg_g0 = hotf->avg_seg_age/(double)_PPS/L2PGAP;
 	long tw = (long)(hotf->avg_seg_age*hotf->tw_ratio);
-	if (hf_cnt==print_cond) printf("[HF-NOTICE] NEW HOT FILTER, age: %.3f%% (%ld)\n", avg_g0, tw);
+	//if (hf_cnt==print_cond) printf("[HF-NOTICE] NEW HOT FILTER, age: %.3f%% (%ld)\n", avg_g0, tw);
 	if (hf_cnt==print_cond) hf_cnt=0;
 
 	hotf->tw=tw;

@@ -41,7 +41,6 @@ char *get_lbas(struct blockmanager* bm, char* oob_data, int len) {
 	//printf("oob_data: 0x%x\n", oob_data);
 	char *res = (char *)malloc(len);
 	memcpy(res, oob_data, len);
-	KEYT* res_k=(KEYT*)res;
 	return res;
 }
 
@@ -97,7 +96,6 @@ void new_do_gc(){
 	g_buffer.idx=0;
 	char *oobs;
 	KEYT *lbas;
-	uint32_t mig_count=0;
 
 	gv_idx=0;
 	uint32_t done_cnt=0;
@@ -191,7 +189,6 @@ int do_gc(){
 	gc_value *gv;
 
 	li_node *now,*nxt;
-	uint32_t tot_num[5]={0,};
 	uint32_t tmp_mig_count = seg_get_ginfo(target->seg_idx);
 	if ((p->n->naive_on==false) && (tmp_mig_count != victim_seg)) {
 		printf("group number of victim segment information is wrong: do_gc()\n");
@@ -321,6 +318,7 @@ int do_gc(){
 	}
 	*/
 	list_free(temp_list);
+	return victim_seg;
 }
 
 

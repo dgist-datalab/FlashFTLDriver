@@ -6,6 +6,7 @@
 #include "vectored_interface.h"
 #include "../include/utils/crc32.h"
 #include <pthread.h>
+#include <time.h>
 
 extern master_processor mp;
 
@@ -20,11 +21,14 @@ static uint8_t *recv_event_addr; // 16B
 static uint64_t *seq_addr; // 8KB
 struct cheeze_req_user *ureq_addr; // sizeof(req) * 1024
 static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
-static uint64_t seq = 0;
+//static uint64_t seq = 0;
 static int trace_fd = 0;
 
-static uint32_t jy_req_start=0;
-static uint32_t jy_req_end=0;
+static long jy_req_start=0;
+static long jy_req_end=0;
+
+time_t time_begin;
+time_t time_tmp;
 
 static int id_req=0;
 //static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
@@ -295,7 +299,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 //	uint32_t tmp_max = 100663295;
 //	uint32_t tmp2_max = 100663296;
 //	uint32_t zip_08=201326592;
-	uint32_t zip_32=41943139;
+	//uint32_t zip_32=41943139;
 	//printf("request: %s\n", request_raw);
 	if (strstr(request_raw, load_sig)) {
 		load_signal=1;
@@ -309,7 +313,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 	//char *write="W";
 	//char *read="R";
 	//printf("type: %s\n", tmp);
-	float perct = (float)id_req*(float)100/(float)zip_32;
+	//float perct = (float)id_req*(float)100/(float)zip_32;
 	//if (id_req%1000==0) printf("\rpercent: %f%%", perct);
 	//if (perct > 40) exit(0);
 	//if (id_req%10000000==0) printf("\n");
@@ -375,7 +379,7 @@ vec_request *jy_ureq2vec_req(char* request_raw) {
 		}
 		temp->key=lba_r+i;
 
-		if (prev_lba = UINT32_MAX) {
+		if (prev_lba == UINT32_MAX) {
 			prev_lba = temp->key;
 		} else {
 			if (prev_lba+1==temp->key) {
@@ -439,6 +443,11 @@ bool jeeyun_end_req(request *const req) {
 		now_processing=NULL;
 		free(preq);
 		++jy_req_end;
+		if (jy_req_end % (100*1024*1024/4) == 0) {
+			time(&time_tmp);
+			printf("[THROUGHPUT] 100GB per %0.0f sec (cur: %ldGB)\n", difftime(time_tmp, time_begin), jy_req_end/(100*1024*1024/4));
+			time(&time_begin);
+		}
 	}
 	pthread_mutex_unlock(&req_cnt_lock);
 	return true;
@@ -530,7 +539,7 @@ vec_request **get_vectored_request_arr()
 
 vec_request *get_trace_vectored_request(){
 	static bool isstart=false;
-	unsigned int crc_len;
+	//unsigned int crc_len;
 
 	
 	if(!isstart){
@@ -566,7 +575,7 @@ vec_request *get_trace_vectored_request(){
 
 bool cheeze_end_req(request *const req){
 	vectored_request *preq=req->parents;
-	uint32_t temp_crc;
+	//uint32_t temp_crc;
 	switch(req->type){
 		case FS_NOTFOUND_T:
 			bench_reap_data(req, mp.li);

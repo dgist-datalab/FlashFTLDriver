@@ -29,6 +29,7 @@ HF_Q* hot_q;
 
 int jy_LBANUM=0;
 
+
 extern MeasureTime mt;
 struct algorithm page_ftl={
 	.argument_set=page_argument,

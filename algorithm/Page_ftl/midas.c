@@ -293,7 +293,8 @@ int decrease_group_size(int gnum, int block_num) {
 
 int check_applying_config(double calc_waf) {
 	printf("\n");
-	if (midas_stat->tmp_waf-midas_stat->tmp_waf*0.05 < calc_waf) {
+	//if (midas_stat->tmp_waf-midas_stat->tmp_waf*0.05 < calc_waf) {
+	if (midas_stat->tmp_waf < calc_waf) {
 		printf("NOT NEED TO CHANGE:: NEW: %.3f, CUR: %.3f\n", calc_waf, midas_stat->tmp_waf);
 		return 0;
 	} else {
@@ -391,14 +392,15 @@ int do_modeling() {
                 //errcheck timing
 		//ginfo valid check timing
 		midas_stat->write_gb++;
-                printf("\rwrite size: %dGB", midas_stat->write_gb);
+                //printf("\rwrite size: %dGB", midas_stat->write_gb);
                 if (midas_stat->e->errcheck) {
                         if (midas_stat->e->errcheck_time == midas_stat->e->err_start) {
 				if (check_configuration_apply()) {
 					printf("\n=> CONFIGURATION check: OK, ((error check on))\n");
 					midas_stat->e->collect=true;
 					midas_stat->e->errcheck_time++;
-				}else printf("\n=> CONFIGURATION check: NO\n");
+				}
+				//else printf("\n=> CONFIGURATION check: NO\n");
 			} else {
 				midas_stat->e->errcheck_time++;
 			}
@@ -406,8 +408,8 @@ int do_modeling() {
                 int st = check_modeling();
                 if (st) printf("!!!Modeling over & adapt configuration!!!\n");
         }
-        if ((midas_stat->write_gb%GIGAUNIT==0) && (midas_stat->cur_req%GB_REQ==0)) {
-                printf("\n");
+        if ((midas_stat->write_gb%(GIGAUNIT*3)==0) && (midas_stat->cur_req%GB_REQ==0)) {
+                //printf("\n");
                 print_stat();
         }
         if ((midas_stat->e->errcheck_time==midas_stat->e->err_window) && (midas_stat->cur_req%GB_REQ==0)) {

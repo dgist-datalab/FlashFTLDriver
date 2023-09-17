@@ -21,7 +21,7 @@ extern HF* hotfilter;
 
 void page_map_create(){
 	model_create(TIME_WINDOW);
-	printf("NOS: %d\n", _NOS);
+	printf("NOS: %ld\n", _NOS);
 	pm_body *p=(pm_body*)calloc(sizeof(pm_body),1);
 	p->mapping=(uint32_t*)malloc(sizeof(uint32_t)*_NOP*L2PGAP);
 	p->ginfo = (uint32_t*)malloc(sizeof(uint32_t)*_NOS);
@@ -56,7 +56,6 @@ void page_map_create(){
 		p->reserve[i]=page_ftl.bm->get_segment(page_ftl.bm,true); //reserve for GC
 	}
 	*/	
-	char name[32];
 	//sprintf(name, "./valid_ratio/ran_WAF_%d", GNUMBER);
 	//wFile = fopen(name, "w");
 	//sprintf(name, "./valid_ratio/ran_block_num_%d", GNUMBER);
@@ -98,7 +97,6 @@ uint32_t page_map_assign(KEYT* lba, uint32_t max_idx, int gnum){
 	for(uint32_t i=0; i<L2PGAP; i++){
 		KEYT t_lba=lba[i];
 		//printf("key: %lu\n", t_lba);
-		uint32_t previous_ppa=p->mapping[t_lba];
 		if(p->mapping[t_lba]!=UINT_MAX){
 			/*when mapping was updated, the old one is checked as a inavlid*/
 			uint32_t g_num = seg_get_ginfo(p->mapping[t_lba]/_PPS/L2PGAP);
@@ -181,7 +179,6 @@ retry:
 		goto retry;
 	}
 
-	uint32_t old_ppa, new_ppa;
 	for(uint32_t i=0; i<idx; i++){
 		KEYT t_lba=lba[i];
 		if(p->mapping[t_lba]!=UINT_MAX){

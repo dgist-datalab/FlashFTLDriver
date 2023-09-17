@@ -40,10 +40,9 @@ void * thread_test(void * argv){
         char tmp[128];
 
         while(fgets(tmp, 128, pFile)) {
-                vec_request *req=jy_ureq2vec_req(tmp);
+		vec_request *req=jy_ureq2vec_req(tmp);
                 if (!req) continue;
 		assign_vectored_req(req);
-
                 //free(req_arr);
         }
 
@@ -58,7 +57,7 @@ void log_lower_print(int sig){
         printf("----------lower print end----------\n");
 }
 
-
+extern time_t time_begin;
 //int MS_TIME_SL;
 pthread_t thr; 
 int main(int argc,char* argv[]){
@@ -91,6 +90,7 @@ int main(int argc,char* argv[]){
 	*/
 	time_t begin;
 	time(&begin);
+	time(&time_begin);
 
         pthread_create(&thr, NULL, thread_test, (void*) argv[1]);
         pthread_join(thr, NULL);
