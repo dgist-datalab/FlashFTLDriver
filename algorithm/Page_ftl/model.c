@@ -1,14 +1,16 @@
 #include "model.h"
 #include "hot.h"
 #include "map.h"
+#include "midas.h"
 
-//extern algorithm page_ftl;
+extern algorithm page_ftl;
 mini_model *mmodel; 
 mtime mm_time;
 extern G_INFO *G_info;
 extern HF_Q* hot_q;
 extern HF *hotfilter;
 extern int jy_LBANUM;
+extern STAT* midas_stat;
 
 extern uint32_t utilization;
 char workload_name[64] = "tmp";
@@ -324,6 +326,7 @@ void *making_group_configuration(void *arg) {
 	total_count = resizing_model();
 
 	hf_q_calculate();
+	pm_body *p = (pm_body*)page_ftl.algo_body;
 
 	/*making group configuration */
 	// there is an opt group config and a valid ratio list for every #ofgroups
@@ -413,6 +416,28 @@ void *making_group_configuration(void *arg) {
 		g0_desig_size=hot_q->best_extra_size;
 		hot_q->calc_unit=hot_q->best_extra_unit;
 	}
+	if (hot_q->g0_size > 1.0) {
+		if (hot_q->g0_valid > 0.18) {
+			printf("MODEL valid ratio is too high!!!\n");
+			printf("===MODELING END===\n");
+			model_initialize();
+			return (void*)0;
+		}
+	} else {
+		if (hot_q->g0_valid > 0.3) {
+			printf("MODEL valid ratio is too high!!!\n");
+			printf("===MODELING END===\n");
+			model_initialize();
+			return (void*)0;
+		}
+	}
+	if (midas_stat->g->gsize[p->gnum-1] < 10) {
+		printf("there is no last group segment,,,,,, return\n");
+		printf("===MODELING END===\n");
+		model_initialize();
+		return (void*)0;
+	}
+
 	int group_add_flag=0;
 	uint32_t max_groupsize=opt_config[0][0]-50;
 	uint32_t tmp_maxsize = max_groupsize;
