@@ -57,8 +57,9 @@ void model_create(int write_size) {
 		mmodel->time_window = write_size*1024/(_PPS*L2PGAP)*1024/4/mmodel->interval_unit_size;
 
 	//checking max entry
-	mmodel->entry_num = 4*1024*1024/(_PPS*L2PGAP)*1024/4/mmodel->interval_unit_size;
-	if (mmodel->time_window <= mmodel->entry_num) mmodel->entry_num = mmodel->time_window;
+	//mmodel->entry_num = 4*1024*1024/(_PPS*L2PGAP)*1024/4/mmodel->interval_unit_size;
+	//if (mmodel->time_window <= mmodel->entry_num) mmodel->entry_num = mmodel->time_window;
+	mmodel->entry_num = mmodel->time_window;
 
 	/*to check first interval
 	 * fnumber: # of interval to check
@@ -361,6 +362,28 @@ void *making_group_configuration(void *arg) {
 	int g0_desig_size=1;
 	double hot_thresh=0.05;
 	memcpy(group_config, opt_config[0], sizeof(uint32_t)*10);
+	if (hot_q->g0_size > 1.0) {
+		if (hot_q->g0_valid > 0.18) {
+			printf("MODEL valid ratio is too high!!!\n");
+			printf("===MODELING END===\n");
+			model_initialize();
+			return (void*)0;
+		}
+	} else {
+		if (hot_q->g0_valid > 0.3) {
+			printf("MODEL valid ratio is too high!!!\n");
+			printf("===MODELING END===\n");
+			model_initialize();
+			return (void*)0;
+		}
+	}
+	if (midas_stat->g->gsize[p->gnum-1] < 10) {
+		printf("there is no last group segment,,,,,, return\n");
+		printf("===MODELING END===\n");
+		model_initialize();
+		return (void*)0;
+	}
+
 	if (hot_q->is_fix==true) {
 		g0_desig_size=(int)hot_q->g0_size;
 		group_config[0] -= g0_desig_size;
@@ -415,27 +438,6 @@ void *making_group_configuration(void *arg) {
 		hot_q->calc_traffic=hot_q->best_extra_traffic;
 		g0_desig_size=hot_q->best_extra_size;
 		hot_q->calc_unit=hot_q->best_extra_unit;
-	}
-	if (hot_q->g0_size > 1.0) {
-		if (hot_q->g0_valid > 0.18) {
-			printf("MODEL valid ratio is too high!!!\n");
-			printf("===MODELING END===\n");
-			model_initialize();
-			return (void*)0;
-		}
-	} else {
-		if (hot_q->g0_valid > 0.3) {
-			printf("MODEL valid ratio is too high!!!\n");
-			printf("===MODELING END===\n");
-			model_initialize();
-			return (void*)0;
-		}
-	}
-	if (midas_stat->g->gsize[p->gnum-1] < 10) {
-		printf("there is no last group segment,,,,,, return\n");
-		printf("===MODELING END===\n");
-		model_initialize();
-		return (void*)0;
 	}
 
 	int group_add_flag=0;

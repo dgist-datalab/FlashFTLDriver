@@ -55,15 +55,15 @@ typedef struct HotFilter_Q{
 	double best_extra_unit;
 }HF_Q;
 
-void hf_init(HF**hotf);
+void hf_init();
 void hf_q_init();
 void hf_q_reset(bool true_reset);
 void hf_q_calculate();
-void hf_destroy(HF* hotf);
-void hf_metadata_reset(HF* hotf);
+void hf_destroy();
+void hf_metadata_reset();
 void hot_merge();
-void hf_reset(int flag, HF* hotf);
-void hf_update_model(double traffic, HF* hotf);
-void hf_update(HF* hotf);
-void hf_generate(uint32_t lba, int gnum, HF* hotf, int hflag);
-int hf_check(uint32_t lba, HF* hotf);
+void hf_reset(int flag);
+void hf_update_model(double traffic);
+void hf_update();
+void hf_generate(uint32_t lba, int gnum, int hflag);
+int hf_check(uint32_t lba);

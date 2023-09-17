@@ -100,7 +100,7 @@ uint32_t page_map_assign(KEYT* lba, uint32_t max_idx, int gnum){
 		if(p->mapping[t_lba]!=UINT_MAX){
 			/*when mapping was updated, the old one is checked as a inavlid*/
 			uint32_t g_num = seg_get_ginfo(p->mapping[t_lba]/_PPS/L2PGAP);
-			hf_generate(t_lba, g_num, hotfilter, 1);
+			hf_generate(t_lba, g_num, 1);
 			invalidate_ppa(p->mapping[t_lba]);
 		} else utilization++;
 		/*mapping update*/

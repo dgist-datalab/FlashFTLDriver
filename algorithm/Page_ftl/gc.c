@@ -245,7 +245,7 @@ int do_gc(){
 				g_buffer.key[g_buffer.idx]=lbas[i];
 				g_buffer.idx++;
 
-				if (tmp_mig_count == 0 || tmp_mig_count==1) hf_generate(lbas[i], tmp_mig_count, hotfilter, 0);
+				if (tmp_mig_count == 0 || tmp_mig_count==1) hf_generate(lbas[i], tmp_mig_count, 0);
 
 				if(g_buffer.idx==L2PGAP){
 					//if (g_buffer.mig_count >= GNUMBER) printf("problem 1: %d\n", g_buffer.mig_count);

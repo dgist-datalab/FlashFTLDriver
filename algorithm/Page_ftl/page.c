@@ -55,7 +55,7 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	algo->bm=bm; //blockmanager is managing invalidation 
 	stat_init();
 	page_map_create();
-	hf_init(&hotfilter);
+	hf_init();
 
 	rb.pending_req=new std::multimap<uint32_t, algo_req *>();
 	rb.issue_req=new std::multimap<uint32_t, algo_req*>();
@@ -215,7 +215,7 @@ uint32_t align_buffering(request *req, KEYT key, value_set *value){
 			hc_cnt=bidx;
 			target_idx = overlapped_idx;
 		} else {
-			hc_cnt=hf_check(req->key, hotfilter);
+			hc_cnt=hf_check(req->key);
 			target_idx = a_buffer[hc_cnt].idx;
 		}
 		a_buffer[hc_cnt].value[target_idx]=req->value;
@@ -230,7 +230,7 @@ uint32_t align_buffering(request *req, KEYT key, value_set *value){
 			if (hc_cnt==1) printf("!!!!align buffering, hot is in cold block\n");
 			target_idx = overlapped_idx;
 		} else {
-			hc_cnt=hf_check(key, hotfilter);
+			hc_cnt=hf_check(key);
 			target_idx = a_buffer[hc_cnt].idx;
 		}
 		a_buffer[hc_cnt].value[target_idx]=value;

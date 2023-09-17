@@ -8,37 +8,38 @@ extern STAT* midas_stat;
 extern mini_model *mmodel;
 extern HF_Q* hot_q; 
 extern int jy_LBANUM;
+extern HF* hotfilter;
 
-void hf_init(HF **hotf) {
-	(*hotf) = (HF*)malloc(sizeof(HF));
-	(*hotf)->max_val = 3;
-	(*hotf)->hot_val = 3;
-	(*hotf)->tw_ratio = 1.0;
+void hf_init() {
+	hotfilter = (HF*)malloc(sizeof(HF));
+	hotfilter->max_val = 3;
+	hotfilter->hot_val = 3;
+	hotfilter->tw_ratio = 1.0;
 
-	(*hotf)->make_flag=1;
-	(*hotf)->use_flag=1;
+	hotfilter->make_flag=1;
+	hotfilter->use_flag=1;
 
-	(*hotf)->tw = (long)jy_LBANUM;
-	(*hotf)->left_tw = (*hotf)->tw;
-	(*hotf)->cold_tw = (long)jy_LBANUM;
+	hotfilter->tw = (long)jy_LBANUM;
+	hotfilter->left_tw = hotfilter->tw;
+	hotfilter->cold_tw = (long)jy_LBANUM;
 
-	(*hotf)->G0_vr_sum=0.0;
-	(*hotf)->G0_vr_num=0.0;
-	(*hotf)->seg_age=0.0;
-	(*hotf)->seg_num=0.0;
-	(*hotf)->avg_seg_age=0.0;
+	hotfilter->G0_vr_sum=0.0;
+	hotfilter->G0_vr_num=0.0;
+	hotfilter->seg_age=0.0;
+	hotfilter->seg_num=0.0;
+	hotfilter->avg_seg_age=0.0;
 
-	(*hotf)->G0_traffic_ratio=0.0;
-	(*hotf)->tot_traffic=0.0;
-	(*hotf)->G0_traffic=0.0;
+	hotfilter->G0_traffic_ratio=0.0;
+	hotfilter->tot_traffic=0.0;
+	hotfilter->G0_traffic=0.0;
 
-	(*hotf)->hot_lba_num=0;
+	hotfilter->hot_lba_num=0;
 
-	(*hotf)->err_cnt=0;
-	(*hotf)->tmp_err_cnt=0;
+	hotfilter->err_cnt=0;
+	hotfilter->tmp_err_cnt=0;
 
-	(*hotf)->cur_hf = (int*)malloc(sizeof(int)*jy_LBANUM);
-	memset((*hotf)->cur_hf, 0, sizeof(int)*jy_LBANUM);
+	hotfilter->cur_hf = (int*)malloc(sizeof(int)*jy_LBANUM);
+	memset(hotfilter->cur_hf, 0, sizeof(int)*jy_LBANUM);
 
 	hf_q_init();
 }
@@ -131,26 +132,26 @@ void hf_q_calculate() {
 	return;
 }
 
-void hf_destroy(HF *hotf) {
-	free(hotf->cur_hf);
-	free(hotf);
+void hf_destroy() {
+	free(hotfilter->cur_hf);
+	free(hotfilter);
 }
 
-void hf_metadata_reset(HF* hotf) {
-	hotf->make_flag=0;
-	hotf->use_flag=0;
-	hotf->G0_vr_num=0;
-	hotf->G0_vr_sum=0;
-	hotf->seg_age=0.0;
-	hotf->seg_num=0.0;
-	hotf->avg_seg_age=0.0;
-	hotf->G0_traffic_ratio=0.0;
-	hotf->tot_traffic=0.0;
-	hotf->G0_traffic=0.0;
-	hotf->hot_lba_num=0;
-	hotf->left_tw = hotf->tw;
-	hotf->err_cnt=0;
-	hotf->tmp_err_cnt=0;
+void hf_metadata_reset() {
+	hotfilter->make_flag=0;
+	hotfilter->use_flag=0;
+	hotfilter->G0_vr_num=0;
+	hotfilter->G0_vr_sum=0;
+	hotfilter->seg_age=0.0;
+	hotfilter->seg_num=0.0;
+	hotfilter->avg_seg_age=0.0;
+	hotfilter->G0_traffic_ratio=0.0;
+	hotfilter->tot_traffic=0.0;
+	hotfilter->G0_traffic=0.0;
+	hotfilter->hot_lba_num=0;
+	hotfilter->left_tw = hotfilter->tw;
+	hotfilter->err_cnt=0;
+	hotfilter->tmp_err_cnt=0;
 }
 
 void hot_merge() {
@@ -175,136 +176,104 @@ void hot_merge() {
 	//TODO p->m->config[i]?
 }
 
-void hf_reset(int flag, HF* hotf) {
-	memset(hotf->cur_hf, 0, sizeof(int)*jy_LBANUM);
-	hotf->left_tw = hotf->tw;
-	if (flag==1) hotf->make_flag=1;
-	hotf->use_flag=0;
+void hf_reset(int flag) {
+	memset(hotfilter->cur_hf, 0, sizeof(int)*jy_LBANUM);
+	hotfilter->left_tw = hotfilter->tw;
+	if (flag==1) hotfilter->make_flag=1;
+	hotfilter->use_flag=0;
 }
 
-void hf_update_model(double traffic, HF *hotf) {
+void hf_update_model(double traffic) {
 	if (traffic==0.0) return;
 	hot_q->g0_traffic_queue[hot_q->queue_idx] = traffic;
 	hot_q->g0_size_queue[hot_q->queue_idx] = midas_stat->g->gsize[0];
-	hot_q->g0_valid_queue[hot_q->queue_idx] = hotf->G0_vr_sum/hotf->G0_vr_num;
+	hot_q->g0_valid_queue[hot_q->queue_idx] = hotfilter->G0_vr_sum/hotfilter->G0_vr_num;
 	hot_q->queue_idx++;
 	if (hot_q->queue_idx == hot_q->queue_max) hot_q->queue_idx = 0;
 	
 	return;
 }
 
-int hf_cnt=0;
-int print_cond=1;
-void hf_update(HF* hotf) {
-	hf_cnt++;
-	if (hotf->left_tw < 0) {
-		//if (hf_cnt==print_cond) printf("wait more time window for hotfilter: %ld\n", -hotf->left_tw);
-		hotf->left_tw=0;
-	}
-	//if (hf_cnt==print_cond) printf("[HF-NOTICE] HOT LBA NUM: %d (%.2f%%)\n", 
-	//		hotf->hot_lba_num, (double)hotf->hot_lba_num/(double)jy_LBANUM*100.0);
+void hf_update() {
 	double prev_seg_age=0.0;
 	double tr=0.0;
-	tr = hotf->G0_traffic/hotf->tot_traffic;
-	//if (hf_cnt==print_cond) printf("[HF-NOTICE] HOT FILTER traffic: %.3f%% (%d / %d)\n",
-	//		tr*100, (int)hotf->G0_traffic, (int)hotf->tot_traffic);
-	hotf->G0_traffic_ratio=tr;
+	tr = hotfilter->G0_traffic/hotfilter->tot_traffic;
+	hotfilter->G0_traffic_ratio=tr;
 
-	if (hotf->G0_traffic != 0) hf_update_model(tr, hotf);
-	prev_seg_age = hotf->tw/hotf->tw_ratio;
+	hf_update_model(tr);
+	prev_seg_age = hotfilter->tw/hotfilter->tw_ratio;
 
 	double avg_g0 = 0.0;
-	hotf->avg_seg_age=(double)hotf->seg_age/(double)hotf->seg_num;
-	avg_g0 = hotf->avg_seg_age/(double)_PPS/L2PGAP;
+	hotfilter->avg_seg_age=(double)hotfilter->seg_age/(double)hotfilter->seg_num;
+	avg_g0 = hotfilter->avg_seg_age/(double)_PPS/L2PGAP;
 
-	//if (hf_cnt==print_cond) printf("[HF-NOTICE] Calculated avg G0: %.3f%% (num of victim: %d)\n", avg_g0, (int)hotf->seg_num);
-	if (prev_seg_age != 0.0) {
-		if (hotf->avg_seg_age >= prev_seg_age*2) {
-			hotf->avg_seg_age = prev_seg_age*1.5;
-		} else {
-			hotf->avg_seg_age = (hotf->avg_seg_age+prev_seg_age)/2.0;
-		}
-	}
-	avg_g0 = hotf->avg_seg_age/(double)_PPS/L2PGAP;
-	long tw = (long)(hotf->avg_seg_age*hotf->tw_ratio);
-	//if (hf_cnt==print_cond) printf("[HF-NOTICE] NEW HOT FILTER, age: %.3f%% (%ld)\n", avg_g0, tw);
-	if (hf_cnt==print_cond) hf_cnt=0;
+	hotfilter->avg_seg_age=(hotfilter->avg_seg_age+prev_seg_age)/2.0;
+	avg_g0 = hotfilter->avg_seg_age/(double)_PPS/L2PGAP;
+	long tw = (long)(hotfilter->avg_seg_age*hotfilter->tw_ratio);
 
-	hotf->tw=tw;
-	hotf->left_tw=tw-1;
-	hotf->seg_age=0.0;
-	hotf->seg_num=0.0;
-	hotf->G0_traffic=0.0;
-	hotf->tot_traffic=0.0;
-	hotf->G0_vr_sum=0.0;
-	hotf->G0_vr_num=0.0;
+	hotfilter->tw=tw;
+	hotfilter->left_tw=tw-1;
+	hotfilter->seg_age=0.0;
+	hotfilter->seg_num=0.0;
+	hotfilter->G0_traffic=0.0;
+	hotfilter->tot_traffic=0.0;
+	hotfilter->G0_vr_sum=0.0;
+	hotfilter->G0_vr_num=0.0;
 
 	return;
 }
 
-void hf_generate(uint32_t lba, int gnum, HF* hotf, int hflag) {
-	if (hotf->make_flag==0) return;
+void hf_generate(uint32_t lba, int gnum, int hflag) {
 	pm_body *p=(pm_body*)page_ftl.algo_body;
-
-	if ((hotf->make_flag==1) && (hotf->left_tw<=0) && (hotf->seg_num>0)) hf_update(hotf);
-
+	if ((hotfilter->left_tw<=0) && (hotfilter->seg_num)) hf_update();
 	
-	if (hotf->cold_tw>0) {
+	if (hotfilter->cold_tw>0) {
 		//printf("[HF-NOTICE] COLD start end\n");
-		hotf->cold_tw--;
+		hotfilter->cold_tw--;
 		return;
 	}
-	
-
 	if (hflag) {
 		//update the LBA to the hotfilter
-		hotf->left_tw--;
+		hotfilter->left_tw--;
 		if (gnum==1) {
 			double seg_age=page_ftl.bm->jy_get_timestamp(page_ftl.bm, p->mapping[lba]/_PPS/L2PGAP);
-			/*
-			if (seg_age == 0) {
-				//it can be 0, because get_ppa, gc G0 -> G1, and accessed lba to the G1
-				//printf("why the segment stamp is 0??\n");
-				printf("lba: %u\n", lba);
-				//abort();
-			}
-			*/
-			double tmp_age=hotf->tw/hotf->tw_ratio;
-			//printf("prev age: %.3f, new age: %.3f\n", tmp_age, seg_age);
+			double tmp_age=hotfilter->tw/hotfilter->tw_ratio;
 			if (seg_age <= tmp_age) {
-				//hot lba
-				if (hotf->cur_hf[lba] <= hotf->max_val-1) {
-					hotf->cur_hf[lba]++;
-					if (hotf->cur_hf[lba] == hotf->hot_val) hotf->hot_lba_num++;
+				//hot lba	
+				if (hotfilter->cur_hf[lba] <= hotfilter->max_val-1) {
+					hotfilter->cur_hf[lba]++;
 				}
 			} else {
 				//not hot lba
-				if (hotf->cur_hf[lba]>0) {
-					hotf->cur_hf[lba]--;
-					if (hotf->cur_hf[lba] == (hotf->hot_val-1)) hotf->hot_lba_num--;
+				if (hotfilter->cur_hf[lba]>0) {
+					hotfilter->cur_hf[lba]--;
 				}
 			}
 		}
 	} else {
-		if (hotf->cur_hf[lba]>0) {
-			hotf->cur_hf[lba]--;
-			if (hotf->cur_hf[lba] == hotf->hot_val-1) hotf->hot_lba_num--;
+		if (hotfilter->cur_hf[lba]>0) {
+			hotfilter->cur_hf[lba]--;
 			uint32_t gnum = seg_get_ginfo(p->mapping[lba]/_PPS/L2PGAP);
-			if (gnum == 0) hotf->cur_hf[lba]--;
+			if (gnum == 0) hotfilter->cur_hf[lba]--;
 		}
 	}	
 	return;
 }
 
-int hf_check(uint32_t lba, HF* hotf) {
-	if (hotf->use_flag == 0) return 1;
-	else {
-		hotf->tot_traffic++;
-		if (hotf->cur_hf[lba] >= hotf->hot_val) {
-			hotf->G0_traffic++;
-			return 0;
-		} else return 1;
-
+void hf_reduce(uint32_t lba, int gnum) {
+	pm_body *p=(pm_body*)page_ftl.algo_body;
+	if (hotfilter->cur_hf[lba]>0) {
+		hotfilter->cur_hf[lba]--;
+		if (seg_get_ginfo(p->mapping[lba]/_PPS/L2PGAP)) hotfilter->cur_hf[lba]--;
 	}
+}
+
+
+int hf_check(uint32_t lba) {
+	hotfilter->tot_traffic++;
+	if (hotfilter->cur_hf[lba] >= hotfilter->hot_val) {
+		hotfilter->G0_traffic++;
+		return 0;
+	} else return 1;
 }
 
