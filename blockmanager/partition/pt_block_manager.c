@@ -11,6 +11,7 @@ struct blockmanager pt_bm={
 	.get_block=base_get_block,
 	.pick_block=base_pick_block,
 	.get_segment=NULL,
+	.jy_get_time_segment=NULL,
 	.get_page_num=base_get_page_num,
 	.pick_page_num=base_pick_page_num,
 	.check_full=base_check_full,
@@ -25,6 +26,7 @@ struct blockmanager pt_bm={
 	.set_oob=base_set_oob,
 	.get_oob=base_get_oob,
 	.change_reserve=base_change_reserve,
+	.jy_change_reserve=NULL,
 
 	.pt_create=pbm_create,
 	.pt_destroy=pbm_destroy,
@@ -139,7 +141,7 @@ uint32_t pbm_create(blockmanager *bm, int pnum, int *epn, lower_info *li){
 		for(int j=0; j<PUNIT; j++){
 			channel *c=&pinfo->p_channel[i][j];
 			q_init(&c->free_block,end-start);
-			mh_init(&c->max_heap,end-start,pt_mh_swap_hptr,pt_mh_assign_hptr,pt_get_cnt);
+			mh_init(&c->max_heap,end-start,pt_mh_swap_hptr,pt_mh_assign_hptr, NULL, NULL);
 			for(int k=start; k<end;k++){
 				__block *n=&p->base_block[k*BPS+j%BPS];
 				q_enqueue((void*)n,c->free_block);

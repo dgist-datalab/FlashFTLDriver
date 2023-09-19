@@ -16,9 +16,13 @@
 uint32_t log_fd;
 #endif
 
-
+extern long cur_timestamp;
 extern uint32_t test_key;
 align_buffer a_buffer;
+
+long tmp_gc_write=0;
+long tmp_user_write=0;
+
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
 
 extern MeasureTime mt;
@@ -155,15 +159,23 @@ uint32_t page_read(request *const req){
 	}
 	return 1;
 }
-uint32_t size=0;
+long reqq_size=0;
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	bool overlap=false;
 
 	uint32_t overlapped_idx=UINT32_MAX;
-	
-	++size;
-	if (size%262144==0) printf("\rwrite size: %dGB", size/262144);
-	if (size%8388608==0) printf("\n");
+
+	cur_timestamp++;
+	tmp_user_write++;	
+	++reqq_size;
+
+	if (reqq_size%GIGAUNIT*1024/4*1024==0) {
+		printf("PROGRESS %dGB] tmp WAF = %.3f\n", (double)(tmp_user_write+tmp_gc_write)/(double)tmp_user_write);
+		tmp_user_write=0;
+		tmp_gc_write=0;
+	}
+	//if (size%262144==0) printf("\rwrite size: %dGB", size/262144);
+	//if (size%8388608==0) printf("\n");
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		if(a_buffer.key[i]==req->key){
 			overlapped_idx=i;

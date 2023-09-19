@@ -6,27 +6,12 @@
 
 extern uint32_t test_key;
 extern algorithm page_ftl;
+extern long cur_timestamp;
+
 
 uint32_t *seg_ratio;
 uint32_t req_num=0;
 char gcur=0;
-FILE *vFile;
-//FILE *gFile;
-//FILE *wFile;
-
-FILE *hFile_10;
-FILE *hFile_20;
-FILE *hFile_30;
-FILE *hFile_40;
-FILE *hFile_50;
-
-FILE *tFile_10;
-FILE *tFile_20;
-FILE *tFile_30;
-FILE *tFile_40;
-FILE *tFile_50;
-
-
 
 void page_map_create(){
 	printf("NOS: %d\n", _NOS);
@@ -50,63 +35,7 @@ void page_map_create(){
 	//sprintf(name, "./valid_ratio/11_valid_%d", GNUMBER);
 	//vFile = fopen(name, "w");
 
-	char *ttp=(char*)malloc(4);
-	if (BENCH_JY == 0) ttp = "08";
-	else if (BENCH_JY == 1) ttp = "11";
-	else ttp = "ran";	
-	sprintf(name, "./valid_ratio/r_%s_hot_10", ttp);
-	hFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_20", ttp);
-	hFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_30", ttp);
-	hFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_40", ttp);
-	hFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/r_%s_hot_50", ttp);
-	hFile_50 = fopen(name, "w");
-
-	sprintf(name, "./valid_ratio/tot_%s_hot_10", ttp);
-	tFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_20", ttp);
-	tFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_30", ttp);
-	tFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_40", ttp);
-	tFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tot_%s_hot_50", ttp);
-	tFile_50 = fopen(name, "w");
-
-	sprintf(name, "./valid_ratio/valid_%s", ttp);
-	vFile = fopen(name, "w");
-
-
-/*
-	sprintf(name, "./valid_ratio/tmp_10");
-	hFile_10 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_20");
-	hFile_20 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_30");
-	hFile_30 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_40");
-	hFile_40 = fopen(name, "w");
-	sprintf(name, "./valid_ratio/tmp_50");
-	hFile_50 = fopen(name, "w");
-*/
-
-	setbuf(hFile_10, NULL);
-	setbuf(hFile_20, NULL);
-	setbuf(hFile_30, NULL);
-	setbuf(hFile_40, NULL);
-	setbuf(hFile_50, NULL);
-
-	setbuf(tFile_10, NULL);
-        setbuf(tFile_20, NULL);
-        setbuf(tFile_30, NULL);
-        setbuf(tFile_40, NULL);
-        setbuf(tFile_50, NULL);
-
-	setbuf(vFile, NULL);
-	p->active=page_ftl.bm->get_segment(page_ftl.bm,true); //now active block for inserted request.
+	p->active=page_ftl.bm->jy_get_time_segment(page_ftl.bm,true); //now active block for inserted request.
 	page_ftl.algo_body=(void*)p; //you can assign your data structure in algorithm structure
 }
 
@@ -168,14 +97,14 @@ uint32_t page_map_gc_update(KEYT *lba, uint32_t idx, uint32_t mig_count){
 retry:
 	if (gcur <= group_idx) {
 		//initialize migration group
-		p->reserve[group_idx] = page_ftl.bm->get_segment(page_ftl.bm, true);
+		p->reserve[group_idx] = page_ftl.bm->jy_get_time_segment(page_ftl.bm, true);
 		++gcur;
 	}
 	res=page_ftl.bm->get_page_num(page_ftl.bm,p->reserve[group_idx]);
 	if (res==UINT32_MAX){
 		__segment* tmp=p->reserve[group_idx];
 		seg_ratio[group_idx+1]++;
-		p->reserve[group_idx] = page_ftl.bm->change_reserve(page_ftl.bm, p->reserve[group_idx]);
+		p->reserve[group_idx] = page_ftl.bm->jy_change_reserve(page_ftl.bm, p->reserve[group_idx]);
 		page_ftl.bm->free_segment(page_ftl.bm, tmp);
 		goto retry;
 	}
@@ -208,22 +137,7 @@ void page_map_free(){
 	free(seg_ratio);
 	free(p->reserve);
 	free(p);
-	fclose(vFile);
-	//fclose(gFile);
-	//fclose(wFile);
-	
-	fclose(hFile_10);
-	fclose(hFile_20);
-	fclose(hFile_30);
-	fclose(hFile_40);
-	fclose(hFile_50);
-	
-	fclose(tFile_10);
-	fclose(tFile_20);
-	fclose(tFile_30);
-	fclose(tFile_40);
-	fclose(tFile_50);
-	
+
 
 }
 

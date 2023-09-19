@@ -6,27 +6,13 @@
 
 extern uint32_t *seg_ratio;
 uint32_t gc_norm_count=0;
-extern FILE *vFile;
-//extern FILE *gFile;
-//extern FILE *wFile;
-
-extern FILE *hFile_10;
-extern FILE *hFile_20;
-extern FILE *hFile_30;
-extern FILE *hFile_40;
-extern FILE *hFile_50;
-
-extern FILE *tFile_10;
-extern FILE *tFile_20;
-extern FILE *tFile_30;
-extern FILE *tFile_40;
-extern FILE *tFile_50;
-
-
 
 extern uint32_t req_num;
 
 extern algorithm page_ftl;
+extern long cur_timestamp;
+extern long tmp_gc_write;
+
 void invalidate_ppa(uint32_t t_ppa){
 	/*when the ppa is invalidated this function must be called*/
 	page_ftl.bm->unpopulate_bit(page_ftl.bm, t_ppa);
@@ -181,15 +167,6 @@ void do_gc(){
 	gc_value *gv;
 
 	li_node *now,*nxt;
-	uint32_t hot_10=0;
-	uint32_t hot_20=0;
-	uint32_t hot_30=0;
-	uint32_t hot_40=0;
-	uint32_t hot_50=0;
-	uint32_t tot_num[5]={0,};
-	uint32_t list_hot_08[5] = {361, 5828, 34346, 126253, 351780};
-	uint32_t list_hot_11[5] = {0, 3, 13, 52, 229};
-	uint32_t list_hot_ran[5] = {627457, 1321580, 2056258, 2824995, 3627312};
 	//static int cnt=0;
 	//printf("gc: %d\n", cnt++);
 	/*by using this for loop, you can traversal all page in block*/
@@ -206,84 +183,9 @@ void do_gc(){
 		if(should_read){
 			gv=send_req(page,GCDR,NULL);
 			list_insert(temp_list,(void*)gv);
-		} else gv = send_req(page,GCDR,NULL);
-		list_insert(hot_list, (void*)gv);
-		while(hot_list->size) {
-			for_each_list_node_safe(hot_list, now, nxt) {
-			gv=(gc_value*)now->data;
-			if (!gv->isdone)continue;
-			char* toob = bm->get_oob(bm, gv->ppa);
-			KEYT *tlba = (KEYT*)get_lbas(bm, toob, sizeof(KEYT)*L2PGAP);
-			for (uint32_t i=0;i<L2PGAP; i++) {
-				if (BENCH_JY == 0) {
-						//zipfian 08
-						int tt;
-						tt=tlba[i];
-						if (tt <= list_hot_08[4]) {
-							++tot_num[4];
-							if (tt <= list_hot_08[3]) {
-								++tot_num[3];
-								if (tt <= list_hot_08[2]) {
-									++tot_num[2];
-									if (tt <= list_hot_08[1]) {
-										++tot_num[1];
-										if (tt <= list_hot_08[0]) {
-											++tot_num[0];
-										}
-									}
-								}
-							}
-						}
-					} else if (BENCH_JY == 1) {
-						//zipfian 11
-						int tt;
-						tt=tlba[i];
-						if (tt <= list_hot_11[4]) {
-							++tot_num[4];
-							if (tt <= list_hot_11[3]) {
-								++tot_num[3];
-								if (tt <= list_hot_11[2]) {
-									++tot_num[2];
-									if (tt <= list_hot_11[1]) {
-										++tot_num[1];
-										if (tt <= list_hot_11[0]) {
-											++tot_num[0];
-										}
-									}
-								}
-							}
-						}
-				
-					} else  {
-						//random
-						int tt;
-						tt=tlba[i];
-						if (tt <= list_hot_ran[4]) {
-							++tot_num[4];
-							if (tt <= list_hot_ran[3]) {
-								++tot_num[3];
-								if (tt <= list_hot_ran[2]) {
-									++tot_num[2];
-									if (tt <= list_hot_ran[1]) {
-										++tot_num[1];
-										if (tt <= list_hot_ran[0]) {
-											++tot_num[0];
-										}
-									}
-								}
-							}
-						}
-					}
-			}
-			if (!should_read) {
-				inf_free_valueset(gv->value, FS_MALLOC_R);
-				free(gv);
-			}
-			free(tlba);
-			list_delete_node(hot_list,now);
-		}}
+		}
+	
 	}
-
 	g_buffer.idx=0;
 	char* oobs;
 	KEYT *lbas;
@@ -305,69 +207,11 @@ void do_gc(){
 
 			for(uint32_t i=0; i<L2PGAP; i++){
 				if(bm->is_invalid_page(bm,gv->ppa*L2PGAP+i)) continue;
+				++tmp_gc_write;
 				++page_num;
 				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 				g_buffer.idx++;
-				if (BENCH_JY == 0) {
-					//zipfian 08
-					int tt;
-					tt=lbas[i];
-					if (tt <= list_hot_08[4]) {
-						++hot_50;
-						if (tt <= list_hot_08[3]) {
-							++hot_40;
-							if (tt <= list_hot_08[2]) {
-								++hot_30;
-								if (tt <= list_hot_08[1]) {
-									++hot_20;
-									if (tt <= list_hot_08[0]) {
-										++hot_10;
-									}
-								}
-							}
-						}
-					}
-				} else if (BENCH_JY == 1) {
-					//zipfian 11
-					int tt;
-					tt=lbas[i];
-					if (tt <= list_hot_11[4]) {
-						++hot_50;
-						if (tt <= list_hot_11[3]) {
-							++hot_40;
-							if (tt <= list_hot_11[2]) {
-								++hot_30;
-								if (tt <= list_hot_11[1]) {
-									++hot_20;
-									if (tt <= list_hot_11[0]) {
-										++hot_10;
-									}
-								}
-							}
-						}
-					}
-			
-				} else  {
-					//random
-					int tt;
-					tt=lbas[i];
-					if (tt <= list_hot_ran[4]) {
-						++hot_50;
-						if (tt <= list_hot_ran[3]) {
-							++hot_40;
-							if (tt <= list_hot_ran[2]) {
-								++hot_30;
-								if (tt <= list_hot_ran[1]) {
-									++hot_20;
-									if (tt <= list_hot_ran[0]) {
-										++hot_10;
-									}
-								}
-							}
-						}
-					}
-				} 
 				if(g_buffer.idx==L2PGAP){
 					//if (g_buffer.mig_count >= GNUMBER) printf("problem 1: %d\n", g_buffer.mig_count);
 					uint32_t res=page_map_gc_update(g_buffer.key, L2PGAP, g_buffer.mig_count);
@@ -393,54 +237,6 @@ void do_gc(){
 		g_buffer.idx=0;	
 	}
 	bm->trim_segment(bm,target,page_ftl.li); //erase a block
-	
-	// print valid ratio
-	char val_buf[64];
-	sprintf(val_buf, "%d %f\n", tmp_mig_count+1, (float)page_num/(float)tot_page_num*(float)100);
-	fputs(val_buf, vFile);
-	
-	//printf("gc occurs, valid page: %f%%\n", (float)page_num/(float)tot_page_num*(float)100);
-	
-	//print hot ratio
-	char hot_buf[64];
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)hot_10/(float)page_num*(float)100);
-	fputs(hot_buf, hFile_10);
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)hot_20/(float)page_num*(float)100);
-	fputs(hot_buf, hFile_20);
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)hot_30/(float)page_num*(float)100);
-	fputs(hot_buf, hFile_30);
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)hot_40/(float)page_num*(float)100);
-	fputs(hot_buf, hFile_40);
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)hot_50/(float)page_num*(float)100);
-	fputs(hot_buf, hFile_50);
-	
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)tot_num[0]/(float)tot_page_num*(float)100);
-	fputs(hot_buf, tFile_10);
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)tot_num[1]/(float)tot_page_num*(float)100);
-	fputs(hot_buf, tFile_20);
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)tot_num[2]/(float)tot_page_num*(float)100);
-	fputs(hot_buf, tFile_30);
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)tot_num[3]/(float)tot_page_num*(float)100);
-	fputs(hot_buf, tFile_40);
-	sprintf(hot_buf, "%d %f\n", tmp_mig_count+1, (float)tot_num[4]/(float)tot_page_num*(float)100);
-	fputs(hot_buf, tFile_50);
-
-
-	// * print # of current segment number
-	/*
-	for (int i=0;i<(GNUMBER-1);++i) {
-		printf("current %d group segment number: %d\n", i+1, seg_ratio[i]);
-	}
-	*/
-	/*
-	if (bm->check_full(bm, p->active, MASTER_PAGE)) {
-		bm->free_segment(bm, p->active);
-
-		p->active=bm->get_segment(page_ftl.bm, false);//make reserved to active block
-	//p->reserve=bm->change_reserve(bm,p->reserve); //get new reserve block from block_manager
-	}
-	*/
-	list_free(hot_list);
 	list_free(temp_list);
 }
 
@@ -490,7 +286,7 @@ retry:
 		//printf("free segment: %u\n", page_ftl.bm->get_free_segment_number(page_ftl.bm));
 		++seg_ratio[0];
 		__segment *tmp = p->active;
-		p->active = page_ftl.bm->change_reserve(page_ftl.bm, p->active);
+		p->active = page_ftl.bm->jy_change_reserve(page_ftl.bm, p->active);
 		page_ftl.bm->free_segment(page_ftl.bm,tmp); //get a new block
 		goto retry;
 	}

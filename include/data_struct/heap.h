@@ -6,7 +6,7 @@
 #define MHR_CHIPTR(mh,idx) &((mh->body)[idx*2+1])
 
 typedef struct heap_node{
-	uint64_t cnt;
+	double cnt;
 	void *data;
 }hn;
 
@@ -16,10 +16,11 @@ typedef struct max_heap{
 	int max;
 	void (*swap_hptr)(void * a, void *b);
 	void (*assign_hptr)(void *a, void* mh);
-	int (*get_cnt)(void *a);
+	double (*get_cnt)(void *a, void *b);
+	void *bm;
 }mh;
 
-void mh_init(mh**, int bn, void (*swap_hptr)(void*,void*), void(*aassign_hptr)(void *, void *),int (*get_cnt)(void *a));
+void mh_init(mh**, int bn, void (*swap_hptr)(void*,void*), void(*aassign_hptr)(void *, void *),double (*get_cnt)(void *a, void *b), void *bm);
 void mh_free(mh*);
 void mh_insert(mh*, void *data, int number);
 void mh_insert_append(mh *, void *data);

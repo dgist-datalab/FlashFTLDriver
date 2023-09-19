@@ -60,6 +60,7 @@ void log_lower_print(int sig){
 
 //int MS_TIME_SL;
 pthread_t thr; 
+extern time_t time_begin;
 int main(int argc,char* argv[]){
 	
 	struct sigaction sa;
@@ -90,6 +91,7 @@ int main(int argc,char* argv[]){
 	*/
 	time_t begin;
 	time(&begin);
+	time(&time_begin);
 
         pthread_create(&thr, NULL, thread_test, (void*) argv[1]);
         pthread_join(thr, NULL);

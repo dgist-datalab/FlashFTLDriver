@@ -224,6 +224,7 @@ struct blockmanager{
 	__block* (*get_block) (struct blockmanager*,__segment*);
 	__block *(*pick_block)(struct blockmanager*, uint32_t page_num);
 	__segment* (*get_segment) (struct blockmanager*, bool isreserve);
+	__segment* (*jy_get_time_segment) (struct blockmanager*, bool isreserve);
 	int (*get_page_num)(struct blockmanager*, __segment*);
 	int (*pick_page_num)(struct blockmanager*, __segment*);
 	bool (*check_full)(struct blockmanager*, __segment*, uint8_t type);
@@ -241,6 +242,7 @@ struct blockmanager{
 	void (*set_oob)(struct blockmanager*, char* data, int len, uint32_t ppa);
 	char *(*get_oob)(struct blockmanager*, uint32_t ppa);
 	__segment* (*change_reserve)(struct blockmanager *, __segment *reserve);
+	__segment* (*jy_change_reserve)(struct blockmanager*, __segment *reserve);
 	void (*reinsert_segment)(struct blockmanager *, uint32_t seg_idx);
 	uint32_t (*remain_free_page)(struct blockmanager *, __segment *active);
 	void (*invalidate_number_decrease)(struct blockmanager *, uint32_t ppa);

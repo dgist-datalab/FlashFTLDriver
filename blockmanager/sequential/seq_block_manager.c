@@ -1,9 +1,11 @@
 #include "seq_block_manager.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 static uint64_t total_validate_piece_ppa;
 static uint64_t total_invalidate_piece_ppa;
+long cur_timestamp=1;
 
 struct blockmanager seq_bm={
 	.create=seq_create,
@@ -11,6 +13,7 @@ struct blockmanager seq_bm={
 	.get_block=seq_get_block,
 	.pick_block=seq_pick_block,
 	.get_segment=seq_get_segment,
+	.jy_get_time_segment=seq_jy_get_time_segment,
 	.get_page_num=seq_get_page_num,
 	.pick_page_num=seq_pick_page_num,
 	.check_full=seq_check_full,
@@ -30,6 +33,7 @@ struct blockmanager seq_bm={
 	.set_oob=seq_set_oob,
 	.get_oob=seq_get_oob,
 	.change_reserve=seq_change_reserve,
+	.jy_change_reserve=seq_jy_change_reserve,
 	.reinsert_segment=seq_reinsert_segment,
 	.remain_free_page=seq_remain_free_page,
 	.invalidate_number_decrease=seq_invalidate_number_decrease,
@@ -75,6 +79,23 @@ int seq_get_cnt(void *a){
 	return aa->total_invalid_number;
 }
 
+double seq_get_cnt_new(void *a, void *b) {
+        block_set *aa = (block_set*)a;
+        struct blockmanager* bm = (struct blockmanager*) b;
+        sbm_pri *p = (sbm_pri*)bm->private_data;
+
+        int idx = aa->blocks[0]->block_num/BPS;
+        if (p->timestamp[idx] == 0) {
+                printf("timestamp of segment is null\n");
+                abort();
+        }
+        long interval_t = (long)(cur_timestamp - p->timestamp[idx]);
+        double int_t = sqrt((double)interval_t); //age value
+
+        double cand_value = (float)int_t*(double)aa->total_invalid_number/((double)_PPS*L2PGAP-aa->total_invalid_number);
+        return cand_value;
+}
+
 uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	bm->li=li;
 	//bb_checker_start(bm->li);/*check if the block is badblock*/
@@ -87,6 +108,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 	p->logical_segment=(block_set*)calloc(sizeof(block_set), _NOS);
 	p->assigned_block=p->free_block=0;
 	p->seg_populate_bit=(uint8_t*)calloc(_NOS/8+(_NOS%8?1:0), sizeof(uint8_t));
+	p->timestamp= (long*)calloc(sizeof(long), _NOS);
 
 	int glob_block_idx=0;
 	for(int i=0; i<_NOS; i++){
@@ -101,7 +123,7 @@ uint32_t seq_create (struct blockmanager* bm, lower_info *li){
 		p->logical_segment[i].total_valid_number=0;
 	}
 
-	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt);
+	mh_init(&p->max_heap, _NOS, seq_mh_swap_hptr, seq_mh_assign_hptr, seq_get_cnt_new, bm);
 	q_init(&p->free_logical_segment_q, _NOS);
 	q_init(&p->invalid_block_q, _NOS);
 	
@@ -183,6 +205,60 @@ __segment* seq_get_segment (struct blockmanager* bm, bool isreserve){
 	return res;
 }
 
+__segment* seq_jy_get_time_segment (struct blockmanager* bm, bool isreserve){
+	__segment* res=(__segment*)malloc(sizeof(__segment));
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	
+	block_set *free_block_set=(block_set*)q_dequeue(p->free_logical_segment_q);
+	
+	if(!free_block_set){
+		EPRINT("dev full??", false);
+		return NULL;
+	}
+
+	if(free_block_set->total_invalid_number || free_block_set->total_valid_number){
+		EPRINT("how can it be!\n", true);
+	}
+
+	if(!free_block_set){
+		printf("new block is null!\n");
+		abort();
+	}
+
+
+	if(isreserve){
+
+	}
+	else{
+		mh_insert_append(p->max_heap, (void*)free_block_set);
+	}
+
+	memcpy(res->blocks, free_block_set->blocks, sizeof(__block*)*BPS);
+
+	res->now=0;
+	res->max=BPS;
+	res->invalid_blocks=0;
+	res->used_page_num=0;
+	res->seg_idx=res->blocks[0]->block_num/BPS;
+	
+	p->assigned_block++;
+	p->free_block--;
+	p->timestamp[res->seg_idx] = cur_timestamp;
+
+	if(p->assigned_block+p->free_block!=_NOS){
+		printf("missing segment error\n");
+		abort();
+	}
+/*
+	if(p->seg_populate_bit[res->seg_idx/8] & (1<<(res->seg_idx%8))){
+		EPRINT("already populate!\n", true);
+	}
+
+	p->seg_populate_bit[res->seg_idx/8] |=(1<<(res->seg_idx%8));*/
+	return res;
+}
+
+
 __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 
 	sbm_pri *p=(sbm_pri*)bm->private_data;
@@ -193,6 +269,18 @@ __segment* seq_change_reserve(struct blockmanager* bm,__segment *reserve){
 	mh_insert_append(p->max_heap, (void*)bs);
 
 	return seq_get_segment(bm,true);
+}
+
+__segment* seq_jy_change_reserve(struct blockmanager* bm,__segment *reserve){
+
+	sbm_pri *p=(sbm_pri*)bm->private_data;
+	uint32_t segment_start_block_number=reserve->blocks[0]->block_num;
+	uint32_t segment_idx=segment_start_block_number/BPS;
+	block_set *bs=&p->logical_segment[segment_idx];
+
+	mh_insert_append(p->max_heap, (void*)bs);
+
+	return seq_jy_get_time_segment(bm,true);
 }
 
 

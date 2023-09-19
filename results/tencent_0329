@@ -1,0 +1,107 @@
+signal add!
+bench range:0 ~ 4294967295
+lower mem dev  mode
+NOC :2 _NOS:512
+NOS: 512
+write size: 1GBwrite size: 2GBwrite size: 3GBwrite size: 4GBwrite size: 5GBwrite size: 6GBwrite size: 7GBwrite size: 8GBwrite size: 9GBwrite size: 10GBwrite size: 11GBwrite size: 12GBwrite size: 13GBwrite size: 14GBwrite size: 15GBwrite size: 16GBwrite size: 17GBwrite size: 18GBwrite size: 19GBwrite size: 20GBwrite size: 21GBwrite size: 22GBwrite size: 23GBwrite size: 24GBwrite size: 25GBwrite size: 26GBwrite size: 27GBwrite size: 28GBwrite size: 29GBwrite size: 30GBwrite size: 31GBwrite size: 32GB
+write size: 33GBwrite size: 34GBwrite size: 35GBwrite size: 36GBwrite size: 37GBwrite size: 38GBwrite size: 39GBwrite size: 40GBwrite size: 41GBwrite size: 42GBwrite size: 43GBwrite size: 44GBwrite size: 45GBwrite size: 46GBwrite size: 47GBwrite size: 48GBwrite size: 49GBwrite size: 50GBwrite size: 51GBwrite size: 52GBwrite size: 53GBwrite size: 54GBwrite size: 55GBwrite size: 56GBwrite size: 57GBwrite size: 58GBwrite size: 59GBwrite size: 60GBwrite size: 61GBwrite size: 62GBwrite size: 63GBwrite size: 64GB
+write size: 65GBwrite size: 66GBwrite size: 67GBwrite size: 68GBwrite size: 69GBwrite size: 70GBwrite size: 71GBwrite size: 72GBwrite size: 73GBwrite size: 74GBwrite size: 75GBwrite size: 76GBwrite size: 77GBwrite size: 78GBwrite size: 79GBwrite size: 80GBwrite size: 81GBwrite size: 82GBwrite size: 83GBwrite size: 84GBwrite size: 85GBwrite size: 86GBwrite size: 87GBwrite size: 88GBwrite size: 89GBwrite size: 90GBwrite size: 91GBwrite size: 92GBwrite size: 93GBwrite size: 94GBwrite size: 95GBwrite size: 96GB
+write size: 97GBwrite size: 98GBwrite size: 99GBwrite size: 100GBwrite size: 101GBwrite size: 102GBwrite size: 103GBwrite size: 104GBwrite size: 105GBwrite size: 106GBwrite size: 107GBwrite size: 108GBwrite size: 109GBwrite size: 110GBwrite size: 111GBwrite size: 112GBwrite size: 113GBwrite size: 114GBwrite size: 115GBwrite size: 116GBwrite size: 117GBwrite size: 118GBwrite size: 119GBwrite size: 120GBwrite size: 121GBwrite size: 122GBwrite size: 123GBwrite size: 124GBwrite size: 125GBwrite size: 126GBwrite size: 127GBwrite size: 128GB
+write size: 129GBwrite size: 130GBwrite size: 131GBwrite size: 132GBwrite size: 133GBwrite size: 134GBwrite size: 135GBwrite size: 136GBwrite size: 137GBwrite size: 138GBwrite size: 139GBwrite size: 140GBwrite size: 141GBwrite size: 142GBwrite size: 143GBwrite size: 144GBwrite size: 145GBwrite size: 146GBwrite size: 147GBwrite size: 148GBwrite size: 149GBwrite size: 150GBwrite size: 151GBwrite size: 152GBwrite size: 153GBwrite size: 154GBwrite size: 155GBwrite size: 156GBwrite size: 157GBwrite size: 158GBwrite size: 159GBwrite size: 160GB
+write size: 161GBwrite size: 162GBwrite size: 163GBwrite size: 164GBwrite size: 165GBwrite size: 166GBwrite size: 167GBwrite size: 168GBwrite size: 169GBwrite size: 170GBwrite size: 171GBwrite size: 172GBwrite size: 173GBwrite size: 174GBwrite size: 175GBwrite size: 176GBwrite size: 177GBwrite size: 178GBwrite size: 179GBwrite size: 180GBwrite size: 181GBwrite size: 182GBwrite size: 183GBwrite size: 184GBwrite size: 185GBwrite size: 186GBwrite size: 187GBwrite size: 188GBwrite size: 189GBwrite size: 190GBwrite size: 191GBwrite size: 192GB
+write size: 193GBwrite size: 194GBwrite size: 195GBwrite size: 196GBwrite size: 197GBwrite size: 198GBwrite size: 199GBwrite size: 200GBwrite size: 201GBwrite size: 202GBwrite size: 203GBwrite size: 204GBwrite size: 205GBwrite size: 206GBwrite size: 207GBwrite size: 208GBwrite size: 209GBwrite size: 210GBwrite size: 211GBwrite size: 212GBwrite size: 213GBwrite size: 214GBwrite size: 215GBwrite size: 216GBwrite size: 217GBwrite size: 218GBwrite size: 219GBwrite size: 220GBwrite size: 221GBwrite size: 222GBwrite size: 223GBwrite size: 224GB
+write size: 225GBwrite size: 226GBwrite size: 227GBwrite size: 228GBwrite size: 229GBwrite size: 230GBwrite size: 231GBwrite size: 232GBwrite size: 233GBwrite size: 234GBwrite size: 235GBwrite size: 236GBwrite size: 237GBwrite size: 238GBwrite size: 239GBwrite size: 240GBwrite size: 241GBwrite size: 242GBwrite size: 243GBwrite size: 244GBwrite size: 245GBwrite size: 246GBwrite size: 247GBwrite size: 248GBwrite size: 249GBwrite size: 250GBwrite size: 251GBwrite size: 252GBwrite size: 253GBwrite size: 254GBwrite size: 255GBwrite size: 256GB
+write size: 257GBwrite size: 258GBwrite size: 259GBwrite size: 260GBwrite size: 261GBwrite size: 262GBwrite size: 263GBwrite size: 264GBwrite size: 265GBwrite size: 266GBwrite size: 267GBwrite size: 268GBwrite size: 269GBwrite size: 270GBwrite size: 271GBwrite size: 272GBwrite size: 273GBwrite size: 274GBwrite size: 275GBwrite size: 276GBwrite size: 277GBwrite size: 278GBwrite size: 279GBwrite size: 280GBwrite size: 281GBwrite size: 282GBwrite size: 283GBwrite size: 284GBwrite size: 285GBwrite size: 286GBwrite size: 287GBwrite size: 288GB
+write size: 289GBwrite size: 290GBwrite size: 291GBwrite size: 292GBwrite size: 293GBwrite size: 294GBwrite size: 295GBwrite size: 296GBwrite size: 297GBwrite size: 298GBwrite size: 299GBwrite size: 300GBwrite size: 301GBwrite size: 302GBwrite size: 303GBwrite size: 304GBwrite size: 305GBwrite size: 306GBwrite size: 307GBwrite size: 308GBwrite size: 309GBwrite size: 310GBwrite size: 311GBwrite size: 312GBwrite size: 313GBwrite size: 314GBwrite size: 315GBwrite size: 316GBwrite size: 317GBwrite size: 318GBwrite size: 319GBwrite size: 320GB
+write size: 321GBwrite size: 322GBwrite size: 323GBwrite size: 324GBwrite size: 325GBwrite size: 326GBwrite size: 327GBwrite size: 328GBwrite size: 329GBwrite size: 330GBwrite size: 331GBwrite size: 332GBwrite size: 333GBwrite size: 334GBwrite size: 335GBwrite size: 336GBwrite size: 337GBwrite size: 338GBwrite size: 339GBwrite size: 340GBwrite size: 341GBwrite size: 342GBwrite size: 343GBwrite size: 344GBwrite size: 345GBwrite size: 346GBwrite size: 347GBwrite size: 348GBwrite size: 349GBwrite size: 350GBwrite size: 351GBwrite size: 352GB
+write size: 353GBwrite size: 354GBwrite size: 355GBwrite size: 356GBwrite size: 357GBwrite size: 358GBwrite size: 359GBwrite size: 360GBwrite size: 361GBwrite size: 362GBwrite size: 363GBwrite size: 364GBwrite size: 365GBwrite size: 366GBwrite size: 367GBwrite size: 368GBwrite size: 369GBwrite size: 370GBwrite size: 371GBwrite size: 372GBwrite size: 373GBwrite size: 374GBwrite size: 375GBwrite size: 376GBwrite size: 377GBwrite size: 378GBwrite size: 379GBwrite size: 380GBwrite size: 381GBwrite size: 382GBwrite size: 383GBwrite size: 384GB
+write size: 385GBwrite size: 386GBwrite size: 387GBwrite size: 388GBwrite size: 389GBwrite size: 390GBwrite size: 391GBwrite size: 392GBwrite size: 393GBwrite size: 394GBwrite size: 395GBwrite size: 396GBwrite size: 397GBwrite size: 398GBwrite size: 399GBwrite size: 400GBwrite size: 401GBwrite size: 402GBwrite size: 403GBwrite size: 404GBwrite size: 405GBwrite size: 406GBwrite size: 407GBwrite size: 408GBwrite size: 409GBwrite size: 410GBwrite size: 411GBwrite size: 412GBwrite size: 413GBwrite size: 414GBwrite size: 415GBwrite size: 416GB
+write size: 417GBwrite size: 418GBwrite size: 419GBwrite size: 420GBwrite size: 421GBwrite size: 422GBwrite size: 423GBwrite size: 424GBwrite size: 425GBwrite size: 426GBwrite size: 427GBwrite size: 428GBwrite size: 429GBwrite size: 430GBwrite size: 431GBwrite size: 432GBwrite size: 433GBwrite size: 434GBwrite size: 435GBwrite size: 436GBwrite size: 437GBwrite size: 438GBwrite size: 439GBwrite size: 440GBwrite size: 441GBwrite size: 442GBwrite size: 443GBwrite size: 444GBwrite size: 445GBwrite size: 446GBwrite size: 447GBwrite size: 448GB
+write size: 449GBwrite size: 450GBwrite size: 451GBwrite size: 452GBwrite size: 453GBwrite size: 454GBwrite size: 455GBwrite size: 456GBwrite size: 457GBwrite size: 458GBwrite size: 459GBwrite size: 460GBwrite size: 461GBwrite size: 462GBwrite size: 463GBwrite size: 464GBwrite size: 465GBwrite size: 466GBwrite size: 467GBwrite size: 468GBwrite size: 469GBwrite size: 470GBwrite size: 471GBwrite size: 472GBwrite size: 473GBwrite size: 474GBwrite size: 475GBwrite size: 476GBwrite size: 477GBwrite size: 478GBwrite size: 479GBwrite size: 480GB
+write size: 481GBwrite size: 482GBwrite size: 483GBwrite size: 484GBwrite size: 485GBwrite size: 486GBwrite size: 487GBwrite size: 488GBwrite size: 489GBwrite size: 490GBwrite size: 491GBwrite size: 492GBwrite size: 493GBwrite size: 494GBwrite size: 495GBwrite size: 496GBwrite size: 497GBwrite size: 498GBwrite size: 499GBwrite size: 500GBwrite size: 501GBwrite size: 502GBwrite size: 503GBwrite size: 504GBwrite size: 505GBwrite size: 506GBwrite size: 507GBwrite size: 508GBwrite size: 509GBwrite size: 510GBwrite size: 511GBwrite size: 512GB
+write size: 513GBwrite size: 514GBwrite size: 515GBwrite size: 516GBwrite size: 517GBwrite size: 518GBwrite size: 519GBwrite size: 520GBwrite size: 521GBwrite size: 522GBwrite size: 523GBwrite size: 524GBwrite size: 525GBwrite size: 526GBwrite size: 527GBwrite size: 528GBwrite size: 529GBwrite size: 530GBwrite size: 531GBwrite size: 532GBwrite size: 533GBwrite size: 534GBwrite size: 535GBwrite size: 536GBwrite size: 537GBwrite size: 538GBwrite size: 539GBwrite size: 540GBwrite size: 541GBwrite size: 542GBwrite size: 543GBwrite size: 544GB
+write size: 545GBwrite size: 546GBwrite size: 547GBwrite size: 548GBwrite size: 549GBwrite size: 550GBwrite size: 551GBwrite size: 552GBwrite size: 553GBwrite size: 554GBwrite size: 555GBwrite size: 556GBwrite size: 557GBwrite size: 558GBwrite size: 559GBwrite size: 560GBwrite size: 561GBwrite size: 562GBwrite size: 563GBwrite size: 564GBwrite size: 565GBwrite size: 566GBwrite size: 567GBwrite size: 568GBwrite size: 569GBwrite size: 570GBwrite size: 571GBwrite size: 572GBwrite size: 573GBwrite size: 574GBwrite size: 575GBwrite size: 576GB
+write size: 577GBwrite size: 578GBwrite size: 579GBwrite size: 580GBwrite size: 581GBwrite size: 582GBwrite size: 583GBwrite size: 584GBwrite size: 585GBwrite size: 586GBwrite size: 587GBwrite size: 588GBwrite size: 589GBwrite size: 590GBwrite size: 591GBwrite size: 592GBwrite size: 593GBwrite size: 594GBwrite size: 595GBwrite size: 596GBwrite size: 597GBwrite size: 598GBwrite size: 599GBwrite size: 600GBwrite size: 601GBwrite size: 602GBwrite size: 603GBwrite size: 604GBwrite size: 605GBwrite size: 606GBwrite size: 607GBwrite size: 608GB
+write size: 609GBwrite size: 610GBwrite size: 611GBwrite size: 612GBwrite size: 613GBwrite size: 614GBwrite size: 615GBwrite size: 616GBwrite size: 617GBwrite size: 618GBwrite size: 619GBwrite size: 620GBwrite size: 621GBwrite size: 622GBwrite size: 623GBwrite size: 624GBwrite size: 625GBwrite size: 626GBwrite size: 627GBwrite size: 628GBwrite size: 629GBwrite size: 630GBwrite size: 631GBwrite size: 632GBwrite size: 633GBwrite size: 634GBwrite size: 635GBwrite size: 636GBwrite size: 637GBwrite size: 638GBwrite size: 639GBwrite size: 640GB
+write size: 641GBwrite size: 642GBwrite size: 643GBwrite size: 644GBwrite size: 645GBwrite size: 646GBwrite size: 647GBwrite size: 648GBwrite size: 649GBwrite size: 650GBwrite size: 651GBwrite size: 652GBwrite size: 653GBwrite size: 654GBwrite size: 655GBwrite size: 656GBwrite size: 657GBwrite size: 658GBwrite size: 659GBwrite size: 660GBwrite size: 661GBwrite size: 662GBwrite size: 663GBwrite size: 664GBwrite size: 665GBwrite size: 666GBwrite size: 667GBwrite size: 668GBwrite size: 669GBwrite size: 670GBwrite size: 671GBwrite size: 672GB
+write size: 673GBwrite size: 674GBwrite size: 675GBwrite size: 676GBwrite size: 677GBwrite size: 678GBwrite size: 679GBwrite size: 680GBwrite size: 681GBwrite size: 682GBwrite size: 683GBwrite size: 684GBwrite size: 685GBwrite size: 686GBwrite size: 687GBwrite size: 688GBwrite size: 689GBwrite size: 690GBwrite size: 691GBwrite size: 692GBwrite size: 693GBwrite size: 694GBwrite size: 695GBwrite size: 696GBwrite size: 697GBwrite size: 698GBwrite size: 699GBwrite size: 700GBwrite size: 701GBwrite size: 702GBwrite size: 703GBwrite size: 704GB
+write size: 705GBwrite size: 706GBwrite size: 707GBwrite size: 708GBwrite size: 709GBwrite size: 710GBwrite size: 711GBwrite size: 712GBwrite size: 713GBwrite size: 714GBwrite size: 715GBwrite size: 716GBwrite size: 717GBwrite size: 718GBwrite size: 719GBwrite size: 720GBwrite size: 721GBwrite size: 722GBwrite size: 723GBwrite size: 724GBwrite size: 725GBwrite size: 726GBwrite size: 727GBwrite size: 728GBwrite size: 729GBwrite size: 730GBwrite size: 731GBwrite size: 732GBwrite size: 733GBwrite size: 734GBwrite size: 735GBwrite size: 736GB
+write size: 737GBwrite size: 738GBwrite size: 739GBwrite size: 740GBwrite size: 741GBwrite size: 742GBwrite size: 743GBwrite size: 744GBruntime: 1988 sec 
+
+
+
+(0)[cdf]read---
+--------------------------------------------
+|            bench type:                   |
+--------------------------------------------
+----algorithm----
+[0~100(usec)]: 0
+[100~200(usec)]: 0
+[200~300(usec)]: 0
+[300~400(usec)]: 0
+[400~500(usec)]: 0
+[500~600(usec)]: 0
+[600~700(usec)]: 0
+[700~800(usec)]: 0
+[800~900(usec)]: 0
+[900~1000(usec)]: 0
+[over_ms]: 0
+[over__s]: 0
+----lower----
+[0~100(usec)]: 0
+[100~200(usec)]: 0
+[200~300(usec)]: 0
+[300~400(usec)]: 0
+[400~500(usec)]: 0
+[500~600(usec)]: 0
+[600~700(usec)]: 0
+[700~800(usec)]: 0
+[800~900(usec)]: 0
+[900~1000(usec)]: 0
+[over_ms]: 0
+[over__s]: 0
+----average----
+[avg_algo]: 0.0
+[avg_low]: 0.0
+-----lower_info----
+[write_op]: 0
+[read_op]: 0
+[trim_op]:0
+[WAF, RAF]: 0.000000, 0.000000
+[if rw test]: 0.000000(WAF), 0.000000(RAF)
+
+----summary----
+[all_time]: 0.0
+[size]: 762567.816406(mb)
+[FAIL NUM] 0
+[IOPS] inf
+[cache hit cnt,ratio] 0, -nan
+[cache hit cnt,ratio dftl] 0, 0.000000
+[READ WRITE CNT] 0 195217361
+error cnt:0
+result of ms:
+---
+
+[SUCCESS RATIO] 1.000000
+[throughput] inf(kb/s)
+             inf(mb/s)
+TRIM 4247
+MAPPINGR 0
+MAPPINGW 0
+GCMR 0
+GCMW 0
+DATAR 0
+DATAW 48803961
+GCDR 32991617
+GCDW 29064630
+GCMR_DGC 0
+GCMW_DGC 0
+COMPACTIONDATA-R 0
+COMPACTIONDATA-W 0
+MISSDATAR 0
+TESTIO 0
+(null) 0
+Total Read Traffic : 32991617
+Total Write Traffic: 77868591
+
+Total WAF: 1.60

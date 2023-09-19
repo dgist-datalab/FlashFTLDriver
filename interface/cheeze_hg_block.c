@@ -6,6 +6,7 @@
 #include "vectored_interface.h"
 #include "../include/utils/crc32.h"
 #include <pthread.h>
+#include <time.h>
 
 extern master_processor mp;
 
@@ -23,8 +24,11 @@ static char *data_addr[2]; // page_addr[1]: 1GB, page_addr[2]: 1GB
 static uint64_t seq = 0;
 static int trace_fd = 0;
 
-static uint32_t jy_req_start=0;
-static uint32_t jy_req_end=0;
+static long jy_req_start=0;
+static long jy_req_end=0;
+
+time_t time_begin;
+time_t time_tmp;
 
 static int id_req=0;
 //static uint32_t trace_crc[TRACE_DEV_SIZE/LPAGESIZE];
@@ -438,6 +442,11 @@ bool jeeyun_end_req(request *const req) {
 		now_processing=NULL;
 		free(preq);
 		++jy_req_end;
+		if (jy_req_end % (100*1024*1024/4)==0) {
+			time(&time_tmp);
+			printf("[THROUGHPUT] 100GB per %0.0f sec (cur: %ldGB)\n", difftime(time_tmp, time_begin), jy_req_end/(1024*1024/4));
+			time(&time_begin);
+		}
 	}
 	pthread_mutex_unlock(&req_cnt_lock);
 	return true;
