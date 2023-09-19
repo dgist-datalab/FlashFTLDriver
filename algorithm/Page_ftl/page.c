@@ -169,13 +169,13 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	tmp_user_write++;	
 	++reqq_size;
 
-	if (reqq_size%GIGAUNIT*1024/4*1024==0) {
-		printf("PROGRESS %dGB] tmp WAF = %.3f\n", (double)(tmp_user_write+tmp_gc_write)/(double)tmp_user_write);
+	if (reqq_size%(GIGAUNIT*1024/4*1024)==0) {
+		printf("[PROGRESS %dGB] tmp WAF = %.3f\n", reqq_size/(1024*1024/4),(double)(tmp_user_write+tmp_gc_write)/(double)tmp_user_write);
 		tmp_user_write=0;
 		tmp_gc_write=0;
 	}
-	//if (size%262144==0) printf("\rwrite size: %dGB", size/262144);
-	//if (size%8388608==0) printf("\n");
+	//if (reqq_size%262144==0) printf("\rwrite size: %dGB", reqq_size/262144);
+	//if (reqq_size%8388608==0) printf("\n");
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		if(a_buffer.key[i]==req->key){
 			overlapped_idx=i;
