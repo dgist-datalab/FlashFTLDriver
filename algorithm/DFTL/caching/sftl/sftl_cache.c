@@ -785,6 +785,12 @@ void sftl_empty_cache(struct my_cache *mc){
 	}
 	printf("cached_entry_num:%u (%lf)\n", total_entry_num, (double)total_entry_num/RANGE);
 	printf("average head num:%lf\n", (double)(average_head_num)/GTDNUM);
-
+	
+	uint64_t total_index_memory=0;
+	for(uint32_t i=0; i<GTDNUM; i++){
+		total_index_memory+=scm.gtd_size[i];
+	}
+	printf("total index memory:%lu\n", total_index_memory);
+	
 	scm.now_caching_byte=0;
 }

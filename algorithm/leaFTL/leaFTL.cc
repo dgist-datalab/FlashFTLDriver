@@ -77,6 +77,12 @@ uint32_t lea_print_log(){
     printf("===========LEA LOG===============\n");
     printf("target cache_memory:%u/%u\n", lru_now_byte, lru_max_byte);
     printf("segment_num: %u, average:%.2lf\n", now_segment_num, (double)now_segment_num/TRANSMAPNUM);
+
+	uint64_t total_index_size=0;
+	for(uint32_t i=0; i<TRANSMAPNUM; i++){
+		total_index_size+=main_gp[i].size;
+	}
+	printf("total index size:%lu\n", total_index_size);
     return 1;
 }
 
@@ -133,6 +139,7 @@ uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
 }
 
 void lea_destroy(lower_info *, algorithm *){
+	lea_print_log();
     lea_write_buffer_free(wb);
     pm_free(pm);
     pm_free(translate_pm);
@@ -780,15 +787,15 @@ retry:
     }
 
     #ifdef WRITE_STOP_READ
-        req->end_req(req);
-    /*
+    //    req->end_req(req);
+    
         if(write_cnt%L2PGAP==0){
             send_IO_temp_write(lower, req);
         }
         else{
             req->end_req(req);
         }
-    */
+    
     #else
         req->end_req(req);
     #endif
