@@ -21,6 +21,8 @@ SRCS +=\
 	   ./lsmtree.cpp\
 	   ./shortcut_dir.cpp\
 	   ./lsmtree_data_dump.cpp\
+	   ./cache_layer.cpp\
+	   ./page_cache.cpp\
 
 
 OBJS :=\

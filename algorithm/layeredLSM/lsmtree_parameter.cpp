@@ -28,6 +28,7 @@ void lsmtree_print_param(lsmtree_parameter param){
 	printf("BF level: %u~%u\n", param.BF_level_range.start, param.BF_level_range.end);
 	printf("PLR level: %u~%u\n", param.PLR_level_range.start, param.PLR_level_range.end);
 	printf("Cache flag: %s\n", param.cache_flag ? "true": "false");
+	printf("Memory limit: %lf\n", (double)param.memory_limit/(RANGE*param.target_bit/8));
 	printf("=========================\n");
 }
 
@@ -257,7 +258,8 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 	float fpr=0.1;
 	uint32_t test_flag=0;
 	uint32_t target_bit=33;//bit_calculate(RANGE);
-	uint32_t memory_usage=29;
+	uint32_t total_memory_usage=29;
+	uint32_t memory_usage=total_memory_usage;
 	uint32_t cache_flag=0;
 	while((c=getopt(argc,argv,"hHmMtTfFbBGgCc"))!=-1){
 		switch(c){
@@ -299,7 +301,8 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 	printf("gc_type:%u\n",gc_type);
 	//lsmtree_calculate_parameter2(fpr, target_bit, RANGE*target_bit/100*memory_usage,RANGE);
 
-	lsmtree_parameter param=lsmtree_calculate_parameter(fpr, target_bit, RANGE*target_bit/100*memory_usage,RANGE, cache_flag?true:false);
+	lsmtree_parameter param=lsmtree_calculate_parameter(fpr, target_bit, RANGE*target_bit/100*total_memory_usage,RANGE, cache_flag?true:false);
+	param.memory_limit=RANGE*target_bit/8*memory_usage/100;
 	lsmtree_print_param(param);
 	//param.cache_flag=cache_flag?true:false;
 

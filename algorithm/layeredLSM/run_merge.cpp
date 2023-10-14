@@ -6,6 +6,7 @@
 #include "./piece_ppa.h"
 #include "./lsmtree.h"
 #include "./gc.h"
+#include "./cache_layer.h"
 extern lower_info *g_li;
 bool debug_flag=false;
 extern uint32_t target_PBA;
@@ -280,7 +281,8 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 		}
 	}
 
-	shortcut_link_bulk_lba(shortcut, r, &lba_set, true);
+	//shortcut_link_bulk_lba(shortcut, r, &lba_set, true);
+	cache_layer_sc_update(LSM, lba_set, r, lba_set.size());
 
 	if(r->type==RUN_NORMAL){
 		iter=sorted_list->begin();
@@ -292,7 +294,6 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			sorted_list->erase(iter++);
 		}
 	}
-	
 }
 
 static inline void __check_disjoint_spm(run **rset, uint32_t run_num, mm_container *mm_set){
@@ -435,7 +436,8 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 		__move_iter_target(mm, 0);
 	}
 
-	shortcut_link_bulk_lba(shortcut, r, &temp_vec, true);
+	//shortcut_link_bulk_lba(shortcut, r, &temp_vec, true);
+	cache_layer_sc_update(LSM, temp_vec, r, temp_vec.size());
 
 #ifdef SC_QUERY_DP
 	sc_dir_dp_free(temp_dp);
@@ -541,12 +543,15 @@ static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num,
 
 		mm_set[i].now_proc_block_idx=0;
 		mm_set[i].done=false;
+
+		
 	}
 	return mm_set;
 }
 
 void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
+
 	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
 
 	bool trivial_move_flag=!force;
@@ -630,12 +635,24 @@ void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force,
 	free(th_req);
 	free(mm_set);
 	run_insert_done(res, true);
+
 	printf("merge end\n");
 }
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
 	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
+
+
+	//remove mf from cache
+	for(uint32_t i=0; i<run_num; i++){
+		run *temp_run=rset[i];
+		if(temp_run->type==RUN_LOG) continue;
+		uint32_t now_entry_num=temp_run->st_body->now_STE_num;
+		for(uint32_t j=0; j<now_entry_num; j++){
+			cache_layer_idx_force_evict(lsm, temp_run->st_body->sp_meta[j].piece_ppa);
+		}
+	}
 
 	bool trivial_move_flag=!force;
 	if(trivial_move_flag){
@@ -683,6 +700,13 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	}
 	free(mm_set);
 	run_insert_done(res, true);
+
+	/*insert mf to cache*/
+	uint32_t target_run_ste_num=res->st_body->now_STE_num;
+	for(uint32_t i=0; i<target_run_ste_num; i++){
+		cache_layer_idx_insert(lsm, res->st_body->sp_meta[i].piece_ppa, res->st_body->pba_array[i].mf,false);
+	}
+	
 	printf("merge end\n");
 }
 

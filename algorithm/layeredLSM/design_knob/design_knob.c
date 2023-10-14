@@ -10,7 +10,7 @@
 #include "../../../include/settings.h"
 #include "../../../include/utils/thpool.h"
 #include "../translation_functions/bf_guard_mapping.h"
-#define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriver/algorithm/layeredLSM/design_knob"
+#define DIR_PATH "./algorithm/layeredLSM/design_knob"
 
 double *plr_dp;
 double *line_per_chunk;
@@ -65,7 +65,7 @@ void init_memory_info(uint32_t error, uint32_t target_bit){
     sprintf(plr_table_map,"%s/plr_table/%u-%d.map", DIR_PATH, target_bit, error);
 	int fd=open(plr_table_map, O_CREAT | O_RDWR, 0666);
 	if(fd==-1){
-		perror("????\n");
+		perror("DIR PATH error\n");
 		exit(1);
 	}
 	bool new_file=false;

@@ -159,6 +159,28 @@ void lru_update(LRU* lru, lru_node* now){
 	//lru_check_error(lru);
 }
 
+void lru_move_last(LRU *lru, lru_node* target){
+	if(target == NULL){
+		return ;
+	}
+	if(target == lru->tail){
+		return ;
+	}
+	if(target == lru->head){
+		lru->head = target->next;
+		lru->head->prev = NULL;
+	}
+	else{
+		target->prev->next = target->next;
+		target->next->prev = target->prev;
+	}
+
+	target->prev = lru->tail;
+	target->next = NULL;
+	lru->tail->next = target;
+	lru->tail = target;
+}
+
 void lru_delete(LRU* lru, lru_node* now){
 	if(now == NULL){
 		return ;

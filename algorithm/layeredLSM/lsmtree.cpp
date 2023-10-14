@@ -1,8 +1,11 @@
 #include "lsmtree.h"
 #include "compaction.h"
+#include "cache_layer.h"
 
 page_read_buffer rb;
 
+
+extern lower_info *g_li;
 extern uint32_t test_key;
 static inline uint32_t __rm_get_ridx(run_manager *rm){
 	fdriver_lock(&rm->lock);
@@ -100,6 +103,8 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 	sorted_array_master_init(rm->total_run_num);
 	res->shortcut=shortcut_init(rm->total_run_num, RANGE, param.target_bit);
 	res->bm=L2PBm_init(sm, rm->total_run_num);
+	res->sc_seg=sm->get_segment(sm, BLOCK_RESERVE);
+	res->master_sm=sm;
 	fdriver_mutex_init(&res->lock);
 
 	param.spare_run_num-=MEMTABLE_NUM;
@@ -132,6 +137,8 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
+
+	cache_layer_init(res, param.memory_limit, g_li);
 	return res;
 }
 
@@ -149,6 +156,7 @@ void lsmtree_free(lsmtree *lsm){
 		level_free(lsm->disk[i]);
 	}
 
+	cache_layer_free(lsm);
 	free(lsm->disk);
 	sorted_array_master_free();
 	shortcut_free(lsm->shortcut);
@@ -158,7 +166,6 @@ void lsmtree_free(lsmtree *lsm){
 	delete rb.issue_req;
 }
 
-extern lower_info *g_li;
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	run *r=lsm->memtable[lsm->now_memtable_idx];
 
@@ -230,25 +237,90 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 }
 
 uint32_t lsmtree_read(lsmtree *lsm, request *req){
-	uint32_t res;
+	uint32_t res=READ_DONE;
 	run *r;
 	//printf("req->key read:%u\n", req->key);
 	if(req->retry==false){
-		r = shortcut_query(lsm->shortcut, req->key);
-		if (r == NULL)
-		{
-			req->type = FS_NOTFOUND_T;
-			//printf("req->key :%u not found\n", req->key);
+		//first check memtable
+		req->flag=READ_REQ_INIT;
+		res=run_query(lsm->memtable[lsm->now_memtable_idx], req);
+		if(res!=READ_NOT_FOUND){
+			return res;
+		}
+
+		if(cache_layer_sc_read(lsm, req->key, &r, req, true)==NULL){
+			req->flag=READ_REQ_DONE;
+			//NOT FOUND
+			req->type=FS_NOTFOUND_T;
 			req->end_req(req);
 			return READ_NOT_FOUND;
 		}
-		res = run_query(r, req);
+		else if(r==NULL){
+			//cache miss in sc
+			req->flag=READ_REQ_SC;
+			req->type_ftl++;
+		}
+		else{
+			//sc cache hit
+			req->flag=READ_REQ_MAP;
+			map_function *mf;
+			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
+			if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_miss
+				req->flag=READ_REQ_DATA;
+				res=run_query(r, req);
+			}
+			else{ //map miss
+				req->type_ftl++;
+			}
+		}
+		res=READ_DONE;
+
+		//r = shortcut_query(lsm->shortcut, req->key);
+		//if (r == NULL)
+		//{
+		//	req->type = FS_NOTFOUND_T;
+		//	//printf("req->key :%u not found\n", req->key);
+		//	req->end_req(req);
+		//	return READ_NOT_FOUND;
+		//}
+		//res = run_query(r, req);
 	}
 	else{
-		r=((map_read_param*)req->param)->r;
-		req->type_ftl++;
-		res=run_query_retry(r, req);
+		if(req->flag==READ_REQ_SC){
+			cache_read_param *crparam=(cache_read_param*)req->param;
+			cache_layer_sc_retry(lsm, req->key, &r, crparam);
+			if(r==NULL){
+				printf("???\n");
+				abort();
+			}
+			req->param=NULL;
+			req->flag=READ_REQ_MAP;
+
+			map_function *mf;
+			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
+			if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_hit
+				req->flag=READ_REQ_DATA;
+				res=run_query(r, req);
+			}
+			else{ //map miss
+				req->type_ftl++;
+			}
+		}
+		else if(req->flag==READ_REQ_MAP){
+			cache_read_param *crparam=(cache_read_param*)req->param;
+			r=crparam->r;
+			cache_layer_idx_retry(lsm, crparam->pba_or_scidx, crparam);
+			req->param=NULL;
+			req->flag=READ_REQ_DATA;
+			res=run_query(r, req);
+		}
+		else{
+			r=((map_read_param*)req->param)->r;
+			req->type_ftl++;
+			res=run_query_retry(r, req);
+		}
 	}
+
 	if(res==READ_NOT_FOUND){
 		req->type=FS_NOTFOUND_T;
 		printf("req->key :%u not found\n", req->key);
@@ -318,4 +390,113 @@ void lsmtree_run_print(lsmtree* lsm){
 			run_print(lsm->rm->run_array[i], false);
 		}
 	}
+}
+
+typedef struct sc_gc_node{
+	uint32_t ppa;
+	uint32_t sc_idx;
+	value_set *value;
+	volatile bool isdone;
+}sc_gc_node;
+
+static void *sc_gc_end_req(algo_req *req){
+	sc_gc_node *sgn=(sc_gc_node*)req->param;
+	if(req->type==GCMR){
+		sgn->isdone=true;
+	}
+	else if(req->type==GCMW){
+		inf_free_valueset(sgn->value, FS_MALLOC_R);
+	}
+	else{
+		printf("???\n");
+		abort();
+	}
+	free(req);
+	return NULL;
+}
+
+static algo_req *sc_gc_get_algo(sc_gc_node*sgn, uint32_t type){
+	algo_req *res=(algo_req*)malloc(sizeof(algo_req));
+	res->type=GCMR;
+	res->ppa=sgn->ppa;
+	res->value=sgn->value;
+	res->end_req=sc_gc_end_req;
+	res->param=(void*)sgn;
+	res->parents=NULL;
+	return res;
+}
+
+static inline sc_gc_node* __issue_gc_read_node(uint32_t ppa){
+	sc_gc_node *res=(sc_gc_node*)malloc(sizeof(sc_gc_node));
+	res->ppa=ppa;
+	res->value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+	res->isdone=false;
+	algo_req* req=sc_gc_get_algo(res, GCMR);
+	g_li->read(ppa, PAGESIZE, res->value, req);
+	return res;
+}
+
+uint32_t lsm_get_ppa_from_scseg(void *arg, void (*update_addr)(uint32_t*,uint32_t*, uint32_t)){
+	lsmtree *lsm=(lsmtree*)arg;
+	blockmanager *sm=lsm->master_sm;
+	if(sm->check_full(lsm->sc_seg)){
+		//do gc
+		__segment *target=lsm->sc_seg;
+		std::list<sc_gc_node *>gc_list;
+		uint32_t first_page=target->seg_idx*_PPS;
+		//read validate_page
+		uint32_t i=0;
+		for(i=0; i<_PPS; i++){
+			uint32_t page=first_page+i;
+			if(sm->is_invalid_piece(sm, page*L2PGAP)){
+				continue;
+			}
+			sc_gc_node *sgn=__issue_gc_read_node(page);
+			gc_list.push_back(sgn);
+		}
+
+		uint32_t size=gc_list.size();
+		uint32_t *sc_idx_set=(uint32_t*)malloc(sizeof(uint32_t)*size);
+		uint32_t *new_ppa_set=(uint32_t*)malloc(sizeof(uint32_t)*size);
+		//check all read
+		std::list<sc_gc_node*>::iterator iter;
+		for(i=0, iter=gc_list.begin(); iter!=gc_list.end(); iter++, i++){
+			while(!(*iter)->isdone){}
+			(*iter)->sc_idx=*((uint32_t*)sm->get_oob(sm, (*iter)->ppa));
+			sc_idx_set[i]=(*iter)->sc_idx;
+		}
+
+		for(uint32_t bidx=0; bidx<BPS; bidx++){
+			__block *b=target->blocks[bidx];
+			b->now_assigned_pptr=0;
+			memset(b->bitset, 0, _PPB * L2PGAP / 8);
+			memset(b->oob_list, 0, sizeof(b->oob_list));
+			b->invalidate_piece_num = b->validate_piece_num = 0;
+			b->is_full_invalid = false;
+		}
+
+		target->now_assigned_bptr=0;
+		target->used_page_num=0;
+		target->validate_piece_num=target->invalidate_piece_num=0;
+		target->private_data=NULL;
+		target->invalid_block_num=0;
+		g_li->trim_block(target->seg_idx * _PPS);
+
+		//write validate_page
+		for(i=0, iter=gc_list.begin(); iter!=gc_list.end(); iter++, i++){
+			algo_req *req=sc_gc_get_algo(*iter, GCMW);
+			new_ppa_set[i]=sm->get_page_addr(target);
+			sm->set_oob(sm, (char*)&sc_idx_set[i], sizeof(uint32_t), new_ppa_set[i]);
+			sm->bit_set(sm, new_ppa_set[i]*L2PGAP);
+			g_li->write(first_page+i, PAGESIZE, (*iter)->value, req);
+			free((*iter));
+		}
+
+		update_addr(sc_idx_set, new_ppa_set, size);
+		free(sc_idx_set);
+		free(new_ppa_set);
+	}
+
+	uint32_t res=sm->get_page_addr(lsm->sc_seg);
+	return res;
 }

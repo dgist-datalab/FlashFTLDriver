@@ -30,7 +30,7 @@ map_function* compression_init(uint32_t contents_num, float fpr, uint64_t total_
 		lru_init(&comp_lru, NULL, NULL);
 		fdriver_mutex_init(&cache_lock);
 		target_mem_bit=total_bit;
-		printf("target_mem_bit:%u\n", target_mem_bit);
+		printf("target_mem_bit:%lu\n", target_mem_bit);
 		start_flag=false;
 	}
 
@@ -145,7 +145,6 @@ compressed_form *compression_data(uint8_t *data, uint64_t *target_bit, uint32_t 
 			bit_num++;
 			max_delta/=2;
 		}
-		uint32_t real_bit_num=bit_num;
 		bit_num=CEIL(bit_num, 8)*8; //byte align
 
 		entry_per_chunk=((CHUNKSIZE-32)/bit_num+1);
@@ -359,7 +358,6 @@ uint32_t compression_query(map_function *m, uint32_t lba, map_read_param ** para
 		return res;
 	}
 	else{//no cache
-		static int miss_cnt=0;
 		fdriver_unlock(&cache_lock);
 		res_param->retry_flag=COMP_READ_MAP;
 		res_param->read_map=true;
@@ -413,7 +411,6 @@ uint32_t compression_retry(map_function *m, map_read_param *param){
 	compression_df=false;
 
 	/*check cache full*/
-	static int eviction_cnt=0;
 	compression_ent *temp;
 	while(now_mem_bit+comp_ent->mem_bit > target_mem_bit){
 		temp=(compression_ent*)lru_pop(comp_lru);
@@ -443,7 +440,7 @@ uint64_t compression_get_memory_usage(map_function *m, uint32_t target_bit){
 	compression_ent *comp_ent=GET_COMP_ENT(m->private_data);
 	fdriver_unlock(&cache_lock);
 	if(!comp_ent){
-		return NULL;
+		return 0;
 	}
 	return comp_ent->mem_bit;
 }
@@ -456,7 +453,7 @@ void compression_make_done(map_function *m){
 
 	fdriver_lock(&cache_lock);
 	compression_ent *temp;
-	static int eviction_cnt=0;
+	//static int eviction_cnt=0;
 	while(now_mem_bit+comp_ent->mem_bit > target_mem_bit){
 		temp=(compression_ent*)lru_pop(comp_lru);
 		//lru_check_error(comp_lru);
@@ -500,9 +497,9 @@ void compression_free(map_function *m){
 }
 
 bool compression_add_pending_req(map_function *m, request *req){
-
+	return false;
 }
 
 request *compression_get_pending_request(map_function *m){
-
+	return NULL;
 }

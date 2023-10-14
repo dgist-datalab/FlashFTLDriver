@@ -2,6 +2,7 @@
 #include "../../interface/interface.h"
 #include "./lsmtree.h"
 #include "./piece_ppa.h"
+#include "./cache_layer.h"
 extern uint32_t test_key;
 extern uint32_t test_key2;
 extern lower_info *g_li;
@@ -22,6 +23,9 @@ static void __check_data(algo_req *req, char *value){
 		memmove(&p_req->value->value[0], &value[intra_offset*LPAGESIZE], LPAGESIZE);
 		p_req->end_req(p_req);
 	//	fdriver_unlock(&param->r->lock);
+		if(param->r->type!=RUN_LOG){
+			cache_layer_idx_unpin(LSM, param->r->st_body->sp_meta[param->ste_num].piece_ppa);
+		}
 		param->mf->query_done(param->mf, param);
 	}
 	else{
@@ -129,6 +133,13 @@ uint32_t run_translate_intra_offset(run *r, uint32_t ste_num, uint32_t intra_off
 	else{
 		return st_array_read_translation(r->st_body, ste_num, intra_offset);
 	}
+}
+
+uint32_t run_pick_target_mf(run *r, uint32_t lba, map_function **mf){
+	uint32_t ste_num = st_array_get_target_STE(r->st_body, lba);
+	uint32_t res=r->st_body->sp_meta[ste_num].piece_ppa;
+	(*mf)=r->st_body->pba_array[ste_num].mf;
+	return res;
 }
 
 uint32_t run_query(run *r, request *req){

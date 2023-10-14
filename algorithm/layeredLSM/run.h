@@ -146,6 +146,8 @@ void run_trivial_move_insert(run *r, uint32_t lba, uint32_t psa, bool last);
  * */
 uint32_t run_query(run *r, request *req);
 
+uint32_t run_pick_target_mf(run *r, uint32_t lba, map_function **mf);
+
 /*
  * Function: run_query_retry
  * ------------------------

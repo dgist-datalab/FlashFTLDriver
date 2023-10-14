@@ -27,6 +27,7 @@ lru_node* lru_push(LRU*, void*);
 lru_node* lru_push_last(LRU *, void *);
 void* lru_find(LRU *, uint32_t key);
 void* lru_pop(LRU*);
+void lru_move_last(LRU *, lru_node*);
 void lru_update(LRU*, lru_node*);
 void lru_delete(LRU*, lru_node*);
 void lru_check_error(LRU *);

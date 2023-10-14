@@ -6,10 +6,16 @@
 #include "./shortcut.h"
 #include "../../include/container.h"
 #include "../../include/utils/thpool.h"
+#include "./page_cache.h"
 #include <queue>
 #include <stdlib.h>
 #define MEMTABLE_NUM 1
 //#define THREAD_COMPACTION
+
+
+enum{
+	READ_REQ_INIT, READ_REQ_SC, READ_REQ_MAP, READ_REQ_DATA, READ_REQ_DONE,
+};
 
 typedef struct page_read_buffer{
 	std::multimap<uint32_t, algo_req *> * pending_req;
@@ -53,6 +59,7 @@ typedef struct lsmtree_parameter{
 	range BF_level_range;
 	range PLR_level_range;
 	uint64_t max_memory_usage_bit;
+	uint32_t memory_limit;
 }lsmtree_parameter;
 
 typedef struct lsmtree_monitor{
@@ -73,7 +80,9 @@ typedef struct lsmtree_monitor{
 
 typedef struct lsmtree{
 	run_manager *rm;
+	blockmanager* master_sm;
 	struct shortcut_master *shortcut;
+	pc_set *pcs;
 	L2P_bm *bm;
 	uint32_t now_memtable_idx;
 	run *memtable[MEMTABLE_NUM];
@@ -85,6 +94,7 @@ typedef struct lsmtree{
 
 	fdriver_lock_t read_cnt_lock;
 	uint32_t now_flying_read_cnt;
+	__segment *sc_seg;
 }lsmtree;
 
 /*
@@ -125,6 +135,7 @@ struct run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run
 void __lsm_free_run(lsmtree *lsm, run *r);
 void __lsm_calculate_memory_usage(lsmtree *lsm,uint64_t entry_num, int32_t memory_usage_bit, uint32_t map_type, bool pinning);
 bool __lsm_pinning_enable(lsmtree *lsm, uint32_t entry_num);
+uint32_t lsm_get_ppa_from_scseg(void *arg, void (*update_addr)(uint32_t *, uint32_t*, uint32_t));
 
 static inline uint32_t bit_calculate(uint32_t lba_range){
 	uint32_t res=0;

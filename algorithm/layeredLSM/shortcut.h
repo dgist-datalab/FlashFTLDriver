@@ -24,7 +24,6 @@ typedef struct shortcut_info{
 }shortcut_info;
 typedef struct shortcut_info sc_info;
 
-
 typedef struct shortcut_master{
 	std::list<uint32_t> *free_q;
 #ifdef SC_MEM_OPT

@@ -1,5 +1,4 @@
-#ifndef MAPPING_FUNCTION
-#define MAPPING_FUNCTION
+#pragma once
 #include "../../include/settings.h"
 #include "../../include/container.h"
 #include "./summary_page.h"
@@ -152,7 +151,7 @@ typedef struct map_function{
 	uint32_t max_contents_num;
 	uint32_t memory_usage_bit;
 	//uint32_t make_summary_lba;
-}map_function;
+} map_function;
 
 /*
 	Function: map_function_factory
@@ -229,4 +228,3 @@ static inline char *map_type_to_string(uint32_t map_type){
 	return NULL;
 }
 
-#endif
