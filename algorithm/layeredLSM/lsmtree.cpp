@@ -239,6 +239,7 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res=READ_DONE;
 	run *r;
+	bool temp;
 	//printf("req->key read:%u\n", req->key);
 	if(req->retry==false){
 		//first check memtable
@@ -248,7 +249,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 			return res;
 		}
 
-		if(cache_layer_sc_read(lsm, req->key, &r, req, true)==NULL){
+		if(cache_layer_sc_read(lsm, req->key, &r, req, true, &temp)==NULL){
 			req->flag=READ_REQ_DONE;
 			//NOT FOUND
 			req->type=FS_NOTFOUND_T;
@@ -258,14 +259,14 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 		else if(r==NULL){
 			//cache miss in sc
 			req->flag=READ_REQ_SC;
-			req->type_ftl++;
+			req->type_ftl+=10;
 		}
 		else{
 			//sc cache hit
 			req->flag=READ_REQ_MAP;
 			map_function *mf;
 			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
-			if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_miss
+			if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_hit
 				req->flag=READ_REQ_DATA;
 				res=run_query(r, req);
 			}
@@ -303,7 +304,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 				res=run_query(r, req);
 			}
 			else{ //map miss
-				req->type_ftl++;
+				req->type_ftl+=20;
 			}
 		}
 		else if(req->flag==READ_REQ_MAP){

@@ -665,7 +665,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	uint32_t prev_lba=UINT32_MAX;
 
 	run *res=target_run;
-
+	bool trivial_move_flag_for_cache=false;
 	while(1){
 		target_round+=force?rset[0]->st_body->now_STE_num:4*BPS/run_num;
 		mm_container *tirivial_move_target=__sorting_mm_set(mm_set, run_num, target_round, &sorted_arr, lsm, trivial_move_flag, &prev_lba);
@@ -676,6 +676,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 		if(tirivial_move_target){
 			summary_pair target=sp_set_iter_pick(tirivial_move_target->ssi, tirivial_move_target->r, NULL, NULL);
 			prev_lba=trivial_move(res, lsm->shortcut, tirivial_move_target, target);
+			trivial_move_flag_for_cache=true;
 		}
 
 		bool done_flag=true;
@@ -704,7 +705,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	/*insert mf to cache*/
 	uint32_t target_run_ste_num=res->st_body->now_STE_num;
 	for(uint32_t i=0; i<target_run_ste_num; i++){
-		cache_layer_idx_insert(lsm, res->st_body->sp_meta[i].piece_ppa, res->st_body->pba_array[i].mf,false);
+		cache_layer_idx_insert(lsm, res->st_body->sp_meta[i].piece_ppa, res->st_body->pba_array[i].mf, false, trivial_move_flag_for_cache);
 	}
 	
 	printf("merge end\n");

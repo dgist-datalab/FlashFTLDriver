@@ -1,6 +1,8 @@
 #include "page_cache.h"
 #include "../../interface/interface.h"
 #include <list>
+#include <pthread.h>
+pthread_mutex_t pinning_lock=PTHREAD_MUTEX_INITIALIZER;
 
 void pc_set_init(pc_set *target, uint32_t max_cached_size, uint32_t lba_num, lower_info *li){
     lru_init(&target->lru, NULL, NULL);
@@ -67,12 +69,17 @@ bool pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx, bool p
 
     if(pc){
         lru_update(target->lru, pc->node);
-        pc->ispinned=pinned;
         if(pinned){
+            pthread_mutex_lock(&pinning_lock);
+            pc->ispinned=true;
             if(pc->refer_cnt==0){
                 target->pinned_size+=pc->size;
             }
-           pc->refer_cnt++;
+            pc->refer_cnt++;
+            pthread_mutex_unlock(&pinning_lock);
+        }
+        else{
+            pc->ispinned=false;
         }
         return true;
     }
@@ -170,14 +177,14 @@ void pc_unpin(pc_set *target, cache_type type, uint32_t ppa_or_scidx){
         abort();
     }
     if(pc->ispinned){
+        pthread_mutex_lock(&pinning_lock);
         pc->refer_cnt--;
         if (pc->refer_cnt == 0){
             pc->ispinned = false;
             target->pinned_size-= pc->size;
         }
+        pthread_mutex_unlock(&pinning_lock);
     }
-
-    target->pinned_size-=pc->size;
 }
 
 static void *__write_end_req(algo_req *req){

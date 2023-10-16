@@ -86,7 +86,6 @@ uint32_t page_read(request *const req){
 }
 
 uint32_t align_buffering(request *const req, KEYT key, value_set *value){
-
 	bool overlap=false;
 	uint32_t overlapped_idx=UINT32_MAX;
 	for(uint32_t i=0; i<a_buffer.idx; i++){

@@ -13,6 +13,7 @@
 #include "read_helper.h"
 #include "version.h"
 #include "helper_algorithm/bf_set.h"
+#include "cache_layer.h"
 #include "segment_level_manager.h"
 #include "../../bench/measurement.h"
 #include <deque>
@@ -87,6 +88,8 @@ typedef struct tree_param{
 	double run_range_size[21];
 	double level_size_ratio[21];
 	double WAF;
+	uint32_t memory_limit;
+
 #ifdef DYNAMIC_WISCKEY
 	uint64_t BF_memory;
 	uint64_t PLR_memory;
