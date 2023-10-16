@@ -56,6 +56,7 @@ struct request {
 	FSTYPE type;
 	KEYT key;
 	bool retry;
+	uint8_t flag;
 	uint32_t tag_num;
 	uint32_t offset;
 	uint32_t tid;
