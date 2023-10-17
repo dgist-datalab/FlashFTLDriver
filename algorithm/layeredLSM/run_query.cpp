@@ -21,11 +21,11 @@ static void __check_data(algo_req *req, char *value){
 		fdriver_unlock(&LSM->read_cnt_lock);
 
 		memmove(&p_req->value->value[0], &value[intra_offset*LPAGESIZE], LPAGESIZE);
-		p_req->end_req(p_req);
 	//	fdriver_unlock(&param->r->lock);
 		if(param->r->type!=RUN_LOG){
 			cache_layer_idx_unpin(LSM, param->r->st_body->sp_meta[param->ste_num].piece_ppa);
 		}
+		p_req->end_req(p_req);
 		param->mf->query_done(param->mf, param);
 	}
 	else{

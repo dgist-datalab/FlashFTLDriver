@@ -240,7 +240,10 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res=READ_DONE;
 	run *r;
 	bool temp;
-	//printf("req->key read:%u\n", req->key);
+	if(req->key==test_key){
+		static int cnt=0;
+		printf("req->key read:%u cnt:%u seq:%u\n", req->key, ++cnt, req->seq);
+	}
 	if(req->retry==false){
 		//first check memtable
 		req->flag=READ_REQ_INIT;
@@ -249,7 +252,8 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 			return res;
 		}
 
-		if(cache_layer_sc_read(lsm, req->key, &r, req, true, &temp)==NULL){
+		if(cache_layer_sc_read(lsm, req->key, &r, req, true, &temp)==NULL && r==NULL){
+			
 			req->flag=READ_REQ_DONE;
 			//NOT FOUND
 			req->type=FS_NOTFOUND_T;
@@ -263,6 +267,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 		}
 		else{
 			//sc cache hit
+			cache_layer_sc_unpin(lsm, req->key);
 			req->flag=READ_REQ_MAP;
 			map_function *mf;
 			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
@@ -407,6 +412,7 @@ static void *sc_gc_end_req(algo_req *req){
 	}
 	else if(req->type==GCMW){
 		inf_free_valueset(sgn->value, FS_MALLOC_R);
+		free(sgn);
 	}
 	else{
 		printf("???\n");
@@ -490,7 +496,6 @@ uint32_t lsm_get_ppa_from_scseg(void *arg, void (*update_addr)(uint32_t*,uint32_
 			sm->set_oob(sm, (char*)&sc_idx_set[i], sizeof(uint32_t), new_ppa_set[i]);
 			sm->bit_set(sm, new_ppa_set[i]*L2PGAP);
 			g_li->write(first_page+i, PAGESIZE, (*iter)->value, req);
-			free((*iter));
 		}
 
 		update_addr(sc_idx_set, new_ppa_set, size);

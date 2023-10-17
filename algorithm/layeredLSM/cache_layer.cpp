@@ -40,28 +40,36 @@ uint32_t cache_get_ppa(uint32_t cache_idx, page_cache *pc){
 
 void *cache_layer_read_endreq(algo_req* req){
     cache_read_param *param=(cache_read_param*)req->param;
+    param->isdone=true;
+    if(!param->isinternal){
+        inf_assign_try(req->parents);
+    }    
+    free(req);
 
-    page_cache *target_pc=pc_set_pick(param->pcs, SHORTCUT, param->pba_or_scidx);
-    
-    std::vector<algo_req*>::iterator iter;
-    for(iter=target_pc->waiting_req.begin(); iter!=target_pc->waiting_req.end(); iter++){
-        algo_req *temp_req=*iter;
-        param=(cache_read_param*)(*iter)->param;
-        if(param->isinternal){
-            param->isdone=true;
-        }
-        else{
-            param->isdone=true;
-            std::vector<algo_req*>::iterator iter;
-            inf_assign_try(req->parents);
-        }
-        free(temp_req);
-    }
     return NULL;
 }
 
+void __cache_sc_panding_req(pc_set *pcs, uint32_t ppa_or_scidx){
+    page_cache *pc=pc_set_pick(pcs, SHORTCUT, ppa_or_scidx);
+    std::vector<algo_req*>::iterator iter;
+    for(iter=pc->waiting_req.begin(); iter!=pc->waiting_req.end(); iter++){
+        algo_req *temp_req=*iter;
+        cache_read_param *param=(cache_read_param*)temp_req->param;
+        param->isdone=true;
+        if(!param->isinternal){
+            inf_assign_try(temp_req->parents);
+        }
+        free(temp_req);
+    }
+}
+
 void cache_layer_sc_retry(lsmtree *lsm, uint32_t lba, run **ridx, cache_read_param *crp){
-    pc_set_insert(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, (void*)__temp_cache_data, NULL);
+    __cache_sc_panding_req(lsm->pcs, lba/RIDXINPAGE);
+
+    page_cache *pc=pc_set_pick(lsm->pcs, SHORTCUT, lba/RIDXINPAGE);
+    if(pc->flag==FLYING){
+        pc_set_insert(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, (void*)__temp_cache_data, NULL);
+    }
     (*ridx)=shortcut_query(lsm->shortcut, lba);
     cache_finalize(crp);
     pc_unpin(lsm->pcs, SHORTCUT, lba/RIDXINPAGE);
@@ -96,45 +104,49 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
     uint32_t sc_idx=lba/RIDXINPAGE;
     (*isdone)=true;
     (*ridx)=NULL;
-    if(cache_check && pc_is_cached(lsm->pcs, SHORTCUT, sc_idx, false)){
+
+    page_cache *target_pc=pc_is_cached(lsm->pcs, SHORTCUT, sc_idx, cache_check);
+    if(cache_check && target_pc && target_pc->flag!=FLYING){
         (*ridx)=shortcut_query(lsm->shortcut, lba);
         return NULL;
     }
     else{
-        page_cache *target_pc=pc_set_pick(lsm->pcs, SHORTCUT, sc_idx);
-        if(parent && target_pc->ppa==UINT32_MAX){ //read not found case
-            (*ridx)=NULL;
-            return NULL;
-        }
+        bool isflying_pc=target_pc && target_pc->flag==FLYING;
 
-        /*
-        static uint32_t cnt=0;
-        printf("read cnt:%u\n", ++cnt);
-        if(cnt==172){
-            printf("here\n");
-        }
-        */
+        if(!isflying_pc){
+            uint32_t target_size=PAGESIZE;
+            if(pc_has_space(lsm->pcs, target_size)){
+                /*do nothing*/           
+            }
+            else{
+                /*do eviction*/
+                if(lsm->pcs->now_cached_size-lsm->pcs->pinned_size < target_size){
+                    //too many  requests
+                    (*isdone)=false;
+                    return NULL;
+                }
+                pc_evict(lsm->pcs, true, target_size, cache_get_ppa);
+            }
 
-        uint32_t target_size=PAGESIZE;
-        if(pc_has_space(lsm->pcs, target_size)){
-            /*do nothing*/           
+            target_pc=pc_occupy(lsm->pcs, SHORTCUT, sc_idx, target_size);
+            if(cache_check && target_pc->ppa==UINT32_MAX){
+                //read path
+                pc_reclaim(lsm->pcs, target_pc);
+                (*ridx) = NULL; //read not found
+                return NULL;               
+            }
+            else{
+                //write path
+                if (target_pc->ppa == UINT32_MAX){
+                    /*initial state*/
+                    pc_set_insert(lsm->pcs, SHORTCUT, sc_idx, (void *)__temp_cache_data, NULL);
+                    (*ridx) = NULL;
+                    return NULL;
+                }
+            }
         }
         else{
-            /*do eviction*/
-            if(lsm->pcs->now_cached_size-lsm->pcs->pinned_size < target_size){
-                //too many  requests
-                (*isdone)=false;
-                return NULL;
-            }
-            pc_evict(lsm->pcs, true, target_size, cache_get_ppa);
-        }
-
-        pc_occupy(lsm->pcs, SHORTCUT, sc_idx, target_size);
-        if(target_pc->ppa==UINT32_MAX){
-            /*initial state*/
-            pc_set_insert(lsm->pcs, SHORTCUT, sc_idx, (void *)__temp_cache_data, NULL);
-            (*ridx) = NULL;
-            return NULL;
+            pc_increase_refer_cnt(lsm->pcs, target_pc);
         }
 
         cache_read_param *rparam = (cache_read_param *)malloc(sizeof(cache_read_param));
@@ -151,6 +163,7 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
         rparam->value=value;
         rparam->pcs=lsm->pcs;
         rparam->pba_or_scidx=sc_idx;
+        rparam->pc=target_pc;
 
         if(parent){
             parent->param=(void*)rparam;
@@ -163,6 +176,11 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
 }
 
 void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *des_run, uint32_t size){
+    static int cnt=0;
+    printf("call cnt:%d\n", ++cnt);
+    if(cnt==4217){
+        printf("debug cnt\n");
+    }
     //figure out which sc_idx to update
     std::list<std::pair<uint32_t, uint32_t> > target_sc_array; //first-->scidx, second-->start idx
     uint32_t previous_sc_idx=UINT32_MAX;
@@ -234,30 +252,47 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
             }
         }
     }
+    /*debug for sc*/
+    std::vector<page_cache>::iterator sc_iter;
+    for(sc_iter=lsm->pcs->cached_sc.begin(); sc_iter!=lsm->pcs->cached_sc.end(); sc_iter++){
+        if((*sc_iter).refer_cnt){
+            abort();
+        }
+    }
     return NULL;
 }
 
-bool __cache_check_and_occupy(lsmtree *lsm, uint32_t pba, map_function *mf, bool read_path){
-    if(read_path && pc_is_cached(lsm->pcs, IDX, pba, true)){
+bool __cache_check_and_occupy(lsmtree *lsm, uint32_t pba, map_function *mf, bool read_path, page_cache **res){
+    page_cache *target_pc=pc_is_cached(lsm->pcs, IDX, pba, read_path);
+    if(read_path && target_pc && target_pc->flag!=FLYING){
         return true;
     }
     else{
-        uint32_t target_size=mf->get_memory_usage(mf, 32)/8;
-        if(pc_has_space(lsm->pcs, target_size)){
-            /*do nothing*/           
+        bool isflying_pc=target_pc && target_pc->flag==FLYING;
+        if(!isflying_pc){
+            uint32_t target_size=mf->get_memory_usage(mf, 32)/8;
+            if(pc_has_space(lsm->pcs, target_size)){
+                /*do nothing*/           
+            }
+            else{
+                /*do eviction*/
+                pc_evict(lsm->pcs, true, target_size, cache_get_ppa);
+            }
+
+            pc_occupy(lsm->pcs, IDX, pba, target_size);
         }
         else{
-            /*do eviction*/
-            pc_evict(lsm->pcs, true, target_size, cache_get_ppa);
+            pc_increase_refer_cnt(lsm->pcs, target_pc);
         }
-
-        pc_occupy(lsm->pcs, IDX, pba, target_size);
     }
+
+    (*res)=target_pc;
     return false;
 }
 
 void cache_layer_idx_insert(lsmtree *lsm, uint32_t pba, map_function *mf, bool pinning, bool trivial_move){
-    if(__cache_check_and_occupy(lsm, pba, mf, pinning | trivial_move)){
+    page_cache *temp;
+    if(__cache_check_and_occupy(lsm, pba, mf, pinning | trivial_move, &temp)){
         //hit case
         return;
     }
@@ -275,27 +310,17 @@ void cache_layer_idx_force_evict(lsmtree *lsm, uint32_t pba){
 
 void *cache_layer_read_idx_endreq(algo_req *req){
     cache_read_param *param=(cache_read_param*)req->param;
-    page_cache *target_pc=pc_set_pick(param->pcs, IDX, param->pba_or_scidx);
-
-    std::vector<algo_req*>::iterator iter;
-    for(iter=target_pc->waiting_req.begin(); iter!=target_pc->waiting_req.end(); iter++){
-        algo_req *temp_req=*iter;
-        param=(cache_read_param*)(*iter)->param;
-        if(param->isinternal){
-            param->isdone=true;
-        }
-        else{
-            param->isdone=true;
-            std::vector<algo_req*>::iterator iter;
-            inf_assign_try(req->parents);
-        }
-        free(temp_req);
-    }    
+    param->isdone=true;
+    if(!param->isinternal){
+        inf_assign_try(req->parents);
+    }
+    free(req);
     return NULL;
 }
 
 void *cache_layer_idx_read(lsmtree *lsm, uint32_t pba, uint32_t lba, run *r, request *parent, map_function *mf){
-    if(__cache_check_and_occupy(lsm, pba, mf, true)){
+    page_cache *target_pc;
+    if(__cache_check_and_occupy(lsm, pba, mf, true, &target_pc)){
         /*hit case*/
         return NULL;
     }
@@ -320,6 +345,7 @@ void *cache_layer_idx_read(lsmtree *lsm, uint32_t pba, uint32_t lba, run *r, req
     rparam->r=r;
     rparam->parents_req=(void*)parent;
     rparam->isinternal=false;
+    rparam->pc=target_pc;
 
     parent->param=(void*)rparam;
     parent->retry=true;
@@ -329,8 +355,26 @@ void *cache_layer_idx_read(lsmtree *lsm, uint32_t pba, uint32_t lba, run *r, req
     return (void*)rparam;
 }
 
+void __cache_idx_pending_req(pc_set *pcs, uint32_t ppa_or_scidx){
+    page_cache *pc=pc_set_pick(pcs, IDX, ppa_or_scidx);
+    std::vector<algo_req*>::iterator iter;
+    for(iter=pc->waiting_req.begin(); iter!=pc->waiting_req.end(); iter++){
+        algo_req *temp_req=*iter;
+        cache_read_param *param=(cache_read_param*)temp_req->param;
+        param->isdone=true;
+        if(!param->isinternal){
+            inf_assign_try(temp_req->parents);
+        }
+        free(temp_req);
+    }
+}
+
 void cache_layer_idx_retry(lsmtree *lsm, uint32_t pba, cache_read_param *crp){
-    pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);   
+    __cache_idx_pending_req(lsm->pcs, pba);
+    page_cache *pc=pc_set_pick(lsm->pcs, IDX, pba);
+    if(pc->flag==FLYING){
+        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);   
+    }
     cache_finalize(crp);
 }
 
@@ -344,4 +388,8 @@ void cache_finalize(cache_read_param *crp){
 
 void cache_layer_idx_unpin(lsmtree *lsm, uint32_t pba){
     pc_unpin(lsm->pcs, IDX, pba);
+}
+
+void cache_layer_sc_unpin(lsmtree *lsm, uint32_t lba){
+    pc_unpin(lsm->pcs, SHORTCUT, lba/RIDXINPAGE);
 }

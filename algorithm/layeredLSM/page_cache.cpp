@@ -3,6 +3,8 @@
 #include <list>
 #include <pthread.h>
 pthread_mutex_t pinning_lock=PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t idx_map_lock=PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t req_wait_lock=PTHREAD_MUTEX_INITIALIZER;
 
 void pc_set_init(pc_set *target, uint32_t max_cached_size, uint32_t lba_num, lower_info *li){
     lru_init(&target->lru, NULL, NULL);
@@ -23,6 +25,8 @@ void pc_set_init(pc_set *target, uint32_t max_cached_size, uint32_t lba_num, low
     temp_pc.ispinned=false;
     temp_pc.data=NULL;
     temp_pc.node=NULL;
+    temp_pc.refer_cnt=0;
+    temp_pc.pba=UINT32_MAX;
 
     for(uint32_t i=0; i<lba_num/RIDXINPAGE+1; i++){
         temp_pc.scidx=i;
@@ -44,15 +48,18 @@ void pc_set_free(pc_set *target){
     target->cached_idx.clear();
 }
 
-bool pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx, bool pinned){
+page_cache* pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx, bool pinned){
     page_cache *pc=NULL;
     if(type==SHORTCUT){
+        pthread_mutex_lock(&idx_map_lock);
         pc=&target->cached_sc[ppa_or_scidx];
-        if(pc->flag==EMPTY || pc->flag==FLYING){
+        if(pc->flag==EMPTY){
             pc=NULL;
         }
+        pthread_mutex_unlock(&idx_map_lock);
     }
     else if(type==IDX){
+        pthread_mutex_lock(&idx_map_lock);
         std::map<uint32_t, page_cache*>::iterator miter;
         miter=target->cached_idx.find(ppa_or_scidx);
         if(miter==target->cached_idx.end()){
@@ -61,13 +68,14 @@ bool pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx, bool p
         else{
             pc=miter->second;
         }
+        pthread_mutex_unlock(&idx_map_lock);
     }
     else{
         printf("error!\n");
         abort();
     }
 
-    if(pc){
+    if(pc && pc->flag!=FLYING){
         lru_update(target->lru, pc->node);
         if(pinned){
             pthread_mutex_lock(&pinning_lock);
@@ -78,24 +86,24 @@ bool pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx, bool p
             pc->refer_cnt++;
             pthread_mutex_unlock(&pinning_lock);
         }
-        else{
-            pc->ispinned=false;
-        }
-        return true;
     }
-    else return false;
+    return pc;
 }
 
 bool pc_has_space(pc_set *target, uint32_t need_size){
     return target->now_cached_size + need_size < target->max_cached_size;
 }
 
-void pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, uint32_t size){
+
+page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, uint32_t size){
     page_cache *pc=NULL;
     if(target->now_cached_size + size > target->max_cached_size){
         printf("size error!\n");
         abort();
     }
+
+
+    pthread_mutex_lock(&idx_map_lock);
     if(type==SHORTCUT){
         pc = &target->cached_sc[ppa_or_scidx];
         pc->flag=EMPTY;
@@ -114,6 +122,7 @@ void pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, uint32_t 
         printf("error!\n");
         abort();
     }
+    pthread_mutex_unlock(&idx_map_lock);
 
     pc->flag=OCCUPIED;
     pc->data=malloc(size);
@@ -124,10 +133,29 @@ void pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, uint32_t 
 
     target->pinned_size+=size;
     target->now_cached_size+=size;
+    return pc;
+}
+
+void pc_reclaim(pc_set *pcs, page_cache *pc){
+    if(pc->type!=SHORTCUT){
+        printf("error!\n");
+        abort();
+    }
+
+    pc->flag=EMPTY;
+    free(pc->data);
+    pc->ispinned=false;
+    pc->refer_cnt=0;
+
+    pcs->pinned_size-=pc->size;
+    pcs->now_cached_size-=pc->size;
+    pcs->cached_sc_num--;
 }
 
 void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void *data, void (*converter)(void *data, page_cache *pc)){
     page_cache *pc;
+
+    pthread_mutex_lock(&idx_map_lock);
     if(type==SHORTCUT){
         pc=&target->cached_sc[ppa_or_scidx];
     }
@@ -140,6 +168,7 @@ void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void 
         printf("error!\n");
         abort();
     }
+    pthread_mutex_unlock(&idx_map_lock);
 
     if(converter){
         converter(data, pc);
@@ -159,8 +188,25 @@ void pc_set_update(pc_set *target, uint32_t ppa_or_scidx){
     pc->flag=DIRTY;
 }
 
+void pc_unpin_target(pc_set *pcs, page_cache *pc){
+    if(!pc->ispinned){
+        printf("error!\n");
+        abort();
+    }
+    if(pc->ispinned){
+        pthread_mutex_lock(&pinning_lock);
+        pc->refer_cnt--;
+        if (pc->refer_cnt == 0){
+            pc->ispinned = false;
+            pcs->pinned_size-= pc->size;
+        }
+        pthread_mutex_unlock(&pinning_lock);
+    }
+}
+
 void pc_unpin(pc_set *target, cache_type type, uint32_t ppa_or_scidx){
     page_cache *pc;
+    pthread_mutex_lock(&idx_map_lock);
     if(type==SHORTCUT){
         pc=&target->cached_sc[ppa_or_scidx];
     }
@@ -171,20 +217,8 @@ void pc_unpin(pc_set *target, cache_type type, uint32_t ppa_or_scidx){
         printf("error!\n");
         abort();
     }
-
-    if(!pc->ispinned){
-        printf("error!\n");
-        abort();
-    }
-    if(pc->ispinned){
-        pthread_mutex_lock(&pinning_lock);
-        pc->refer_cnt--;
-        if (pc->refer_cnt == 0){
-            pc->ispinned = false;
-            target->pinned_size-= pc->size;
-        }
-        pthread_mutex_unlock(&pinning_lock);
-    }
+    pthread_mutex_unlock(&idx_map_lock);
+    pc_unpin_target(target, pc);
 }
 
 static void *__write_end_req(algo_req *req){
@@ -221,6 +255,11 @@ void pc_evict(pc_set *target, bool internal, uint32_t need_size, uint32_t (*get_
         if(pc->ispinned){
             temp_list.insert(temp_list.end(), pc);
             continue;
+        }
+
+        if (pc->ispinned == false && pc->refer_cnt){
+            printf("error!=\n");
+            abort();
         }
 
         target->now_cached_size-=pc->size;
@@ -287,6 +326,7 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
     page_cache *pc=NULL;
     if(type==SHORTCUT){
         pc=&target->cached_sc[ppa_or_scidx];
+        res->ppa=pc->ppa;
     }
     else if(type==IDX){
         std::map<uint32_t, page_cache*>::iterator miter;
@@ -295,35 +335,38 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
             printf("error!\n");
             abort();
         }
-
         pc=miter->second;
+        res->ppa=pc->ppa/L2PGAP;
     }
     else{
         printf("error!\n");
         abort();
     }
 
-    if(pc->flag!=OCCUPIED){
+    if(!(pc->flag==OCCUPIED || pc->flag==FLYING)){
         printf("error!\n");
         abort();
     }
     pc->flag=FLYING;
-    res->ppa=pc->ppa;
 
     /*add waiting request*/
+    pthread_mutex_lock(&req_wait_lock);
     if(pc->waiting_req.size()==0){
-        pc->waiting_req.push_back(res);
+        //pc->waiting_req.push_back(res);
         target->li->read(res->ppa, PAGESIZE, value, res);
     }
     else{
         pc->waiting_req.push_back(res);
     }
+    pthread_mutex_unlock(&req_wait_lock);
 
     return res;
 }
 
 page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx){
     page_cache *pc=NULL;
+
+    pthread_mutex_lock(&idx_map_lock);
     if(type==SHORTCUT){
         pc=&pcs->cached_sc[ppa_or_scidx];
     }
@@ -340,6 +383,18 @@ page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx){
         printf("error!\n");
         abort();
     }
+    pthread_mutex_unlock(&idx_map_lock);
 
     return pc;
+}
+
+
+void pc_increase_refer_cnt(pc_set *target, page_cache *pc){
+    pthread_mutex_lock(&pinning_lock);
+    pc->refer_cnt++;
+    if(pc->refer_cnt==1){
+        pc->ispinned=true;
+        target->pinned_size+=pc->size;
+    }
+    pthread_mutex_unlock(&pinning_lock);
 }
