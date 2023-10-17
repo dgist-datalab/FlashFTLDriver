@@ -54,6 +54,35 @@ void lru_free(LRU* lru){
 	free(lru);
 }
 
+lru_node* lru_push_special(LRU* lru, void* table_ptr, uint32_t type, uint32_t id, uint32_t size){
+	lru_node *now = (lru_node*)malloc(sizeof(lru_node));
+	now->data = table_ptr;
+	now->next = now->prev = NULL;
+	now->type=type;
+	now->id=id;
+	now->size=size;
+	if(lru->size == 0){
+		lru->head = lru->tail = now;
+	}
+	else{
+		lru->head->prev = now;
+		now->next = lru->head;
+		lru->head = now;
+	}
+	
+	if(lru->retrieve_key){
+		uint32_t key=lru->retrieve_key(table_ptr);
+		if(art_insert(&lru->map, (const unsigned char*)&key, sizeof(key), now->data)){
+			printf("already exist key:%u in lru map", key);
+			abort();
+		}
+	}
+
+	//lru_check_error(lru);
+	lru->size++;
+	return now;
+}
+
 lru_node* lru_push(LRU* lru, void* table_ptr){
 	lru_node *now = (lru_node*)malloc(sizeof(lru_node));
 	now->data = table_ptr;
@@ -104,6 +133,39 @@ lru_node* lru_push_last(LRU* lru, void* table_ptr){
 	lru->size++;
 	//lru_check_error(lru);
 	return now;
+}
+
+
+void* lru_pop_special(LRU* lru, uint32_t *type, uint32_t *idx, uint32_t *size){
+	if(!lru->head || lru->size == 0){
+		return NULL;
+	}
+	lru_node *now = lru->tail;
+	void *re = now->data;
+	lru->tail = now->prev;
+	if(lru->tail != NULL){
+		lru->tail->next = NULL;
+	}
+	else{
+		lru->head = NULL;
+	}
+	if(lru->retrieve_key){
+		uint32_t key=lru->retrieve_key(now->data);
+		art_delete(&lru->map, (const unsigned char*)&key, sizeof(key));
+	}
+
+	*type=now->type;
+	*idx=now->id;
+	*size=now->size;
+
+	lru->size--;
+	if(lru->free_data){
+		lru->free_data(re);
+	}
+
+	
+	free(now);
+	return re;
 }
 
 void* lru_pop(LRU* lru){

@@ -267,7 +267,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 		}
 		else{
 			//sc cache hit
-			cache_layer_sc_unpin(lsm, req->key);
+			//cache_layer_sc_unpin(lsm, req->key);
 			req->flag=READ_REQ_MAP;
 			map_function *mf;
 			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
@@ -276,7 +276,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 				res=run_query(r, req);
 			}
 			else{ //map miss
-				req->type_ftl++;
+				req->type_ftl+=20;
 			}
 		}
 		res=READ_DONE;

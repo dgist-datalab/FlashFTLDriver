@@ -72,7 +72,7 @@ void cache_layer_sc_retry(lsmtree *lsm, uint32_t lba, run **ridx, cache_read_par
     }
     (*ridx)=shortcut_query(lsm->shortcut, lba);
     cache_finalize(crp);
-    pc_unpin(lsm->pcs, SHORTCUT, lba/RIDXINPAGE);
+    //pc_unpin(lsm->pcs, SHORTCUT, lba/RIDXINPAGE);
 }
 
 static inline void __sc_udpate(lsmtree *lsm, std::vector<uint32_t> &lba_set, run* des_run, 
@@ -120,7 +120,7 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
             }
             else{
                 /*do eviction*/
-                if(lsm->pcs->now_cached_size-lsm->pcs->pinned_size < target_size){
+                if(lsm->pcs->now_cached_size < target_size){
                     //too many  requests
                     (*isdone)=false;
                     return NULL;
@@ -146,7 +146,7 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
             }
         }
         else{
-            pc_increase_refer_cnt(lsm->pcs, target_pc);
+            //pc_increase_refer_cnt(lsm->pcs, target_pc);
         }
 
         cache_read_param *rparam = (cache_read_param *)malloc(sizeof(cache_read_param));
@@ -176,11 +176,6 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
 }
 
 void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *des_run, uint32_t size){
-    static int cnt=0;
-    printf("call cnt:%d\n", ++cnt);
-    if(cnt==4217){
-        printf("debug cnt\n");
-    }
     //figure out which sc_idx to update
     std::list<std::pair<uint32_t, uint32_t> > target_sc_array; //first-->scidx, second-->start idx
     uint32_t previous_sc_idx=UINT32_MAX;
@@ -225,7 +220,7 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
                     break;
                 }
                 __sc_udpate(lsm, lba_set, des_run, size, iter, target_sc_array.end());
-                pc_unpin(lsm->pcs, SHORTCUT, iter->first);
+                //pc_unpin(lsm->pcs, SHORTCUT, iter->first);
                 continue;
             }
             else{
@@ -246,17 +241,10 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
 
                 __sc_udpate(lsm, lba_set, des_run, size, (*crp_iter).second, target_sc_array.end());
                 
-                pc_unpin(lsm->pcs, SHORTCUT, (*(*crp_iter).second).first);
+                //pc_unpin(lsm->pcs, SHORTCUT, (*(*crp_iter).second).first);
                 cache_finalize(crp);
                 crp_list.erase(crp_iter++);
             }
-        }
-    }
-    /*debug for sc*/
-    std::vector<page_cache>::iterator sc_iter;
-    for(sc_iter=lsm->pcs->cached_sc.begin(); sc_iter!=lsm->pcs->cached_sc.end(); sc_iter++){
-        if((*sc_iter).refer_cnt){
-            abort();
         }
     }
     return NULL;
@@ -282,7 +270,7 @@ bool __cache_check_and_occupy(lsmtree *lsm, uint32_t pba, map_function *mf, bool
             pc_occupy(lsm->pcs, IDX, pba, target_size);
         }
         else{
-            pc_increase_refer_cnt(lsm->pcs, target_pc);
+            //pc_increase_refer_cnt(lsm->pcs, target_pc);
         }
     }
 
@@ -299,9 +287,9 @@ void cache_layer_idx_insert(lsmtree *lsm, uint32_t pba, map_function *mf, bool p
 
     //miss case
     pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);
-    if(!pinning){
-        pc_unpin(lsm->pcs, IDX, pba);
-    }
+    //if(!pinning){
+    //    pc_unpin(lsm->pcs, IDX, pba);
+    //}
 }
 
 void cache_layer_idx_force_evict(lsmtree *lsm, uint32_t pba){
@@ -387,9 +375,9 @@ void cache_finalize(cache_read_param *crp){
 
 
 void cache_layer_idx_unpin(lsmtree *lsm, uint32_t pba){
-    pc_unpin(lsm->pcs, IDX, pba);
+    //pc_unpin(lsm->pcs, IDX, pba);
 }
 
 void cache_layer_sc_unpin(lsmtree *lsm, uint32_t lba){
-    pc_unpin(lsm->pcs, SHORTCUT, lba/RIDXINPAGE);
+    //pc_unpin(lsm->pcs, SHORTCUT, lba/RIDXINPAGE);
 }

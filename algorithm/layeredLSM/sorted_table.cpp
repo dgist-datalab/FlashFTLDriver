@@ -136,7 +136,7 @@ st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinnin
 	res->type=pinning?ST_PINNING: ST_NORMAL;
 	if(res->type==ST_PINNING){
 		res->pinning_data=(uint32_t *)malloc(max_sector_num * sizeof(uint32_t));
-		res->gced_unlink_data=bitmap_init(max_sector_num);
+		res->gced_unlink_data=bitmap_init(max_sector_num*2);
 	}
 	else{
 		res->pinning_data=NULL;

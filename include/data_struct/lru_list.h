@@ -7,6 +7,9 @@
 
 typedef struct lru_node{
 	void *data;
+	uint32_t type;
+	uint32_t id;
+	uint32_t size;
 	struct lru_node *next;
 	struct lru_node *prev;
 } lru_node;
@@ -24,9 +27,11 @@ typedef struct __lru{
 void lru_init(LRU**, void(*)(void*), uint32_t(*)(void*));
 void lru_free(LRU*);
 lru_node* lru_push(LRU*, void*);
+lru_node* lru_push_special(LRU*, void*, uint32_t, uint32_t, uint32_t );
 lru_node* lru_push_last(LRU *, void *);
 void* lru_find(LRU *, uint32_t key);
 void* lru_pop(LRU*);
+void* lru_pop_special(LRU*, uint32_t *, uint32_t *, uint32_t *);
 void lru_move_last(LRU *, lru_node*);
 void lru_update(LRU*, lru_node*);
 void lru_delete(LRU*, lru_node*);
