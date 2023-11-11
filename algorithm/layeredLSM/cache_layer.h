@@ -12,6 +12,7 @@ typedef struct cache_read_param{
     page_cache *pc;
     run *r;
     void *parents_req;
+    run *r2;
 }cache_read_param;
 
 
@@ -31,5 +32,5 @@ void cache_layer_idx_retry(lsmtree *lsm, uint32_t pba, cache_read_param *crp);
 void * cache_layer_idx_read(lsmtree *lsm, uint32_t pba, uint32_t lba, run *r, request *req, map_function *mf);
 //void cache_layer_idx_unpin(lsmtree *lsm, uint32_t pba);
 //void cache_layer_sc_unpin(lsmtree *lsm, uint32_t lba);
-
+std::vector<algo_req*>* cache_layer_get_pending_req(lsmtree *lsm, uint32_t lba_or_ppa, cache_type type);
 void cache_finalize(cache_read_param *crp);

@@ -61,7 +61,7 @@ void run_free(run *r ,struct shortcut_master *sc){
 	}
 	shortcut_release_sc_info(sc, r->info->idx);
 	uint64_t memory_usage_bit=0;
-	memory_usage_bit=run_memory_usage(r, r->lsm->param.target_bit);
+	memory_usage_bit=run_memory_usage(r, r->lsm->param.target_bit, true);
 	uint32_t map_type=r->type==RUN_LOG?r->run_log_mf->type:r->st_body->param.map_type;
 	__lsm_calculate_memory_usage(r->lsm, r->now_entry_num, -1 * memory_usage_bit, map_type, r->type==RUN_PINNING);
 	st_array_free(r->st_body);

@@ -1,11 +1,15 @@
 #include "page_cache.h"
 #include "../../interface/interface.h"
+#include "cache_layer.h"
 #include <list>
 #include <pthread.h>
 pthread_mutex_t pinning_lock=PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t idx_map_lock=PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t req_wait_lock=PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t lru_lock=PTHREAD_MUTEX_INITIALIZER;
+static inline void print_error(uint64_t line){
+    printf("%s error :%u\n", __FILE__, line);
+}
 
 void pc_set_init(pc_set *target, uint32_t max_cached_size, uint32_t lba_num, lower_info *li){
     lru_init(&target->lru, NULL, NULL);
@@ -43,7 +47,7 @@ void lru_checker(LRU *lru){
     for_each_lru_list(lru, now){
         page_cache *pc=(page_cache*)now->data;
         if(pc->type!=SHORTCUT && pc->type!=IDX){
-            printf("error!\n");
+            print_error(__LINE__);
             abort();
         }
     }
@@ -85,11 +89,11 @@ page_cache* pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx,
         pthread_mutex_unlock(&idx_map_lock);
     }
     else{
-        printf("error!\n");
+        print_error(__LINE__);
         abort();
     }
 
-    if(pc && pc->flag!=FLYING){
+    if(pc && pc->flag!=FLYING && pc->flag!=OCCUPIED){
         lru_update(target->lru, pc->node);
         lru_checker(target->lru);
         //if(pinned){
@@ -119,14 +123,18 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
     page_cache *pc=NULL;
     pthread_mutex_lock(&lru_lock);
     if(target->now_cached_size + size > target->max_cached_size){
-        printf("size error!\n");
-        abort();
+        //print_error(__LINE__);
+        //abort();
     }
 
 
     pthread_mutex_lock(&idx_map_lock);
     if(type==SHORTCUT){
         pc = &target->cached_sc[ppa_or_scidx];
+        if(pc->flag!=EMPTY){
+            print_error(__LINE__);
+            abort();
+        }
         pc->flag=EMPTY;
         pc->type=type;
         target->cached_sc_num++;
@@ -137,11 +145,26 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
         pc->flag = EMPTY;
         pc->size = size;
         pc->ppa=ppa_or_scidx;
+
+        if(target->cached_idx_num!=target->cached_idx.size()){
+            printf("errror %s:%u\n",__FILE__, __LINE__);
+            abort();
+        }
+        if(target->cached_idx.find(ppa_or_scidx)!=target->cached_idx.end()){
+            print_error(__LINE__);
+            abort();
+        }
         target->cached_idx.insert(std::make_pair(ppa_or_scidx, pc));
         target->cached_idx_num++;
+
+        if(target->cached_idx_num!=target->cached_idx.size()){
+            printf("errror %s:%u\n",__FILE__, __LINE__);
+            abort();
+        }
     }
     else{
-        printf("error!\n");
+
+        print_error(__LINE__);
         abort();
     }
     pthread_mutex_unlock(&idx_map_lock);
@@ -162,7 +185,7 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
 void pc_reclaim(pc_set *pcs, page_cache *pc){
     pthread_mutex_lock(&lru_lock);
     if(pc->type!=SHORTCUT){
-        printf("error!\n");
+        print_error(__LINE__);
         abort();
     }
 
@@ -188,7 +211,7 @@ void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void 
         std::map<uint32_t, page_cache*>::iterator miter;
         miter=target->cached_idx.find(ppa_or_scidx);
         if(miter==target->cached_idx.end()){
-            printf("error!\n");
+            print_error(__LINE__);
             abort();
         }
         pc=miter->second;
@@ -196,7 +219,7 @@ void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void 
         pc->ppa=ppa_or_scidx;
     }
     else{
-        printf("error!\n");
+        print_error(__LINE__);
         abort();
     }
     pthread_mutex_unlock(&idx_map_lock);
@@ -293,7 +316,29 @@ void pc_evict(pc_set *target, bool internal, uint32_t need_size, uint32_t (*get_
         lru_checker(target->lru);
         if(pc==NULL){
             printf("all cached entries are pinned %s:%d\n", __FUNCTION__, __LINE__);
-            abort();
+            //abort();
+            uint32_t flying_cnt=0;
+            uint32_t empty_cnt=0;
+            uint32_t remain_cnt=0;
+            std::vector<page_cache>::iterator iter;
+            for(iter=target->cached_sc.begin(); iter!=target->cached_sc.end(); iter++){
+                if(iter->flag==FLYING){
+                    flying_cnt++;
+                }
+                else if(iter->flag==EMPTY){
+                    empty_cnt++;
+                }
+                else{
+                    remain_cnt++;
+                }
+            }
+
+            target->now_cached_size=(flying_cnt+remain_cnt)*PAGESIZE;
+            target->cached_idx.clear();
+            remain_size=target->max_cached_size-target->now_cached_size;
+            if(target_size <remain_size){
+                break;
+            }
         }
 
         target->now_cached_size-=size;
@@ -320,12 +365,26 @@ void pc_evict(pc_set *target, bool internal, uint32_t need_size, uint32_t (*get_
             pc->flag = EMPTY;
         }
         else if(type==IDX){
+            if (target->cached_idx_num != target->cached_idx.size())
+            {
+                printf("errror %s:%u\n",__FILE__, __LINE__);
+                abort();
+            }
             target->cached_idx_num--;
             std::map<uint32_t, page_cache*>::iterator miter;
             miter=target->cached_idx.find(id);
             if(miter!=target->cached_idx.end()){
                 delete miter->second;
                 target->cached_idx.erase(miter);
+            }
+            else{
+                abort();
+            }
+            if (target->cached_idx_num != target->cached_idx.size())
+            {
+
+            printf("errror %s:%u\n",__FILE__, __LINE__);
+                abort();
             }
             //free(pc->data);
             //delete pc;
@@ -353,7 +412,22 @@ void pc_force_evict_idx(pc_set *pcs, uint32_t pba){
         pthread_mutex_unlock(&lru_lock);
         return;
     }
-    lru_move_last(pcs->lru, miter->second->node);
+    if (pcs->cached_idx_num != pcs->cached_idx.size())
+    {
+        printf("errror %s:%u\n",__FILE__, __LINE__);
+        abort();
+    }
+    lru_delete(pcs->lru, miter->second->node);
+    pcs->now_cached_size-=miter->second->size;
+    pcs->cached_idx_num--;
+    delete miter->second;
+    pcs->cached_idx.erase(miter);
+    if (pcs->cached_idx_num != pcs->cached_idx.size())
+    {
+        printf("errror %s:%u\n",__FILE__, __LINE__);
+        abort();
+    }
+    //lru_move_last(pcs->lru, miter->second->node);
 
     lru_checker(pcs->lru);
 
@@ -378,23 +452,23 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
         std::map<uint32_t, page_cache*>::iterator miter;
         miter=target->cached_idx.find(ppa_or_scidx);
         if(miter==target->cached_idx.end()){
-            printf("error!\n");
+            print_error(__LINE__);
             abort();
         }
         pc=miter->second;
         res->ppa=pc->ppa/L2PGAP;
     }
     else{
-        printf("error!\n");
+        print_error(__LINE__);
         abort();
     }
 
     if(!(pc->flag==OCCUPIED || pc->flag==FLYING)){
-        printf("error!\n");
+        print_error(__LINE__);
         abort();
     }
     pc->flag=FLYING;
-
+    ((cache_read_param*)param)->pc=pc;
     /*add waiting request*/
     pthread_mutex_lock(&req_wait_lock);
     if(pc->waiting_req.size()==0){
@@ -409,11 +483,12 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
     return res;
 }
 
-page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx){
+page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx, bool lock_flag){
     page_cache *pc=NULL;
-
-    pthread_mutex_lock(&lru_lock);
-    pthread_mutex_lock(&idx_map_lock);
+    if(lock_flag){
+        pthread_mutex_lock(&lru_lock);  
+        pthread_mutex_lock(&idx_map_lock);
+    }
     if(type==SHORTCUT){
         pc=&pcs->cached_sc[ppa_or_scidx];
     }
@@ -421,17 +496,19 @@ page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx){
         std::map<uint32_t, page_cache*>::iterator miter;
         miter=pcs->cached_idx.find(ppa_or_scidx);
         if(miter==pcs->cached_idx.end()){
-            printf("error!\n");
+            print_error(__LINE__);
             abort();
         }
         pc=miter->second;
     }
     else{
-        printf("error!\n");
+        print_error(__LINE__);
         abort();
     }
-    pthread_mutex_unlock(&idx_map_lock);
-    pthread_mutex_unlock(&lru_lock);
+    if(lock_flag){
+        pthread_mutex_unlock(&idx_map_lock);
+        pthread_mutex_unlock(&lru_lock);
+    }
 
     return pc;
 }

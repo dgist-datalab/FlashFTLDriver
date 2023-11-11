@@ -10,6 +10,18 @@ extern uint32_t debug_lba;
 extern uint32_t test_ppa;
 //bool global_debug_flag=false;
 
+sftl_cache_monitor scm;
+extern demand_map_manager dmm;
+
+void sftl_print_log_idx(my_cache *sc){
+       uint64_t total_memory=0;
+       for(uint32_t i=0; i< GTDNUM; i++){
+               total_memory+=scm.gtd_size[i];
+       }
+
+       printf("SFTL idx memory:%.2lf\n", (double)total_memory/(RANGE*4));
+}
+
 my_cache sftl_cache_func{
 	.init=sftl_init,
 	.free=sftl_free,
@@ -35,11 +47,9 @@ my_cache sftl_cache_func{
 	.update_dynamic_size=sftl_update_dynamic_size,
 	.empty_cache=sftl_empty_cache,
 	.exist=sftl_exist,
-	.print_log=NULL,
+	.print_log=sftl_print_log_idx,
 };
 
-sftl_cache_monitor scm;
-extern demand_map_manager dmm;
 
 uint32_t sftl_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&scm.lru, NULL, NULL);

@@ -60,7 +60,7 @@ void pc_evict(pc_set *, bool internal, uint32_t need_size, uint32_t (*get_ppa)(u
 void pc_force_evict_idx(pc_set *pcs, uint32_t pba);
 
 algo_req* pc_send_get_request(pc_set *, cache_type type, request *parents, uint32_t ppa_or_scidx, value_set* value,void *param, void*(*end_req)(algo_req*));
-page_cache *pc_set_pick(pc_set *, cache_type type, uint32_t ppa_or_scidx);
+page_cache *pc_set_pick(pc_set *, cache_type type, uint32_t ppa_or_scidx, bool lock_flag);
 //void pc_increase_refer_cnt(pc_set *pcs, page_cache *pc);
 
 /*Request interface*/

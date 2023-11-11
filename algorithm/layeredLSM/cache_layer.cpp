@@ -4,6 +4,7 @@
 
 static char __temp_cache_data[PAGESIZE];
 static lsmtree *main_lsm;
+extern uint32_t test_key;
 void cache_layer_init(lsmtree *lsm, uint32_t cached_size, lower_info *li){
     lsm->pcs=new pc_set();
     pc_set_init(lsm->pcs, cached_size, RANGE, li);
@@ -19,7 +20,7 @@ void cache_update_pc_ppa_by_gc(uint32_t *scidx_set, uint32_t *new_ppa_set, uint3
     static int cnt=0;
     printf("--------------------%d\n",cnt);
     for(uint32_t i=0; i<size; i++){
-        page_cache *target_pc=pc_set_pick(main_lsm->pcs, SHORTCUT, scidx_set[i]);
+        page_cache *target_pc=pc_set_pick(main_lsm->pcs, SHORTCUT, scidx_set[i], false);
         if(target_pc->flag==DIRTY){
             target_pc->flag=CLEAN;
         }
@@ -49,8 +50,17 @@ void *cache_layer_read_endreq(algo_req* req){
     return NULL;
 }
 
+std::vector<algo_req*>* cache_layer_get_pending_req(lsmtree *lsm, uint32_t lba_or_ppa, cache_type type){
+    uint32_t target_idx=lba_or_ppa;
+    if(type==SHORTCUT){
+        target_idx=lba_or_ppa/RIDXINPAGE;
+    }
+    page_cache *pc=pc_set_pick(lsm->pcs, type, target_idx, true);
+    return &pc->waiting_req;
+}
+
 void __cache_sc_panding_req(pc_set *pcs, uint32_t ppa_or_scidx){
-    page_cache *pc=pc_set_pick(pcs, SHORTCUT, ppa_or_scidx);
+    page_cache *pc=pc_set_pick(pcs, SHORTCUT, ppa_or_scidx, true);
     std::vector<algo_req*>::iterator iter;
     for(iter=pc->waiting_req.begin(); iter!=pc->waiting_req.end(); iter++){
         algo_req *temp_req=*iter;
@@ -64,9 +74,9 @@ void __cache_sc_panding_req(pc_set *pcs, uint32_t ppa_or_scidx){
 }
 
 void cache_layer_sc_retry(lsmtree *lsm, uint32_t lba, run **ridx, cache_read_param *crp){
-    __cache_sc_panding_req(lsm->pcs, lba/RIDXINPAGE);
+    //__cache_sc_panding_req(lsm->pcs, lba/RIDXINPAGE);
 
-    page_cache *pc=pc_set_pick(lsm->pcs, SHORTCUT, lba/RIDXINPAGE);
+    page_cache *pc=pc_set_pick(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, true);
     if(pc->flag==FLYING){
         pc_set_insert(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, (void*)__temp_cache_data, NULL);
     }
@@ -96,6 +106,11 @@ std::list<std::pair<uint32_t, uint32_t> >::iterator end_iter){
 
     std::vector<uint32_t> lba_target;
     lba_target.assign(lba_set.begin()+current, lba_set.begin()+last);
+    for(uint32_t i=current; i< last; i++){
+        if(lba_set[i]==test_key){
+            printf("break!\n");
+        }
+    }
     shortcut_link_bulk_lba(lsm->shortcut, des_run, &lba_target, true);
 }
 
@@ -160,6 +175,7 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
             rparam->isinternal = true;
             value=inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
         }
+        rparam->r2=shortcut_query(lsm->shortcut, lba);
         rparam->value=value;
         rparam->pcs=lsm->pcs;
         rparam->pba_or_scidx=sc_idx;
@@ -180,10 +196,15 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
     std::list<std::pair<uint32_t, uint32_t> > target_sc_array; //first-->scidx, second-->start idx
     uint32_t previous_sc_idx=UINT32_MAX;
     for(uint32_t i=0; i<size; i++){
+        if(lba_set[i]==test_key){
+            printf("target key in %u\n", i);
+        }
         if(lba_set[i]/RIDXINPAGE!=previous_sc_idx){
             target_sc_array.push_back(std::pair<uint32_t, uint32_t>(lba_set[i]/RIDXINPAGE,i));
             previous_sc_idx=lba_set[i]/RIDXINPAGE;
         }
+
+
     }
 
     //1. check the sc_page is cached or not
@@ -193,7 +214,6 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
     for(iter=target_sc_array.begin(); iter!=target_sc_array.end();){
         if(pc_is_cached(lsm->pcs, SHORTCUT, (*iter).first, false)){
             //get next iteration
-
             __sc_udpate(lsm, lba_set, des_run, size, iter, target_sc_array.end());
 
             target_sc_array.erase(iter++);
@@ -206,10 +226,16 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
     //2. send read request for not cached sc_page and update
     typedef std::pair<cache_read_param*, std::list<std::pair<uint32_t, uint32_t> >::iterator> temp_pair;
     iter=target_sc_array.begin();
-    while(iter!=target_sc_array.end()){
+    uint32_t max_update_batch=lsm->pcs->max_cached_size/PAGESIZE;
+    while(target_sc_array.size()!=0){
         std::list<temp_pair > crp_list;
         //send request
-        for(; iter!=target_sc_array.end(); iter++){
+        uint32_t request_cnt=0;
+        for(; iter!=target_sc_array.end();){
+            if(request_cnt==max_update_batch){
+                break;
+            }
+
             run *temp_ridx;
             bool isdone;
             cache_read_param *crp=(cache_read_param*)cache_layer_sc_read(lsm, (*iter).first*RIDXINPAGE, &temp_ridx, NULL, false, &isdone);
@@ -219,13 +245,22 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
                     /*too many flying request*/
                     break;
                 }
+
                 __sc_udpate(lsm, lba_set, des_run, size, iter, target_sc_array.end());
                 //pc_unpin(lsm->pcs, SHORTCUT, iter->first);
+                request_cnt++;
+                target_sc_array.erase(iter++);
                 continue;
             }
             else{
                 crp_list.push_back(temp_pair(crp, iter));
+                iter++;
             }
+            request_cnt++;
+        }
+
+        if(crp_list.size()==0 && target_sc_array.size()==0){
+            break;
         }
 
         //update request
@@ -243,9 +278,13 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
                 
                 //pc_unpin(lsm->pcs, SHORTCUT, (*(*crp_iter).second).first);
                 cache_finalize(crp);
+                target_sc_array.erase((*crp_iter).second);
                 crp_list.erase(crp_iter++);
+
             }
         }
+
+        iter=target_sc_array.begin();
     }
     return NULL;
 }
@@ -307,7 +346,7 @@ void *cache_layer_read_idx_endreq(algo_req *req){
 }
 
 void *cache_layer_idx_read(lsmtree *lsm, uint32_t pba, uint32_t lba, run *r, request *parent, map_function *mf){
-    page_cache *target_pc;
+    page_cache *target_pc=NULL;
     if(__cache_check_and_occupy(lsm, pba, mf, true, &target_pc)){
         /*hit case*/
         return NULL;
@@ -344,7 +383,7 @@ void *cache_layer_idx_read(lsmtree *lsm, uint32_t pba, uint32_t lba, run *r, req
 }
 
 void __cache_idx_pending_req(pc_set *pcs, uint32_t ppa_or_scidx){
-    page_cache *pc=pc_set_pick(pcs, IDX, ppa_or_scidx);
+    page_cache *pc=pc_set_pick(pcs, IDX, ppa_or_scidx, true);
     std::vector<algo_req*>::iterator iter;
     for(iter=pc->waiting_req.begin(); iter!=pc->waiting_req.end(); iter++){
         algo_req *temp_req=*iter;
@@ -358,8 +397,8 @@ void __cache_idx_pending_req(pc_set *pcs, uint32_t ppa_or_scidx){
 }
 
 void cache_layer_idx_retry(lsmtree *lsm, uint32_t pba, cache_read_param *crp){
-    __cache_idx_pending_req(lsm->pcs, pba);
-    page_cache *pc=pc_set_pick(lsm->pcs, IDX, pba);
+    //__cache_idx_pending_req(lsm->pcs, pba);
+    page_cache *pc=pc_set_pick(lsm->pcs, IDX, pba, true);
     if(pc->flag==FLYING){
         pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);   
     }

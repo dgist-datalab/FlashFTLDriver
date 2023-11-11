@@ -21,7 +21,7 @@ void run_print(run *r, bool content){
 	}
 }
 
-uint64_t run_memory_usage(run *target_run, uint32_t target_bit){
+uint64_t run_memory_usage(run *target_run, uint32_t target_bit, bool pinning){
 	uint64_t memory_usage_run=0;
 	if(!target_run) return 0;
 	if(target_run->type==RUN_LOG){
@@ -48,7 +48,7 @@ uint64_t run_memory_usage(run *target_run, uint32_t target_bit){
 				}
 			}
 		}
-		if (target_run->type == RUN_PINNING)
+		if (pinning && target_run->type == RUN_PINNING)
 		{
 			memory_usage_run += target_run->now_entry_num * target_bit;
 		}

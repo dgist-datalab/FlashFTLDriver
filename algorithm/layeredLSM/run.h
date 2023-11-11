@@ -204,7 +204,7 @@ bool run_log_gc_update(run *r, uint32_t lba, uint32_t old_psa, uint32_t new_psa)
 
 //#################################### run_util.c
 void run_print(run *r, bool content);
-uint64_t run_memory_usage(run *r, uint32_t target_bit);
+uint64_t run_memory_usage(run *r, uint32_t target_bit, bool pinning);
 
 //#################################### run_util.c done
 

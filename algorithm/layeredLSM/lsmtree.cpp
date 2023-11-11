@@ -236,6 +236,51 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 	return 0;
 }
 
+uint32_t  lsmtree_pending_sc(lsmtree *lsm, request *req){
+	run *r;
+	run *r2=NULL;
+	uint32_t res=READ_DONE;
+	cache_read_param *crparam=(cache_read_param*)req->param;
+	r2=crparam->r2;
+	cache_layer_sc_retry(lsm, req->key, &r, crparam);
+	r=r2;
+	if (r == NULL){
+		req->flag = READ_REQ_DONE;
+		// NOT FOUND
+		req->type = FS_NOTFOUND_T;
+		req->end_req(req);
+		res = READ_NOT_FOUND;
+		return res;
+	}
+	req->param = NULL;
+	req->flag = READ_REQ_MAP;
+
+	map_function *mf;
+	uint32_t mf_pba = run_pick_target_mf(r, req->key, &mf);
+	if (cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf) == NULL)
+	{ // map_hit
+		req->flag = READ_REQ_DATA;
+		res = run_query(r, req);
+	}
+	else
+	{ // map miss
+		req->type_ftl += 20;
+	}
+	return res;
+}
+
+uint32_t lsmtree_pending_idx(lsmtree *lsm, request *req){
+	run *r;
+	uint32_t res=READ_DONE;
+	cache_read_param *crparam=(cache_read_param*)req->param;
+	r=crparam->r;
+	cache_layer_idx_retry(lsm, crparam->pba_or_scidx, crparam);
+	req->param=NULL;
+	req->flag=READ_REQ_DATA;
+	res=run_query(r, req);
+	return res;
+}
+
 uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res=READ_DONE;
 	run *r;
@@ -293,32 +338,58 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	}
 	else{
 		if(req->flag==READ_REQ_SC){
-			cache_read_param *crparam=(cache_read_param*)req->param;
-			cache_layer_sc_retry(lsm, req->key, &r, crparam);
-			if(r==NULL){
-				printf("???\n");
-				abort();
-			}
-			req->param=NULL;
-			req->flag=READ_REQ_MAP;
+			//cache_read_param *crparam=(cache_read_param*)req->param;
+			//cache_layer_sc_retry(lsm, req->key, &r, crparam);
 
-			map_function *mf;
-			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
-			if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_hit
-				req->flag=READ_REQ_DATA;
-				res=run_query(r, req);
+			//if(r==NULL){
+			//	req->flag=READ_REQ_DONE;
+			//	//NOT FOUND
+			//	req->type=FS_NOTFOUND_T;
+			//	req->end_req(req);
+			//	res=READ_NOT_FOUND;
+			//}
+			//req->param=NULL;
+			//req->flag=READ_REQ_MAP;
+
+			//map_function *mf;
+			//uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
+			//if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_hit
+			//	req->flag=READ_REQ_DATA;
+			//	res=run_query(r, req);
+			//}
+			//else{ //map miss
+			//	req->type_ftl+=20;
+			//}
+
+			std::vector<algo_req*>* pending_req=cache_layer_get_pending_req(lsm, req->key, SHORTCUT);
+			res=lsmtree_pending_sc(lsm, req);
+    		std::vector<algo_req*>::iterator iter;
+			for(iter=pending_req->begin(); iter!=pending_req->end(); iter++){
+				algo_req* temp=*iter;
+				lsmtree_pending_sc(lsm, temp->parents);
+				free(temp);
 			}
-			else{ //map miss
-				req->type_ftl+=20;
+
+			if(res==READ_NOT_FOUND){
+				return res;
 			}
 		}
 		else if(req->flag==READ_REQ_MAP){
-			cache_read_param *crparam=(cache_read_param*)req->param;
-			r=crparam->r;
-			cache_layer_idx_retry(lsm, crparam->pba_or_scidx, crparam);
-			req->param=NULL;
-			req->flag=READ_REQ_DATA;
-			res=run_query(r, req);
+			//cache_read_param *crparam=(cache_read_param*)req->param;
+			//r=crparam->r;
+			//cache_layer_idx_retry(lsm, crparam->pba_or_scidx, crparam);
+			//req->param=NULL;
+			//req->flag=READ_REQ_DATA;
+			//res=run_query(r, req);
+			uint32_t pba=((cache_read_param*)req->param)->pba_or_scidx;
+			std::vector<algo_req*>* pending_req=cache_layer_get_pending_req(lsm, pba, IDX);
+			res=lsmtree_pending_idx(lsm, req);
+    		std::vector<algo_req*>::iterator iter;
+			for(iter=pending_req->begin(); iter!=pending_req->end(); iter++){
+				algo_req* temp=*iter;
+				lsmtree_pending_idx(lsm, temp->parents);
+				free(temp);
+			}
 		}
 		else{
 			r=((map_read_param*)req->param)->r;
@@ -343,10 +414,10 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 	uint64_t pftl_memory=lsm->param.target_bit*RANGE;
 	uint64_t memtable_memory=0;
 	for(uint32_t i=0; i<MEMTABLE_NUM; i++){
-		memtable_memory+=run_memory_usage(lsm->memtable[i], lsm->param.target_bit);
+		memtable_memory+=run_memory_usage(lsm->memtable[i], lsm->param.target_bit, true);
 	}
 	printf("\tmemtable -> %.2lf\n",(double)memtable_memory/(pftl_memory));
-
+	uint64_t idx_memory_usage=0;
 	for(uint32_t i=0; i<lsm->param.total_level_num; i++){
 		level *target_level=lsm->disk[i];
 		uint64_t memory_usage_per_level=0;
@@ -357,7 +428,8 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 			if(target_run->type==RUN_PINNING){
 				pinning_run_num++;
 			}
-			memory_usage_per_level+=run_memory_usage(target_run, lsm->param.target_bit);
+			idx_memory_usage+=run_memory_usage(target_run, lsm->param.target_bit, false);
+			memory_usage_per_level+=run_memory_usage(target_run, lsm->param.target_bit, true);
 		}
 		printf("\t%u:%s %u(%u):%u -> %.2lf\n", i,
 		map_type_to_string(target_level->map_type), target_level->now_run_num,
@@ -367,6 +439,7 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 	printf("BF mem per ent: %.2lf\n",(double)lsm->monitor.bf_memory_usage/lsm->monitor.bf_memory_ent);
 	printf("PLR mem per ent: %.2lf\n",(double)lsm->monitor.plr_memory_usage/lsm->monitor.plr_memory_ent);
 	printf("SC mem per ent: %.4lf\n", (double)shortcut_memory_usage(lsm->shortcut)/RANGE);
+	printf("now total IDX size: %.2lf\n", (double)(idx_memory_usage+5*RANGE)/8/(RANGE*4));
 #ifdef SC_MEM_OPT
 	uint64_t table_num=0;
 	for(uint32_t i=0; i<MAX_SC_DIR_NUM; i++){

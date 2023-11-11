@@ -198,7 +198,7 @@ void run_insert_done(run *r, bool merge_insert){
 	}
 	r->pp=NULL;
 
-	uint64_t mf_memory_usage=run_memory_usage(r, r->lsm->param.target_bit);
+	uint64_t mf_memory_usage=run_memory_usage(r, r->lsm->param.target_bit, true);
 	uint32_t map_type=r->type==RUN_LOG?r->run_log_mf->type:r->st_body->param.map_type;
 	__lsm_calculate_memory_usage(r->lsm,r->now_entry_num, mf_memory_usage, map_type, r->type==RUN_PINNING);
 	/*
