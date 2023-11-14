@@ -111,7 +111,7 @@ std::list<std::pair<uint32_t, uint32_t> >::iterator end_iter){
             printf("break!\n");
         }
     }
-    shortcut_link_bulk_lba(lsm->shortcut, des_run, &lba_target, true);
+   //shortcut_link_bulk_lba(lsm->shortcut, des_run, &lba_target, true);
 }
 
 void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *parent, bool cache_check, bool *isdone){
@@ -291,7 +291,7 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
 
 bool __cache_check_and_occupy(lsmtree *lsm, uint32_t pba, map_function *mf, bool read_path, page_cache **res){
     page_cache *target_pc=pc_is_cached(lsm->pcs, IDX, pba, read_path);
-    if(read_path && target_pc && target_pc->flag!=FLYING){
+    if(target_pc && target_pc->flag!=FLYING){
         return true;
     }
     else{
@@ -373,6 +373,7 @@ void *cache_layer_idx_read(lsmtree *lsm, uint32_t pba, uint32_t lba, run *r, req
     rparam->parents_req=(void*)parent;
     rparam->isinternal=false;
     rparam->pc=target_pc;
+    rparam->size=mf->get_memory_usage(mf, 32)/8;
 
     parent->param=(void*)rparam;
     parent->retry=true;
@@ -399,7 +400,11 @@ void __cache_idx_pending_req(pc_set *pcs, uint32_t ppa_or_scidx){
 void cache_layer_idx_retry(lsmtree *lsm, uint32_t pba, cache_read_param *crp){
     //__cache_idx_pending_req(lsm->pcs, pba);
     page_cache *pc=pc_set_pick(lsm->pcs, IDX, pba, true);
-    if(pc->flag==FLYING){
+    if(pc==NULL){
+        pc=pc_occupy(lsm->pcs, IDX, pba, crp->size);
+        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);
+    }
+    else if(pc->flag==FLYING){
         pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);   
     }
     cache_finalize(crp);

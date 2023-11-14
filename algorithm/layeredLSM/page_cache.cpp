@@ -137,6 +137,7 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
         }
         pc->flag=EMPTY;
         pc->type=type;
+		pc->size=size;
         target->cached_sc_num++;
     }
     else if(type==IDX){
@@ -177,7 +178,6 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
     pc->node=NULL;
 
     //target->pinned_size+=size;
-    target->now_cached_size+=size;
     pthread_mutex_unlock(&lru_lock);
     return pc;
 }
@@ -230,6 +230,8 @@ void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void 
     else{
         //memcpy(pc->data, data, pc->size);
     }
+
+    target->now_cached_size+=pc->size;
 
     pthread_mutex_lock(&lru_lock);
     pc->node=lru_push_special(target->lru, pc, type, ppa_or_scidx, pc->size);
@@ -334,7 +336,7 @@ void pc_evict(pc_set *target, bool internal, uint32_t need_size, uint32_t (*get_
             }
 
             target->now_cached_size=(flying_cnt+remain_cnt)*PAGESIZE;
-            target->cached_idx.clear();
+            //target->cached_idx.clear();
             remain_size=target->max_cached_size-target->now_cached_size;
             if(target_size <remain_size){
                 break;
@@ -496,8 +498,7 @@ page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx, boo
         std::map<uint32_t, page_cache*>::iterator miter;
         miter=pcs->cached_idx.find(ppa_or_scidx);
         if(miter==pcs->cached_idx.end()){
-            print_error(__LINE__);
-            abort();
+            return NULL;
         }
         pc=miter->second;
     }

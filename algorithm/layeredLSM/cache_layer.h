@@ -6,6 +6,7 @@ typedef struct cache_read_param{
     bool isinternal;
     bool isdone;
     uint32_t pba_or_scidx;
+    uint32_t size;
     cache_type type;
     value_set *value;
     pc_set *pcs;

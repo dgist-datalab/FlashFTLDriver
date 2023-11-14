@@ -251,7 +251,7 @@ void processing_pending_req(algo_req *req, value_set *value){
     }
     if(isretry){
         if(data_retry){
-            req->parents->type_ftl+=100;
+            req->parents->type_ftl+=10;
         }
         inf_assign_try(req->parents);
     }

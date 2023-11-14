@@ -281,7 +281,7 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 		}
 	}
 
-	//shortcut_link_bulk_lba(shortcut, r, &lba_set, true);
+	shortcut_link_bulk_lba(shortcut, r, &lba_set, true);
 	cache_layer_sc_update(LSM, lba_set, r, lba_set.size());
 
 	if(r->type==RUN_NORMAL){
@@ -436,7 +436,7 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 		__move_iter_target(mm, 0);
 	}
 
-	//shortcut_link_bulk_lba(shortcut, r, &temp_vec, true);
+	shortcut_link_bulk_lba(shortcut, r, &temp_vec, true);
 	cache_layer_sc_update(LSM, temp_vec, r, temp_vec.size());
 
 #ifdef SC_QUERY_DP
