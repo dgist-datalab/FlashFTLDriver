@@ -68,6 +68,7 @@ void pc_set_free(pc_set *target){
 page_cache* pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx, bool pinned){
     page_cache *pc=NULL;
     pthread_mutex_lock(&lru_lock);
+    
     if(type==SHORTCUT){
         pthread_mutex_lock(&idx_map_lock);
         pc=&target->cached_sc[ppa_or_scidx];
@@ -85,6 +86,9 @@ page_cache* pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx,
         }
         else{
             pc=miter->second;
+            if(pc->flag==EMPTY){
+                pc=NULL;
+            }
         }
         pthread_mutex_unlock(&idx_map_lock);
     }
@@ -138,25 +142,31 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
         pc->flag=EMPTY;
         pc->type=type;
 		pc->size=size;
+        pc->waiting_req.clear();
         target->cached_sc_num++;
     }
     else if(type==IDX){
-        pc = new page_cache();
-        pc->type = type;
-        pc->flag = EMPTY;
-        pc->size = size;
-        pc->ppa=ppa_or_scidx;
 
         if(target->cached_idx_num!=target->cached_idx.size()){
             printf("errror %s:%u\n",__FILE__, __LINE__);
             abort();
         }
-        if(target->cached_idx.find(ppa_or_scidx)!=target->cached_idx.end()){
-            print_error(__LINE__);
-            abort();
+        std::map<uint32_t, page_cache*>::iterator miter;
+        miter=target->cached_idx.find(ppa_or_scidx);
+        if(miter!=target->cached_idx.end()){
+            pc=miter->second; 
         }
-        target->cached_idx.insert(std::make_pair(ppa_or_scidx, pc));
-        target->cached_idx_num++;
+        else{
+            pc = new page_cache();
+            pc->waiting_req.clear();
+            target->cached_idx.insert(std::make_pair(ppa_or_scidx, pc));
+            pc->flag = EMPTY;
+        }
+        pc->type = type;
+        pc->size = size;
+        pc->ppa=ppa_or_scidx;
+
+        target->cached_idx_num=target->cached_idx.size();
 
         if(target->cached_idx_num!=target->cached_idx.size()){
             printf("errror %s:%u\n",__FILE__, __LINE__);
@@ -172,7 +182,6 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
 
     pc->flag=OCCUPIED;
     //pc->data=(char*)malloc(size);
-    pc->waiting_req.clear();
     //pc->ispinned = true;
     //pc->refer_cnt=1;
     pc->node=NULL;
@@ -200,7 +209,7 @@ void pc_reclaim(pc_set *pcs, page_cache *pc){
     pthread_mutex_unlock(&lru_lock);
 }
 
-void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void *data, void (*converter)(void *data, page_cache *pc)){
+void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void *data, void (*converter)(void *data, page_cache *pc), uint32_t (*get_ppa)(uint32_t sc_idx, page_cache *pc)){
     page_cache *pc=NULL;
 
     pthread_mutex_lock(&idx_map_lock);
@@ -243,6 +252,15 @@ void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void 
     pthread_mutex_unlock(&lru_lock);
     pc->waiting_req.clear();
     pc->flag=CLEAN;
+
+    if(target->now_cached_size > target->max_cached_size){
+        static int cache_max_size=0;
+        if(cache_max_size < target->now_cached_size){
+            cache_max_size=target->now_cached_size;
+        }
+      //  printf("over cached!\n %u:%u  -- (cached_max_size: %u)\n" ,target->now_cached_size, target->max_cached_size, cache_max_size);
+        pc_evict(target, true, 0, get_ppa);
+    }
 }
 
 void pc_set_update(pc_set *target, uint32_t ppa_or_scidx){
@@ -302,8 +320,8 @@ static void __send_write_reqeust(pc_set *target, page_cache *pc, uint32_t new_pp
     target->li->write(new_ppa, PAGESIZE, res->value, res);
 }
 
-void pc_evict(pc_set *target, bool internal, uint32_t need_size, uint32_t (*get_ppa)(uint32_t sc_idx, page_cache *pc)){
-    uint32_t remain_size=target->max_cached_size-target->now_cached_size;
+void pc_evict(pc_set *target, bool internal, int32_t need_size, uint32_t (*get_ppa)(uint32_t sc_idx, page_cache *pc)){
+    int32_t remain_size=target->max_cached_size-target->now_cached_size;
     if(remain_size > need_size) return;
     pthread_mutex_lock(&lru_lock);
     int32_t target_size=need_size-remain_size;

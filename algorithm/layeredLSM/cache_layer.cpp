@@ -78,7 +78,7 @@ void cache_layer_sc_retry(lsmtree *lsm, uint32_t lba, run **ridx, cache_read_par
 
     page_cache *pc=pc_set_pick(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, true);
     if(pc->flag==FLYING){
-        pc_set_insert(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, (void*)__temp_cache_data, NULL);
+        pc_set_insert(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, (void*)__temp_cache_data, NULL, cache_get_ppa);
     }
     (*ridx)=shortcut_query(lsm->shortcut, lba);
     cache_finalize(crp);
@@ -154,7 +154,7 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
                 //write path
                 if (target_pc->ppa == UINT32_MAX){
                     /*initial state*/
-                    pc_set_insert(lsm->pcs, SHORTCUT, sc_idx, (void *)__temp_cache_data, NULL);
+                    pc_set_insert(lsm->pcs, SHORTCUT, sc_idx, (void *)__temp_cache_data, NULL, cache_get_ppa);
                     (*ridx) = NULL;
                     return NULL;
                 }
@@ -272,7 +272,7 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
                     crp_iter++;
                     continue;
                 }
-                pc_set_insert(lsm->pcs, SHORTCUT, (*(*crp_iter).second).first, (void*)__temp_cache_data, NULL);
+                pc_set_insert(lsm->pcs, SHORTCUT, (*(*crp_iter).second).first, (void*)__temp_cache_data, NULL, cache_get_ppa);
 
                 __sc_udpate(lsm, lba_set, des_run, size, (*crp_iter).second, target_sc_array.end());
                 
@@ -325,7 +325,7 @@ void cache_layer_idx_insert(lsmtree *lsm, uint32_t pba, map_function *mf, bool p
     }
 
     //miss case
-    pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);
+    pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL, cache_get_ppa);
     //if(!pinning){
     //    pc_unpin(lsm->pcs, IDX, pba);
     //}
@@ -402,10 +402,10 @@ void cache_layer_idx_retry(lsmtree *lsm, uint32_t pba, cache_read_param *crp){
     page_cache *pc=pc_set_pick(lsm->pcs, IDX, pba, true);
     if(pc==NULL){
         pc=pc_occupy(lsm->pcs, IDX, pba, crp->size);
-        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);
+        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL, cache_get_ppa);
     }
     else if(pc->flag==FLYING){
-        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);   
+        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL, cache_get_ppa);   
     }
     cache_finalize(crp);
 }
