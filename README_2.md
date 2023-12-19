@@ -4,7 +4,7 @@
 ## What is MiDAS?
 MiDAS is a Migration-based Data placement technique with Adaptive group number and Size configuration for log-structured systems. 
 
-MiDAS is implemented in both **trace-driven simulation** and a **real SSD prototype**. The simulator is used to quickly evaluate WAF of the GC techniques. And we used a real SSD prototype to measure I/O performance and the overheads associated with the CPU and memory for system execution.
+MiDAS is implemented in both **trace-driven simulation** and a **real SSD prototype**. The simulator is used to quickly evaluate WAF of the GC techniques. Also, We used a real SSD prototype to measure I/O performance and the overheads associated with the CPU and memory for system execution.
 
 The original paper that introduced MiDAS is currently in the revision stage of [USENIX FAST 2024](https://www.usenix.org/conference/fast24).
 
@@ -29,7 +29,7 @@ MiDAS is implemented on [FlashDriver](https://github.com/dgist-datalab/FlashFTLD
 
 To measure I/O performance and the overheads associated with the CPU, you need special hardware (Xilinx VCU108+Customized NAND Flash).
 
-However, you can evaluate the WAF without the specific hardware using memory(RAM drive).
+However, you can evaluate the WAF without the specific hardware using a memory (RAM drive).
 
 The MiDAS algorithm is implemented in the directory `algorithm/MiDAS/`.
 
