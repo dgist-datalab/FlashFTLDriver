@@ -51,7 +51,7 @@
 
 #elif defined(SLC)
 
-#define GIGAUNIT 128L
+//#define GIGAUNIT 128L
 #define OP 100
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
@@ -62,8 +62,9 @@
 
 //#ifdef AMF
 	#define NOC 2
-	#define BPS (128)
-	#define _PPS (_PPB*BPS)
+//	#define BPS (128)
+//	#define _PPS (_PPB*BPS)
+	#define BPS (_PPS/_PPB)
 //#else
 //	#define BPS (64)
 //	#define _PPS (_PPB*BPS)

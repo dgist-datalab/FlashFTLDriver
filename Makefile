@@ -11,9 +11,17 @@
 export CC=g++
 export CXX=g++
 
+ifndef GIGAUNIT
+GIGAUNIT := 128L
+endif
+
+ifndef _PPS
+_PPS := 16384
+endif
+
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=Page_ftl
+export TARGET_ALGO=MiDAS
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
@@ -35,6 +43,8 @@ export COMMONFLAGS=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable -Wno-unused-command-line-argument -Wno-deprecated\
+			-DGIGAUNIT=$(GIGAUNIT)\
+			-D_PPS=$(_PPS)\
 			#-O3\
 
 #-O3 -march=native -mtune=native -flto=20 \
@@ -231,4 +241,5 @@ clean :
 	@$(RM) *driver
 	@$(RM) bd_testcase
 	@$(RM) libdriver.so
+	@$(RM) midas
 

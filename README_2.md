@@ -31,7 +31,7 @@ To measure I/O performance and the overheads associated with the CPU, you need s
 
 However, you can evaluate the WAF without the specific hardware using memory(RAM drive).
 
-The MiDAS algorithm is implemented in the directory `algorithm/Page_FTL/`.
+The MiDAS algorithm is implemented in the directory `algorithm/MiDAS/`.
 
 
 ### Prerequisites
@@ -39,7 +39,7 @@ The hardware/software requirements for executing MiDAS are as followed.
 
 
 #### Hardware
-* `DRAM`: Larger than 135GB for mimic of physical addressing part of SSD to RAM drive.
+* `DRAM`: Larger than device size of trace files + extra 10% of the device size for the data structures and OP region to test the trace files. For example, you need 140GB size of DRAM to run trace file with 128GB device size.
 
 
 #### Software
@@ -47,22 +47,13 @@ The hardware/software requirements for executing MiDAS are as followed.
 ~
 ~
 
-### Installation & Execution
 
-
-#### Installation & Compilation
+### Installation & Compilation
 * Clone required reopsitory (MiDAS SSD prototype) into your host machine.
 ```
 $ git clone ~
 $ cd FlashFTLDriver
 ```
-
-
-* Compile MiDAS
-```
-make clean; make
-```
-
 
 * Download the trace file to test the prototype
 ```
@@ -70,16 +61,35 @@ $ ~
 ```
 
 
-#### Execution
+### Compile & Execution
+After downloading trace file, you can test MiDAS. This experiment may be finished in %% minutes by your server environment.
 
+* FIO Zipfian 1.0 workload (filename: ~)
+   * You can test the same FIO-H workload in the paper. But you need larger than 135GB size of DRAM.
 
-* After downloading trace file, you can test MiDAS. This experiment may be finished in %% minutes by your server environment.
 ```
+$ make clean; make -j
 $ ./midas {trace_file}
 ```
 
+* Smaller FIO Zipfian 1.0 workload (filename: ~)
+   * You need 8GB size of DRAM to test this trace file.
+```
+$ make clean; make GIGAUNIT=4L _PPS=128 -j
+$ ./midas {trace_file}
+``` 
 
-#### Results
+
+### Some statements for code structure
+MiDAS algorithm is implemented in a algorithm/MiDAS/ directory.
+This includes UID, MCAM, GCS algorithms.
+- `midas.c`     : adaptably change group cofiguration, and check irregular pattern
+- `model.c`     : UID, MCAM, GCS algorithm
+- `gc.c`        : victim selection policy
+- `hot.c`       : hot group separation
+
+
+### Results
 During the experiment, you can see that MiDAS adaptably change the group configuration.
 
 
@@ -152,13 +162,4 @@ calculated Traffic: 0.570
 => NAIVE ON!!!!
 ===============================
 ```
-
-
-### Some statements for code structure
-MiDAS algorithm is implemented in a algorithm/Page_ftl/ directory.
-This includes UID, MCAM, GCS algorithms.
-- `midas.c`	: adaptably change group cofiguration, and check irregular pattern
-- `model.c`	: UID, MCAM, GCS algorithm
-- `gc.c`	: victim selection policy
-- `hot.c`	: hot group separation
 

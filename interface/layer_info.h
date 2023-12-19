@@ -42,7 +42,7 @@ static void layer_info_mapping(master_processor *mp,int argc, char **argv){
 
 #ifdef normal
 	mp->algo=&__normal;
-#elif defined(Page_ftl)
+#elif defined(MiDAS)
 	mp->algo=&page_ftl;
 #elif defined(DFTL)
 	mp->algo=&demand_ftl;

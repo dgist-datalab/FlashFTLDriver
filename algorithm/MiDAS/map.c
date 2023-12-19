@@ -22,6 +22,7 @@ extern HF* hotfilter;
 void page_map_create(){
 	model_create(TIME_WINDOW);
 	printf("NOS: %ld\n", _NOS);
+	//printf("PPS: %d, BPS: %d, PPB: %d\n", _PPS, BPS, _PPB);
 	pm_body *p=(pm_body*)calloc(sizeof(pm_body),1);
 	p->mapping=(uint32_t*)malloc(sizeof(uint32_t)*_NOP*L2PGAP);
 	p->ginfo = (uint32_t*)malloc(sizeof(uint32_t)*_NOS);
