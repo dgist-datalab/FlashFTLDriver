@@ -1,7 +1,7 @@
-#MiDAS
+# MiDAS
 
 
-##What is MiDAS?
+## What is MiDAS?
 MiDAS is a Migration-based Data placement technique with Adaptive group number and Size configuration for log-structured systems. 
 
 MiDAS is implemented in both **trace-driven simulation** and a **real SSD prototype**. The simulator is used to quickly evaluate WAF of the GC techniques. And we used a real SSD prototype to measure I/O performance and the overheads associated with the CPU and memory for system execution.
