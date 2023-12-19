@@ -44,11 +44,12 @@ struct algorithm page_ftl={
 page_read_buffer rb;
 
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
-	printf("page create\n");
+	//printf("page create\n");
 	if (GIGAUNIT==128) {
 		jy_LBANUM = 128*1000/1024*1000/4*1000;
 	} else jy_LBANUM = LBANUM;
-	printf("LBA NUMBER: %d\n", jy_LBANUM);
+	printf("Storage Capacity: %ldGiB  ", GIGAUNIT);
+	printf("(LBA NUMBER: %d)\n", jy_LBANUM);
 
 	
 	algo->li=li; //lower_info means the NAND CHIP

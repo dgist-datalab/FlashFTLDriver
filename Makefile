@@ -12,7 +12,7 @@ export CC=g++
 export CXX=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=AMF
+export TARGET_LOWER=posix_memory
 export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -23,7 +23,7 @@ DEBUGFLAGS=\
 			-rdynamic\
 			-Wno-pointer-arith\
 			-g\
--fsanitize=address \
+#-fsanitize=address \
 # -static-libsan\
 
 export COMMONFLAGS=\
@@ -144,7 +144,7 @@ LIBS +=\
 #		-ljemalloc\
 #	-laio\
 
-all: jriver
+all: midas
 
 DEBUG: debug_driver
 
@@ -162,27 +162,8 @@ cheeze_trace_block_driver: ./interface/cheeze_hg_block.c ./interface/mainfiles/c
 driver: ./interface/vectored_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
 
-jriver: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
+midas: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
-
-jriver_11: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
-	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
-
-jriver_ran: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
-	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
-
-jriver_2: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
-	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
-
-jriver_4: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
-	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
-
-jriver_8: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
-	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
-
-jriver_16: ./interface/cheeze_hg_block.c ./interface/mainfiles/jeeyun_block_main.c libdriver.a libart.o
-	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)
-
 
 bd_testcase: ./interface/mainfiles/testcase.c libdriver.a
 	$(CC) $(CFLAGS) -o $@ $^ $(ARCH) $(LIBS)

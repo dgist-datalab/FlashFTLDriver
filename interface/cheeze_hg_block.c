@@ -403,11 +403,11 @@ extern volatile vectored_request *now_processing;
 
 bool jeeyun_end_req(request *const req) {
 	if (load_signal) {
-		printf("\nTRIM: %ld\n", (long) mp.li->req_type_cnt[0]);
-		printf("MAPPINGW: %ld\n", (long) mp.li->req_type_cnt[2]);
-		printf("GCMW: %ld\n", (long) mp.li->req_type_cnt[4]);
-		printf("DATAW: %ld\n", (long) mp.li->req_type_cnt[6]);
-		printf("GCDW: %ld\n", (long) mp.li->req_type_cnt[8]);
+		//printf("\nTRIM: %ld\n", (long) mp.li->req_type_cnt[0]);
+		//printf("MAPPINGW: %ld\n", (long) mp.li->req_type_cnt[2]);
+		//printf("GCMW: %ld\n", (long) mp.li->req_type_cnt[4]);
+		//printf("DATAW: %ld\n", (long) mp.li->req_type_cnt[6]);
+		//printf("GCDW: %ld\n", (long) mp.li->req_type_cnt[8]);
 		load_signal=0;
 	}
 	vectored_request *preq=req->parents;
@@ -445,7 +445,9 @@ bool jeeyun_end_req(request *const req) {
 		++jy_req_end;
 		if (jy_req_end % (100*1024*1024/4) == 0) {
 			time(&time_tmp);
-			printf("[THROUGHPUT] 100GB per %0.0f sec (cur: %ldGB)\n", difftime(time_tmp, time_begin), jy_req_end/(100*1024*1024/4));
+			//printf("[THROUGHPUT] 100GB per %0.0f sec (cur: %ldGB)\n", difftime(time_tmp, time_begin), jy_req_end/(1024*1024/4));
+			printf("[THROUGHPUT] %0.0f MB/sec (current progress: %ldGB)\n", 
+					100.0*1024.0/difftime(time_tmp, time_begin), jy_req_end/(1024*1024/4));
 			time(&time_begin);
 		}
 	}

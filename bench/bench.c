@@ -183,7 +183,7 @@ void bench_add(bench_type type, uint32_t start, uint32_t end, uint64_t number){
 	}
 	_master->m_num++;
 #ifndef KVSSD
-	printf("bench range:%u ~ %u\n",start,end);
+	//printf("bench range:%u ~ %u\n",start,end);
 #endif
 	idx++;
 }
@@ -318,38 +318,38 @@ void bench_print(){
 #endif
 		bench_type_cdf_print(bdata);
 		
-		printf("--------------------------------------------\n");
-		printf("|            bench type:                   |\n");
-		printf("--------------------------------------------\n");
+		//printf("--------------------------------------------\n");
+		//printf("|            bench type:                   |\n");
+		//printf("--------------------------------------------\n");
 #ifdef BENCH
 
-		printf("----algorithm----\n");
+		//printf("----algorithm----\n");
 		for(int j=0; j<10; j++){
-			printf("[%d~%d(usec)]: %ld\n",j*100,(j+1)*100,bdata->algo_mic_per_u100[j]);
+		//	printf("[%d~%d(usec)]: %ld\n",j*100,(j+1)*100,bdata->algo_mic_per_u100[j]);
 		}
-		printf("[over_ms]: %ld\n",bdata->algo_mic_per_u100[10]);
-		printf("[over__s]: %ld\n",bdata->algo_mic_per_u100[11]);
+		//printf("[over_ms]: %ld\n",bdata->algo_mic_per_u100[10]);
+		//printf("[over__s]: %ld\n",bdata->algo_mic_per_u100[11]);
 
 
-		printf("----lower----\n");
+		//printf("----lower----\n");
 		for(int j=0; j<10; j++){
-			printf("[%d~%d(usec)]: %ld\n",j*100,(j+1)*100,bdata->lower_mic_per_u100[j]);
+		//	printf("[%d~%d(usec)]: %ld\n",j*100,(j+1)*100,bdata->lower_mic_per_u100[j]);
 		}
-		printf("[over_ms]: %ld\n",bdata->lower_mic_per_u100[10]);
-		printf("[over__s]: %ld\n",bdata->lower_mic_per_u100[11]);
+		//printf("[over_ms]: %ld\n",bdata->lower_mic_per_u100[10]);
+		//printf("[over__s]: %ld\n",bdata->lower_mic_per_u100[11]);
 
-		printf("----average----\n");
+		//printf("----average----\n");
 		uint64_t total=0,avg_sec=0, avg_usec=0;
 		total=(bdata->algo_sec*1000000+bdata->algo_usec)/_m->m_num;
 		avg_sec=total/1000000;
 		avg_usec=total%1000000;
-		printf("[avg_algo]: %ld.%ld\n",avg_sec,avg_usec);
+		//printf("[avg_algo]: %ld.%ld\n",avg_sec,avg_usec);
 
 		total=(bdata->lower_sec*1000000+bdata->lower_usec)/_m->m_num;
 		avg_sec=total/1000000;
 		avg_usec=total%1000000;
-		printf("[avg_low]: %ld.%ld\n",avg_sec,avg_usec);
-		bench_li_print(&_master->li[i],_m);
+		//printf("[avg_low]: %ld.%ld\n",avg_sec,avg_usec);
+		//bench_li_print(&_master->li[i],_m);
 #endif
 		printf("\n----summary----\n");
 		if(_m->type==RANDRW || _m->type==SEQRW || _m->type==VECTOREDRW){
@@ -467,7 +467,6 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 				break;
 		}	
 	} 
-	*/
 	
 	static int cnt=0;
 	cumulate_number=0;
@@ -482,6 +481,7 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 				break;
 		}
 	}
+	*/
 	
 }
 #endif

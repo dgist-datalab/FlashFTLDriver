@@ -632,13 +632,19 @@ void inf_free(){
 		delete stop_req_log_list;
 	}
 
-	bench_print();
+	//bench_print();
 	bench_free();
 	mp.li->stop();
 	mp.stopflag=true;
 
-	printf("result of ms:\n");
-	printf("---\n");
+	 fprintf(stdout,"Total Read Traffic : %lu\n", 
+			 mp.li->req_type_cnt[1]+mp.li->req_type_cnt[3]+mp.li->req_type_cnt[5]+mp.li->req_type_cnt[7]);
+	 fprintf(stdout,"Total Write Traffic: %lu\n\n", 
+			 mp.li->req_type_cnt[2]+mp.li->req_type_cnt[4]+mp.li->req_type_cnt[6]+mp.li->req_type_cnt[8]);
+	 fprintf(stdout,"Total WAF: %.2f\n\n", 
+			 (float)(mp.li->req_type_cnt[2]+mp.li->req_type_cnt[4]+mp.li->req_type_cnt[6]+mp.li->req_type_cnt[8]) / mp.li->req_type_cnt[6]);
+	//printf("result of ms:\n");
+	//printf("---\n");
 	for(int i=0; i<1; i++){
 		processor *t=&mp.processors[i];
 

@@ -15,13 +15,13 @@
 
 void log_print(int sig){
 	free_cheeze();
-	printf("f cheeze\n");
+	//printf("f cheeze\n");
 	inf_free();
-	printf("f inf\n");
+	//printf("f inf\n");
 	fflush(stdout);
 	fflush(stderr);
 	sync();
-	printf("before exit\n");
+	//printf("before exit\n");
 	exit(1);
 }
 
@@ -67,7 +67,7 @@ int main(int argc,char* argv[]){
 	setbuf(stderr, NULL);
 	sa.sa_handler = log_print;
 	sigaction(SIGINT, &sa, NULL);
-	printf("signal add!\n");
+	//printf("signal add!\n");
 
 //	MS_TIME_SL = atoi(getenv("MS_TIME_SL"));
 //	printf("Using MS_TIME_SL of %d\n", MS_TIME_SL);

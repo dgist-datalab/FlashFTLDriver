@@ -357,7 +357,7 @@ int err_check() {
 			continue;
 		} else {
 			printf("\t(X)\n");
-			printf("!!!UNKNOWN GROUP: %d!!!\n", i);
+			printf("!!!IRREGULAR GROUP: %d!!!\n", i);
 			if (i==p->gnum-1) {
 				if (p->n->naive_on==false) naive_mida_on();
 			} else {
@@ -406,9 +406,9 @@ int do_modeling() {
 			}
                 }
                 int st = check_modeling();
-                if (st) printf("!!!Modeling over & adapt configuration!!!\n");
+                if (st) printf("!!!UID modeling over & adapt configuration!!!\n");
         }
-        if ((midas_stat->write_gb%(GIGAUNIT*3)==0) && (midas_stat->cur_req%GB_REQ==0)) {
+        if ((midas_stat->write_gb%(GIGAUNIT)==0) && (midas_stat->cur_req%GB_REQ==0)) {
                 //printf("\n");
                 print_stat();
         }

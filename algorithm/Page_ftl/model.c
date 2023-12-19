@@ -93,11 +93,11 @@ void model_create(int write_size) {
 	mm_time.load_timing=0;
 	mm_time.extra_load=0/4*1024*1024; //unitsize: page
 
-	printf("*** MINIATURE MODEL SETTINGS ***\n- lba sampling ratio: %d\n", mmodel->lba_sampling_ratio);
-	printf("- interval unit size: %d segments (%d pages)\n", mmodel->interval_unit_size, mmodel->interval_unit_size*(_PPS*L2PGAP));
-	printf("- time window: %.2fGB (%llu units)\n", mmodel->time_window/1024.*(_PPS*L2PGAP)/1024.*mmodel->interval_unit_size*4, mmodel->time_window);
-	printf("- real mode: %s \n", mm_time.is_real?"true":"false");
-	printf("- extra load timing: %lluGB */\n\n", mm_time.extra_load/1024/1024*4);
+	printf("*** Update Interval Distribution SETTINGS ***\n- LBA sampling rate: %.2f\n", 1.0/(float)mmodel->lba_sampling_ratio);
+	printf("- UID interval unit size: %d segments (%d pages)\n", mmodel->interval_unit_size, mmodel->interval_unit_size*(_PPS));
+	printf("- Epoch size: %.2fGB (%llu units)\n", mmodel->time_window/1024.*(_PPS*L2PGAP)/1024.*mmodel->interval_unit_size*4, mmodel->time_window);
+	//printf("- real mode: %s \n", mm_time.is_real?"true":"false");
+	//printf("- extra load timing: %lluGB */\n\n", mm_time.extra_load/1024/1024*4);
 	/*making time stamp list and interval count list*/
 	
 	mmodel->time_stamp = (unsigned long long*)malloc(sizeof(unsigned long long)*jy_LBANUM/mmodel->lba_sampling_ratio);
@@ -407,7 +407,7 @@ void *making_group_configuration(void *arg) {
 		hot_q->best_extra_traffic = hot_q->calc_traffic;
 		opt_traffic = hot_q->g0_traffic;
 	} else {
-		printf("!!!!!!!!!!HOT GROUP SIZE FIX!!!!!!!!!!\n");
+		//printf("!!!!!!!!!!HOT GROUP SIZE FIX!!!!!!!!!!\n");
 		for (int i=1;i<30;i++) {
 			if (i < hot_q->calc_size) continue;
 			group_config[0] = _NOS-FREENUM - i;
@@ -418,9 +418,9 @@ void *making_group_configuration(void *arg) {
 				break;
 			}
 			double predicted_WAF = hot_WAF_predictor(valid_ratio_list, 1);
-			printf("%d ", hot_q->calc_size);
-			print_config2(1, group_config, predicted_WAF, valid_ratio_list);
-			printf("calc traffic: %.3f\n", hot_q->calc_traffic);
+			//printf("%d ", hot_q->calc_size);
+			//print_config2(1, group_config, predicted_WAF, valid_ratio_list);
+			//printf("calc traffic: %.3f\n", hot_q->calc_traffic);
 			if (predicted_WAF < opt_waf[0]-hot_thresh) {
 				hot_q->best_extra_size=hot_q->calc_size;
 				hot_q->best_extra_traffic=hot_q->calc_traffic;
@@ -487,8 +487,10 @@ void *making_group_configuration(void *arg) {
 				free(valid_ratio_list);
 			}
 		}
-		printf("%d ", g0_desig_size);
-		print_config2(gnum, opt_config[i+1], opt_waf[i+1], opt_valid_ratio_list[i+1]);
+		if (opt_waf[i+1] < 100.0) {
+			printf("%d ", g0_desig_size);
+			print_config2(gnum, opt_config[i+1], opt_waf[i+1], opt_valid_ratio_list[i+1]);
+		}
 		memcpy(group_config, opt_config[i+1], sizeof(uint32_t)*10);
 		//gnum = opt_gnum;
 		/*
@@ -517,7 +519,7 @@ void *making_group_configuration(void *arg) {
         print_config2(final_gnum, final_config, final_waf, final_valid_ratio_list);
         printf("==================\n");
 
-	printf("***phase 2***\n");
+	//printf("***phase 2***\n");
 
 	/* group configuration phase 2*/
 	int initial_last_size=0;
@@ -529,7 +531,7 @@ void *making_group_configuration(void *arg) {
 			gnum=final_gnum;
 			group_config[gnum-1] += g0_desig_size;
 			initial_last_size=group_config[gnum-1];
-			printf("HOT group size check\n");
+			//printf("HOT group size check\n");
 			hot_q->calc_size=0;
 			for (int i=1;i<30;i++) {
 				if (i <= hot_q->calc_size) continue;
@@ -594,10 +596,10 @@ group_config[gnum-1] -= 1;
                 	}
 			
 		}
-		printf("%d ", g0_desig_size);
-		print_config2(final_gnum, final_config, final_waf, final_valid_ratio_list);
+		//printf("%d ", g0_desig_size);
+		//print_config2(final_gnum, final_config, final_waf, final_valid_ratio_list);
 	}
-	printf("FINAL RESULTS\n");
+	//printf("FINAL RESULTS\n");
 	//print_config(opt_gnum, opt_config, opt_waf, opt_valid_ratio_list);
 	//print_config_into_log(final_gnum, final_config, final_waf, final_valid_ratio_list);
 	//abort();
@@ -634,7 +636,7 @@ group_config[gnum-1] -= 1;
 
 /* print final results by miniature model */
 void print_config(int gnum, uint32_t *opt_config, double opt_waf, double *opt_valid_ratio_list, double opt_traffic) {
-	printf("*****MODEL PREDICTION RESULTS*****\n");
+	printf("*****GCS Group Configuration RESULTS*****\n");
 	printf("group number: %d\n", gnum);
 	for (int i=0;i<gnum; i++) printf("*group %d: size %d, valid ratio %f\n", i, opt_config[i], opt_valid_ratio_list[i]);
 	printf("calculated WAF: %f\n", opt_waf);
@@ -791,7 +793,7 @@ double hot_WAF_predictor(double *valid_ratio_list, int group_num) {
 unsigned long long resizing_model() {
 
 	/* first interval unit */
-	printf("here\n");	
+	//printf("here\n");	
 	//char m2[128] = "modeling/modeling_prev_";
 	
 	//strcat(m2, workload_name);
@@ -813,13 +815,13 @@ unsigned long long resizing_model() {
 	unsigned long long tot=0;
 	/* first interval unit */
 	if (mmodel->lba_sampling_ratio > 1) {
-		printf("first interval analyzer check: ");
+		//printf("first interval analyzer check: ");
 		while (!(mmodel->first_done)) {}
-		printf("DONE\n");
+		//printf("DONE\n");
 		mmodel->model_count[0] = mmodel->first_count*mmodel->time_window/mmodel->fnumber/mmodel->lba_sampling_ratio;
 	}
 	tot += mmodel->model_count[0];
-	printf("first interval calculate done\n");
+	//printf("first interval calculate done\n");
 	double left_time = 0.0;
 	//tot += mmodel->model_count[mmodel->time_window-1];
 	/* other interval units */
@@ -1227,7 +1229,7 @@ double *hot_valid_ratio_predictor(uint32_t *group_config, uint32_t group_num, un
 					hot_q->calc_traffic=tmp_tr;
 					tot_cnt -= invalid_cnt;
 					if (extr_size > hot_size) {
-						printf("hot group size over: %.2f (+%.2f)\n", extr_size, extr_size-hot_size);
+						//printf("hot group size over: %.2f (+%.2f)\n", extr_size, extr_size-hot_size);
 						group_config[group_num-1] -= (extr_size-hot_size);
 					}
 					hot_q->calc_size=extr_size;
@@ -1386,7 +1388,7 @@ END:
 //	if (valid_ratio_list[group_num-1]<=0) {
 	for(int k = 0; k < group_num; k++){
 		if (valid_ratio_list[k] <= 0.){	
-			printf("exit\n");
+			//printf("exit\n");
 			//abort();
 			free(valid_ratio_list);
 			free(invalid_cnt_list);
