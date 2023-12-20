@@ -4,7 +4,7 @@
 ## What is MiDAS?
 MiDAS is a Migration-based Data placement technique with Adaptive group number and Size configuration for log-structured systems. 
 
-MiDAS is implemented in both **trace-driven simulation** and a **real SSD prototype**. The simulator is used to quickly evaluate WAF of the GC techniques. Also, we used a real SSD prototype to measure I/O performance and the overheads associated with the CPU and memory for system execution.
+MiDAS is implemented in both **trace-driven simulation** and a **real SSD prototype**. The simulator is used to quickly evaluate WAF of the GC techniques. Also, We used a real SSD prototype to measure I/O performance and the overheads associated with the CPU and memory for system execution.
 
 The original paper that introduced MiDAS is currently in the revision stage of [USENIX FAST 2024](https://www.usenix.org/conference/fast24).
 
@@ -29,7 +29,7 @@ MiDAS is implemented on [FlashDriver](https://github.com/dgist-datalab/FlashFTLD
 
 To measure I/O performance and the overheads associated with the CPU, you need special hardware (Xilinx VCU108+Customized NAND Flash).
 
-However, you can evaluate the WAF without the specific hardware using memory (RAM drive).
+However, you can evaluate the WAF without the specific hardware using a memory (RAM drive).
 
 The MiDAS algorithm is implemented in the directory `algorithm/MiDAS/`.
 
@@ -75,7 +75,7 @@ $ ./midas {trace_file}
 * Smaller FIO Zipfian 1.0 workload (filename: ~)
    * You need 8GB size of DRAM to test this trace file.
 ```
-$ make clean; make GIGAUNIT=8L _PPS=128 -j
+$ make clean; make GIGAUNIT=4L _PPS=128 -j
 $ ./midas {trace_file}
 ``` 
 
@@ -163,18 +163,3 @@ calculated Traffic: 0.570
 ===============================
 ```
 
-
-* When the excution is over, You can check the total runtime, read traffic, write traffic, and WAF of the MiDAS.
-```
-runtime: 950 sec
-Total Read Traffic : 23531283
-Total Write Traffic: 31225469
-
-Total WAF: 2.52
-
-TRIM 239862
-DATAR 0
-DATAW 12384205
-GCDR 23531283
-GCDW 18841264
-```
