@@ -378,10 +378,10 @@ void *making_group_configuration(void *arg) {
 		}
 	}
 	if (midas_stat->g->gsize[p->gnum-1] < 10) {
-		printf("there is no last group segment,,,,,, return\n");
-		printf("===MODELING END===\n");
-		model_initialize();
-		return (void*)0;
+		//printf("there is no last group segment,,,,,, return\n");
+		//printf("===MODELING END===\n");
+		//model_initialize();
+		//return (void*)0;
 	}
 
 	if (hot_q->is_fix==true) {

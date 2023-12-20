@@ -206,8 +206,15 @@ void *posix_refresh(lower_info *li){
 
 void *posix_destroy(lower_info *li){
 	for(int i=0; i<LREQ_TYPE_NUM;i++){
-		fprintf(stderr,"%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
+		//fprintf(stderr,"%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
 	}
+	fprintf(stderr, "%s %lu\n", bench_lower_type(0), li->req_type_cnt[0]);
+	fprintf(stderr, "%s %lu\n", bench_lower_type(5), li->req_type_cnt[5]);
+	fprintf(stderr, "%s %lu\n", bench_lower_type(6), li->req_type_cnt[6]);
+	fprintf(stderr, "%s %lu\n", bench_lower_type(7), li->req_type_cnt[7]);
+	fprintf(stderr, "%s %lu\n", bench_lower_type(8), li->req_type_cnt[8]);
+
+	//fprintf(stderr, "hello\n");
 	for(uint32_t i = 0; i < li->NOP; i++){
 		free(seg_table[i].storage);
 	}
