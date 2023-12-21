@@ -52,24 +52,24 @@ The hardware/software requirements for executing MiDAS are as followed.
 * Clone required reopsitory (MiDAS SSD prototype) into your host machine.
 ```
 $ git clone ~
-$ cd MiDAS
+$ cd FlashFTLDriver
 ```
 
 * Download the trace file to test the prototype
 ```
-$ wget https://zenodo.org/record/10409599/files/test-fio-small
+$ ~
 ```
 
 
 ### Compile & Execution
 After downloading trace file, you can test MiDAS. This experiment may be finished in %% minutes by your server environment.
 
-* FIO Zipfian 1.0 workload (filename: test-fio-small)
+* FIO Zipfian 1.0 workload (filename: ~)
    * You can test the same FIO-H workload in the paper. But you need larger than 135GB size of DRAM.
 
 ```
 $ make clean; make -j
-$ ./midas {trace_file} {victim_selection (fifo/greedy/cost-benefit} {device_size (GB)} {segment_size (MB)}
+$ ./midas {trace_file}
 ```
 
 * Smaller FIO Zipfian 1.0 workload (filename: ~)
@@ -83,9 +83,9 @@ $ ./midas {trace_file}
 ### Some statements for code structure
 MiDAS algorithm is implemented in a algorithm/MiDAS/ directory.
 This includes UID, MCAM, GCS algorithms.
-- `algorithm.cpp`     : adaptably change group cofiguration, and check irregular pattern
-- `model.cpp`     : UID, MCAM, GCS algorithm
-- `hf.cpp`        : Hot block separation
+- `midas.c`     : adaptably change group cofiguration, and check irregular pattern
+- `model.c`     : UID, MCAM, GCS algorithm
+- `gc.c`        : victim selection policy
 - `hot.c`       : hot group separation
 
 
@@ -105,6 +105,17 @@ Storage Capacity: 128GiB  (LBA NUMBER: 31250000)
 - UID interval unit size: 1 segments (16384 pages)
 - Epoch size: 512.00GB (2048 units)
 ```
+
+
+* Throughput information
+
+Throughput is calculated per 100GB write requests.
+
+```
+[THROUGHPUT] 347 MB/sec (current progress: 300GB)
+[THROUGHPUT] 246 MB/sec (current progress: 400GB)
+```
+
 
 * You can see the group configuration and valid ratio of the groups per 1x write request of the storage capacity.
 
