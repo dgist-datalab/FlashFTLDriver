@@ -10,9 +10,6 @@ The original paper that introduced MiDAS is currently in the revision stage of [
 
 The archive snapshot with a detailed screencast used in the paper is available at ~~link~~.
 
-~
-~
-~
 
 ## Real SSD prototype
 MiDAS is implemented on [FlashDriver](https://github.com/dgist-datalab/FlashFTLDriver), a user-space Flash Simulation Platform.
@@ -31,38 +28,28 @@ The hardware/software requirements for executing MiDAS are as followed.
 #### Hardware
 * `DRAM`: Larger than device size of trace files + extra 10% of the device size for the data structures and OP region to test the trace files. For example, you need 140GB size of DRAM to run trace file with 128GB device size.
 
-
 #### Software
-~
-~
-~
+There are no special software requirements to run the simulation.
 
 
 ### Installation & Compilation
 * Clone required reopsitory (MiDAS SSD prototype) into your host machine.
 ```
-$ git clone ~
+$ git clone git@github.com:dgist-datalab/FlashFTLDriver.git
 $ cd FlashFTLDriver
+$ git checkout MiDAS
 ```
 
 * Download the trace file to test the prototype
 ```
-$ ~
+$ wget https://zenodo.org/record/10409599/files/test-fio-small
 ```
 
 
 ### Compile & Execution
 After downloading trace file, you can test MiDAS. This experiment may be finished in %% minutes by your server environment.
 
-* FIO Zipfian 1.0 workload (filename: ~)
-   * You can test the same FIO-H workload in the paper. But you need larger than 135GB size of DRAM.
-
-```
-$ make clean; make -j
-$ ./midas {trace_file}
-```
-
-* Smaller FIO Zipfian 1.0 workload (filename: ~)
+* FIO Zipfian 1.0 workload (filename: test-fio-small)
    * You need 8GB size of DRAM to test this trace file.
 ```
 $ make clean; make GIGAUNIT=8L _PPS=128 -j
@@ -85,15 +72,15 @@ During the experiment, you can see that MiDAS adaptably change the group configu
 
 * UID information : When you run MiDAS, You can see the parameters of the UID at the beginning. 
 We sample a subset of LBA for timestamp monitoring, with a sampling rate of 0.01. 
-We use a coarse-grained update interval unit of 16K blocks and epoch lengths of 4x of the storage capacity (128GB).
+We use a coarse-grained update interval unit of 1K blocks and epoch lengths of 4x of the storage capacity (8GB).
 Following result is an example.
 
 ```
-Storage Capacity: 128GiB  (LBA NUMBER: 31250000)
+Storage Capacity: 8GiB  (LBA NUMBER: 1953125)
 *** Update Interval Distribution SETTINGS ***
 - LBA sampling rate: 0.01
-- UID interval unit size: 1 segments (16384 pages)
-- Epoch size: 512.00GB (2048 units)
+- UID interval unit size: 1 segments (1024 pages)
+- Epoch size: 32.00GB (2048 units)
 ```
 
 
