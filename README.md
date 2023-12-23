@@ -10,16 +10,6 @@ The original paper that introduced MiDAS is currently in the revision stage of [
 
 The archive snapshot with a detailed screencast used in the paper is available at ~~link~~.
 
-
-## Trace-driven simulation
-The simulation of MiDAS is implemented by C. 
-
-You can evaluate the WAF of MiDAS with the simulator and trace files.
-
-
-### Prerequisites on software
-The software requirements for executing MiDAS simulator are as followed.
-
 ~
 ~
 ~
