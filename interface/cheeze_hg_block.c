@@ -307,7 +307,11 @@ static inline vec_request *ch_ureq2vec_req(cheeze_ureq *creq, int id){
 				abort();
 				break;
 		}
+#ifdef TRACE_REPLAY
+		temp->key=(creq->pos+i)%RANGE;
+#else
 		temp->key=creq->pos+i;
+#endif
 		if(print_read_latency && type==FS_GET_T){
 			printf("READ: %u\n", temp->key);
 		}
@@ -485,7 +489,7 @@ vec_request *get_trace_vectored_request(){
 		if(len!=sizeof(ureq)){
 			printf("read error!!: len:%u\n", len);
 			raise(SIGINT);
-			exit(1);
+			//exit(1);
 			while(1){}
 			break;
 			abort();

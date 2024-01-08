@@ -50,7 +50,7 @@ my_cache sftl_cache_func{
 	.print_log=sftl_print_log_idx,
 };
 
-
+static uint32_t *real_mapping;
 uint32_t sftl_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&scm.lru, NULL, NULL);
 	uint32_t half_translate_page_num=RANGE/(PAGESIZE/(sizeof(uint32_t)))/2;
@@ -63,6 +63,11 @@ uint32_t sftl_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	scm.gtd_size=(uint32_t*)malloc(GTDNUM *sizeof(uint32_t));
 	for(uint32_t i=0; i<GTDNUM; i++){
 		scm.gtd_size[i]=BITMAPSIZE+PAGESIZE;
+	}
+
+	real_mapping=(uint32_t*)malloc(sizeof(uint32_t)*_NOP*L2PGAP);
+	for(uint32_t i=0; i<_NOP*L2PGAP; i++){
+		real_mapping[i]=UINT32_MAX;
 	}
 
 	printf("|\tcaching <min> percentage: %.2lf%%\n", (double) ((scm.max_caching_byte/(BITMAPSIZE+PAGESIZE)) * BITMAPMEMBER)/ RANGE *100);
@@ -372,6 +377,8 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	int32_t changed_gtd_size;
 	lru_node *ln;
 
+	real_mapping[lba]=ppa;
+
 	if(etr->status==EMPTY){
 		sc=get_initial_state_cache(gtd_idx, etr);
 		ln=lru_push(scm.lru, sc);
@@ -560,6 +567,9 @@ uint32_t sftl_update_from_translation_gc(struct my_cache *, char *data, uint32_t
 	uint32_t *ppa_list=(uint32_t*)data;
 	uint32_t old_ppa=ppa_list[GETOFFSET(lba)];
 	ppa_list[GETOFFSET(lba)]=ppa;
+
+	real_mapping[lba]=ppa;
+
 	return old_ppa;
 }
 
@@ -597,6 +607,8 @@ void sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
 }
 
 uint32_t sftl_get_mapping(struct my_cache *, uint32_t lba){
+//	return real_mapping[lba];
+
 	uint32_t gtd_idx=GETGTDIDX(lba);
 	GTD_entry *etr=&dmm.GTD[gtd_idx];
 	if(!etr->private_data){

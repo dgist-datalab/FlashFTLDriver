@@ -54,9 +54,31 @@ std::vector<algo_req*>* cache_layer_get_pending_req(lsmtree *lsm, uint32_t lba_o
     uint32_t target_idx=lba_or_ppa;
     if(type==SHORTCUT){
         target_idx=lba_or_ppa/RIDXINPAGE;
+        std::map<uint32_t, std::vector<algo_req*>* >::iterator pm_iter;
+        pm_iter=lsm->pcs->pending_sc_req_map.find(target_idx);
+        if(pm_iter==lsm->pcs->pending_sc_req_map.end()){
+            printf("wtf???\n");
+            abort();
+        }
+        else{
+            std::vector<algo_req*> *res=pm_iter->second;
+            lsm->pcs->pending_sc_req_map.erase(pm_iter);
+            return res;
+        } 
     }
-    page_cache *pc=pc_set_pick(lsm->pcs, type, target_idx, true);
-    return &pc->waiting_req;
+    else{
+        std::map<uint32_t, std::vector<algo_req*>* >::iterator pm_iter;
+        pm_iter=lsm->pcs->pending_req_map.find(target_idx);
+        if(pm_iter==lsm->pcs->pending_req_map.end()){
+            printf("wtf???\n");
+            abort();
+        }
+        else{
+            std::vector<algo_req*> *res=pm_iter->second;
+            lsm->pcs->pending_req_map.erase(pm_iter);
+            return res;
+        }        
+    }
 }
 
 void __cache_sc_panding_req(pc_set *pcs, uint32_t ppa_or_scidx){
@@ -78,7 +100,7 @@ void cache_layer_sc_retry(lsmtree *lsm, uint32_t lba, run **ridx, cache_read_par
 
     page_cache *pc=pc_set_pick(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, true);
     if(pc->flag==FLYING){
-        pc_set_insert(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, (void*)__temp_cache_data, NULL);
+        pc_set_insert(lsm->pcs, SHORTCUT, lba/RIDXINPAGE, (void*)__temp_cache_data, NULL, cache_get_ppa);
     }
     (*ridx)=shortcut_query(lsm->shortcut, lba);
     cache_finalize(crp);
@@ -104,13 +126,8 @@ std::list<std::pair<uint32_t, uint32_t> >::iterator end_iter){
         last=(*nxt_iter).second;
     }
 
-    std::vector<uint32_t> lba_target;
-    lba_target.assign(lba_set.begin()+current, lba_set.begin()+last);
-    for(uint32_t i=current; i< last; i++){
-        if(lba_set[i]==test_key){
-            printf("break!\n");
-        }
-    }
+    //std::vector<uint32_t> lba_target;
+    //lba_target.assign(lba_set.begin()+current, lba_set.begin()+last);
    //shortcut_link_bulk_lba(lsm->shortcut, des_run, &lba_target, true);
 }
 
@@ -154,7 +171,7 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
                 //write path
                 if (target_pc->ppa == UINT32_MAX){
                     /*initial state*/
-                    pc_set_insert(lsm->pcs, SHORTCUT, sc_idx, (void *)__temp_cache_data, NULL);
+                    pc_set_insert(lsm->pcs, SHORTCUT, sc_idx, (void *)__temp_cache_data, NULL, cache_get_ppa);
                     (*ridx) = NULL;
                     return NULL;
                 }
@@ -193,6 +210,9 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
 
 void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *des_run, uint32_t size){
     //figure out which sc_idx to update
+    /*
+    static int cnt=0;
+    printf("cache layer sc update :%u\n", cnt++);*/
     std::list<std::pair<uint32_t, uint32_t> > target_sc_array; //first-->scidx, second-->start idx
     uint32_t previous_sc_idx=UINT32_MAX;
     for(uint32_t i=0; i<size; i++){
@@ -202,6 +222,7 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
         if(lba_set[i]/RIDXINPAGE!=previous_sc_idx){
             target_sc_array.push_back(std::pair<uint32_t, uint32_t>(lba_set[i]/RIDXINPAGE,i));
             previous_sc_idx=lba_set[i]/RIDXINPAGE;
+            //printf("previous_sc_idx:%u\n", previous_sc_idx);
         }
 
 
@@ -272,7 +293,7 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
                     crp_iter++;
                     continue;
                 }
-                pc_set_insert(lsm->pcs, SHORTCUT, (*(*crp_iter).second).first, (void*)__temp_cache_data, NULL);
+                pc_set_insert(lsm->pcs, SHORTCUT, (*(*crp_iter).second).first, (void*)__temp_cache_data, NULL, cache_get_ppa);
 
                 __sc_udpate(lsm, lba_set, des_run, size, (*crp_iter).second, target_sc_array.end());
                 
@@ -325,7 +346,7 @@ void cache_layer_idx_insert(lsmtree *lsm, uint32_t pba, map_function *mf, bool p
     }
 
     //miss case
-    pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);
+    pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL, cache_get_ppa);
     //if(!pinning){
     //    pc_unpin(lsm->pcs, IDX, pba);
     //}
@@ -402,10 +423,10 @@ void cache_layer_idx_retry(lsmtree *lsm, uint32_t pba, cache_read_param *crp){
     page_cache *pc=pc_set_pick(lsm->pcs, IDX, pba, true);
     if(pc==NULL){
         pc=pc_occupy(lsm->pcs, IDX, pba, crp->size);
-        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);
+        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL, cache_get_ppa);
     }
     else if(pc->flag==FLYING){
-        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL);   
+        pc_set_insert(lsm->pcs, IDX, pba, (void*)__temp_cache_data, NULL, cache_get_ppa);   
     }
     cache_finalize(crp);
 }
