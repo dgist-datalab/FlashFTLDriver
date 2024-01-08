@@ -15,9 +15,9 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 64L
+#define GIGAUNIT 16L
 #ifndef OP
-#define OP 85
+#define OP 80
 #endif
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
