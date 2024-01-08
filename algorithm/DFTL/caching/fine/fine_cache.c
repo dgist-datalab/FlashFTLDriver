@@ -65,7 +65,8 @@ static inline void fine_mapping_sanity_checker(char *value){
 uint32_t fine_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&fcm.lru, NULL, entry_to_lba);
 	fcm.max_caching_map=(total_caching_physical_pages*PAGESIZE/FINECACHEENT_SZ);
-	fcm.max_caching_map-=(fcm.max_caching_map/8)/FINECACHEENT_SZ; //for dirty bit
+	//fcm.max_caching_map-=(fcm.max_caching_map/8)/FINECACHEENT_SZ; //for dirty bit
+	fcm.max_caching_map-=(fcm.max_caching_map/FINECACHEENT_SZ)*2/8; //for clock lru
 	fcm.now_caching_map=0;
 	mc->type=FINE;
 	mc->private_data=NULL;

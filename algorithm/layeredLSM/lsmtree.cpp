@@ -241,9 +241,8 @@ uint32_t  lsmtree_pending_sc(lsmtree *lsm, request *req){
 	run *r2=NULL;
 	uint32_t res=READ_DONE;
 	cache_read_param *crparam=(cache_read_param*)req->param;
-	r2=crparam->r2;
 	cache_layer_sc_retry(lsm, req->key, &r, crparam);
-	r=r2;
+	r=shortcut_query(lsm->shortcut, req->key);
 	if (r == NULL){
 		req->flag = READ_REQ_DONE;
 		// NOT FOUND
@@ -273,10 +272,10 @@ uint32_t lsmtree_pending_idx(lsmtree *lsm, request *req){
 	run *r;
 	uint32_t res=READ_DONE;
 	cache_read_param *crparam=(cache_read_param*)req->param;
-	r=crparam->r;
 	cache_layer_idx_retry(lsm, crparam->pba_or_scidx, crparam);
 	req->param=NULL;
 	req->flag=READ_REQ_DATA;
+	r=shortcut_query(lsm->shortcut, req->key);
 	res=run_query(r, req);
 	return res;
 }
@@ -369,7 +368,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 				lsmtree_pending_sc(lsm, temp->parents);
 				free(temp);
 			}
-
+			delete pending_req;
 			if(res==READ_NOT_FOUND){
 				return res;
 			}
@@ -390,6 +389,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 				lsmtree_pending_idx(lsm, temp->parents);
 				free(temp);
 			}
+			delete pending_req;
 		}
 		else{
 			r=((map_read_param*)req->param)->r;

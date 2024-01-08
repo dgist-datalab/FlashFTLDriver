@@ -50,8 +50,8 @@
 #define LPAGESIZE 4096
 #define L2PGAP (PAGESIZE/LPAGESIZE)
 #define BLOCKSIZE (_PPB*PAGESIZE)
-#define _NOP (TOTALSIZE/PAGESIZE)
 #define _NOS (TOTALSIZE/(_PPS*PAGESIZE))
+#define _NOP ((_NOS)*_PPS)
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
 
