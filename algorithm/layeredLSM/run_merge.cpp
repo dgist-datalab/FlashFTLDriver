@@ -550,7 +550,7 @@ static mm_container *__make_mmset(run **rset, run *target_run, uint32_t run_num,
 }
 
 void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
-	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
+	//DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 
 	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
 
@@ -640,7 +640,7 @@ void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force,
 }
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
-	DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
+	//DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
 
 

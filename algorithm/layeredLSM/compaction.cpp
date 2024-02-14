@@ -51,7 +51,7 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 #endif
 
 		if(last_level_compaction){
-			printf("last: %u + %u\n", merge_src[0]->info->idx, merge_src[1]->info->idx);
+	//		printf("last: %u + %u\n", merge_src[0]->info->idx, merge_src[1]->info->idx);
 		}
 
 		uint32_t total_target_entry = 0;
@@ -99,10 +99,10 @@ void __compaction_another_level(lsmtree *lsm, uint32_t start_idx, bool force){
 	}
 	uint64_t now_shortcut_memory=lsm->shortcut->now_sc_memory_usage;
 	if(original_shortcut_memory > now_shortcut_memory){
-		printf("sc memory decrease! %lf\n", (double)now_shortcut_memory/original_shortcut_memory);
+		//printf("sc memory decrease! %lf\n", (double)now_shortcut_memory/original_shortcut_memory);
 	}
 	else if(original_shortcut_memory< now_shortcut_memory){
-		printf("sc memory increase!\n");
+		//printf("sc memory increase!\n");
 	}
 }
 

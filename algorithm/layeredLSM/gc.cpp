@@ -92,7 +92,7 @@ static inline void __clear_block_and_gsegment(L2P_bm *bm, __gsegment *target){
 	for_each_block(target, blk, bidx){
 		if(blk->block_idx==test_piece_ppa/L2PGAP/_PPB){
 			static int cnt=0;
-			printf("%u clear[%u]\n", blk->block_idx, cnt++);
+			//printf("%u clear[%u]\n", blk->block_idx, cnt++);
 		}
 		L2PBm_clear_block_info(bm, blk->block_idx);
 	}
@@ -644,7 +644,7 @@ static inline void copy_mixed_block(L2P_bm *bm, list *blk_list){
 
 uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
 	static uint32_t cnt=0;
-	DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
+	//DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
 	printf("target seg:%u\n",target->seg_idx);
 	if(cnt > 1200 && target->seg_idx==149){
 	//	GDB_MAKE_BREAKPOINT;
