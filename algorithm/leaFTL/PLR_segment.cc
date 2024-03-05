@@ -36,6 +36,7 @@ segment *segment_make(temp_map *map, SEGMENT_TYPE type, uint32_t interval){
         }
         res->body.plr->insert_end();
     }
+    res->level_ptr=NULL;
     return res;
 }
 

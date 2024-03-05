@@ -30,6 +30,7 @@ uint32_t max_cached_trans_map;
 uint32_t now_segment_num;
 page_read_buffer rb;
 uint32_t read_buffer_hit_cnt;
+extern group_monitor gm;
 
 uint32_t lea_mapping_update_cnt;
 uint32_t find_exact_piece_ppa_cnt;
@@ -41,7 +42,6 @@ typedef struct group_update_param{
 }group_update_param;
 
 group_update_param gup_set[TRANSMAPNUM];
-
 group main_gp[TRANSMAPNUM];
 
 extern uint32_t test_key;
@@ -125,7 +125,15 @@ uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
     lru_max_byte=max_cached_trans_map*PAGESIZE;
     lru_now_byte=0;
     lru_reserve_byte=0;
-    
+
+    printf("fast search: %s\n", gm.fast_search?"on":"off");
+    if(gm.fast_search){
+        gm.seg_list=new std::vector<segment*>(RANGE, NULL);
+    }
+    else{
+        gm.seg_list=NULL;
+    }
+
     for(uint32_t i=0; i<TRANSMAPNUM; i++){
         group_init(&main_gp[i], i);
     }
@@ -135,6 +143,8 @@ uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
 	fdriver_mutex_init(&rb.pending_lock);
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
+
+
     return 1;
 }
 
@@ -167,7 +177,6 @@ inline uint32_t xx_to_byte(char *a){
 	}
 	return 1;
 }
-
 uint32_t lea_argument(int argc, char **argv){
     bool cache_size=false;
 	bool cache_type_set=false;
@@ -178,7 +187,8 @@ uint32_t lea_argument(int argc, char **argv){
 	uint64_t base;
 	uint32_t physical_page_num;
 	double cache_percentage;
-	while((c=getopt(argc,argv,"cp"))!=-1){
+    gm.fast_search=false;
+	while((c=getopt(argc,argv,"cpf"))!=-1){
 		switch(c){
 			case 'c':
 				cache_size=true;
@@ -191,6 +201,9 @@ uint32_t lea_argument(int argc, char **argv){
 				base=atoi(argv[optind]);
 				physical_page_num=base*gran/PAGESIZE;
 				break;
+            case 'f':
+                gm.fast_search=true;
+                break;
 			case 'p':
 				cache_size=true;
 				cache_percentage=atof(argv[optind])/100;
