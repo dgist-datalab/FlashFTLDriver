@@ -39,6 +39,8 @@ void pc_set_init(pc_set *target, uint32_t max_cached_size, uint32_t lba_num, low
     }
 
     target->li=li;
+    target->pending_req_map.clear();
+    target->pending_sc_req_map.clear();
 }
 
 void lru_checker(LRU *lru){
@@ -491,12 +493,34 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
     ((cache_read_param*)param)->pc=pc;
     /*add waiting request*/
     pthread_mutex_lock(&req_wait_lock);
-    if(pc->waiting_req.size()==0){
-        //pc->waiting_req.push_back(res);
-        target->li->read(res->ppa, PAGESIZE, value, res);
+    if(type==SHORTCUT){
+        if(parents==NULL){
+            target->li->read(res->ppa, PAGESIZE, value, res);
+        }
+        else{
+        std::map<uint32_t, std::vector<algo_req*>* >::iterator pm_iter;
+        pm_iter=target->pending_sc_req_map.find(ppa_or_scidx);
+        if(pm_iter==target->pending_sc_req_map.end()){
+            std::vector<algo_req*>* new_pending_req=new std::vector<algo_req*>();
+            target->pending_sc_req_map.insert(std::make_pair(ppa_or_scidx, new_pending_req));
+            target->li->read(res->ppa, PAGESIZE, value, res);
+        }
+        else{
+            pm_iter->second->push_back(res);
+        }
+        }
     }
     else{
-        pc->waiting_req.push_back(res);
+        std::map<uint32_t, std::vector<algo_req*>* >::iterator pm_iter;
+        pm_iter=target->pending_req_map.find(ppa_or_scidx);
+        if(pm_iter==target->pending_req_map.end()){
+            std::vector<algo_req*>* new_pending_req=new std::vector<algo_req*>();
+            target->pending_req_map.insert(std::make_pair(ppa_or_scidx, new_pending_req));
+            target->li->read(res->ppa, PAGESIZE, value, res);
+        }
+        else{
+            pm_iter->second->push_back(res);
+        }
     }
     pthread_mutex_unlock(&req_wait_lock);
 
@@ -516,6 +540,10 @@ page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx, boo
         std::map<uint32_t, page_cache*>::iterator miter;
         miter=pcs->cached_idx.find(ppa_or_scidx);
         if(miter==pcs->cached_idx.end()){
+           if(lock_flag){
+                pthread_mutex_unlock(&lru_lock);  
+                pthread_mutex_unlock(&idx_map_lock);
+            }
             return NULL;
         }
         pc=miter->second;

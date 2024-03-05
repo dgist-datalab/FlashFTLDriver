@@ -5,6 +5,7 @@
 #include "../../include/settings.h"
 #include "../../interface/interface.h"
 #include "./issue_io.h"
+#include<set>
 #define FAST_LOAD_STORE
 #define NOT_FOUND UINT32_MAX
 #define INITIAL_STATE_PADDR (UINT32_MAX)
@@ -13,6 +14,9 @@
 
 //typedef std::map<uint32_t, segment*> level;
 //typedef std::map<uint32_t, segment*>::iterator level_iter;
+//typedef std::set<segment*> level;
+//typedef std::set<segment*>::iterator level_iter;
+
 typedef std::vector<segment*> level;
 typedef std::vector<segment*>::iterator level_iter;
 typedef std::vector<level*>::iterator level_list_iter;
@@ -57,6 +61,9 @@ typedef struct group_monitor{
     uint64_t total_segment;
     uint32_t interval_segment;
     uint64_t compaction_cnt;
+    bool fast_search;
+
+    std::vector<segment*> *seg_list;
 }group_monitor;
 
 typedef struct group_read_param{

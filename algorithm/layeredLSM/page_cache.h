@@ -41,6 +41,8 @@ typedef struct page_cache_set{
 
     std::vector<page_cache> cached_sc; 
     std::map<uint32_t, page_cache*> cached_idx; //read only cache, key - ppa and data - idx
+    std::map<uint32_t, std::vector<algo_req*>* > pending_req_map;
+    std::map<uint32_t, std::vector<algo_req*>* > pending_sc_req_map;
     lower_info *li;
 }pc_set;
 

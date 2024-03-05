@@ -40,6 +40,15 @@ std::vector<storage_node> temporal_storage;
         (grp)->oob=NULL;\
     }while(0)
 
+#define SET_SEG_FAST_SEARCH(_gm, _lba, _seg, _size)\
+    do{\
+        if((_gm).fast_search){\
+            for(uint32_t __i=0; __i<(_size); __i++){\
+                (_gm).seg_list->at((_lba)[__i])=(_seg);\
+            }\
+        }\
+    }while(0)
+
 void group_init(group *res, uint32_t idx){
     if(temporal_storage_init_flag==false){
         temporal_storage_init_flag=true;
@@ -70,6 +79,16 @@ void print_all_level(std::vector<level*> *level_list){
 
 bool seg_compare(segment *a, segment *b){
     return a->start < b->start;
+}
+
+void level_link_seg(level *lev, segment *seg){
+    lev->push_back(seg);
+    seg->level_ptr=lev;
+}
+
+void level_link_seg2(level *lev, level_iter iter, segment *seg){
+    lev->insert(iter, seg);
+    seg->level_ptr=lev;
 }
 
 void check_level_overlap(level *lev){
@@ -121,20 +140,24 @@ level_iter level_lower_bound_wrapper(level *lev, segment *seg, bool *found){
 }
 
 segment *group_get_segment(group *gp, uint32_t lba){
-    if(lba==test_key){
-        //GDB_MAKE_BREAKPOINT;
-    }
     if(gp->level_list==NULL){
         return NULL;
     }
+
+    if(gm.fast_search){
+        return gm.seg_list->at(lba);
+    }
+
     level_list_iter iter=gp->level_list->begin();
     CRB_node *app_target=crb_find_node(gp->crb, lba);
     segment temp;
     temp.start=lba;
     temp.end=lba;
     bool found;
-    for(uint32_t level_height=0; iter!=gp->level_list->end(); iter++, level_height++){
 
+
+
+    for(uint32_t level_height=0; iter!=gp->level_list->end(); iter++, level_height++){
         if(lba==test_key && level_height==11){
             //GDB_MAKE_BREAKPOINT;
         }
@@ -263,6 +286,17 @@ static void find_overlap(level *lev, segment *seg, std::vector<segment*> *res){
 }
 
 static level* find_level_by_seg(group *gp, segment *seg, uint32_t *res_idx){
+    if(gm.fast_search){
+        if(seg->level_ptr==NULL){
+            printf("the segment must have level ptr!\n");
+            abort();
+        }
+
+        level *t=(level*)seg->level_ptr;
+        (*res_idx)=std::lower_bound(t->begin(), t->end(), seg, seg_compare)-t->begin();
+        return t;
+    }
+
     level_list_iter iter=gp->level_list->begin();
     bool found;
     for(; iter!=gp->level_list->end(); iter++){
@@ -283,7 +317,9 @@ void group_update_segment(group *gp, std::vector<CRB_node>* arr){
     for(uint32_t i=0; i<arr->size(); i++){
         CRB_node target=arr->at(i);
         uint32_t idx;
+
         level *lev=find_level_by_seg(gp, target.seg, &idx);
+
         if(target.lba_arr){
             segment_update(lev->at(idx), target.lba_arr->at(0), target.lba_arr->back());
         }
@@ -295,6 +331,7 @@ void group_update_segment(group *gp, std::vector<CRB_node>* arr){
 }
 
 static void group_segment_update(group *gp, level *lev, temp_map *tmap, segment *new_seg, std::vector<segment*> *godown){
+
     std::vector<CRB_node> update_target_node;
     if(new_seg->type==SEGMENT_TYPE::APPROXIMATE){
         crb_insert(gp->crb, tmap, new_seg, &update_target_node);
@@ -305,7 +342,7 @@ static void group_segment_update(group *gp, level *lev, temp_map *tmap, segment 
 
     if(update_target_node.size()){
         group_update_segment(gp, &update_target_node);
-    }
+    }    
 
     std::vector<segment*> overlapped;
     overlapped.clear();
@@ -354,7 +391,7 @@ static void group_segment_update(group *gp, level *lev, temp_map *tmap, segment 
             iter++;
         }
     }
-    lev->insert(iter, new_seg);
+    level_link_seg2(lev, iter, new_seg);
 }
 
 void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval, void (*cache_size_update)(group *gp, uint32_t size, bool decrease)){
@@ -367,6 +404,10 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
     }*/
 
     segment *target=segment_make(tmap, type, interval);
+    
+    SET_SEG_FAST_SEARCH(gm, tmap->lba, target, tmap->size);
+
+
     bool isfirst=false;
 
     if(gp->level_list==NULL){
@@ -391,6 +432,8 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
     now_segment_num-=gp->level_list->at(0)->size();
 
     group_segment_update(gp, (*gp->level_list)[0], tmap, target, &godown);
+
+
     size=0;
     size+=group_level_size(gp->level_list->at(0));
     size+=crb_size(gp->crb);
@@ -406,7 +449,7 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
         for(uint32_t i=0; i<godown.size(); i++){
             segment *seg=godown[i];
             new_level_size+=segment_size(seg);
-            lev->push_back(seg);
+            level_link_seg(lev, seg);
         }
         gp->size+=new_level_size;
         cache_size_update(gp, new_level_size, false);
@@ -436,12 +479,10 @@ segment *map_make_segment_wrapper(uint32_t *lba, uint32_t *piece_ppa, uint32_t s
     param_map.piece_ppa=piece_ppa;
     param_map.size=size;
 
-    if(size==1){
-        return segment_make(&param_map, SEGMENT_TYPE::ACCURATE, 0);
-    }
-    else{
-        return segment_make(&param_map, SEGMENT_TYPE::ACCURATE, 1);
-    }
+
+    segment *res=segment_make(&param_map, SEGMENT_TYPE::ACCURATE, size==1?0:1);
+    SET_SEG_FAST_SEARCH(gm, lba, res, size);
+    return res;
 }
 
 
@@ -461,7 +502,6 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
         lba=t_lba;
     }
     
-
     level* res=new level();
     uint32_t prev_piece_ppa=piece_ppa[0];
     uint32_t start_idx=0;
@@ -483,7 +523,8 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
         }
         else{
             segment *target=map_make_segment_wrapper(&lba[start_idx], &piece_ppa[start_idx], target_size);
-            res->push_back(target);
+            level_link_seg(res, target);
+            
 
             if(piece_ppa[i]==INITIAL_STATE_PADDR){
                 have_remain=false;
@@ -499,7 +540,7 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
     
     if(have_remain){
         segment *target=map_make_segment_wrapper(&lba[start_idx], &piece_ppa[start_idx], target_size);
-        res->push_back(target);
+        level_link_seg(res, target);
     }
 
     return res;

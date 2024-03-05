@@ -15,9 +15,9 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 64L
+#define GIGAUNIT 16L
 #ifndef OP
-#define OP 85
+#define OP 80
 #endif
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
@@ -50,8 +50,8 @@
 #define LPAGESIZE 4096
 #define L2PGAP (PAGESIZE/LPAGESIZE)
 #define BLOCKSIZE (_PPB*PAGESIZE)
-#define _NOP (TOTALSIZE/PAGESIZE)
 #define _NOS (TOTALSIZE/(_PPS*PAGESIZE))
+#define _NOP ((_NOS)*_PPS)
 #define _NOB (BPS*_NOS)
 #define _RNOS (REALSIZE/(_PPS*PAGESIZE))//real number of segment
 
