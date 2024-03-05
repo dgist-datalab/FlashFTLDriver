@@ -54,6 +54,7 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 }
 
 void page_destroy (lower_info* li, algorithm *algo){
+	demand_print_log();
 	demand_map_free();
 	printf("read buffer hit:%u\n", read_buffer_hit_cnt);
 
