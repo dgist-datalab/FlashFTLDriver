@@ -32,6 +32,7 @@ static inline bool validate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool
 
 static inline bool invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, bool force){
 	__debug_check(bm, piece_ppa, false, false);
+	bm->li->invalidate_inform(piece_ppa/L2PGAP);
 	if(!bm->bit_unset(bm, piece_ppa) && force){
 		return BIT_ERROR;
 	}

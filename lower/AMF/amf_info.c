@@ -4,6 +4,7 @@
 #include "../../include/debug_utils.h"
 #include "./block_buffer_write.h"
 #include "./normal_write.h"
+#include "../../include/data_struct/partitioned_slab.h"
 #include <pthread.h>
 #include <unistd.h>
 #include <queue>
@@ -14,11 +15,21 @@ char **mem_pool;
 char *temp_mem_buf;
 #endif
 
+PS_master *ps_master;
+
 void amf_error_call_back_r(void *req);
 void amf_error_call_back_w(void *req);
 void amf_error_call_back_e(void *req);
 
 void amf_traffic_print(lower_info *);
+
+void amf_invalidate_inform(uint64_t ppa){
+#ifdef COPYMETA_ONLY
+	PS_master_free_slab(ppa);
+#else	
+	return;
+#endif
+}
 
 lower_info amf_info={
 	.create=amf_info_create,
@@ -42,6 +53,7 @@ lower_info amf_info={
 
 	.dump=amf_info_dump,
 	.load=amf_info_load,
+	.invalidate_inform=amf_invalidate_inform,
 };
 
 void amf_traffic_print(lower_info *li){
@@ -83,16 +95,28 @@ static inline void __amf_info_create_body(bool load){
 	normal_write_init();
 #endif
 
+#ifdef COPYMETA_ONLY
+	ps_master=PS_master_init(_NOS, _PPS, NOP/100*COPYMETA_ONLY);
+	mem_pool=NULL;
+#else
 	mem_pool=(char**)malloc(sizeof(char*)*_NOP);
+#endif
+
 	temp_mem_buf=(char*)malloc(PAGESIZE);
+
+
 }
 
 uint32_t amf_info_create(lower_info *li, blockmanager *bm){
 	__amf_info_create_body(false);
-#ifdef LOWER_MEM_DEV
+#ifdef LOWER_MEM_DEV 
 	printf("lower mem dev  mode\n");
 	for(uint32_t i=0; i<_NOP; i++){
+		#ifdef COPYMETA_ONLY
+		continue;
+		#else
 		mem_pool[i]=(char*)malloc(PAGESIZE);
+		#endif
 	}
 #endif
 
@@ -121,10 +145,18 @@ void* amf_info_destroy(lower_info *li){
 
 #ifdef LOWER_MEM_DEV
 	for(uint32_t i=0; i<_NOP; i++){
+		#ifdef COPYMETA_ONLY
+		continue;
+		#else
 		free(mem_pool[i]);
+		#endif
 	}
 	free(mem_pool);
 	free(temp_mem_buf);
+#endif
+
+#ifdef COPYMETA_ONLY
+	PS_master_destroy(ps_master);
 #endif
 
 #ifndef TESTING
@@ -142,7 +174,13 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,algo_req * co
 
 	}
 	else{
+#ifdef COPYMETA_ONLY
+		if(PS_ismeta_data(req->type)){
+			PS_master_insert(ps_master, ppa, value->value);
+		}
+#else
 		memcpy(mem_pool[ppa], value->value, PAGESIZE);
+#endif
 	}
 #if BPS!=AMF_PUNIT
 	p_bbuf_issue(LOWER_WRITE, ppa, temp_mem_buf, req);
@@ -159,7 +197,20 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,algo_req * con
 	req->test_ppa=ppa;
 	req->type_lower=0;
 
+#ifdef COPYMETA_ONLY
+	if(PS_ismeta_data(req->type)){
+		char *temp=PS_master_get(ps_master, ppa);
+		if(temp==NULL){
+			printf("meta data is not exist! %u\n", ppa);
+			abort();
+		}
+		memcpy(value->value, temp, PAGESIZE);
+	}
+#else
 	memcpy(value->value, mem_pool[ppa], PAGESIZE);
+#endif
+
+
 #if BPS!=AMF_PUNIT
 	p_bbuf_issue(LOWER_READ, ppa, temp_mem_buf, req);
 #else
@@ -171,6 +222,10 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,algo_req * con
 
 void* amf_info_trim_block(uint32_t ppa){
 	collect_io_type(TRIM, &amf_info);
+
+#ifdef COPYMETA_ONLY
+	PS_master_free_partition(ps_master, ppa);
+#endif
 
 #if BPS!=AMF_PUNIT
 	if(REAL_PPA(ppa,0)!=0){
@@ -215,7 +270,15 @@ void amf_flying_req_wait(){
 
 void *amf_info_write_sync(uint32_t type, uint32_t ppa, char *data){
 	collect_io_type(type, &amf_info);
+#ifdef COPYMETA_ONLY
+	if(PS_ismeta_data(type)){
+		PS_master_insert(ps_master, ppa, data);
+	}
+#else
 	memcpy(mem_pool[ppa], data, PAGESIZE);
+#endif
+
+
 #if BPS!=AMF_PUNIT
 	p_bbuf_sync_issue(LOWER_WRITE, ppa, temp_mem_buf);
 #else
@@ -231,7 +294,19 @@ void *amf_info_read_sync(uint32_t type, uint32_t ppa, char *data){
 #else
 	normal_write_sync_issue(LOWER_READ, ppa, temp_mem_buf);
 #endif
+
+#ifdef COPYMETA_ONLY
+	if(PS_ismeta_data(type)){
+		char *temp=PS_master_get(ps_master, ppa);
+		if(temp==NULL){
+			printf("meta data is not exist! %u\n", ppa);
+			abort();
+		}
+		memcpy(data, temp, PAGESIZE);
+	}
+#else
 	memcpy(data, mem_pool[ppa], PAGESIZE);
+#endif
 	return NULL;
 }
 

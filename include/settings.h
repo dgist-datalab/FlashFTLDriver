@@ -15,7 +15,7 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 16L
+#define GIGAUNIT 64L
 #ifndef OP
 #define OP 80
 #endif
@@ -25,6 +25,7 @@
 #define PAGE_TARGET_KILO (16)
 #define PAGESIZE (PAGE_TARGET_KILO*K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
+#define COPYMETA_ONLY 10
 
 #if 1
 	#define CARD_NUM 2

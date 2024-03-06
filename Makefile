@@ -7,8 +7,8 @@ export CC=g++
 export CXX=g++
 
 TARGET_INF=interface
-export TARGET_LOWER=AMF
-export TARGET_ALGO=leaFTL
+export TARGET_LOWER=posix_memory
+export TARGET_ALGO=layeredLSM
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -18,7 +18,7 @@ DEBUGFLAGS=\
 			-Wno-pointer-arith\
 			-g\
 			-export-dynamic\
-#-fsanitize=address\
+-fsanitize=address\
 
 export COMMONFLAGS+=\
 			-Wno-write-strings\
@@ -32,9 +32,9 @@ export COMMONFLAGS+=\
 			-DLSM_DEBUG\
 			-DPROGRESS\
 			-DPARALLEL_MANAGER\
-			-O3\
-#			-DWRITE_STOP_READ\
+#			-O3\
 #			-DTRACE_REPLAY\
+#			-DWRITE_STOP_READ\
 #			-DTRACE_COLLECT\
 #			-DMAPPING_TIME_CHECK\
 #			-DTRACE_REPLAY\
@@ -110,6 +110,7 @@ SRCS +=\
 	./include/data_struct/redblack.c\
 	./include/data_struct/heap.c\
 	./include/data_struct/lru_list.c\
+	./include/data_struct/partitioned_slab.c\
 	./bench/measurement.c\
 	./bench/bench.c\
 	./bench/bench_demand.c\
@@ -123,6 +124,7 @@ SRCS +=\
 	./blockmanager/bb_checker.c\
 	./parallel_unit_manager/pu_manager.c\
 	./blockmanager/block_manager_master.c\
+
 
 TARGETOBJ =\
 			$(patsubst %.c,%.o,$(SRCS))\

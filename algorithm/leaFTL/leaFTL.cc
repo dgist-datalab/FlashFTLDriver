@@ -567,7 +567,7 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
                         #endif
 
                         if(invalidate && t_grp->piece_ppa!=INITIAL_STATE_PADDR){
-                            invalidate_piece_ppa(bm, t_grp->piece_ppa);
+                            invalidate_piece_ppa(bm, t_grp->piece_ppa, 1, false);
                         }
                         else if(invalidate==false){
                             map->piece_ppa[t_grp->lba%MAPINTRANS]=t_grp->piece_ppa;

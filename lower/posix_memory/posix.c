@@ -20,10 +20,12 @@
 #include <limits.h>
 #include <queue>
 #include <set>
+
 //#include <readline/readline.h>
 //#include <readline/history.h>
 pthread_mutex_t fd_lock;
 mem_seg *seg_table;
+PS_master *ps_master;
 queue *p_q;
 pthread_t t_id;
 bool stopflag;
@@ -77,7 +79,16 @@ lower_info my_posix={
 	.print_traffic=posix_traffic_print,
 	.dump=posix_dump,
 	.load=posix_load,
+	.invalidate_inform=posix_invalidate_inform,
 };
+
+void posix_invalidate_inform(uint64_t ppa){
+#ifdef COPYMETA_ONLY
+	PS_master_free_slab(ps_master, ppa);
+#else
+	return;
+#endif
+}
 
 void posix_traffic_print(lower_info *li){
 	static int cnt=0;
@@ -103,7 +114,20 @@ uint32_t lower_test_ppa=UINT32_MAX;
 static uint8_t convert_type(uint8_t type) {
 	return (type & (0xff>>1));
 }
-void data_copy_from(uint32_t ppa, char *data){
+
+
+
+void data_copy_from(uint32_t ppa, char *data, uint32_t type){
+#ifdef COPYMETA_ONLY
+	if(PS_ismeta_data(type)){
+		char *saved_data=PS_master_get(ps_master, ppa);
+		if(data==NULL){
+			printf("not a target_data! %s:%d\n", __FILE__, __LINE__);
+			abort();
+		}
+		memcpy(data, saved_data, PAGESIZE);
+	}
+#else
 	if(!seg_table[ppa].storage){
 		printf("%u not populated!\n", ppa );
 		abort();
@@ -111,9 +135,15 @@ void data_copy_from(uint32_t ppa, char *data){
 	else{
 		memcpy(data, seg_table[ppa].storage, PAGESIZE);
 	}
+#endif
 }
 
-void data_copy_to(uint32_t ppa, char *data){
+void data_copy_to(uint32_t ppa, char *data, uint32_t type){
+#ifdef COPYMETA_ONLY
+	if(PS_ismeta_data(type)){
+		PS_master_insert(ps_master, ppa, data);
+	}
+#else
 	if(!seg_table[ppa].storage){
 		seg_table[ppa].storage = (char *)malloc(PAGESIZE);
 	}
@@ -122,6 +152,7 @@ void data_copy_to(uint32_t ppa, char *data){
 		abort();
 	}
 	memcpy(seg_table[ppa].storage,data,PAGESIZE);
+#endif
 }
 
 #ifdef LASYNC
@@ -154,10 +185,10 @@ void *l_main(void *__input){
 		else{
 			switch(inf_req->type){
 				case FS_LOWER_W: 
-					data_copy_to(inf_req->key, inf_req->data);
+					data_copy_to(inf_req->key, inf_req->data, inf_req->upper_req->type);
 					break;
 				case FS_LOWER_R:
-					data_copy_from(inf_req->key, inf_req->data);
+					data_copy_from(inf_req->key, inf_req->upper_req->type);
 					break;
 			}
 			fdriver_unlock(&inf_req->lock);
@@ -175,6 +206,8 @@ void posix_async_make_req(posix_request *p_req){
 		}	
 	}
 }
+
+
 
 posix_request* posix_get_preq(FSTYPE type, uint32_t PPA, value_set *value, char *data, bool async,
 		algo_req *const req){
@@ -241,9 +274,13 @@ static uint32_t posix_create_body(lower_info *li){
 	pthread_create(&t_id,NULL,&l_main,NULL);
 #endif
 
+#ifdef COPYMETA_ONLY
+	ps_master=PS_master_init(_NOS, _PPS, _NOP/100*COPYMETA_ONLY);
+#else
 	for(uint32_t i=0; i<QDEPTH; i++){
 		pp_cache[i].ppa=UINT32_MAX;
 	}
+#endif
 	return 1;
 }
 
@@ -364,7 +401,7 @@ void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const
 
 		if (collect_io_type(req->type, &my_posix))
 		{
-			data_copy_to(PPA, value->value);
+			data_copy_to(PPA, value->value, req->type);
 		}
 	}
 
@@ -392,7 +429,7 @@ void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, algo_req *const
 	}
 
 	if(collect_io_type(req->type, &my_posix)){
-		data_copy_from(PPA, value->value);
+		data_copy_from(PPA, value->value, req->type);
 	}
 
 	req->end_req(req);
@@ -407,7 +444,7 @@ void *posix_write_sync(uint32_t type, uint32_t ppa, char *data){
 		fdriver_lock(&p_req->lock);
 		free(p_req);
 #else
-		data_copy_to(ppa, data);
+		data_copy_to(ppa, data, type);
 #endif
 	}
 	return NULL;
@@ -421,7 +458,7 @@ void *posix_read_sync(uint32_t type, uint32_t ppa, char *data){
 		fdriver_lock(&p_req->lock);
 		free(p_req);
 #else
-		data_copy_from(ppa, data);
+		data_copy_from(ppa, data, type);
 #endif
 	}
 	return NULL;
@@ -429,6 +466,11 @@ void *posix_read_sync(uint32_t type, uint32_t ppa, char *data){
 
 void *posix_trim_block(uint32_t _PPA){
 	uint32_t PPA=convert_ppa(_PPA);
+
+#ifdef COPYMETA_ONLY
+	PS_master_free_partition(ps_master, PPA);
+#endif
+
 	if(my_posix.SOP*PPA >= my_posix.TS || PPA%my_posix.PPS != 0){
 		printf("\ntrim error\n");
 		abort();
