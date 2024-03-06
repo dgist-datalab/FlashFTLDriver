@@ -12,6 +12,7 @@ extern algorithm demand_ftl;
 extern my_cache coarse_cache_func;
 extern my_cache fine_cache_func;
 extern my_cache sftl_cache_func;
+extern my_cache nocpu_sftl_cache_func;
 extern my_cache tp_cache_func;
 demand_map_manager dmm;
 dmi DMI;
@@ -216,11 +217,11 @@ static inline char *cache_type(cache_algo_type t){
 		case DEMAND_FINE: return "DEMAND_FINE";
 		case SFTL: return "SFTL";
 		case TPFTL: return "TPFTL";
+		case NOCPU_SFTL: return "NOCPU_SFTL";
 		default:
 			abort();
 	}
 }
-
 
 static inline void mapping_sanity_checker_with_cache(char *value, uint32_t etr_idx){
 #ifndef DFTL_DEBUG
@@ -411,11 +412,11 @@ void demand_map_free(){
 		fdriver_destroy(&dmm.GTD[i].lock);
 		list_free(dmm.GTD[i].pending_req);
 	}
-	free(dmm.GTD);
 	dmm.cache->free(dmm.cache);
 	delete dmm.flying_map_read_req_set;
 	delete dmm.flying_map_read_flag_set;
 	delete dmm.flying_req;
+	free(dmm.GTD);
 }
 
 uint32_t pending_debug_seq;
@@ -1754,6 +1755,10 @@ uint32_t demand_argument(int argc, char **argv){
 				dmm.cache=&tp_cache_func;
 				dmm.c_type=TPFTL;
 				break;
+			case NOCPU_SFTL:
+				dmm.cache=&nocpu_sftl_cache_func;
+				dmm.c_type=NOCPU_SFTL;	
+				break;	
 		}
 	}
 	else{

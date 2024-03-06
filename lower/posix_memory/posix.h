@@ -2,6 +2,7 @@
 #define POSIX_HEADER
 #include "../../include/container.h"
 #include "../../include/sem_lock.h"
+#include "../../include/data_struct/partitioned_slab.h"
 
 //#define LASYNC
 #define FS_LOWER_W 1
@@ -24,6 +25,7 @@ void* posix_trim_a_block(uint32_t ppa);
 void *posix_make_trim(uint32_t ppa);
 void *posix_refresh(lower_info*);
 void posix_stop();
+void posix_invalidate_inform(uint64_t ppa);
 void posix_flying_req_wait();
 uint32_t convert_ppa(uint32_t);
 uint32_t posix_dump(lower_info *li, FILE *p);

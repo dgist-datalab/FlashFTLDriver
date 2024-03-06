@@ -37,6 +37,7 @@ lower_info pu_manager={
 	.print_traffic	=	pu_traffic_print,
 	.dump=pu_dump,
 	.load=pu_load,
+	.invalidate_inform=pu_invalidate_inform,
 };
 
 static uint8_t test_type(uint8_t type){
@@ -155,6 +156,13 @@ void pu_create_body(lower_info *_li){
 	for(uint32_t i=0; i<QDEPTH; i++){
 		pu_wrap_q->push(&pu_wrapper_array[i]);
 		pu_temp_cache[i].ppa=UINT32_MAX;
+	}
+}
+
+void pu_invalidate_inform(uint64_t ppa){
+	lower_info *real_lower=(lower_info*)pu_manager.private_data;
+	if(real_lower->invalidate_inform){
+		real_lower->invalidate_inform(ppa);
 	}
 }
 

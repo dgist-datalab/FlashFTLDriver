@@ -17,7 +17,7 @@
 #define GETETR(dmm, lba) (&(dmm).GTD[GETGTDIDX(lba)])
 #define GTD_IDX_TO_FIRST_LBA(idx) ((idx)*PAGESIZE/sizeof(DMF))
 typedef enum {
-	DEMAND_COARSE, DEMAND_FINE, SFTL, TPFTL,
+	DEMAND_COARSE, DEMAND_FINE, SFTL, TPFTL, NOCPU_SFTL
 }cache_algo_type;
 
 enum{
@@ -35,7 +35,7 @@ enum{
 	MAP_WRITE=4,
 	MAP_WRITE_GC=8,
 };
-#define CACHE_TYPE_MAX_NUM (TPFTL+1)
+#define CACHE_TYPE_MAX_NUM (NOCPU_SFTL+1)
 
 typedef enum GTD_ETR_STATUS{
 	EMPTY				= 0x0000,

@@ -34,6 +34,9 @@ uint32_t cache_get_ppa(uint32_t cache_idx, page_cache *pc){
     if(old_ppa!=UINT32_MAX){
         main_lsm->master_sm->bit_unset(main_lsm->master_sm, old_ppa*L2PGAP);
     }
+
+    main_lsm->master_sm->li->invalidate_inform(old_ppa);
+
     main_lsm->master_sm->set_oob(main_lsm->master_sm, (char*)&pc->scidx, sizeof(uint32_t), res);
     main_lsm->master_sm->bit_set(main_lsm->master_sm, res*L2PGAP);
     return res;

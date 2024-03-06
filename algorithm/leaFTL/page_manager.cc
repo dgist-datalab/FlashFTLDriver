@@ -75,8 +75,11 @@ void g_buffer_insert(align_buffer *g_buffer, char *data, uint32_t lba){
     g_buffer->idx++;
 }
 
-void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa){
-    bm->bit_unset(bm, piece_ppa);
+void invalidate_piece_ppa(blockmanager *bm, uint32_t piece_ppa, int num, bool ismap){
+    for(int i=0; i<num ;i++){
+        bm->bit_unset(bm, piece_ppa+i);
+        bm->li->invalidate_inform(piece_ppa/L2PGAP);
+    }
     if(piece_ppa==lea_test_piece_ppa){
         printf("%u is invalidate\n", piece_ppa);
     }

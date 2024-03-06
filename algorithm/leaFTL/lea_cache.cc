@@ -73,9 +73,9 @@ void __lea_cache_evict_body(uint32_t size){
 
         uint32_t *piece_ppa_set=lea_gp_to_mapping(victim); //this includes group store
         if(victim->ppa!=INITIAL_STATE_PADDR){
-            for (uint32_t i = 0; i < L2PGAP; i++){
-                invalidate_piece_ppa(translate_pm->bm, victim->ppa * L2PGAP + i);
-            }
+            //for (uint32_t i = 0; i < L2PGAP; i++){
+            invalidate_piece_ppa(translate_pm->bm, victim->ppa * L2PGAP, L2PGAP, true);
+            //}
         }
 retry:
         remain_space=pm_remain_space(translate_pm, true);

@@ -17,7 +17,7 @@
 
 #define GIGAUNIT 64L
 #ifndef OP
-#define OP 85
+#define OP 80
 #endif
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
@@ -25,6 +25,7 @@
 #define PAGE_TARGET_KILO (16)
 #define PAGESIZE (PAGE_TARGET_KILO*K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
+#define COPYMETA_ONLY 10
 
 #if 1
 	#define CARD_NUM 2

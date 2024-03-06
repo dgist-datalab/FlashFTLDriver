@@ -21,3 +21,4 @@ void		pu_flying_req_wait();
 void		pu_traffic_print(lower_info *);
 uint32_t	pu_dump(lower_info *li, FILE *fp);
 uint32_t	pu_load(lower_info *li, FILE *fp);
+void        pu_invalidate_inform(uint64_t ppa);

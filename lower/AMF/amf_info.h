@@ -4,9 +4,12 @@
 #include "../../include/container.h"
 #include "./libamfdriver/AmfManager.h"
 
+
+
 enum{
 	LOWER_WRITE, LOWER_READ, LOWER_TRIM,
 };
+
 
 //#define TESTING
 #define LOWER_MEM_DEV

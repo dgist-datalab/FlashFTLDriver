@@ -154,6 +154,7 @@ struct lower_info {
 	void (*print_traffic)(struct lower_info *);
 	uint32_t (*dump)(lower_info *li, FILE *fp);
 	uint32_t (*load)(lower_info *li, FILE *fp );
+	void (*invalidate_inform)(uint64_t ppa);
 	struct blockmanager *bm;
 
 	lower_status (*statusOfblock)(BLOCKT);
