@@ -51,9 +51,13 @@ std::vector<storage_node> temporal_storage;
 
 void group_init(group *res, uint32_t idx){
     if(temporal_storage_init_flag==false){
+        storage_node temp_node;
+        temp_node.crb=NULL;
+        temp_node.level_list=NULL;
+
         temporal_storage_init_flag=true;
         temporal_storage.clear();
-        temporal_storage.reserve(TRANSMAPNUM);
+        temporal_storage.resize(TRANSMAPNUM, temp_node);
     }
     res->crb=crb_init();
     res->level_list=new std::vector<level*>();
@@ -325,6 +329,7 @@ void group_update_segment(group *gp, std::vector<CRB_node>* arr){
         }
         else{
             //remove entry;
+            segment_free(target.seg);
             lev->erase(lev->begin()+idx);
         }
     }
@@ -464,9 +469,11 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
 
         for(uint32_t i=1; i<gp->level_list->size(); i++){
             new_level_list->push_back(gp->level_list->at(i));
+            //delete gp->level_list->at(i);
         }
 
         delete gp->level_list;
+        temporal_storage[gp->map_idx].level_list=NULL;
         gp->level_list=new_level_list;
     }
 
@@ -571,6 +578,10 @@ static inline uint32_t __clean_levellist(level_list_t *l_list){
 }
 
 void group_clean(group *gp, bool reinit, bool byeviction){
+
+ //   temporal_storage[gp->map_idx].level_list=NULL;
+  //  temporal_storage[gp->map_idx].crb=NULL;
+
     uint32_t segment_num=0;
 #ifdef FAST_LOAD_STORE
     if(gp->level_list){
@@ -591,6 +602,7 @@ void group_clean(group *gp, bool reinit, bool byeviction){
                 printf("not allowed: in the eviction the PLR must be moved to temporal storage\n");
                 abort();
             }
+
             gp->level_list->clear();
             crb_free(gp->crb);
             gp->crb=crb_init();
@@ -757,6 +769,14 @@ void group_load_levellist(group *gp){
 }
 
 void group_store_levellist(group *gp){
+    if(temporal_storage[gp->map_idx].level_list && temporal_storage[gp->map_idx].level_list!=gp->level_list){
+        __clean_levellist(temporal_storage[gp->map_idx].level_list);
+    }
+
+    if(temporal_storage[gp->map_idx].crb){
+        //crb_free(temporal_storage[gp->map_idx].crb);
+    }
+
     temporal_storage[gp->map_idx].level_list=gp->level_list;
     temporal_storage[gp->map_idx].crb=gp->crb;
     gp->level_list=NULL;

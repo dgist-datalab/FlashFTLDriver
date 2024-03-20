@@ -1,5 +1,7 @@
 #include "interface.h"
 #include "vectored_interface.h"
+
+
 #include "../include/container.h"
 #include "../include/FS.h"
 #include "../bench/bench.h"
@@ -11,6 +13,7 @@
 #include "../include/utils/tag_q.h"
 #include "../include/utils/data_checker.h"
 #include "../blockmanager/block_manager_master.h"
+#include "../interface/global_write_buffer.h"
 #include "buse.h"
 #include "layer_info.h"
 #include <stdio.h>
@@ -183,7 +186,9 @@ bool inf_assign_try(request *req){
 	bool flag=false;
 	for(int i=0; i<1; i++){
 		processor *t=&mp.processors[i];
-		tag_manager_free_tag(tm, req->tag_num);
+		if(req->tag_num!=-1){
+			tag_manager_free_tag(tm, req->tag_num);
+		}
 #ifdef layeredLSM
 /*
 		if(req->type==FS_GET_T){
@@ -236,12 +241,20 @@ send_req:
 }
 
 uint32_t inf_algorithm_caller(request *const inf_req){
+	int res=0;
 	switch(inf_req->type){
 		case FS_GET_T:
-			mp.algo->read(inf_req);
+			res=read_global_write_buffer(inf_req);
+			if(res==-1){
+				mp.algo->read(inf_req);
+			}
 			break;
 		case FS_SET_T:
-			return mp.algo->write(inf_req);
+			res=write_global_write_buffer(inf_req);
+			if(res==-1){
+				res=mp.algo->write(inf_req);
+			}
+			return res;
 		case FS_DELETE_T:
 			mp.algo->remove(inf_req);
 			break;
@@ -433,6 +446,10 @@ void inf_parsing(int *argc, char **argv){
 }
 
 void inf_init(int apps_flag, int total_num, int argc, char **argv){
+#ifdef GLOBAL_WRITE_BUFFER
+	init_global_write_buffer(GLOBAL_WRITE_BUFFER/2);
+#endif
+
 #ifdef BUSE_MEASURE
     measure_init(&infTime);
     measure_init(&infendTime);
@@ -708,6 +725,9 @@ extern std::multimap<uint32_t, request *> *stop_req_list;
 extern std::map<uint32_t, request *> *stop_req_log_list;
 
 void inf_free(){
+#ifdef GLOBAL_WRITE_BUFFER
+	free_global_write_buffer();
+#endif
 	//inf_print_lot();
 	if(stop_req_list){
 		delete stop_req_list;
@@ -723,7 +743,7 @@ void inf_free(){
 	printf("---\n");
 	for(int i=0; i<1; i++){
 		processor *t=&mp.processors[i];
-
+		pthread_join(t->t_id,NULL);
 		q_free(t->req_q);
 #ifdef interface_pq
 		q_free(t->req_rq);

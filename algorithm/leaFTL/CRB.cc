@@ -75,6 +75,8 @@ lba_buffer* remove_overlap_CRBnode(lba_buffer *lba_arr, temp_map *tmap){
         res->push_back(*iter);
     }
 
+    //delete lba_arr;
+
     return res;
 }
 
@@ -119,7 +121,11 @@ void crb_remove_overlap(CRB *crb, temp_map *tmap, std::vector<CRB_node>* update_
     }
 
     for(uint32_t i=0; i<new_target.size(); i++){
-        crb->insert(std::pair<uint32_t, CRB_node*>(new_target[i]->lba_arr->at(0), new_target[i]));
+        std::pair<CRB_iter, bool> temp=crb->insert(std::pair<uint32_t, CRB_node*>(new_target[i]->lba_arr->at(0), new_target[i]));
+        if(temp.second==false){
+            printf("overlaps  are not removed %s:%u\n", __FUNCTION__, __LINE__);
+            abort();
+        }
     }
 }
 
@@ -140,6 +146,8 @@ void crb_insert(CRB *crb, temp_map *tmap, segment *seg, std::vector<CRB_node> *u
 void crb_free(CRB *crb){
     CRB_iter iter=crb->begin();
     for(;iter!=crb->end();){
+        delete iter->second->lba_arr;
+        //segment_free(iter->second->seg);
         free(iter->second);
         crb->erase(iter++);
     }

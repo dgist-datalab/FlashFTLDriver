@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=layeredLSM
+export TARGET_ALGO=leaFTL
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -18,7 +18,7 @@ DEBUGFLAGS=\
 			-Wno-pointer-arith\
 			-g\
 			-export-dynamic\
--fsanitize=address\
+	-fsanitize=address\
 
 export COMMONFLAGS+=\
 			-Wno-write-strings\
@@ -31,8 +31,9 @@ export COMMONFLAGS+=\
 			-Wno-unused-but-set-variable\
 			-DLSM_DEBUG\
 			-DPROGRESS\
-			-DPARALLEL_MANAGER\
+			-mcmodel=large\
 #			-O3\
+#			-DPARALLEL_MANAGER\
 #			-DTRACE_REPLAY\
 #			-DWRITE_STOP_READ\
 #			-DTRACE_COLLECT\
@@ -97,6 +98,7 @@ SRCS +=\
 	./interface/queue.c\
 	./interface/interface.c\
 	./interface/vectored_interface.c\
+	./interface/global_write_buffer.c\
 	./include/FS.c\
 	./include/slab.c\
 	./include/utils/debug_tools.c\

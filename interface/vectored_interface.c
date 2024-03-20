@@ -68,6 +68,7 @@ uint32_t inf_vector_make_req(char *buf, void* (*end_req) (void*), uint32_t mark)
 		temp->param=NULL;
 		temp->value=NULL;
 		temp->seq=seq++;
+		temp->global_seq=temp->seq;
 		temp->type_ftl=0;
 		temp->type_lower=0;
 		switch(temp->type){
@@ -310,6 +311,11 @@ void release_each_req(request *req){
 		pthread_mutex_lock(&req_read_cnt_lock);
 		flying_read_req--;
 		pthread_mutex_unlock(&req_read_cnt_lock);
+	}
+	//static int cnt=0;
+	//printf("%d tag_num:%u\n", cnt++, tag_num);
+	if(tag_num==3200171710){
+		abort();
 	}
 
 	flying_cnt++;

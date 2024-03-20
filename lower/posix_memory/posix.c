@@ -188,7 +188,7 @@ void *l_main(void *__input){
 					data_copy_to(inf_req->key, inf_req->data, inf_req->upper_req->type);
 					break;
 				case FS_LOWER_R:
-					data_copy_from(inf_req->key, inf_req->upper_req->type);
+					data_copy_from(inf_req->key, inf_req->data, inf_req->upper_req->type);
 					break;
 			}
 			fdriver_unlock(&inf_req->lock);

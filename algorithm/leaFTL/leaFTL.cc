@@ -160,6 +160,10 @@ void lea_destroy(lower_info *, algorithm *){
     temp_map_free(compaction_temp_map);
     lru_free(gp_lru);
 
+    for(int i=0; i<TRANSMAPNUM; i++){
+        group_free(&main_gp[i]);
+    }
+
 	delete rb.pending_req;
 	delete rb.issue_req;
 }
@@ -268,6 +272,7 @@ void processing_pending_req(algo_req *req, value_set *value){
         }
         inf_assign_try(req->parents);
     }
+    free(req);
 }
 
 void *lea_read_end_req(algo_req* const req){

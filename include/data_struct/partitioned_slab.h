@@ -4,6 +4,7 @@
 #include <queue>
 #include <string.h>
 #include "../settings.h"
+#include "../types.h"
 
 #define SLABSIZE PAGESIZE
 

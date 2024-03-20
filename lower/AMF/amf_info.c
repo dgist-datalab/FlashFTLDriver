@@ -25,7 +25,7 @@ void amf_traffic_print(lower_info *);
 
 void amf_invalidate_inform(uint64_t ppa){
 #ifdef COPYMETA_ONLY
-	PS_master_free_slab(ppa);
+	PS_master_free_slab(ps_master, ppa);
 #else	
 	return;
 #endif
@@ -96,7 +96,7 @@ static inline void __amf_info_create_body(bool load){
 #endif
 
 #ifdef COPYMETA_ONLY
-	ps_master=PS_master_init(_NOS, _PPS, NOP/100*COPYMETA_ONLY);
+	ps_master=PS_master_init(_NOS, _PPS, _NOP/100*COPYMETA_ONLY);
 	mem_pool=NULL;
 #else
 	mem_pool=(char**)malloc(sizeof(char*)*_NOP);

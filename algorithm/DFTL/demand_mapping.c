@@ -560,6 +560,7 @@ inline void __demand_map_pending_read(request *req, demand_param *dp, bool need_
 		dp->target.ppa=get_mapping_wrapper(req, dp->target.lba);
 	}
 
+	//printf("[de2] req->global_seq:%u\n", req->global_seq);
 	dmm.all_now_req->erase(req->global_seq);
 	//debug_size();
 
@@ -1367,6 +1368,7 @@ uint32_t demand_map_assign(request *req, KEYT *_lba, KEYT *_physical, uint32_t *
 		physical=mp->physical;
 		req->round_cnt=0;
 
+		//printf("[in] req->global_seq:%u\n", req->global_seq);
 		dmm.all_now_req->insert(std::pair<uint32_t, request*>(req->global_seq, req));
 		//send_user_req(req, DATAW, dp->ppa, dp->value);
 	}
@@ -1435,6 +1437,7 @@ end:
 		dmm.flying_req->erase(req->seq);
 	}
 	if(i==mp->max_idx){ //done 
+		//printf("[de] req->global_seq:%u\n", req->global_seq);
 		dmm.all_now_req->erase(req->global_seq);
 //		debug_size()
 		if(req->param){
