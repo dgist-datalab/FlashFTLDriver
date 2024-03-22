@@ -44,7 +44,7 @@ std::vector<storage_node> temporal_storage;
     do{\
         if((_gm).fast_search){\
             for(uint32_t __i=0; __i<(_size); __i++){\
-                (_gm).seg_list->at((_lba)[__i])=(_seg);\
+                (_gm).seg_list[((_lba)[__i])]=(_seg);\
             }\
         }\
     }while(0)
@@ -149,10 +149,11 @@ segment *group_get_segment(group *gp, uint32_t lba){
     }
 
     if(gm.fast_search){
-        return gm.seg_list->at(lba);
+        return gm.seg_list[lba];
     }
 
     level_list_iter iter=gp->level_list->begin();
+ 
     CRB_node *app_target=crb_find_node(gp->crb, lba);
     segment temp;
     temp.start=lba;
@@ -162,9 +163,6 @@ segment *group_get_segment(group *gp, uint32_t lba){
 
 
     for(uint32_t level_height=0; iter!=gp->level_list->end(); iter++, level_height++){
-        if(lba==test_key && level_height==11){
-            //GDB_MAKE_BREAKPOINT;
-        }
         level_iter lev_iter=level_lower_bound_wrapper((*iter), &temp, &found);
         if(!found) {
             continue;
@@ -400,14 +398,6 @@ static void group_segment_update(group *gp, level *lev, temp_map *tmap, segment 
 }
 
 void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval, void (*cache_size_update)(group *gp, uint32_t size, bool decrease)){
-    /*
-    static int cnt=0;
-    printf("%s, %u, %lu, %u\n", __FUNCTION__, tmap->lba[0], tmap->lba[0]/MAPINTRANS, ++cnt);
-    if(cnt==277397){
-        //leaFTL_debug=true;
-        //GDB_MAKE_BREAKPOINT;
-    }*/
-
     segment *target=segment_make(tmap, type, interval);
     
     SET_SEG_FAST_SEARCH(gm, tmap->lba, target, tmap->size);
@@ -473,7 +463,6 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
         }
 
         delete gp->level_list;
-        temporal_storage[gp->map_idx].level_list=NULL;
         gp->level_list=new_level_list;
     }
 
@@ -515,9 +504,6 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
     uint32_t target_size=1;
     bool have_remain=false;
     for(uint32_t i=1; i<MAPINTRANS; i++){
-        if(lba[i]==test_key){
-            //GDB_MAKE_BREAKPOINT;
-        }
         if(prev_piece_ppa==INITIAL_STATE_PADDR){
             //start_from now
             start_idx=i;
@@ -541,6 +527,10 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
                 target_size=1;
                 have_remain=true;
             }
+        }
+
+        if(piece_ppa[i]==INITIAL_STATE_PADDR){
+            have_remain=false;   
         }
         prev_piece_ppa=piece_ppa[i];
     }
@@ -578,10 +568,6 @@ static inline uint32_t __clean_levellist(level_list_t *l_list){
 }
 
 void group_clean(group *gp, bool reinit, bool byeviction){
-
- //   temporal_storage[gp->map_idx].level_list=NULL;
-  //  temporal_storage[gp->map_idx].crb=NULL;
-
     uint32_t segment_num=0;
 #ifdef FAST_LOAD_STORE
     if(gp->level_list){
@@ -760,25 +746,49 @@ void group_monitor_print(){
 }
 
 void group_load_levellist(group *gp){
+
     if(gp->level_list || gp->crb){
         printf("must be empty before load!\n");
         GDB_MAKE_BREAKPOINT;
     }
     gp->level_list=temporal_storage[gp->map_idx].level_list;
     gp->crb=temporal_storage[gp->map_idx].crb;
+
+    temporal_storage[gp->map_idx].level_list=NULL;
+    temporal_storage[gp->map_idx].crb=NULL;
 }
 
 void group_store_levellist(group *gp){
-    if(temporal_storage[gp->map_idx].level_list && temporal_storage[gp->map_idx].level_list!=gp->level_list){
+    if(gp->map_idx==38){
+        //static int cnt=0;
+        //printf("%u target stored!\n", cnt++);
+    }
+
+    if(temporal_storage[gp->map_idx].level_list){
         __clean_levellist(temporal_storage[gp->map_idx].level_list);
+        delete temporal_storage[gp->map_idx].level_list;
     }
 
     if(temporal_storage[gp->map_idx].crb){
-        //crb_free(temporal_storage[gp->map_idx].crb);
+        crb_free(temporal_storage[gp->map_idx].crb);
     }
 
     temporal_storage[gp->map_idx].level_list=gp->level_list;
     temporal_storage[gp->map_idx].crb=gp->crb;
     gp->level_list=NULL;
     gp->crb=NULL;
+}
+
+
+void group_clen_temporal_storage(){
+    for(uint32_t i=0; i<temporal_storage.size(); i++){
+        if(temporal_storage[i].level_list){
+            __clean_levellist(temporal_storage[i].level_list);
+            delete temporal_storage[i].level_list;
+        }
+        if(temporal_storage[i].crb){
+            crb_free(temporal_storage[i].crb);
+        }
+    }
+    temporal_storage.clear();
 }

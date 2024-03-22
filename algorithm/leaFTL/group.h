@@ -63,7 +63,7 @@ typedef struct group_monitor{
     uint64_t compaction_cnt;
     bool fast_search;
 
-    std::vector<segment*> *seg_list;
+    std::vector<segment*> seg_list;
 }group_monitor;
 
 typedef struct group_read_param{
@@ -104,6 +104,7 @@ void group_clean(group *gp, bool reinit, bool byecivtion);
 void group_monitor_print();
 void group_load_levellist(group *gp);
 void group_store_levellist(group *gp);
+void group_clen_temporal_storage();
 static inline group_read_param *group_get_empty_grp(){
     group_read_param *res=(group_read_param*)calloc(1, sizeof(group_read_param));
     return res;

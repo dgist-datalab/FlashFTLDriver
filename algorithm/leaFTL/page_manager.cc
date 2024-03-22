@@ -389,6 +389,7 @@ void pm_map_gc(page_manager *pm, __gsegment *target, temp_map *res){
             uint32_t new_ppa=get_map_ppa(pm, false, lba_arr[0]);
             res->lba[res->size]=lba_arr[0];
             res->piece_ppa[res->size]=new_ppa;
+            gp->type=GCMW;
             send_IO_back_req(GCMW, pm->lower, new_ppa, gp->value, (void*)gp, pm_end_req);
             res->size++; 
             list_delete_node(temp_list, now);

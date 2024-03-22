@@ -63,13 +63,14 @@ void __lea_cache_evict_body(uint32_t size){
             GDB_MAKE_BREAKPOINT;
         }
 
+
+        group_store_levellist(victim);
         if(victim->isclean){
-            victim->isclean=true;
-            group_store_levellist(victim);
             group_clean(victim, true, true);
             victim->cache_flag=CACHE_FLAG::UNCACHED;
             continue;
         }
+        
 
         uint32_t *piece_ppa_set=lea_gp_to_mapping(victim); //this includes group store
         if(victim->ppa!=INITIAL_STATE_PADDR){

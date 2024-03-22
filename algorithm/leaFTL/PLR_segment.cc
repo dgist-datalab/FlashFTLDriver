@@ -1,8 +1,10 @@
 #include "./PLR_segment.h"
 #include "../../include/settings.h"
 #include "../../include/debug_utils.h"
+#include <set>
 extern uint32_t test_key;
 segment *segment_make(temp_map *map, SEGMENT_TYPE type, uint32_t interval){
+    static int cnt=0;
     segment *res=(segment *)malloc(sizeof(segment));
     res->type=type;
     res->start=map->lba[0];
@@ -37,6 +39,8 @@ segment *segment_make(temp_map *map, SEGMENT_TYPE type, uint32_t interval){
         res->body.plr->insert_end();
     }
     res->level_ptr=NULL;
+    res->seq=cnt++;
+
     return res;
 }
 
@@ -74,6 +78,7 @@ void segment_free(segment* seg){
         case SEGMENT_TYPE::ACCURATE:
            break;
         case SEGMENT_TYPE::APPROXIMATE:
+            seg->body.plr->clear();
             delete seg->body.plr;
             break;
     }
@@ -131,6 +136,7 @@ uint64_t segment_size(segment *seg){
         return seg->body.plr->get_line_cnt()*8;
     }
 }
+
 
 void segment_print(segment *seg){
     printf("%u~%u,%s\n", seg->start, seg->end, seg->type==SEGMENT_TYPE::ACCURATE?"ACC":"APP");

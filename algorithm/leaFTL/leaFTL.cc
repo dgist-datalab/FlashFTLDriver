@@ -128,10 +128,10 @@ uint32_t lea_create(lower_info *li, blockmanager *bm, algorithm *algo){
 
     printf("fast search: %s\n", gm.fast_search?"on":"off");
     if(gm.fast_search){
-        gm.seg_list=new std::vector<segment*>(RANGE, NULL);
+        gm.seg_list=std::vector<segment*>(RANGE, NULL);
     }
     else{
-        gm.seg_list=NULL;
+        
     }
 
     for(uint32_t i=0; i<TRANSMAPNUM; i++){
@@ -164,6 +164,7 @@ void lea_destroy(lower_info *, algorithm *){
         group_free(&main_gp[i]);
     }
 
+    group_clen_temporal_storage();
 	delete rb.pending_req;
 	delete rb.issue_req;
 }
@@ -237,9 +238,7 @@ void processing_pending_req(algo_req *req, value_set *value){
     bool data_found=false;
     bool isretry=false;
     bool data_retry=false;
-    if(grp->lba==test_key){
-        //GDB_MAKE_BREAKPOINT;
-    }
+
     switch (grp->retry_flag){
     case RETRY_FLAG::NORMAL_RETRY:
     case RETRY_FLAG::NOT_RETRY:
@@ -591,7 +590,6 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
 
 uint32_t *lea_gp_to_mapping(group *gp){
 #ifdef FAST_LOAD_STORE
-    group_store_levellist(gp);
     return &exact_map[gp->map_idx*MAPINTRANS];
 #else
     for(uint32_t i=0; i<MAPINTRANS; i++){
@@ -721,18 +719,7 @@ void lea_mapping_update(temp_map *map, blockmanager *bm, bool isgc){
             std::list<group_update_param*>::iterator gup_iter;
             while(gup_list.size()){
                 for(gup_iter=gup_list.begin(); gup_iter!=gup_list.end();){
-                    if(cnt==94){
-                        //printf("%u\n", ++small_cnt);
-                    }
                     t_gup=*gup_iter;
-
-
-                    if(cnt==94 && t_gup->gp->map_idx==510){
-                        //GDB_MAKE_BREAKPOINT;
-                    }
-                    if(t_gup->gp->map_idx==0 && cnt==109){
-                        //GDB_MAKE_BREAKPOINT;
-                    }
                     if(t_gup->grp.read_done==false){
                         gup_iter++; //wait until read
                         continue;
@@ -768,9 +755,6 @@ bool write_buffer_check_ignore(uint32_t lba){
 }
 
 uint32_t lea_write(request *const req){
-    if(req->key==test_key){
-        printf("%u is buffered\n", test_key);
-    }
     lea_write_buffer_insert(wb, req->key, req->value->value);
 
     static int write_cnt=0;

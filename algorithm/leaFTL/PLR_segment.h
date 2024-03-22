@@ -19,6 +19,8 @@ typedef struct segment{
     uint32_t start_piece_ppa;
     content body;
     void *level_ptr;
+
+    int seq;
 }segment;
 
 segment *segment_make(temp_map *map, SEGMENT_TYPE type, uint32_t interval);
