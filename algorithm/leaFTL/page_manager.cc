@@ -126,6 +126,14 @@ bool pm_assign_new_seg(page_manager *pm, bool isdata){
     if(bm->is_gc_needed(bm)){
         return false;
     }
+    else{
+        if(isdata){
+            uint32_t free_seg_num=bm->total_free_page_num(bm, NULL)/_PPS;
+            if(free_seg_num +map_seg_number <=minimum_number_map_seg){
+                return false;
+            }
+        }
+    }
     
     if(isdata){
         data_seg_number++;
@@ -235,18 +243,20 @@ static io_param *send_gc_req(lower_info *lower, uint32_t ppa, uint32_t type, val
 
 
 static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *target, bool isdata){
+    int prev_seg_type=seg_type_flag[target->seg_idx];
     seg_type_flag[target->seg_idx]=SEGTYPE_FLAG::NONE;
 
     if(target->seg_idx==lea_test_piece_ppa/4/_PPS){
         printf("%u clear!\n", lea_test_piece_ppa);
     }
 
+
     /*reset active segment and reserve segment*/
     bm->trim_segment(bm ,target);
     pm->active=pm->reserve;
     bm->change_reserve_to_active(bm, pm->reserve);
     pm->reserve=bm->get_segment(bm, BLOCK_RESERVE);
-    if(seg_type_flag[pm->reserve->seg_idx]==SEGTYPE_FLAG::DATA){
+    if(prev_seg_type==SEGTYPE_FLAG::DATA){
         data_seg_number--;
     }
     else{
@@ -417,9 +427,8 @@ void pm_gc(page_manager *pm, temp_map *res, bool isdata){
     __gsegment *gc_target=pm_get_gc_target(pm->bm);
     static int cnt=0;
     printf("gc %u cnt\n", ++cnt);
-    if(cnt==2479){
+    if(cnt==482){
         //gc_debug_flag=true;
-        //GDB_MAKE_BREAKPOINT;
     }
     //printf("\tmap_seg_number:%u\n", map_seg_number);
     //printf("\tdata_seg_number:%u\n", data_seg_number);
@@ -468,6 +477,8 @@ void pm_gc(page_manager *pm, temp_map *res, bool isdata){
     else{
         pm_map_gc(pm, gc_target, res);
     }
+
+    printf("pm gc[cnt:%u] map:minimum %u:%u\n", cnt, map_seg_number, minimum_number_map_seg);
 }
 
 uint32_t pm_map_flush(page_manager *pm, bool isactive, char *data, uint32_t gp_idx){
