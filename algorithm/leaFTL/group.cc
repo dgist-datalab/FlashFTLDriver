@@ -11,6 +11,7 @@ bool leaFTL_debug;
 group_monitor gm;
 extern uint32_t *exact_map;
 bool temporal_storage_init_flag;
+extern uint64_t after_compaction_size[TRANSMAPNUM];
 typedef struct storage_node{
     level_list_t * level_list;
     CRB *crb;
@@ -550,6 +551,7 @@ void group_from_translation_map(group *gp, uint32_t *lba, uint32_t *piece_ppa, u
     gp->segment_num=new_level->size();
     now_segment_num+=gp->segment_num;
     gp->size=group_level_size(new_level);
+    after_compaction_size[idx]=gp->size;
     gp->level_list->push_back(new_level);
 }
 
