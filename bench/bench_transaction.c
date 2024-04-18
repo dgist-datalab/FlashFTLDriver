@@ -186,7 +186,7 @@ void vectored_get(uint32_t start, uint32_t end, monitor* m, bool isseq){
 	}
 }
 
-void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
+void vectored_rw_body(uint32_t start, uint32_t end, monitor* m, bool isseq, uint32_t (*func)(uint32_t start, uint32_t end, uint32_t parm), uint32_t param){
 	uint32_t request_per_command=_master->trans_configure.request_num_per_command;
 	uint32_t number_of_command=(m->m_num)/request_per_command;
 	m->m_num=number_of_command*request_per_command;
@@ -211,16 +211,9 @@ void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
 			(*(uint8_t*)&buf[idx])=FS_SET_T;
 			idx+=sizeof(uint8_t);
 
-			if(isseq){
-				key_buf[j]=start+i*request_per_command+j;
-				(*(uint32_t*)&buf[idx])=key_buf[j];
-				idx+=sizeof(uint32_t);
-			}
-			else{
-				key_buf[j]=start+rand()%(end-start);
-				(*(uint32_t*)&buf[idx])=key_buf[j];
-				idx+=sizeof(uint32_t);
-			}
+			key_buf[j]=func(start, end, param);
+			(*(uint32_t*)&buf[idx])=key_buf[j];
+			idx+=sizeof(uint32_t);
 
 			(*(uint32_t*)&buf[idx])=0;//offset
 			idx+=sizeof(uint32_t);
@@ -240,14 +233,9 @@ void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
 			(*(uint8_t*)&buf[idx])=FS_GET_T;
 			idx+=sizeof(uint8_t);
 
-			if(isseq){
-				(*(uint32_t*)&buf[idx])=key_buf[j];
-				idx+=sizeof(uint32_t);
-			}
-			else{
-				(*(uint32_t*)&buf[idx])=key_buf[j];
-				idx+=sizeof(uint32_t);
-			}
+			(*(uint32_t*)&buf[idx])=key_buf[j];
+			idx+=sizeof(uint32_t);
+
 			(*(uint32_t*)&buf[idx])=0;//offset
 			idx+=sizeof(uint32_t);
 			m->read_cnt++;
@@ -255,6 +243,51 @@ void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
 	}
 	m->m_num=m->read_cnt+m->write_cnt;
 	free(key_buf);
+}
+
+
+uint32_t random_func(uint32_t start, uint32_t end, uint32_t param){
+	return start+rand()%(end-start);
+}
+
+void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
+	vectored_rw_body(start, end, m, isseq, random_func, 0);
+}
+
+uint32_t temporal_local_func(uint32_t start, uint32_t end, uint32_t hot_ratio){
+	uint32_t hot_range_end=start+(end-start)*(100-hot_ratio)/100;
+	uint32_t result=0;
+	if(rand()%100<hot_ratio){
+		result=start+rand()%(hot_range_end-start);
+	}
+	else{
+		result=hot_range_end+rand()%(end-hot_range_end);
+	}
+	return result;
+}
+
+void vectored_temporal_locality_rw(uint32_t start, uint32_t end, monitor* m, uint32_t param){
+	vectored_rw_body(start, end, m, true, temporal_local_func, param);
+}
+
+uint32_t spatail_local_func(uint32_t start, uint32_t end, uint32_t length){
+	static int cnt=0;
+	static uint32_t max_chunk_num=(end-start)/length;
+
+	static uint32_t prev_start_num=0;
+	uint32_t result=0;
+	if (cnt % length == 0){
+		prev_start_num = start + (rand() % max_chunk_num) * length;
+	}
+
+	result=prev_start_num + (cnt % length);
+
+	cnt++;
+	return result;
+}
+
+void vectored_spatial_locality_rw(uint32_t start, uint32_t end, monitor* m, uint32_t param){
+	vectored_rw_body(start, end, m, false, spatail_local_func, param);
 }
 
 void vectored_partial_rw(uint32_t start, uint32_t end, monitor* m){

@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <limits.h>
 #include <getopt.h>
+
+#include <libconfig.h>
+
 #include "../include/FS.h"
 #include "../include/settings.h"
 #include "../include/types.h"
@@ -25,8 +28,10 @@ MeasureTime write_opt_time[11];
 extern master_processor mp;
 extern uint64_t cumulative_type_cnt[LREQ_TYPE_NUM];
 
-int utilization=100;
-int round=2;
+static int utilization=100;
+static int round=1;
+static int type=-1;
+static int param=0;
 
 int main(int argc,char* argv[]){
 	//int temp_cnt=bench_set_params(argc,argv,temp_argv);
@@ -34,8 +39,8 @@ int main(int argc,char* argv[]){
 	setbuf(stderr, NULL);
 	//bench_parameters* bp=bench_parsing_parameters(&argc,argv);
 
-	//parsing argc for 'U' and 'R', which are used to set utilization and round
-	//after that remove 'U' and 'R' from argv
+	//parsing argc for 'U','T' and 'R', which are used to set utilization and round
+	//after that remove 'U', 'T' and 'R' from argv
 	//ignore other options
 	for(int i=1; i<argc; i++){
 		if(argv[i][0]=='-' && argv[i][1]=='U'){
@@ -54,9 +59,25 @@ int main(int argc,char* argv[]){
 			argc-=2;
 			i-=2;
 		}
+		else if(argv[i][0]=='-' && argv[i][1]=='T'){
+			type=atoi(&argv[i+1][0]);
+			for(int j=i; j<argc-2; j++){
+				argv[j]=argv[j+2];
+			}
+			argc-=2;
+			i-=2;
+		}
+		else if(argv[i][0]=='-' && argv[i][1]=='P'){
+			param=atoi(&argv[i+1][0]);
+			for(int j=i; j<argc-2; j++){
+				argv[j]=argv[j+2];
+			}
+			argc-=2;
+			i-=2;
+		}
 	}
 
-	printf("U:%u R:%u\n", utilization, round);
+	printf("U:%u R:%u T:%d P:%u\n", utilization, round, type, param);
 
 	//if(bp){
 	//	inf_init(0,0,argc,argv);
@@ -82,17 +103,32 @@ int main(int argc,char* argv[]){
 	//	bench_add(VECTOREDSSET,0,RANGE,RANGE);
 	//	bench_add(VECTOREDSGET,0,RANGE,RANGE);
 	//	bench_add(VECTOREDRSET,0,RANGE,RANGE);
-		bench_add(VECTOREDRW,0,RANGE/100*utilization,RANGE*round);
-	//	inf_print_log();
-	//	bench_add(VECTOREDSGET,0, RANGE, RANGE);
-	//	bench_add(VECTOREDUNIQRSET,0,RANGE, RANGE);
-	//	bench_add(VECTOREDRGET,0, RANGE, RANGE/10);
-	//	bench_add(VECTOREDRW,0, RANGE,(RANGE));
-	//	bench_add(VECTOREDRGET,0,RANGE,RANGE);
-	//	bench_add(VECTOREDLOCALIZEDGET,0,RANGE,RANGE);
-	//	bench_add(VECTOREDRGET,0,RANGE,RANGE);
-	//	bench_add(VECTOREDRSET,0,RANGE,RANGE*2);
+	    switch (type)
+		{
+		case 0:
+		case -1: //Random RW
+			bench_add(VECTOREDRW,0,RANGE/100*utilization,RANGE*round, 0);
+			break;
+		case 1: //Sequential RW
+			bench_add(VECTOREDSSET,0,RANGE/100*utilization,RANGE*round, 0);
+			bench_add(VECTOREDSGET,0,RANGE/100*utilization,RANGE*round, 0);
+			break;
+
+		case 2: //Temporal locality RW
+			bench_add(VECTOREDTEMPLOCALRW,0,RANGE/100*utilization,RANGE*round, param);
+			break;
+
+		case 3: //Spatial locality RW
+			bench_add(VECTOREDSPATIALRW,0,RANGE/100*utilization,RANGE*round, param);
+			break;
+
+		default:
+			printf("type error\n");
+
+			break;
+		}
 #endif
+
 	//}
 	//printf("range: %lu!\n",RANGE);
 

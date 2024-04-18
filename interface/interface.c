@@ -483,7 +483,7 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv){
 	pthread_mutex_init(&mp.flag,NULL);
 	if(apps_flag){
 		bench_init();
-		bench_add(NOR,0,-1,total_num);
+		bench_add(NOR,0,-1,total_num, 0);
 	}
 
 	layer_info_mapping(&mp, mp.data_load, argc, argv);	

@@ -96,6 +96,7 @@ void bench_make_data(){
 	_m->empty=false;
 	_m->m_num=_meta->number;
 	_m->type=_meta->type;
+	uint32_t param=_meta->param;
 	uint32_t start=_meta->start;
 	uint32_t end=_meta->end;
 	switch(_meta->type){
@@ -147,6 +148,12 @@ void bench_make_data(){
 		case VECTOREDPARTIARW:
 			vectored_partial_rw(start, end, _m);
 			break;
+		case VECTOREDTEMPLOCALRW:
+			vectored_temporal_locality_rw(start, end, _m, param);
+			break;
+		case VECTOREDSPATIALRW:
+			vectored_spatial_locality_rw(start, end, _m, param);
+			break;
 #ifndef KVSSD
 		case SEQLATENCY:
 			seq_latency(start,end,50,_m);
@@ -166,12 +173,13 @@ void bench_make_data(){
 	MS(&_m->benchTime);
 }
 
-void bench_add(bench_type type, uint32_t start, uint32_t end, uint64_t number){
+void bench_add(bench_type type, uint32_t start, uint32_t end, uint64_t number, uint32_t param){
 	static int idx=0;
 	_master->meta[idx].start=start;
 	_master->meta[idx].end=end;
 	_master->meta[idx].type=type;
 	_master->meta[idx].number=number%2?(number/2)*2:number;
+	_master->meta[idx].param=param;
 
 	for(int j=0;j<ALGOTYPE;j++){
 		for(int k=0;k<LOWERTYPE;k++){

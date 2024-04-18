@@ -49,6 +49,7 @@ typedef struct{
 	uint32_t start;
 	uint32_t end;
 	uint64_t number;
+	uint32_t param;
 	bench_type type;
 }bench_meta;
 
@@ -150,7 +151,7 @@ bench_parameters *bench_parsing_parameters(int *argc, char *argv[]);
 void bench_parameters_free(bench_parameters*);
 void bench_init();
 void bench_vectored_configure();
-void bench_add(bench_type type,uint32_t start, uint32_t end,uint64_t number);
+void bench_add(bench_type type,uint32_t start, uint32_t end,uint64_t number, uint32_t param);
 bench_value* get_bench();
 void bench_refresh(bench_type, uint32_t start, uint32_t end, uint64_t number);
 void bench_free();
@@ -203,6 +204,9 @@ void vectored_rw(uint32_t, uint32_t, monitor*, bool isseq);
 void vectored_unique_rset(uint32_t, uint32_t, monitor*);
 void vectored_localized_get(uint32_t, uint32_t, monitor *);
 void vectored_partial_rw(uint32_t, uint32_t, monitor *);
+void vectored_temporal_locality_rw(uint32_t, uint32_t, monitor *, uint32_t );
+void vectored_spatial_locality_rw(uint32_t, uint32_t, monitor *, uint32_t);
+
 
 int my_itoa(uint32_t key, char **_target, char *buf);
 
