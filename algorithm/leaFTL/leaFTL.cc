@@ -34,6 +34,7 @@ extern group_monitor gm;
 
 uint32_t lea_mapping_update_cnt;
 uint32_t find_exact_piece_ppa_cnt;
+uint64_t after_compaction_size[TRANSMAPNUM];
 
 typedef struct group_update_param{
    group_read_param grp;
@@ -79,10 +80,16 @@ uint32_t lea_print_log(){
     printf("segment_num: %u, average:%.2lf\n", now_segment_num, (double)now_segment_num/TRANSMAPNUM);
 
 	uint64_t total_index_size=0;
-	for(uint32_t i=0; i<TRANSMAPNUM; i++){
-		total_index_size+=main_gp[i].size;
+	for(uint64_t i=0; i<TRANSMAPNUM; i++){
+        if(after_compaction_size[i]==0){
+            total_index_size+=after_compaction_size[i];
+        }
+        else{
+            total_index_size+=main_gp[i].size;
+        }
+
 	}
-	printf("total index size:%lu\n", total_index_size);
+	printf("total index size:%lu, %lf\n", total_index_size, (double)total_index_size/(RANGE*32));
     return 1;
 }
 
