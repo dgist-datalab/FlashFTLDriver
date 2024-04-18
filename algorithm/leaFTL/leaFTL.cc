@@ -82,7 +82,7 @@ uint32_t lea_print_log(){
 	for(uint32_t i=0; i<TRANSMAPNUM; i++){
 		total_index_size+=main_gp[i].size;
 	}
-	printf("total index size:%lu\n", total_index_size);
+	printf("total index size:%lu, %lf\n", total_index_size, (double)total_index_size/(RANGE*32));
     return 1;
 }
 
