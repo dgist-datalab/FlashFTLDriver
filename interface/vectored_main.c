@@ -5,7 +5,7 @@
 #include <limits.h>
 #include <getopt.h>
 
-#include <libconfig.h>
+//#include <libconfig.h>
 
 #include "../include/FS.h"
 #include "../include/settings.h"
@@ -77,7 +77,7 @@ int main(int argc,char* argv[]){
 		}
 	}
 
-	printf("U:%u R:%u T:%d P:%u\n", utilization, round, type, param);
+	printf("U:%u R:%u T:%d P:%u N:%u\n", utilization, round, type, param, RANGE/100*utilization);
 
 	//if(bp){
 	//	inf_init(0,0,argc,argv);

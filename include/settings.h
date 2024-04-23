@@ -15,20 +15,21 @@
 #define P (1024L*T)
 #define MILI (1000000)
 
-#define GIGAUNIT 64L
+#define GIGAUNIT 16LL//440LL-->max
 #ifndef OP
-#define OP 80
+#define OP 90
 #endif
 #define SHOWINGSIZE (GIGAUNIT * G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
-#define REALSIZE (512L*G)
+#define REALSIZE (256L*G)
 #define PAGE_TARGET_KILO (16)
 #define PAGESIZE (PAGE_TARGET_KILO*K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
 #define COPYMETA_ONLY 10
+//#define GLOBAL_WRITE_BUFFER (128*1024)//(256*1024) //1MB
 
 #if 1
-	#define CARD_NUM 2
+	#define CARD_NUM 1
 	#define BUS_NUM 8
 	#define CHIP_NUM 8
 #else // using BPS=1
@@ -66,10 +67,10 @@
 #define BLOCKT uint32_t
 #define PTR_BIT 32
 
-#define QSIZE		(128) 
-#define LOWQDEPTH	(128)
-#define QDEPTH		(128)
-#define DEV_QDEPTH (128)
+#define QSIZE		(64) 
+#define LOWQDEPTH	(64)
+#define QDEPTH		(64)
+#define DEV_QDEPTH 	(64)
 
 #define THPOOL
 #define NUM_THREAD 4

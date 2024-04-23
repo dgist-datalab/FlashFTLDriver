@@ -114,6 +114,8 @@ void compaction_flush(lsmtree *lsm, run *r)
 	bool pinning_enable = false;
 #endif
 
+	pinning_enable=false;
+
 	run *new_run = __lsm_populate_new_run(lsm, lsm->disk[0]->map_type, pinning_enable ? RUN_PINNING : RUN_NORMAL, r->now_entry_num, 1);
 
 	run_recontstruct(lsm, r, new_run, false);
@@ -127,7 +129,12 @@ void compaction_flush(lsmtree *lsm, run *r)
 
 	while(gc_check_enough_space(lsm->bm, (lsm->param.memtable_entry_num)/MAX_SECTOR_IN_BLOCK)==false){
 		lsm->monitor.force_compaction_cnt++;
-		__compaction_another_level(lsm, 0, true);
+		//__compaction_another_level(lsm, 0, true);
+		run *target=level_get_max_unlinked_run(lsm->disk[lsm->param.total_level_num-1]);
+		new_run=__lsm_populate_new_run(lsm, lsm->disk[lsm->param.total_level_num-1]->map_type, RUN_NORMAL, target->now_entry_num, lsm->param.total_level_num-1);
+		run_recontstruct(lsm, target, new_run, true);
+		__lsm_free_run(lsm, target);
+		level_insert_run(lsm->disk[lsm->param.total_level_num-1], new_run);
 	}
 	__lsm_free_run(lsm, r);
 	uint64_t new_shortcut_memory=lsm->shortcut->now_sc_memory_usage;

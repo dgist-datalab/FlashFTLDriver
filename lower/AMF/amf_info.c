@@ -104,7 +104,6 @@ static inline void __amf_info_create_body(bool load){
 
 	temp_mem_buf=(char*)malloc(PAGESIZE);
 
-
 }
 
 uint32_t amf_info_create(lower_info *li, blockmanager *bm){
