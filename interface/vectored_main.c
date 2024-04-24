@@ -107,7 +107,8 @@ int main(int argc,char* argv[]){
 		{
 		case 0:
 		case -1: //Random RW
-			bench_add(VECTOREDRW,0,RANGE/100*utilization,RANGE*round, 0);
+			bench_add(VECTOREDRSET,0,RANGE/100*utilization,RANGE*(round-1), 0);
+			bench_add(VECTOREDRW,0,RANGE/100*utilization,RANGE*2, 0);
 			break;
 		case 1: //Sequential RW
 			bench_add(VECTOREDSSET,0,RANGE/100*utilization,RANGE*round, 0);
@@ -115,6 +116,7 @@ int main(int argc,char* argv[]){
 			break;
 
 		case 2: //Temporal locality RW
+			bench_add(VECTOREDUNIQRSET,0,RANGE/100*utilization,RANGE*round, param);
 			bench_add(VECTOREDTEMPLOCALRW,0,RANGE/100*utilization,RANGE*round, param);
 			break;
 

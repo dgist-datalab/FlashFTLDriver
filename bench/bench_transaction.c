@@ -186,7 +186,7 @@ void vectored_get(uint32_t start, uint32_t end, monitor* m, bool isseq){
 	}
 }
 
-void vectored_rw_body(uint32_t start, uint32_t end, monitor* m, bool isseq, uint32_t (*func)(uint32_t start, uint32_t end, uint32_t parm), uint32_t param){
+void vectored_rw_body(uint32_t start, uint32_t end, monitor* m, bool isseq, uint32_t (*func)(uint32_t start, uint32_t end, uint32_t parm), uint32_t param, bool read_only){
 	uint32_t request_per_command=_master->trans_configure.request_num_per_command;
 	uint32_t number_of_command=(m->m_num)/request_per_command;
 	m->m_num=number_of_command*request_per_command;
@@ -197,8 +197,15 @@ void vectored_rw_body(uint32_t start, uint32_t end, monitor* m, bool isseq, uint
 	m->command_num=number_of_command;
 	m->command_issue_num=0;
 
+	uint32_t target_request=0;
+	if(read_only){
+		target_request=number_of_command;
+	}
+	else{
+		target_request=number_of_command/2;
+	}
 
-	for(uint32_t i=0; i<number_of_command/2; i++){
+	for(uint32_t i=0; i<target_request; i++){
 		uint32_t idx=0;
 		m->tbody[i].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
 		char *buf=m->tbody[i].buf;
@@ -208,7 +215,13 @@ void vectored_rw_body(uint32_t start, uint32_t end, monitor* m, bool isseq, uint
 		idx+=sizeof(uint32_t);
 
 		for(uint32_t j=0; j<request_per_command; j++){
-			(*(uint8_t*)&buf[idx])=FS_SET_T;
+			if(read_only){
+				(*(uint8_t*)&buf[idx])=FS_GET_T;
+			}
+			else{
+				(*(uint8_t*)&buf[idx])=FS_SET_T;
+			}
+			//(*(uint8_t*)&buf[idx])=FS_SET_T;
 			idx+=sizeof(uint8_t);
 
 			key_buf[j]=func(start, end, param);
@@ -220,6 +233,7 @@ void vectored_rw_body(uint32_t start, uint32_t end, monitor* m, bool isseq, uint
 			m->write_cnt++;
 		}
 
+		if(read_only) continue;
 		idx=0;
 		m->tbody[i+number_of_command/2].buf=(char*)malloc(request_buf_size + TXNHEADERSIZE);
 		buf=m->tbody[i+number_of_command/2].buf;
@@ -245,13 +259,12 @@ void vectored_rw_body(uint32_t start, uint32_t end, monitor* m, bool isseq, uint
 	free(key_buf);
 }
 
-
 uint32_t random_func(uint32_t start, uint32_t end, uint32_t param){
 	return start+rand()%(end-start);
 }
 
 void vectored_rw(uint32_t start, uint32_t end, monitor* m, bool isseq){
-	vectored_rw_body(start, end, m, isseq, random_func, 0);
+	vectored_rw_body(start, end, m, isseq, random_func, 0, false);
 }
 
 uint32_t temporal_local_func(uint32_t start, uint32_t end, uint32_t hot_ratio){
@@ -263,11 +276,20 @@ uint32_t temporal_local_func(uint32_t start, uint32_t end, uint32_t hot_ratio){
 	else{
 		result=hot_range_end+rand()%(end-hot_range_end);
 	}
+
+	static int cnt=0, hot_cnt=0;
+
+	//cnt++;
+	//if(hot_range_end>result){
+	//	hot_cnt++;
+	//}
+	//printf("%lf\n", (double)hot_cnt/cnt*100);
+
 	return result;
 }
 
 void vectored_temporal_locality_rw(uint32_t start, uint32_t end, monitor* m, uint32_t param){
-	vectored_rw_body(start, end, m, true, temporal_local_func, param);
+	vectored_rw_body(start, end, m, true, temporal_local_func, param, true);
 }
 
 uint32_t spatail_local_func(uint32_t start, uint32_t end, uint32_t length){
@@ -287,7 +309,7 @@ uint32_t spatail_local_func(uint32_t start, uint32_t end, uint32_t length){
 }
 
 void vectored_spatial_locality_rw(uint32_t start, uint32_t end, monitor* m, uint32_t param){
-	vectored_rw_body(start, end, m, false, spatail_local_func, param);
+	vectored_rw_body(start, end, m, false, spatail_local_func, param, false);
 }
 
 void vectored_partial_rw(uint32_t start, uint32_t end, monitor* m){
