@@ -114,6 +114,12 @@ void compaction_flush(lsmtree *lsm, run *r)
 	bool pinning_enable = false;
 #endif
 
+	static int cnt=0;
+	if(cnt>=477){
+		printf("cbb: %d\n", cnt);
+	}
+	printf("cnt: %d\n", cnt++);
+
 	pinning_enable=false;
 
 	run *new_run = __lsm_populate_new_run(lsm, lsm->disk[0]->map_type, pinning_enable ? RUN_PINNING : RUN_NORMAL, r->now_entry_num, 1);
@@ -127,7 +133,7 @@ void compaction_flush(lsmtree *lsm, run *r)
 
 	__compaction_another_level(lsm, 0, false);
 
-	while(gc_check_enough_space(lsm->bm, (lsm->param.memtable_entry_num)/MAX_SECTOR_IN_BLOCK)==false){
+	while(gc_check_enough_space(lsm->bm, ((lsm->param.memtable_entry_num)/MAX_SECTOR_IN_BLOCK)*2)==false){
 		lsm->monitor.force_compaction_cnt++;
 		//__compaction_another_level(lsm, 0, true);
 		run *target=level_get_max_unlinked_run(lsm->disk[lsm->param.total_level_num-1]);

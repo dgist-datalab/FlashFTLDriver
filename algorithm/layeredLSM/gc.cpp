@@ -688,6 +688,7 @@ uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
 
 	list_free(normal_list);
 	list_free(frag_list);
+	list_free(mixed_list);
 	uint32_t res=BPS-bm->reserve_block_idx;
 	bm->now_seg_idx=bm->reserve_seg->seg_idx;
 	bm->now_block_idx=bm->reserve_block_idx;
@@ -821,6 +822,10 @@ out:
 		uint32_t seg_idx=temp_seg_q.front();
 		sm->insert_gc_target(sm, seg_idx);
 		temp_seg_q.pop();
+	}
+
+	if(res==false){
+		printf("free:%u target:%u\n", free_block_num, target_pba_num);
 	}
 	return res;
 }

@@ -70,10 +70,13 @@ char *PS_master_get(PS_master *master, int key){
 }
 
 void PS_master_free_partition(PS_master *master, int key){
+
     uint64_t partition = key / master->block_in_partition;
+
     pthread_mutex_lock(&master->partition_locks[partition]);
     pthread_mutex_lock(&master->queue_lock);
     for(auto it = master->partitiones[partition].begin(); it != master->partitiones[partition].end(); it++){
+        master->slab_deref_count[it->second]=0;
         master->free_slabs.push(it->second);
     }
     pthread_mutex_unlock(&master->queue_lock);
@@ -83,6 +86,7 @@ void PS_master_free_partition(PS_master *master, int key){
 
 void PS_master_free_slab(PS_master*master, uint64_t key){
     uint64_t partition = key / master->block_in_partition;
+   
     pthread_mutex_lock(&master->partition_locks[partition]);
     auto it=master->partitiones[partition].find(key);
     if (it== master->partitiones[partition].end())

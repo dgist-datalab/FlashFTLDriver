@@ -497,7 +497,7 @@ static void *sc_gc_end_req(algo_req *req){
 
 static algo_req *sc_gc_get_algo(sc_gc_node*sgn, uint32_t type){
 	algo_req *res=(algo_req*)malloc(sizeof(algo_req));
-	res->type=GCMR;
+	res->type=type;
 	res->ppa=sgn->ppa;
 	res->value=sgn->value;
 	res->end_req=sc_gc_end_req;
