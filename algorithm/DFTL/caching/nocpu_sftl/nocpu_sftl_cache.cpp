@@ -466,7 +466,7 @@ uint32_t nocpu_sftl_update_from_translation_gc(struct my_cache *, char *data, ui
 	return old_ppa;
 }
 
-void nocpu_sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
+void nocpu_sftl_update_dynamic_size2(struct my_cache *, uint32_t lba, char *data){
 	//if(lba/(PAGESIZE/sizeof(uint32_t))==56){
 	//	GDB_MAKE_BREAKPOINT;
 	//}
@@ -499,6 +499,57 @@ void nocpu_sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data)
 		abort();
 	}
 	nscm.gtd_size[GETGTDIDX(lba)]=(total_head*sizeof(uint32_t)+BITMAPSIZE);
+}
+
+void nocpu_sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
+	//if(lba/(PAGESIZE/sizeof(uint32_t))==56){
+	//	GDB_MAKE_BREAKPOINT;
+	//}
+	uint32_t total_head=0;
+	uint32_t last_ppa=0;
+	uint32_t offset=0;
+	bool sequential_flag=false;
+	uint32_t *ppa_list=(uint32_t*)data;
+
+	uint32_t gtd_idx=GETGTDIDX(lba);
+	nscm.temp_ent[gtd_idx].run_length->clear();
+
+	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
+		if(i==0){
+			last_ppa=ppa_list[i];
+			total_head++;
+			offset=i;
+		}
+		else{
+			sequential_flag=false;
+			if(last_ppa+1==ppa_list[i]){
+				sequential_flag=true;
+			}
+
+			if(sequential_flag){
+				last_ppa++;
+			}
+			else{
+				nscm.temp_ent[gtd_idx].run_length->insert(std::make_pair(offset, i-1));
+				last_ppa=ppa_list[i];
+				total_head++;
+				offset=i;
+			}
+		}
+	}
+
+	nscm.temp_ent[gtd_idx].run_length->insert(std::make_pair(offset, PAGESIZE/sizeof(uint32_t)-1));
+
+	if(total_head!=nscm.temp_ent[gtd_idx].run_length->size()){
+		printf("total_head:%u run_length:%u\n", total_head, nscm.temp_ent[gtd_idx].run_length->size());
+		abort();
+	}
+
+	if(total_head<1 || total_head>PAGESIZE/sizeof(uint32_t)){
+		printf("total_head over or small %s:%d\n", __FILE__, __LINE__);
+		abort();
+	}
+	nscm.gtd_size[GETGTDIDX(lba)]=(nscm.temp_ent[gtd_idx].run_length->size()+nscm.temp_ent[gtd_idx].unpopulated_num)*sizeof(uint32_t)+BITMAPSIZE;
 }
 
 uint32_t nocpu_sftl_get_mapping(struct my_cache *, uint32_t lba){
