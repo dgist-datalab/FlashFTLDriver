@@ -20,6 +20,30 @@ void nocpu_sftl_print_log_idx(my_cache *sc){
        printf("SFTL idx memory:%.2lf\n", (double)total_memory/(RANGE*4));
 }
 
+static bool nocpu_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
+	if(!etr->private_data) return false;
+	nocpu_sftl_cache *nsc=(nocpu_sftl_cache*)((lru_node*)etr->private_data)->data;
+
+	bool target;
+	uint32_t max=PAGESIZE/sizeof(uint32_t);
+	uint32_t last_ppa=0;
+	uint32_t head_idx=0;
+	uint32_t *ppa_array=(uint32_t*)data;
+	uint32_t ppa_array_idx=0;
+	uint32_t offset=0;
+	uint32_t total_head=0;
+	
+
+	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
+		ppa_array[i]=nsc->head_array[i];
+	}
+
+	free(nsc->head_array);
+	lru_delete(nscm.lru, (lru_node*)etr->private_data);
+	etr->private_data=NULL;
+	nscm.now_caching_byte-=nscm.gtd_size[etr->idx];
+}
+
 my_cache nocpu_sftl_cache_func{
 	.init=						nocpu_sftl_init,
 	.free=						nocpu_sftl_free,
@@ -41,7 +65,7 @@ my_cache nocpu_sftl_cache_func{
 	.update_eviction_target_translation=
 										nocpu_sftl_update_eviction_target_translation,
 	.evict_target=NULL,
-	.dump_cache_update=					NULL,
+	.dump_cache_update=					nocpu_dump_cache_update,
 	.load_specialized_meta=				NULL,
 	.update_dynamic_size=				nocpu_sftl_update_dynamic_size,
 	.empty_cache=						nocpu_sftl_empty_cache,
@@ -191,6 +215,12 @@ enum NEXT_STEP{
 uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc, uint32_t *eviction_hint){
 	nocpu_sftl_cache *sc;
 
+	static int cnt=0;
+	if(cnt++==44528008){
+	//	GDB_MAKE_BREAKPOINT;
+	}
+	//printf("ttt :%u\n", cnt++);
+
 	if(lba==1789965){
 		//GDB_MAKE_BREAKPOINT;
 	}
@@ -234,10 +264,12 @@ uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc, u
 		std::map<int,int>::iterator it=sc->run_length->upper_bound(offset);
 		it--;
 		if(it->first > offset){
+			//no consecutive
 			sc->run_length->insert(std::make_pair(offset, offset));
 		}
 		else if(it->second>offset){
 			if(it->first==offset){
+				//update head
 				uint32_t original_end=it->second;
 				it->second=offset;
 				if(offset+1<=original_end){
@@ -245,16 +277,22 @@ uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc, u
 				}
 			}
 			else{
+				//update inside
+
+				//update forward
 				uint32_t original_end=it->second;
 				it->second=offset-1;
 				if(offset+1<=original_end){
+					//insert new for backward
 					sc->run_length->insert(std::make_pair(offset+1, original_end));
 				}
+				//insert target
 				sc->run_length->insert(std::make_pair(offset, offset));
 			}
 		}
-		else{
+		else{ //-->second==offset or no entry for offset
 			if(it->second+1==offset && sc->head_array[offset-1]+1==ppa){
+				//consecutive previous header
 				it->second=offset;
 			}
 			else{
@@ -271,12 +309,32 @@ uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc, u
 
 				if(it->second==offset && it->first!=offset){
 					it->second=offset-1;
+					sc->run_length->insert(std::make_pair(offset, target_end));
 				}
-				else if(it->second==offset){
-					sc->run_length->erase(it);
+				else if(it->second==offset && it->first==offset){
+					if (offset != 0){
+						if (sc->head_array[offset - 1] + 1 == ppa){
+							// update backward
+							std::map<int, int>::iterator prev = it;
+							prev--;
+							if (prev->second + 1 == offset){
+								prev->second = offset;
+							}
+							sc->run_length->erase(it);
+						}
+						else{
+							//do nothing --> same as the original
+						}
+					}
+					else{
+						//do nothing --> same as the original
+					}
+				}
+				else{ 
+					//no entry for offset
+					sc->run_length->insert(std::make_pair(offset, target_end));
 				}
 				
-				sc->run_length->insert(std::make_pair(offset, target_end));
 			}
 		}
 	}
@@ -312,10 +370,17 @@ uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc, u
 }
 extern uint32_t test_ppa;
 uint32_t nocpu_sftl_update_entry(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa, uint32_t *eviction_hint){
+	//if(etr->idx==56 && ppa!=UINT32_MAX){
+	//	GDB_MAKE_BREAKPOINT;
+	//}
+
 	return __update_entry(etr, lba, ppa, false, eviction_hint);
 }
 
 uint32_t nocpu_sftl_update_entry_gc(struct my_cache *, GTD_entry *etr, uint32_t lba, uint32_t ppa){
+	//if(etr->idx==56 && ppa!=UINT32_MAX){
+	//	GDB_MAKE_BREAKPOINT;
+	//}
 	return __update_entry(etr, lba, ppa, true, NULL);
 }
 
@@ -402,6 +467,9 @@ uint32_t nocpu_sftl_update_from_translation_gc(struct my_cache *, char *data, ui
 }
 
 void nocpu_sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
+	//if(lba/(PAGESIZE/sizeof(uint32_t))==56){
+	//	GDB_MAKE_BREAKPOINT;
+	//}
 	uint32_t total_head=0;
 	uint32_t last_ppa=0;
 	bool sequential_flag=false;
