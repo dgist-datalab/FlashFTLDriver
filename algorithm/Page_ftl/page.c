@@ -248,6 +248,8 @@ uint32_t page_write(request *const req){
 }
 
 uint32_t page_remove(request *const req){
+	req->end_req(req);
+	return 0;
 	for(uint8_t i=0; i<a_buffer.idx; i++){
 		if(a_buffer.key[i]==req->key){
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
