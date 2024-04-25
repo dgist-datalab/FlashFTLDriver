@@ -107,6 +107,8 @@ void PS_master_free_slab(PS_master*master, uint64_t key){
 
 bool PS_ismeta_data(uint32_t type){
 	switch(type){
+        case DUMPR:
+        case DUMPW:
 		case MAPPINGR:
 		case MAPPINGW:
 		case GCMR:

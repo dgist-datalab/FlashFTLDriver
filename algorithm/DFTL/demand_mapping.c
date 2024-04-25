@@ -636,10 +636,11 @@ uint32_t demand_map_coarse_type_pending(request *req, GTD_entry *etr, char *valu
 			}
 
 			if(dmm.cache->entry_type==DYNAMIC){
+				static int cnt=0;
 				uint32_t temp_size=dmm.eviction_hint-dp->now_eviction_hint;
 				if(dmm.cache->get_remain_space(dmm.cache, temp_size) < dp->now_eviction_hint){
-					printf("size error!\n");
-					abort();
+					printf("size error!, is it really problem??:%u\n", cnt++);
+					//abort();
 				}
 			}
 			

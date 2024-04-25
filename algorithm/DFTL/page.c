@@ -331,6 +331,7 @@ void *page_end_req(algo_req* input){
 
 extern demand_map_manager dmm;
 uint32_t dftl_empty_cache(){
+	return 1; 
 	printf("emtpy cache!!\n");
 	wait_all_request();
 	update_cache_mapping();

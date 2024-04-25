@@ -22,7 +22,7 @@ void nocpu_sftl_print_log_idx(my_cache *sc){
 
 static bool nocpu_dump_cache_update(struct my_cache *, GTD_entry *etr, char *data){
 	if(!etr->private_data) return false;
-	nocpu_sftl_cache *nsc=(nocpu_sftl_cache*)((lru_node*)etr->private_data)->data;
+	nocpu_sftl_cache *sc=(nocpu_sftl_cache*)((lru_node*)etr->private_data)->data;
 
 	bool target;
 	uint32_t max=PAGESIZE/sizeof(uint32_t);
@@ -32,13 +32,23 @@ static bool nocpu_dump_cache_update(struct my_cache *, GTD_entry *etr, char *dat
 	uint32_t ppa_array_idx=0;
 	uint32_t offset=0;
 	uint32_t total_head=0;
+
 	
 
 	for(uint32_t i=0; i<PAGESIZE/sizeof(uint32_t); i++){
-		ppa_array[i]=nsc->head_array[i];
+		ppa_array[i]=sc->head_array[i];
 	}
 
-	free(nsc->head_array);
+	#ifdef FASTSFTLCPU
+	nscm.temp_ent[etr->idx].head_array=sc->head_array;
+	nscm.temp_ent[etr->idx].run_length=sc->run_length;
+	nscm.temp_ent[etr->idx].etr=sc->etr;
+	nscm.temp_ent[etr->idx].unpopulated_num=sc->unpopulated_num;
+	#else
+	free(sc->head_array);
+	delete sc->run_length;
+	#endif
+
 	lru_delete(nscm.lru, (lru_node*)etr->private_data);
 	etr->private_data=NULL;
 	nscm.now_caching_byte-=nscm.gtd_size[etr->idx];
@@ -167,6 +177,9 @@ inline static nocpu_sftl_cache* get_initial_state_cache(uint32_t gtd_idx, GTD_en
 }
 
 inline static uint32_t get_ppa_from_sc(nocpu_sftl_cache *sc, uint32_t lba){
+	if(sc->head_array==NULL){
+		return nscm.temp_ent[sc->etr->idx].head_array[GETOFFSET(lba)];
+	}
 	return sc->head_array[GETOFFSET(lba)];
 }
 

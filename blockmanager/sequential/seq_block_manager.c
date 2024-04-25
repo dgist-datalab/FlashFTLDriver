@@ -178,13 +178,13 @@ bool sbm_is_gc_needed(blockmanager *bm){
 
 __gsegment* sbm_get_gc_target(blockmanager* bm){
 	sbm_pri *pri=(sbm_pri*)bm->private_data;
-	__gsegment* res=(__gsegment*)malloc(sizeof(__gsegment));
 
 	mh_construct(pri->max_heap);
 	__segment *target=(__segment *)mh_get_max(pri->max_heap);
 	if(target==NULL){
 		return NULL;
 	}
+	__gsegment* res=(__gsegment*)malloc(sizeof(__gsegment));
 
 	memcpy(res->blocks, target->blocks, sizeof(__block*)*BPS);
 	res->seg_idx=target->seg_idx;
