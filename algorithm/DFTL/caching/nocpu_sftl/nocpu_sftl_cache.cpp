@@ -224,6 +224,88 @@ enum NEXT_STEP{
 	DONE, SHRINK, EXPAND
 };
 
+void update_run_length(std::map<int,int> *run_length, uint32_t offset, uint32_t ppa, uint32_t *head_array){
+	if(run_length->size()==0){
+		run_length->insert(std::make_pair(offset, offset));
+	}
+	else{
+		std::map<int,int>::iterator it=run_length->upper_bound(offset);
+		it--;
+		if(it->first > offset){
+			//no consecutive
+			run_length->insert(std::make_pair(offset, offset));
+		}
+		else if(it->second>offset){
+			if(it->first==offset){
+				//update head
+				uint32_t original_end=it->second;
+				it->second=offset;
+				if(offset+1<=original_end){
+					run_length->insert(std::make_pair(offset+1, original_end));
+				}
+			}
+			else{
+				//update inside
+
+				//update forward
+				uint32_t original_end=it->second;
+				it->second=offset-1;
+				if(offset+1<=original_end){
+					//insert new for backward
+					run_length->insert(std::make_pair(offset+1, original_end));
+				}
+				//insert target
+				run_length->insert(std::make_pair(offset, offset));
+			}
+		}
+		else{ //-->second==offset or no entry for offset
+			if(it->second+1==offset && head_array[offset-1]+1==ppa){
+				//consecutive previous header
+				it->second=offset;
+			}
+			else{
+				uint32_t target_end=offset;
+				std::map<int,int>::iterator next=it;
+				next++;
+				if(next!=run_length->end()){
+					uint32_t next_ppa=head_array[next->first];
+					if(next->first==offset+1 && ppa+1==next_ppa){
+						target_end=next->second;
+						run_length->erase(next);
+					}
+				}
+
+				if(it->second==offset && it->first!=offset){
+					it->second=offset-1;
+					run_length->insert(std::make_pair(offset, target_end));
+				}
+				else if(it->second==offset && it->first==offset){
+					if (offset != 0){
+						if (head_array[offset - 1] + 1 == ppa){
+							// update backward
+							std::map<int, int>::iterator prev = it;
+							prev--;
+							if (prev->second + 1 == offset){
+								prev->second = offset;
+							}
+							run_length->erase(it);
+						}
+						else{
+							//do nothing --> same as the original
+						}
+					}
+					else{
+						//do nothing --> same as the original
+					}
+				}
+				else{ 
+					//no entry for offset
+					run_length->insert(std::make_pair(offset, target_end));
+				}
+			}
+		}
+	}
+}
 
 uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc, uint32_t *eviction_hint){
 	nocpu_sftl_cache *sc;
@@ -270,87 +352,7 @@ uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa, bool isgc, u
 	sc->head_array[GETOFFSET(lba)]=ppa;
 
 	int offset=GETOFFSET(lba);
-	if(sc->run_length->size()==0){
-		sc->run_length->insert(std::make_pair(offset, offset));
-	}
-	else{
-		std::map<int,int>::iterator it=sc->run_length->upper_bound(offset);
-		it--;
-		if(it->first > offset){
-			//no consecutive
-			sc->run_length->insert(std::make_pair(offset, offset));
-		}
-		else if(it->second>offset){
-			if(it->first==offset){
-				//update head
-				uint32_t original_end=it->second;
-				it->second=offset;
-				if(offset+1<=original_end){
-					sc->run_length->insert(std::make_pair(offset+1, original_end));
-				}
-			}
-			else{
-				//update inside
-
-				//update forward
-				uint32_t original_end=it->second;
-				it->second=offset-1;
-				if(offset+1<=original_end){
-					//insert new for backward
-					sc->run_length->insert(std::make_pair(offset+1, original_end));
-				}
-				//insert target
-				sc->run_length->insert(std::make_pair(offset, offset));
-			}
-		}
-		else{ //-->second==offset or no entry for offset
-			if(it->second+1==offset && sc->head_array[offset-1]+1==ppa){
-				//consecutive previous header
-				it->second=offset;
-			}
-			else{
-				uint32_t target_end=offset;
-				std::map<int,int>::iterator next=it;
-				next++;
-				if(next!=sc->run_length->end()){
-					uint32_t next_ppa=sc->head_array[next->first];
-					if(next->first==offset+1 && ppa+1==next_ppa){
-						target_end=next->second;
-						sc->run_length->erase(next);
-					}
-				}
-
-				if(it->second==offset && it->first!=offset){
-					it->second=offset-1;
-					sc->run_length->insert(std::make_pair(offset, target_end));
-				}
-				else if(it->second==offset && it->first==offset){
-					if (offset != 0){
-						if (sc->head_array[offset - 1] + 1 == ppa){
-							// update backward
-							std::map<int, int>::iterator prev = it;
-							prev--;
-							if (prev->second + 1 == offset){
-								prev->second = offset;
-							}
-							sc->run_length->erase(it);
-						}
-						else{
-							//do nothing --> same as the original
-						}
-					}
-					else{
-						//do nothing --> same as the original
-					}
-				}
-				else{ 
-					//no entry for offset
-					sc->run_length->insert(std::make_pair(offset, target_end));
-				}
-				
-			}
-		}
-	}
+	update_run_length(sc->run_length, offset, ppa, sc->head_array);
 
 	if(old_ppa==UINT32_MAX && sc->unpopulated_num){
 		sc->unpopulated_num--;
@@ -475,6 +477,9 @@ uint32_t nocpu_sftl_update_from_translation_gc(struct my_cache *, char *data, ui
 
 	nscm.temp_ent[GETGTDIDX(lba)].head_array[GETOFFSET(lba)]=ppa;
 	real_mapping[lba]=ppa;
+	
+	uint32_t gtd_idx=GETGTDIDX(lba);
+	update_run_length(nscm.temp_ent[gtd_idx].run_length, GETOFFSET(lba), ppa, nscm.temp_ent[gtd_idx].head_array);
 
 	return old_ppa;
 }
@@ -515,6 +520,7 @@ void nocpu_sftl_update_dynamic_size2(struct my_cache *, uint32_t lba, char *data
 }
 
 void nocpu_sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data){
+	return;
 	//if(lba/(PAGESIZE/sizeof(uint32_t))==56){
 	//	GDB_MAKE_BREAKPOINT;
 	//}
@@ -543,7 +549,7 @@ void nocpu_sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data)
 				last_ppa++;
 			}
 			else{
-				nscm.temp_ent[gtd_idx].run_length->insert(std::make_pair(offset, i-1));
+				//nscm.temp_ent[gtd_idx].run_length->insert(std::make_pair(offset, i-1));
 				last_ppa=ppa_list[i];
 				total_head++;
 				offset=i;
@@ -551,16 +557,16 @@ void nocpu_sftl_update_dynamic_size(struct my_cache *, uint32_t lba, char *data)
 		}
 	}
 
-	nscm.temp_ent[gtd_idx].run_length->insert(std::make_pair(offset, PAGESIZE/sizeof(uint32_t)-1));
+	//nscm.temp_ent[gtd_idx].run_length->insert(std::make_pair(offset, PAGESIZE/sizeof(uint32_t)-1));
 
 	if(total_head!=nscm.temp_ent[gtd_idx].run_length->size()){
-		printf("total_head:%u run_length:%u\n", total_head, nscm.temp_ent[gtd_idx].run_length->size());
-		abort();
+		//printf("total_head:%u run_length:%u\n", total_head, nscm.temp_ent[gtd_idx].run_length->size());
+		//abort();
 	}
 
 	if(total_head<1 || total_head>PAGESIZE/sizeof(uint32_t)){
-		printf("total_head over or small %s:%d\n", __FILE__, __LINE__);
-		abort();
+		//printf("total_head over or small %s:%d\n", __FILE__, __LINE__);
+		//abort();
 	}
 	nscm.gtd_size[GETGTDIDX(lba)]=(nscm.temp_ent[gtd_idx].run_length->size()+nscm.temp_ent[gtd_idx].unpopulated_num)*sizeof(uint32_t)+BITMAPSIZE;
 }
