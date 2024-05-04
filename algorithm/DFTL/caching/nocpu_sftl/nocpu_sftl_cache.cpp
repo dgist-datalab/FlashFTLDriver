@@ -481,6 +481,9 @@ uint32_t nocpu_sftl_update_from_translation_gc(struct my_cache *, char *data, ui
 	uint32_t gtd_idx=GETGTDIDX(lba);
 	update_run_length(nscm.temp_ent[gtd_idx].run_length, GETOFFSET(lba), ppa, nscm.temp_ent[gtd_idx].head_array);
 
+
+	nscm.gtd_size[gtd_idx]=(nscm.temp_ent[gtd_idx].run_length->size()+nscm.temp_ent[gtd_idx].unpopulated_num)*sizeof(uint32_t)+BITMAPSIZE;
+
 	return old_ppa;
 }
 
