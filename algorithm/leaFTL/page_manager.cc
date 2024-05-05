@@ -89,7 +89,7 @@ static void validate_ppa(blockmanager *bm, uint32_t ppa, KEYT *lba, uint32_t max
     for(uint32_t i=0; i<max_idx; i++){
         bm->bit_set(bm, ppa*L2PGAP+i);
         if(lba[i]==test_key){
-            printf("%u is mapped to %u\n", lba[i], ppa*L2PGAP+i);
+            //printf("%u is mapped to %u\n", lba[i], ppa*L2PGAP+i);
         }
     }
     bm->set_oob(bm, (char*)lba, sizeof(uint32_t) * max_idx, ppa);

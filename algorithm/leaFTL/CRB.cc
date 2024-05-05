@@ -1,8 +1,29 @@
 #include "./CRB.h"
 #include "../../include/debug_utils.h"
 #include <algorithm>
+#include <set>
+#include <unordered_set>
 extern bool leaFTL_debug;
+
+bool init_flag=false;
+#define MAPINTRANS ((PAGESIZE/sizeof(uint32_t)))
+#define TRANSMAPNUM ((SHOWINGSIZE/PAGESIZE*L2PGAP)/(MAPINTRANS))
+
+std::vector<std::unordered_set<uint32_t>> master_crb;
+void master_crb_init(){
+    master_crb=std::vector<std::unordered_set<uint32_t>>();
+    
+    for(uint32_t i=0; i<TRANSMAPNUM; i++){
+        master_crb.push_back(std::unordered_set<uint32_t>());
+    }
+}
+
 CRB *crb_init(){
+    if(init_flag==false){
+        master_crb_init();
+        init_flag=true;
+    }
+
     CRB *res=new CRB();
     return res;
 }
@@ -80,7 +101,11 @@ lba_buffer* remove_overlap_CRBnode(lba_buffer *lba_arr, temp_map *tmap){
     return res;
 }
 
-void crb_remove_overlap(CRB *crb, temp_map *tmap, std::vector<CRB_node>* update_target){
+void crb_remove_overlap(CRB *crb, temp_map *tmap, std::vector<CRB_node>* update_target, uint32_t group_idx){
+    for(uint32_t i=0; i<tmap->size; i++){
+        master_crb[group_idx].erase(tmap->lba[i]);
+    }
+    return;
     uint32_t end=tmap->lba[tmap->size-1];
     CRB_iter iter=crb_find_start_ptr(crb, tmap->lba[0]);
     std::vector<CRB_node*> new_target;
@@ -129,12 +154,17 @@ void crb_remove_overlap(CRB *crb, temp_map *tmap, std::vector<CRB_node>* update_
     }
 }
 
-void crb_insert(CRB *crb, temp_map *tmap, segment *seg, std::vector<CRB_node> *update_target){
+void crb_insert(CRB *crb, temp_map *tmap, segment *seg, std::vector<CRB_node> *update_target, uint32_t group_idx){
+    for(uint32_t i=0; i<tmap->size; i++){
+        master_crb[group_idx].insert(tmap->lba[i]);
+    }
+    return;
+
     CRB_node *new_node=(CRB_node*)malloc(sizeof(CRB_node));
     new_node->lba_arr=new lba_buffer(tmap->lba, tmap->lba+tmap->size);
     new_node->seg=seg;
 
-    crb_remove_overlap(crb, tmap, update_target);
+    crb_remove_overlap(crb, tmap, update_target, group_idx);
 
     std::pair<CRB_iter, bool> temp=crb->insert(std::pair<uint32_t, CRB_node*>(seg->start, new_node));
     if(temp.second==false){
@@ -154,11 +184,34 @@ void crb_free(CRB *crb){
     delete crb;
 }
 
-uint64_t crb_size(CRB *crb){
+uint64_t crb_size(CRB *crb, uint32_t group_id){
+    if(master_crb[group_id].size()>PAGESIZE/sizeof(uint32_t)){
+        printf("??? %u\n", master_crb[group_id].size());
+        abort();
+    }
+    return master_crb[group_id].size()*4;
+
     uint64_t res=0;
     CRB_iter iter=crb->begin();
     for(; iter!=crb->end(); iter++){
         res+=iter->second->lba_arr->size()*4;
     }
     return res;
+}
+
+void master_crb_clean(uint32_t group_idx){
+    master_crb[group_idx].clear();
+}
+
+
+void master_crb_insert(uint32_t *lba, uint32_t size, uint32_t group_idx){
+    for(uint32_t i=0; i<size; i++){
+        master_crb[group_idx].insert(lba[i]);
+    }
+}
+
+void master_crb_remove(uint32_t *lba, uint32_t size, uint32_t group_idx){
+    for(uint32_t i=0; i<size; i++){
+        master_crb[group_idx].erase(lba[i]);
+    }
 }

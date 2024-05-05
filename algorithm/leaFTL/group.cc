@@ -338,10 +338,10 @@ static void group_segment_update(group *gp, level *lev, temp_map *tmap, segment 
 
     std::vector<CRB_node> update_target_node;
     if(new_seg->type==SEGMENT_TYPE::APPROXIMATE){
-        crb_insert(gp->crb, tmap, new_seg, &update_target_node);
+        crb_insert(gp->crb, tmap, new_seg, &update_target_node, gp->map_idx);
     }
     else{
-        crb_remove_overlap(gp->crb, tmap, &update_target_node);
+        crb_remove_overlap(gp->crb, tmap, &update_target_node, gp->map_idx);
     }
 
     if(update_target_node.size()){
@@ -420,7 +420,7 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
     godown.clear();
     uint32_t size=0;
     size+=group_level_size(gp->level_list->at(0));
-    size+=crb_size(gp->crb);
+    size+=crb_size(gp->crb, gp->map_idx);
     gp->size-=size;
     cache_size_update(gp, size, true);
 
@@ -432,7 +432,7 @@ void group_insert(group *gp, temp_map *tmap, SEGMENT_TYPE type, int32_t interval
 
     size=0;
     size+=group_level_size(gp->level_list->at(0));
-    size+=crb_size(gp->crb);
+    size+=crb_size(gp->crb, gp->map_idx);
     gp->size+=size;
     gp->segment_num+=gp->level_list->at(0)->size();
     now_segment_num+=gp->level_list->at(0)->size();
@@ -485,6 +485,8 @@ segment *map_make_segment_wrapper(uint32_t *lba, uint32_t *piece_ppa, uint32_t s
 
 uint32_t temp_lba[MAPINTRANS];
 level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
+    //master_crb_clean(gp->map_idx);
+
     if(gp->map_idx==test_key/MAPINTRANS){
         printf("target %u compacted\n", test_key);
     }
@@ -518,6 +520,10 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
         else{
             segment *target=map_make_segment_wrapper(&lba[start_idx], &piece_ppa[start_idx], target_size);
             level_link_seg(res, target);
+
+            if(target->type==SEGMENT_TYPE::ACCURATE){
+                master_crb_remove(&lba[start_idx], target_size, gp->map_idx);
+            }
             
 
             if(piece_ppa[i]==INITIAL_STATE_PADDR){
@@ -539,6 +545,9 @@ level* map_to_onelevel(group *gp, uint32_t *t_lba, uint32_t *piece_ppa){
     if(have_remain){
         segment *target=map_make_segment_wrapper(&lba[start_idx], &piece_ppa[start_idx], target_size);
         level_link_seg(res, target);
+        if(target->type==SEGMENT_TYPE::ACCURATE){
+            master_crb_remove(&lba[start_idx], target_size, gp->map_idx);
+        }
     }
 
     return res;
@@ -551,6 +560,7 @@ void group_from_translation_map(group *gp, uint32_t *lba, uint32_t *piece_ppa, u
     gp->segment_num=new_level->size();
     now_segment_num+=gp->segment_num;
     gp->size=group_level_size(new_level);
+    gp->size+=crb_size(gp->crb, idx);
     after_compaction_size[idx]=gp->size;
     gp->level_list->push_back(new_level);
 }

@@ -600,7 +600,7 @@ uint32_t *lea_gp_to_mapping(group *gp){
     return &exact_map[gp->map_idx*MAPINTRANS];
 #else
     for(uint32_t i=0; i<MAPINTRANS; i++){
-        compaction_temp_map->lba[i]=gp->map_idx*MAPINTRANS+i;
+        //compaction_temp_map->lba[i]=gp->map_idx*MAPINTRANS+i;
     }
     lea_mapping_find_exact_piece_ppa(compaction_temp_map, false, NULL, true);
     group_from_translation_map(gp, compaction_temp_map->lba, compaction_temp_map->piece_ppa, gp->map_idx);
@@ -613,9 +613,7 @@ void lea_compaction(){
 	printf("compaction start!\n");
     for(uint32_t idx=0; idx<TRANSMAPNUM ;idx++){
         group *gp=&main_gp[idx];
-        if(gp->cache_flag==CACHE_FLAG::UNCACHED){
-            continue;
-        }
+
         if(gp->level_list==NULL || gp->level_list->size()<=1){
             continue;
         }
@@ -627,6 +625,10 @@ void lea_compaction(){
         lea_mapping_find_exact_piece_ppa(compaction_temp_map, false, NULL, false);
 
         group_from_translation_map(gp, compaction_temp_map->lba, compaction_temp_map->piece_ppa, gp->map_idx);
+
+        if(gp->cache_flag==CACHE_FLAG::UNCACHED){
+            continue;
+        }
         new_lru_now_byte+=gp->size;
     }
     lru_now_byte=new_lru_now_byte;
