@@ -12,6 +12,7 @@ typedef struct tree_map{
 }tree_map;
 
 map_function*	tree_map_init(uint32_t contents_num, float fpr);
+uint32_t 		tree_lookup(map_function *m, uint32_t lba);
 uint32_t		tree_insert(map_function *m, uint32_t lba, uint32_t offset);
 uint32_t		tree_query(map_function *m, uint32_t lba, map_read_param ** param);
 uint32_t		tree_query_retry(map_function *m, map_read_param *param);
