@@ -302,6 +302,18 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 	//lsmtree_calculate_parameter2(fpr, target_bit, RANGE*target_bit/100*memory_usage,RANGE);
 
 	lsmtree_parameter param=lsmtree_calculate_parameter(fpr, target_bit, RANGE*target_bit/100*total_memory_usage,RANGE, cache_flag?true:false);
+
+	printf("LSM-tree figure fix!\n");
+	param.size_factor=15;
+	param.memtable_entry_num=74240;
+	param.total_level_num=2;
+
+	param.BF_level_range.start=1;
+	param.BF_level_range.end=1;
+
+	param.PLR_level_range.start=2;
+	param.PLR_level_range.end=param.total_level_num;
+
 	param.memory_limit=RANGE*target_bit/8*memory_usage/100;
 	lsmtree_print_param(param);
 	//param.cache_flag=cache_flag?true:false;

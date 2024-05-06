@@ -29,10 +29,27 @@ static inline uint32_t __set_read_flag(mm_container *mm_set, uint32_t run_num, u
 	return res;
 } 
 
-static inline void __invalidate_target(run *r, uint32_t piece_ppa, bool force){
-	if(piece_ppa==UNLINKED_PSA) return;
+static inline void __invalidate_target(run *r, uint32_t lba, uint32_t t_piece_ppa, bool force, uint32_t t_ste_num){
+	static int cnt=0;
+	static uint64_t call_cnt=0;
+	if(t_piece_ppa==UNLINKED_PSA) return;
+
+	call_cnt++;
+	uint32_t ste_num=t_ste_num;
+	uint32_t piece_ppa;
+	if(r->type==RUN_LOG){
+		uint32_t global_offset=r->run_log_mf->lookup(r->run_log_mf, lba);
+		piece_ppa=st_array_convert_global_offset_to_psa(r->st_body, global_offset);
+	}
+	else{
+		piece_ppa=st_array_read_translation(r->st_body, ste_num, t_piece_ppa%MAX_SECTOR_IN_BLOCK);
+	}
 	if(invalidate_piece_ppa(r->st_body->bm->segment_manager, piece_ppa, force)==BIT_ERROR){
-		EPRINT("BIT ERROR piece_ppa: %u", true, piece_ppa);
+		cnt++;
+		printf("run type:%u\n", r->type);
+		EPRINT("BIT ERROR piece_ppa: %u, %lu", true, piece_ppa, call_cnt);
+		//printf("BIT ERROR piece_ppa: %u, %u", piece_ppa, cnt);
+		//EPRINT("BIT ERROR piece_ppa: %u", true, piece_ppa);
 	}
 }
 
@@ -65,7 +82,7 @@ static inline uint32_t __move_iter(mm_container *mm_set, uint32_t run_num, uint3
 
 				}
 				else{
-					__invalidate_target(mm_set[i].r, res.piece_ppa, false);
+					__invalidate_target(mm_set[i].r, res.lba, res.piece_ppa, false, now_ste_num);
 				}
 			}
 
@@ -123,7 +140,7 @@ retry:
 
 		}
 		else{
-			__invalidate_target(mm_set[t_idx].r, res.piece_ppa, false);
+			__invalidate_target(mm_set[t_idx].r, res.lba, res.piece_ppa, false, now_ste_num);
 		}
 		__move_iter_target(mm_set, t_idx);
 		res.lba=UINT32_MAX;
@@ -144,7 +161,7 @@ retry:
 
 			}
 			else{
-				__invalidate_target(mm_set[t_idx].r, res.piece_ppa, false);
+				__invalidate_target(mm_set[t_idx].r, res.lba, res.piece_ppa, false, now_ste_num);
 			}
 			__move_iter_target(mm_set, t_idx);
 			res.lba = UINT32_MAX;
@@ -252,7 +269,7 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			if(t_pair->r->st_body->type==ST_PINNING){
 				t_pair->original_psa = __get_original_psa(t_pair);
 			}
-			__invalidate_target(t_pair->r, t_pair->original_psa, true);
+			__invalidate_target(t_pair->r, t_pair->pair.lba, t_pair->original_psa, true, t_pair->ste);
 		}
 	}
 
@@ -268,7 +285,7 @@ static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_
 			t_pair->original_psa = __get_original_psa(t_pair);
 			if (!run_insert(r, t_pair->pair.lba, t_pair->original_psa, NULL, COMPACTIONDATAW, shortcut ,NULL))
 			{
-				__invalidate_target(t_pair->r, t_pair->original_psa, true);
+				__invalidate_target(t_pair->r, t_pair->pair.lba,t_pair->original_psa, true, t_pair->ste);
 			}
 			sorted_list->erase(iter++);
 		}

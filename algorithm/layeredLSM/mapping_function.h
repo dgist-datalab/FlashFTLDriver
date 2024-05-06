@@ -46,6 +46,7 @@ typedef struct {
 }map_param;
 
 typedef struct map_function{
+	uint32_t (*lookup)(struct map_function *m, uint32_t lba);
 /*
  * Function: map_insert
  * --------------------- 
