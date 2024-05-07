@@ -37,8 +37,9 @@ static inline void __invalidate_target(run *r, uint32_t lba, uint32_t t_piece_pp
 	call_cnt++;
 	uint32_t ste_num=t_ste_num;
 	uint32_t piece_ppa;
+	uint32_t global_offset;
 	if(r->type==RUN_LOG){
-		uint32_t global_offset=r->run_log_mf->lookup(r->run_log_mf, lba);
+		global_offset=r->run_log_mf->lookup(r->run_log_mf, lba);
 		piece_ppa=st_array_convert_global_offset_to_psa(r->st_body, global_offset);
 	}
 	else{

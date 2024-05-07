@@ -7,8 +7,14 @@ test:
 2test: plr_test2.cpp
 	g++ -g -O3 -o 2test plr.cpp plr_test2.cpp
 
+3test: plr_test3.cpp
+	g++ -g -O3 -o 3test plr.cpp plr_test3.cpp
+
 temp_test: test.cpp
 	g++ -g -O3 -o temp_test test.cpp
 
 param:
 	g++ -DPARAM -O2 -o plr plr.cpp plr_test.cpp
+
+clean:
+	rm 2test 3test

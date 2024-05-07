@@ -115,6 +115,7 @@ void compaction_flush(lsmtree *lsm, run *r)
 #endif
 
 	static int cnt=0;
+
 	if(cnt>=477){
 		printf("cbb: %d\n", cnt);
 	}

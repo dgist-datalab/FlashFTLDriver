@@ -1,5 +1,6 @@
 #include "./plr_mapping.h"
 
+static uint32_t plr_target_range[]={5, 35, 80, 140, 190};
 map_function *plr_map_init(uint32_t contents_num, float fpr){
 	map_function *res=(map_function*)calloc(1, sizeof(map_function));
 	res->insert=plr_map_insert;
@@ -13,7 +14,8 @@ map_function *plr_map_init(uint32_t contents_num, float fpr){
 	res->free=plr_map_free;
 
 	plr_map *pmap=(plr_map*)calloc(1, sizeof(plr_map));
-	uint32_t range=fpr*100/2;
+	uint32_t target_idx=(fpr*100)/10-1;
+	uint32_t range=plr_target_range[target_idx];
 	pmap->plr_body=new PLR((uint64_t)SLOPE_BIT, range);
 
 	res->private_data=(void*)pmap;

@@ -13,7 +13,7 @@ static uint32_t test_piece_ppa=UINT32_MAX;
 static void __debug_check(blockmanager *bm, uint32_t piece_ppa, 
 		bool valid, bool map){
 	if(test_piece_ppa==UINT32_MAX) return;
-	if(test_piece_ppa==piece_ppa ||  piece_ppa==5049858){
+	if(test_piece_ppa==piece_ppa){
 		static int cnt=0;
 		uint32_t lba=print_lba_from_piece_ppa(bm, piece_ppa);
 		printf("%u %u lba=%u: (map:%u)",++cnt, piece_ppa, lba, map);

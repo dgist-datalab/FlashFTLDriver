@@ -305,7 +305,7 @@ uint32_t lsmtree_argument_set(int argc, char **argv){
 
 	printf("LSM-tree figure fix!\n");
 	param.size_factor=15;
-	param.memtable_entry_num=74240;
+	//param.memtable_entry_num=74240;
 	param.total_level_num=2;
 
 	param.BF_level_range.start=1;

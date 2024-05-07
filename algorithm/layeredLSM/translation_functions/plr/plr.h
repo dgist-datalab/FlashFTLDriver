@@ -7,6 +7,8 @@
 #include <memory.h>
 //using namespace std;
 
+
+
 struct dot {
 	__int128_t x;
 	__int128_t y;

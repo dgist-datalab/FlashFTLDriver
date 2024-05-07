@@ -11,14 +11,8 @@
 #define LIMIT_ROUND 1000
 
 int main(){
-	
 	srand(time(NULL));
 	std::set<uint32_t>* lba_set=new std::set<uint32_t>();
-
-	PLR temp_plr(7,5);
-	temp_plr.insert(1,0);
-	temp_plr.insert_end();
-	//printf("line %u\n", temp_plr.get_line_cnt());
 
 	double prev_merged_entry=0;
 	for(uint32_t i=1; i<=LIMIT_ROUND; i++){
@@ -46,7 +40,7 @@ int main(){
 		if(prev_merged_entry < now_merged_entry){
 			prev_merged_entry=now_merged_entry;
 		}
-		printf("%u %.2f %lu %.2f\n",i, (double)LIMIT_LBA_NUM/plr->get_line_cnt(), plr->get_line_cnt(), (double)plr->get_normal_memory_usage(64)/LIMIT_LBA_NUM);
+		//printf("%u %.2f %lu %.2f\n",i, (double)LIMIT_LBA_NUM/plr->get_line_cnt(), plr->get_line_cnt(), (double)plr->get_normal_memory_usage(64)/LIMIT_LBA_NUM);
 
 		//printf("%u %.2f %.2f\n",i, (double)plr->memory_usage(48)/LIMIT_LBA_NUM, (double)plr->get_normal_memory_usage(48)/LIMIT_LBA_NUM);
 		//printf("entry per line: %.2f (%u)\n", (double)LIMIT_LBA_NUM/plr->get_line_cnt(), plr->get_line_cnt());

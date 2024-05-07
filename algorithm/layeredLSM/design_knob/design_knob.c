@@ -10,7 +10,7 @@
 #include "../../../include/settings.h"
 #include "../../../include/utils/thpool.h"
 #include "../translation_functions/bf_guard_mapping.h"
-#define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriver/algorithm/layeredLSM/design_knob"
+#define DIR_PATH "/home/kukania/APX/FlashFTLDriver/algorithm/layeredLSM/design_knob"
 
 double *plr_dp;
 double *line_per_chunk;
