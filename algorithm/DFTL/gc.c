@@ -16,6 +16,10 @@ uint32_t test_ppa2=UINT32_MAX;
 
 uint32_t now_gc_target=UINT32_MAX;
 uint32_t prev_gc_target=UINT32_MAX;
+
+uint32_t now_map_seg=0;
+uint32_t now_data_seg=0;
+uint32_t max_data_seg=0;
 char **backtrace_check[_PPS*L2PGAP];
 
 pm_body *pm_body_create(blockmanager *bm){
@@ -30,6 +34,11 @@ pm_body *pm_body_create(blockmanager *bm){
 	res->map_reserve=bm->get_segment(bm, BLOCK_RESERVE);
 	res->seg_type_checker[res->map_active->seg_idx]=MAPSEG;
 	res->seg_type_checker[res->map_reserve->seg_idx]=MAPSEG;
+
+	printf("MAX_MAP_SEG:%u %u\n", MAX_MAP_SEG, MAX_TMAP_NUM);
+	max_data_seg=_NOS-MAX_MAP_SEG;
+	now_map_seg+=2;
+	now_data_seg+=2;
 	return res;
 }
 
@@ -304,7 +313,7 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	blockmanager *bm=demand_ftl.bm;
 	/*you can check if the gc is needed or not, using this condition*/
 	if(demand_ftl.bm->check_full(p->active)){
-		if(demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
+		if(now_data_seg>=max_data_seg || demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 			demand_ftl.bm->is_gc_needed(demand_ftl.bm);
 			do_gc();//call gc
 		}
@@ -324,6 +333,7 @@ retry:
 						bm->seg_invalidate_piece_num(bm, i));
 			}
 		}
+		now_data_seg++;
 		p->seg_type_checker[p->active->seg_idx]=DATASEG;
 		goto retry;
 	}

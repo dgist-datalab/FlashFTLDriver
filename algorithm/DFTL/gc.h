@@ -3,6 +3,9 @@
 #include "../../interface/interface.h"
 #include "demand_mapping.h"
 
+#define MAX_TMAP_NUM ((GTDNUM))
+#define MAX_MAP_SEG ((CEIL(MAX_TMAP_NUM, _PPS)+1))
+
 enum{
 	DATASEG, MAPSEG
 };

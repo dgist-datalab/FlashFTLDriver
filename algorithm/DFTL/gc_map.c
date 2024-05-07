@@ -6,6 +6,9 @@ extern uint32_t test_ppa;
 extern uint32_t test_key;
 extern demand_map_manager dmm;
 
+
+extern uint32_t now_map_seg;
+
 void invalidate_map_ppa(uint32_t piece_ppa){
 #ifdef DFTL_DEBUG
 	printf("map invalidate :%u\n", piece_ppa);
@@ -30,7 +33,7 @@ void validate_map_ppa(uint32_t piece_ppa, KEYT gtd_idx){
 ppa_t get_map_ppa(KEYT gtd_idx, bool *gc_triggered){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
-	if(demand_ftl.bm->check_full(p->map_active) && demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
+	if(demand_ftl.bm->check_full(p->map_active) && (demand_ftl.bm->is_gc_needed(demand_ftl.bm))){
 		do_map_gc();//call gc
 		if(gc_triggered){
 			*gc_triggered=true;
@@ -43,6 +46,7 @@ retry:
 		p->map_active=demand_ftl.bm->get_segment(demand_ftl.bm, BLOCK_ACTIVE); //get a new block
 		//p->map_active=demand_ftl.bm->get_segment(demand_ftl.bm, false); //get a new block
 		p->seg_type_checker[p->map_active->seg_idx]=MAPSEG;
+		now_map_seg++;
 		goto retry;
 	}
 	/*
@@ -146,9 +150,11 @@ void do_map_gc(){
 
 finish:
 	bm->trim_segment(bm,target); //erase a block
+	now_map_seg--;
 	p->map_active=p->map_reserve;//make reserved to active block
 	bm->change_reserve_to_active(bm, p->map_reserve);
 	p->map_reserve=bm->get_segment(bm, BLOCK_RESERVE);//get new reserve block from block_manager
+	now_map_seg++;
 	p->seg_type_checker[p->map_reserve->seg_idx]=MAPSEG;
 	if(temp_list){
 		list_free(temp_list);
