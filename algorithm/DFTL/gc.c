@@ -313,7 +313,7 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	blockmanager *bm=demand_ftl.bm;
 	/*you can check if the gc is needed or not, using this condition*/
 	if(demand_ftl.bm->check_full(p->active)){
-		if(now_data_seg>=max_data_seg || demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
+		if(demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 			demand_ftl.bm->is_gc_needed(demand_ftl.bm);
 			do_gc();//call gc
 		}
