@@ -202,7 +202,11 @@ static value_set* __merge_issue_req(__sorted_pair *sort_pair){
 }
 
 uint32_t __get_original_psa(__sorted_pair *pair){
-	if(pair->r->st_body->pinning_data){
+	if(pair->r->type==RUN_LOG){
+		uint32_t global_offset=pair->r->run_log_mf->lookup(pair->r->run_log_mf, pair->pair.lba);
+		return st_array_convert_global_offset_to_psa(pair->r->st_body, global_offset);
+	}
+	else if(pair->r->st_body->pinning_data){
 		uint32_t idx;
 		if(pair->ste==UINT32_MAX){
 			idx=pair->intra_idx;

@@ -119,6 +119,10 @@ static uint8_t convert_type(uint8_t type) {
 
 void data_copy_from(uint32_t ppa, char *data, uint32_t type){
 #ifdef COPYMETA_ONLY
+	if(!seg_table[ppa].populate){
+		printf("%u not populated!\n", ppa );
+		abort();	
+	}
 	if(PS_ismeta_data(type)){
 		char *saved_data=PS_master_get(ps_master, ppa);
 		if(data==NULL){
@@ -140,6 +144,13 @@ void data_copy_from(uint32_t ppa, char *data, uint32_t type){
 
 void data_copy_to(uint32_t ppa, char *data, uint32_t type){
 #ifdef COPYMETA_ONLY
+	if(!seg_table[ppa].populate){
+		seg_table[ppa].populate=true;
+	}
+	else{
+		printf("cannot write! plz write before erase!\n");
+		abort();
+	}
 	if(PS_ismeta_data(type)){
 		PS_master_insert(ps_master, ppa, data);
 	}
@@ -266,6 +277,7 @@ static uint32_t posix_create_body(lower_info *li){
 	seg_table = (mem_seg*)malloc(sizeof(mem_seg)*li->NOP);
 	for(uint32_t i = 0; i < li->NOP; i++){
 		seg_table[i].storage = NULL;
+		seg_table[i].populate=false;
 	}
 	pthread_mutex_init(&fd_lock,NULL);
 #ifdef LASYNC
@@ -484,6 +496,7 @@ void *posix_trim_block(uint32_t _PPA){
 		}
 
 		seg_table[i].storage=NULL;
+		seg_table[i].populate=false;
 	}
 	return NULL;
 }
