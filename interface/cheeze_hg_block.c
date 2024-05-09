@@ -15,7 +15,7 @@ extern master_processor mp;
 #define TRACE_DEV_SIZE (128ULL * 1024L * 1024L * 1024L)
 #define CRC_BUFSIZE (2ULL * 1024L * 1024L)
 
-static uint64_t PHYS_ADDR=0x2800000000;
+static uint64_t PHYS_ADDR=0xb000000000;
 static void *page_addr;
 static uint8_t *send_event_addr; // CHEEZE_QUEUE_SIZE ==> 16B
 static uint8_t *recv_event_addr; // 16B
