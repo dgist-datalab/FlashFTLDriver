@@ -1638,20 +1638,23 @@ uint32_t demand_map_some_update(mapping_entry *target, uint32_t idx){ //for gc
 	
 
 	list_node *now, *nxt;
+	struct timeval start, end;
+	uint64_t time1=0, time2=0;
 	while(temp_list->size){
 		for_each_list_node_safe(temp_list, now, nxt){
 			gmv=(gc_map_value*)now->data;
 			if(!gmv->isdone) continue;
 
 			gtd_idx=gmv->gtd_idx;
+
 			for(uint32_t i=gmv->start_idx;  i<idx && GETGTDIDX(target[i].lba)==gtd_idx; i++){
 				dmm.cache->update_from_translation_gc(dmm.cache, gmv->value->value, target[i].lba, target[i].ppa);	
 			}
-			
+
 			if(dmm.cache->entry_type==DYNAMIC){
 				dmm.cache->update_dynamic_size(dmm.cache, gtd_idx*PAGESIZE/sizeof(uint32_t), gmv->value->value);
 			}
-			
+
 			invalidate_map_ppa(dmm.GTD[gtd_idx].physical_address);
 			uint32_t new_ppa=get_map_ppa(gtd_idx, NULL);
 			dmm.GTD[gtd_idx].physical_address=new_ppa*L2PGAP;
@@ -1691,7 +1694,8 @@ static void print_help(){
 		printf("\t%d: %s\n", i, cache_type((cache_algo_type)i));
 	}
 }
-
+extern uint32_t map_seg_limit;
+extern bool limit_map_seg;
 uint32_t demand_argument(int argc, char **argv){
 	bool cache_size=false;
 	bool cache_type_set=false;
@@ -1703,7 +1707,8 @@ uint32_t demand_argument(int argc, char **argv){
 	uint32_t physical_page_num;
 	double cache_percentage;
 	cache_algo_type c_type;
-	while((c=getopt(argc,argv,"ctph"))!=-1){
+	limit_map_seg=false;
+	while((c=getopt(argc,argv,"ctphl"))!=-1){
 		switch(c){
 			case 'h':
 				print_help();
@@ -1730,6 +1735,10 @@ uint32_t demand_argument(int argc, char **argv){
 				cache_percentage=atof(argv[optind])/100;
 				physical_page_num=(SHOWINGSIZE/K) * cache_percentage;
 				physical_page_num/=PAGESIZE;
+				break;
+			case 'l':
+				map_seg_limit=atoi(argv[optind]);
+				limit_map_seg=true;
 				break;
 			default:
 				print_help();

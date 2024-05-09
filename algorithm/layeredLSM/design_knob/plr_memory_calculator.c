@@ -2,9 +2,9 @@
 #include "../translation_functions/plr/plr.h"
 #include <stdlib.h>
 #include <set>
+static uint32_t plr_target_range[]={5, 35, 80, 140, 190};
 using namespace std;
 uint32_t *random_seq;
-
 void plr_memory_calc_init(uint32_t DEV_size){
 	random_seq=(uint32_t*)malloc(sizeof(uint32_t)*DEV_size);
 	for(uint32_t i=0; i<DEV_size; i++){
@@ -62,7 +62,7 @@ double plr_memory_calc_avg(uint32_t entry_num, uint32_t target_bit,
 
 	qsort(target, entry_num, sizeof(uint32_t), compare);
 
-	PLR *plr=new PLR(8,error/2);
+	PLR *plr=new PLR(8,plr_target_range[error/10-1]);
 	for(uint32_t i=0; i<entry_num; i++){
 		plr->insert(target[i], wiskey?i:i/4);
 	}

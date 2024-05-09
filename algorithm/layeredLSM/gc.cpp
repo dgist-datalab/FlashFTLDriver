@@ -236,6 +236,7 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 			uint32_t page=bidx*_PPB+i;
 			bool read_flag=false;
 			for(uint32_t j=0; j<L2PGAP; j++){
+
 				if(sm->is_invalid_piece(sm, page*L2PGAP+j)){
 					invalidate_piece_num++;
 					continue;
@@ -289,6 +290,7 @@ static inline void copy_normal_block(L2P_bm *bm, list *blk_list){
 					if(!valid_data_ptr[j]){
 						continue;
 					}
+
 					if(validate_piece_ppa(sm, g_value->ppa*L2PGAP+j, true)==BIT_ERROR){
 						EPRINT("bit error in normal block copy", true);
 					}
@@ -641,13 +643,11 @@ static inline void copy_mixed_block(L2P_bm *bm, list *blk_list){
 		list_delete_node(blk_list, now);
 	}
 }
-
 uint32_t gc_data_segment(L2P_bm *bm, __gsegment *target){
 	static uint32_t cnt=0;
 	//DEBUG_CNT_PRINT(cnt_gc_data, UINT32_MAX, __FUNCTION__, __LINE__);
 	printf("target seg:%u\n",target->seg_idx);
 	if(cnt > 1200 && target->seg_idx==149){
-	//	GDB_MAKE_BREAKPOINT;
 	}
 	blockmanager *sm=bm->segment_manager;
 	list *normal_list=list_init();

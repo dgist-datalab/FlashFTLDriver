@@ -12,6 +12,7 @@ map_function*	tree_map_init(uint32_t contents_num, float fpr){
 	res->show_info=NULL;
 	res->get_memory_usage=tree_get_memory_usage;
 
+	res->lookup=tree_lookup;
 	res->iter_init=tree_iter_init;
 	res->iter_pick=tree_iter_pick;
 	res->iter_move=tree_iter_move;
@@ -23,6 +24,17 @@ map_function*	tree_map_init(uint32_t contents_num, float fpr){
 
 	res->private_data=(void *)tr_map;
 	return res;
+}
+
+uint32_t tree_lookup(map_function *m, uint32_t lba){
+	tree_map *tr_map=extract_tree(m);
+	tree_iter it=tr_map->body->find(lba);
+	if(it==tr_map->body->end()){
+		return NOT_FOUND;
+	}
+	else{
+		return it->second;
+	}
 }
 
 uint32_t			tree_insert(map_function *m, uint32_t lba, uint32_t offset){

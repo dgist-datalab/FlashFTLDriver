@@ -52,6 +52,8 @@ uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
 	demand_ftl.algo_body=(void*)pm_body_create(bm);
 	return 1;
 }
+extern uint32_t now_map_seg;
+extern uint32_t now_data_seg;
 
 void page_destroy (lower_info* li, algorithm *algo){
 	demand_print_log();
@@ -65,6 +67,8 @@ void page_destroy (lower_info* li, algorithm *algo){
 				li->req_type_cnt[GCMW_DGC]+
 				li->req_type_cnt[GCMW]+
 				li->req_type_cnt[COMPACTIONDATAW])/li->req_type_cnt[DATAW]);
+
+	printf("map %u data %u", now_map_seg, now_data_seg);
 	free(a_buffer.value);
 
 	delete rb.pending_req;

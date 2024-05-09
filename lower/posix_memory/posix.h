@@ -46,5 +46,6 @@ typedef struct posix_request {
 typedef struct mem_seg {
 	char * storage;
 	char oob[OOB_SIZE];
+	bool populate;
 } mem_seg;
 #endif

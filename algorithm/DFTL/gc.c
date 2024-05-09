@@ -16,6 +16,15 @@ uint32_t test_ppa2=UINT32_MAX;
 
 uint32_t now_gc_target=UINT32_MAX;
 uint32_t prev_gc_target=UINT32_MAX;
+
+uint32_t now_map_seg=0;
+uint32_t now_data_seg=0;
+uint32_t max_data_seg=0;
+
+uint32_t map_seg_limit=3;
+uint32_t data_seg_limit=0;
+bool limit_map_seg;
+
 char **backtrace_check[_PPS*L2PGAP];
 
 pm_body *pm_body_create(blockmanager *bm){
@@ -30,6 +39,15 @@ pm_body *pm_body_create(blockmanager *bm){
 	res->map_reserve=bm->get_segment(bm, BLOCK_RESERVE);
 	res->seg_type_checker[res->map_active->seg_idx]=MAPSEG;
 	res->seg_type_checker[res->map_reserve->seg_idx]=MAPSEG;
+
+	printf("settup map_seg limited: %u %u \n", limit_map_seg, map_seg_limit);
+
+	printf("MAX_MAP_SEG:%u %u _NOS:%u\n", MAX_MAP_SEG, MAX_TMAP_NUM, _NOS);
+	max_data_seg=_NOS-MAX_MAP_SEG;
+	now_map_seg+=2;
+	now_data_seg+=2;
+
+	data_seg_limit=_NOS-map_seg_limit;
 	return res;
 }
 
@@ -287,11 +305,23 @@ void do_gc(){
 	free(update_target);
 
 finish:
+
+
+	if(p->seg_type_checker[target->seg_idx]==MAPSEG){
+		now_map_seg--;
+	}
+	else{
+		now_data_seg--;
+	}
+
 	bm->trim_segment(bm,target); //erase a block
 	p->active=p->reserve;//make reserved to active block
 	bm->change_reserve_to_active(bm, p->reserve);
 	p->reserve=bm->get_segment(bm, BLOCK_RESERVE); //get new reserve block from block_manager
+
 	p->seg_type_checker[p->reserve->seg_idx]=DATASEG;
+	now_data_seg++;
+
 	if(temp_list){
 		list_free(temp_list);
 	}
@@ -304,8 +334,7 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	blockmanager *bm=demand_ftl.bm;
 	/*you can check if the gc is needed or not, using this condition*/
 	if(demand_ftl.bm->check_full(p->active)){
-		if(demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
-			demand_ftl.bm->is_gc_needed(demand_ftl.bm);
+		if((limit_map_seg && now_data_seg>data_seg_limit) || demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 			do_gc();//call gc
 		}
 	}
@@ -324,6 +353,7 @@ retry:
 						bm->seg_invalidate_piece_num(bm, i));
 			}
 		}
+		now_data_seg++;
 		p->seg_type_checker[p->active->seg_idx]=DATASEG;
 		goto retry;
 	}

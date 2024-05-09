@@ -170,7 +170,7 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,algo_req * co
 	req->test_ppa=ppa;
 	req->type_lower=0;
 	if(ppa>=_NOP){
-
+		printf("out of range!\n");
 	}
 	else{
 #ifdef COPYMETA_ONLY
@@ -353,16 +353,16 @@ uint32_t amf_info_load(lower_info *li, FILE *fp){
 }
 
 void amf_error_call_back_r(void *_req){
-	algo_req *req=(algo_req*)_req;
+	amf_wrapper *req=(amf_wrapper*)_req;
 
-	printf("error! in AMF read ppa:%u\n",req->test_ppa);
+	printf("error! in AMF read ppa:%u\n",req->req->test_ppa);
 
 	req->end_req(req);
 }
 void amf_error_call_back_w(void *_req){
-	algo_req *req=(algo_req*)_req;
+	amf_wrapper *req=(amf_wrapper*)_req;
 
-	printf("error! in AMF write ppa:%u\n",req->test_ppa);
+	printf("error! in AMF write ppa:%u\n",req->req->test_ppa);
 
 	req->end_req(req);
 }

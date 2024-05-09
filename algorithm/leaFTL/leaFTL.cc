@@ -609,6 +609,7 @@ uint32_t *lea_gp_to_mapping(group *gp){
 }
 
 void lea_compaction(){
+    return;
     int64_t new_lru_now_byte=0;
 	printf("compaction start!\n");
     for(uint32_t idx=0; idx<TRANSMAPNUM ;idx++){

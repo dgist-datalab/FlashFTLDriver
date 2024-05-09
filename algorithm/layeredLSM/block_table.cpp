@@ -126,7 +126,7 @@ uint32_t L2PBm_pick_empty_RPBA(L2P_bm *bm){
 		(bm->reserve_block_idx++)*_PPB;
 }
 
-uint32_t target_PBA=UINT32_MAX;
+uint32_t target_PBA=95158;
 extern bool debug_flag;
 void L2PBm_make_map(L2P_bm *bm, uint32_t PBA, uint32_t sid, 
 		uint32_t intra_idx){
