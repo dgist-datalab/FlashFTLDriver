@@ -1694,7 +1694,8 @@ static void print_help(){
 		printf("\t%d: %s\n", i, cache_type((cache_algo_type)i));
 	}
 }
-
+extern uint32_t map_seg_limit;
+extern bool limit_map_seg;
 uint32_t demand_argument(int argc, char **argv){
 	bool cache_size=false;
 	bool cache_type_set=false;
@@ -1706,7 +1707,8 @@ uint32_t demand_argument(int argc, char **argv){
 	uint32_t physical_page_num;
 	double cache_percentage;
 	cache_algo_type c_type;
-	while((c=getopt(argc,argv,"ctph"))!=-1){
+	limit_map_seg=false;
+	while((c=getopt(argc,argv,"ctphl"))!=-1){
 		switch(c){
 			case 'h':
 				print_help();
@@ -1733,6 +1735,10 @@ uint32_t demand_argument(int argc, char **argv){
 				cache_percentage=atof(argv[optind])/100;
 				physical_page_num=(SHOWINGSIZE/K) * cache_percentage;
 				physical_page_num/=PAGESIZE;
+				break;
+			case 'l':
+				map_seg_limit=atoi(argv[optind]);
+				limit_map_seg=true;
 				break;
 			default:
 				print_help();
