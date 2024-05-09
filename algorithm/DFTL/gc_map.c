@@ -38,7 +38,7 @@ ppa_t get_map_ppa(KEYT gtd_idx, bool *gc_triggered){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	if(demand_ftl.bm->check_full(p->map_active)){
-		if((limit_map_seg && now_map_seg > map_seg_limit) || demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
+		if((limit_map_seg && now_map_seg >= map_seg_limit) || demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
 			do_map_gc();//call gc
 			if(gc_triggered){
 				*gc_triggered=true;
@@ -88,7 +88,12 @@ void do_map_gc(){
 			p->seg_type_checker[target->seg_idx]!=MAPSEG){
 		if(target){
 			if(p->seg_type_checker[target->seg_idx]==DATASEG && target->all_invalid){
-				break;	
+				if(now_map_seg>=map_seg_limit){
+
+				}
+				else{
+					break;	
+				}
 			}
 			temp_queue.push(target->seg_idx);
 			free(target);
