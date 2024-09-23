@@ -357,14 +357,14 @@ void amf_error_call_back_r(void *_req){
 
 	printf("error! in AMF read ppa:%u\n",req->req->test_ppa);
 
-	req->end_req(req);
+	req->req->end_req(req->req);
 }
 void amf_error_call_back_w(void *_req){
 	amf_wrapper *req=(amf_wrapper*)_req;
 
 	printf("error! in AMF write ppa:%u\n",req->req->test_ppa);
 
-	req->end_req(req);
+	req->req->end_req(req->req);
 }
 void amf_error_call_back_e(void *_req){
 	dummy_req *req=(dummy_req*)_req;
