@@ -296,7 +296,12 @@ uint32_t st_array_read_translation(st_array *sa, uint32_t ste_num, uint32_t intr
 			return physical_page_addr * L2PGAP + global_idx-sa->pba_array[ste_num].start_write_pointer;
 		}
 		else{
-			return sa->pinning_data[global_idx];
+			if(L2PBm_is_frag_block(sa->bm, sa->pba_array[ste_num].PBA)){
+				return sa->pinning_data[global_idx];
+			}
+			else{
+				return sa->pba_array[ste_num].PBA*L2PGAP+intra_idx;
+			}
 		}
 	}
 

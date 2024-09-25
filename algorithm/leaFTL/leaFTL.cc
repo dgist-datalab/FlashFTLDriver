@@ -73,6 +73,10 @@ typedef struct user_io_param{
     value_set *value;
 }user_io_param;
 
+uint64_t total_wb_size=0;
+uint64_t total_wb_lba_distance=0;
+uint64_t total_gc_size=0;
+uint64_t total_gc_lba_distance=0;
 
 uint32_t lea_print_log(){
     printf("===========LEA LOG===============\n");
@@ -90,6 +94,14 @@ uint32_t lea_print_log(){
 
 	}
 	printf("total index size:%lu, %lf\n", total_index_size, (double)total_index_size/(RANGE*32));
+    printf("wb: %lu, %lf\n", total_wb_size, (double)total_wb_lba_distance/total_wb_size);
+    printf("gc: %lu, %lf\n", total_gc_size, (double)total_gc_lba_distance/total_gc_size);
+
+    total_wb_size=0;
+    total_wb_lba_distance=0;
+    total_gc_size=0;
+    total_gc_lba_distance=0;
+
     return 1;
 }
 
@@ -199,7 +211,7 @@ uint32_t lea_argument(int argc, char **argv){
 	uint64_t base;
 	uint32_t physical_page_num;
 	double cache_percentage;
-    gm.fast_search=false;
+    gm.fast_search=true;
 	while((c=getopt(argc,argv,"cpf"))!=-1){
 		switch(c){
 			case 'c':
@@ -542,6 +554,9 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
             for(;master_iter!=target_grp_list.end(); master_iter++){
                 t_grp=*master_iter;
 
+                if(t_grp->lba==test_key){
+                    //GDB_MAKE_BREAKPOINT;
+                }
                 if(lea_cache_evict(t_grp->gp)==false){
                     break;
                 }
@@ -558,6 +573,7 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
                         continue;
                     }
 
+
                     if(t_grp->r_type==DATAREAD && t_grp->retry_flag==RETRY_FLAG::DATA_FOUND){
                         goto found_end;
                     }
@@ -570,6 +586,7 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
 
                     if(t_grp->retry_flag==RETRY_FLAG::DATA_FOUND){
                     found_end:
+                        //t_grp->piece_ppa=exact_map[t_grp->lba];
                         #ifdef DEBUG
                         if(t_grp->piece_ppa!=exact_map[t_grp->lba]){
                             printf("address error find_ppa:%u lea_mapping_update:%u!\n", find_exact_piece_ppa_cnt, lea_mapping_find_exact_piece_ppa);
@@ -777,6 +794,8 @@ uint32_t lea_write(request *const req){
         uint32_t remain_space;
 retry:
         remain_space=pm_remain_space(pm, true);
+        total_wb_size+=wb->L2P_map.size();
+        total_wb_lba_distance+=lea_write_buffer_total_LBA_distance(wb);
 
         if(lea_write_buffer_flush(wb, pm, user_temp_map, remain_space) == false){
             if(user_temp_map->size){
