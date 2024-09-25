@@ -1,3 +1,4 @@
+#pragma once
 #include <map>
 #include <pthread.h>
 #include <vector>
