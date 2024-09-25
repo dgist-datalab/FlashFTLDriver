@@ -37,11 +37,6 @@ THE SOFTWARE.
 #include "dm_nohost.h"
 
 #include "../../../../include/settings.h"
-#ifndef BPS
-#define BPS 64
-#define _PPB 256
-#define PAGESIZE 8129
-#endif
 #include "../../../../include/container.h"
 //#include "../../../../bench/bench.h"
 
@@ -76,26 +71,12 @@ static void __dm_intr_handler (
 	if(r->req_type!=REQTYPE_GC_ERASE){
 		dm_intr_cnt++;
 		algo_req *my_algo_req=(algo_req*)r->req;
-		if(my_algo_req->parents){
-			//bench_lower_end(my_algo_req->parents);
-		}
-		
-
-		if(r->req_type==REQTYPE_READ){
-			if(my_algo_req->type_lower<r->path_type)
-				my_algo_req->type_lower=r->path_type;
-			my_algo_req->end_req(my_algo_req);
+		my_algo_req->end_req(my_algo_req);
+		if(r->req_type==REQTYPE_WRITE){
+			memio_free_dma(1,r->dmaTag);
 		}
 		else{
-			if(r->req_type==UINT8_MAX){
-				if(r->logaddr.lpa[0]==UINT32_MAX){
-					my_algo_req->type=UINT8_MAX;
-				}
-				else{
-					my_algo_req->ppa=r->logaddr.lpa[0];
-				}
-			}
-			my_algo_req->end_req(my_algo_req);
+			memio_free_dma(2,r->dmaTag);
 		}
 	}
 	else{
@@ -300,11 +281,6 @@ static int __memio_do_io (memio_t* mio, int dir, uint32_t lba, uint64_t len, uin
 		
 		/* send I/O requets to the device */
 		if(r->req_type==REQTYPE_READ){
-			if(my_algo_req->type_lower!=0){
-				if(my_algo_req->type_lower>10){
-					printf("wtf!\n");
-				}
-			}
 		}
 		if ((ret = dm->make_req (&mio->bdi, r)) != 0) {
 			bdbm_error ("dm->make_req() failed (ret = %d)", ret);
@@ -564,3 +540,14 @@ void memio_show_info(){
 	printf("m\n");
 }
 
+int memio_empty_write (memio_t* mio, uint32_t lba, void *req){
+	char *temp;
+	int tag = memio_alloc_dma(1, &temp);
+	return memio_write(mio, lba, 8192, (uint8_t*)temp, true, req, tag);
+}
+
+int memio_empty_read (memio_t* mio, uint32_t lba, void *req){
+	char *temp;
+	int tag = memio_alloc_dma(2, &temp);
+	return memio_read(mio, lba, 8192, (uint8_t*)temp, true, req, tag);
+}

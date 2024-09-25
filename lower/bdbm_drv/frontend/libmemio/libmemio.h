@@ -55,3 +55,8 @@ bool memio_is_clean(memio_t *mio);
 void memio_show_info();
 int memio_comp_write (memio_t* mio, uint32_t lba, uint64_t len, uint8_t* data, int async, void *req, int dmaTag);
 int memio_comp_read (memio_t* mio, uint32_t lba, uint64_t len, uint8_t* data, int async, void *req, int dmaTag);
+
+
+
+int memio_empty_write (memio_t* mio, uint32_t lba, void *req);
+int memio_empty_read (memio_t* mio, uint32_t lba, void *req);

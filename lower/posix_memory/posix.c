@@ -8,6 +8,7 @@
 #include "../../interface/queue.h"
 #include "../../interface/bb_checker.h"
 #include "../../include/utils/cond_lock.h"
+#include "../../include/data_struct/partitioned_slab.h"
 #include "../../include/debug_utils.h"
 
 #include <fcntl.h>

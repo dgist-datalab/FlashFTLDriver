@@ -14,10 +14,9 @@ int F_malloc(void **ptr, int size,int rw){
 		printf("type error! in F_MALLOC\n");
 		abort();
 	}
-#ifdef bdbm_drv
-	dmatag=memio_info.lower_alloc(rw,(char**)ptr);
-#elif posix_aio
-	if(size%(4*_K)){
+
+#ifdef linux_aio
+	if(size%(4*K)){
 		(*ptr)=malloc(size);
 	}else{
 		int res;
@@ -38,10 +37,6 @@ int F_malloc(void **ptr, int size,int rw){
 	return dmatag;
 }
 void F_free(void *ptr,int tag,int rw){
-#ifdef bdbm_drv
-	memio_info.lower_free(rw,tag);
-#else 
 	free(ptr);
-#endif
 	return;
 }

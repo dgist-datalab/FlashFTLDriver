@@ -1,39 +1,120 @@
 #include "../../include/settings.h"
-#include "../../bench/measurement.h"
-#include "../../blockmanager/bb_checker.h"
-#include "../../algorithm/Lsmtree/lsmtree.h"
+#include "../../include/container.h"
+#include "../../include/data_struct/partitioned_slab.h"
 #include "frontend/libmemio/libmemio.h"
-#include "devices/nohost/dm_nohost.h"
 #include "bdbm_inf.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
 pthread_mutex_t test_lock;
-extern lsmtree LSM;
-extern bb_checker checker;
+PS_master *ps_master;
 memio_t *mio;
+
+
+typedef struct memio_wrapper{
+	uint32_t tag;
+	uint32_t cnt;
+	uint32_t ppa;
+	algo_req *org;
+}amf_wrapper;
+
+pthread_cond_t wrapper_cond=PTHREAD_COND_INITIALIZER;
+pthread_mutex_t wrapper_lock=PTHREAD_MUTEX_INITIALIZER;
+
+algo_req *wrapper_array;
+memio_wrapper *mem_wrap_array;
+std::queue<uint32_t>* wrap_q;
+
+static inline algo_req* get_memio_wrapper(uint32_t ppa, algo_req* org, bool sync){
+	algo_req *res;
+	pthread_mutex_lock(&wrapper_lock);
+	while(wrap_q->empty()){
+		pthread_cond_wait(&wrapper_cond, &wrapper_lock);
+	}
+	uint32_t tag_num=wrap_q->front();
+	res=&wrapper_array[tag_num];
+	memio_wrapper *pri=&mem_wrap_array[tag_num];
+	pri->org=org;
+	pri->cnt=0;
+	pri->ppa=ppa;
+	pri->tag=tag_num;
+
+	res->param=(void*)pri;
+
+	wrap_q->pop();
+	pthread_mutex_unlock(&wrapper_lock);
+	return res;
+}
+
+static inline void release_memio_wrapper(uint32_t tag){
+	pthread_mutex_lock(&wrapper_lock);
+	wrap_q->push(tag);
+	pthread_cond_broadcast(&wrapper_cond);
+	pthread_mutex_unlock(&wrapper_lock);
+}
+
+
+void *wrap_end_req(algo_req* req){
+	memio_wrapper *pri=(memio_wrapper*)req->param;
+	pri->cnt++;
+	if(pri->cnt==2){
+		algo_req *req=pri->org;
+		req->end_req(req);
+		release_memio_wrapper(pri->tag);
+	}
+	return NULL;
+}
+
+void invalidate_inform(uint64_t ppa);
+static void traffic_print(lower_info *li){
+	static int cnt=0;
+	printf("info print %u\n",cnt);
+	for(int i=0; i<LREQ_TYPE_NUM;i++){
+		printf("%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
+	}
+	printf("WAF: %lf\n\n",
+		   (double)(li->req_type_cnt[MAPPINGW] +
+					li->req_type_cnt[DATAW] +
+					li->req_type_cnt[GCDW] +
+					li->req_type_cnt[GCMW_DGC] +
+					li->req_type_cnt[GCMW] +
+					li->req_type_cnt[COMPACTIONDATAW]) /
+			   li->req_type_cnt[DATAW]);
+	memset(li->req_type_cnt, 0,  sizeof(uint64_t)*LREQ_TYPE_NUM);
+	printf("end\n");
+}
+
 lower_info memio_info={
 	.create=memio_info_create,
 	.destroy=memio_info_destroy,
-	.write=memio_info_push_data,
-	.read=memio_info_pull_data,
-	.read_hw=memio_info_hw_read,
+	.write=memio_info_write_data,
+	.read=memio_info_read_data,
+	.write_sync=NULL,
+	.read_sync=NULL,
 	.device_badblock_checker=memio_badblock_checker,
 	.trim_block=memio_info_trim_block,
 	.trim_a_block=memio_info_trim_a_block,
 	.refresh=memio_info_refresh,
 	.stop=memio_info_stop,
-	.lower_alloc=memio_alloc_dma,
-	.lower_free=memio_free_dma,
+	.lower_alloc=NULL,
+	.lower_free=NULL,
 	.lower_flying_req_wait=memio_flying_req_wait,
 	.lower_show_info=memio_show_info_,
-
 	.lower_tag_num=memio_tag_num,
-	.hw_do_merge=memio_do_merge,
-	.hw_get_kt=memio_get_kt,
-	.hw_get_inv=memio_get_inv
+	.print_traffic=traffic_print,
+	.dump=NULL,
+	.load=NULL,
+	.invalidate_inform=invalidate_inform,
 };
+
+void invalidate_inform(uint64_t ppa){
+#ifdef COPYMETA_ONLY
+	PS_master_free_slab(ps_master, ppa);
+#else
+	return;
+#endif
+}
 
 uint32_t memio_info_create(lower_info *li, blockmanager *bm){
 	li->NOB=_NOB;
@@ -52,6 +133,18 @@ uint32_t memio_info_create(lower_info *li, blockmanager *bm){
 	mio=memio_open();
 	
 	li->bm=bm;
+
+#ifdef COPYMETA_ONLY
+	ps_master=PS_master_init(_NOS, _PPS, _NOP/100*COPYMETA_ONLY);
+#endif
+
+	wrapper_array=(algo_req*)malloc(sizeof(algo_req)*QDEPTH);
+	mem_wrap_array=(memio_wrapper*)malloc(sizeof(memio_wrapper)*QDEPTH);
+	wrap_q=new std::queue<uint32_t>();
+	for(uint32_t i=0; i<QDEPTH; i++){
+		wrapper_array[i].end_req=wrap_end_req;
+		wrap_q->push(i);
+	}
 	return 1;
 }
 
@@ -73,60 +166,67 @@ void *memio_info_destroy(lower_info *li){
 	return NULL;
 }
 
-void *memio_info_push_data(uint32_t ppa, uint32_t size, value_set *value, bool async, algo_req *const req){
+static inline void __issue(uint32_t type, algo_req *org_req, uint32_t ppa){
+	algo_req *temp_req=get_memio_wrapper(ppa, org_req, false);
+	uint32_t target_ppa;
+	for(uint32_t i=0; i<2; i++){
+		target_ppa=(ppa*2+i);
+		switch(type){
+			case 1:
+				memio_empty_write(mio, target_ppa, (void*)temp_req);
+				break;
+			case 2:
+				memio_empty_read(mio, target_ppa, (void*)temp_req);
+				break;
+		}
+	}
+}
+
+void *memio_info_write_data(uint32_t ppa, uint32_t size, value_set *value, algo_req *const req){
 	if(value->dmatag==-1){
 		printf("dmatag -1 error!\n");
 		exit(1);
 	}
 	
-	uint8_t t_type=test_type(req->type);
-	if(t_type < LREQ_TYPE_NUM){
-		memio_info.req_type_cnt[t_type]++;
+	collect_io_type(req->type, &memio_info);
+	if(PS_ismeta_data(req->type)){
+		PS_master_insert(ps_master,ppa,value->value);
 	}
 
-	bb_node t=checker.ent[ppa>>14];
-	uint32_t fppa=bb_checker_fix_ppa(t.flag,t.fixed_segnum,t.pair_segnum,ppa);
-	memio_write(mio,fppa,(uint32_t)size,(uint8_t*)value->value,async,(void*)req,value->dmatag);
-	//memio_write(mio,bb_checker_fix_ppa(checker,ppa),(uint32_t)size,(uint8_t*)value->value,async,(void*)req,value->dmatag);
 	//memio_write(mio,ppa,(uint32_t)size,(uint8_t*)value->value,async,(void*)req,value->dmatag);
-	//pthread_mutex_lock(&test_lock);
+	//memio_empty_write(mio,ppa,(void*)req);
+	__issue(1, req, ppa);
 	return NULL;
 }
-void *memio_info_pull_data(uint32_t ppa, uint32_t size, value_set *value, bool async, algo_req *const req){
-	if(value->dmatag==-1){
-		printf("dmatag -1 error!\n");
-		exit(1);
-	}
-	uint8_t t_type=test_type(req->type);
-	if(t_type < LREQ_TYPE_NUM){
-		memio_info.req_type_cnt[t_type]++;
-	}
+void *memio_info_read_data(uint32_t ppa, uint32_t size, value_set *value, algo_req *const req){
+	
+	collect_io_type(req->type, &memio_info);
 
-	bb_node t=checker.ent[ppa>>14];
-	uint32_t fppa=bb_checker_fix_ppa(t.flag,t.fixed_segnum,t.pair_segnum,ppa);
-	memio_read(mio,fppa,(uint32_t)size,(uint8_t*)value->value,async,(void*)req,value->dmatag);
+	//memio_empty_read(mio,ppa,(void*)req);
+	//memio_read(mio,ppa,(uint32_t)size,(uint8_t*)value->value,async,(void*)req,value->dmatag);
+
+	__issue(2, req, ppa);
+	if(PS_ismeta_data(req->type)){
+		char *temp = PS_master_get(ps_master,ppa);
+		if(temp==NULL){
+			printf("target data null: %s:%u\n", __FILE__, __LINE__);
+		}
+		memcpy(value->value,temp,PAGESIZE);
+	}
 	return NULL;
 }
 
-void *memio_info_trim_block(uint32_t ppa, bool async){
-	//int value=memio_trim(mio,bb_checker_fix_ppa(ppa),(1<<14)*PAGESIZE,NULL);
-	uint32_t block_n=ppa>>14;
-	int value;
-	if(checker.ent[block_n].flag){
-		value=memio_trim(mio,checker.ent[block_n].fixed_segnum,(1<<14)*PAGESIZE, NULL);
-	}
-	else{
-		value=memio_trim(mio,ppa,(1<<14)*PAGESIZE, NULL);
-	}
+void *memio_info_trim_block(uint32_t ppa){
+	collect_io_type(TRIM, &memio_info);
+	memio_trim(mio, ppa*2, (1<<14)*8192, NULL);
+	memio_trim(mio, ppa*2+16384, (1<<14)*8192, NULL);
 	
-	value=memio_trim(mio,checker.ent[block_n].pair_segnum,(1<<14)*PAGESIZE,NULL);
-	
+#ifdef COPYMETA_ONLY
+	PS_master_free_partition(ps_master, ppa);
+#endif
+
 	memio_info.req_type_cnt[TRIM]++;
-	if(value==0){
-		return (void*)-1;
-	}
-	else
-		return NULL;
+	return NULL;
 }
 
 void *memio_info_refresh(struct lower_info* li){
@@ -140,17 +240,9 @@ void *memio_badblock_checker(uint32_t ppa,uint32_t size, void*(*process)(uint64_
 }
 
 
-void *memio_info_trim_a_block(uint32_t ppa, bool async){
-	memio_info.req_type_cnt[TRIM]++;
-	uint32_t pp=ppa%BPS;
-	uint32_t block_n=ppa>>14;
-	if(checker.ent[block_n].flag){
-		memio_trim_a_block(mio,checker.ent[block_n].fixed_segnum+pp);
-	}
-	else{
-		memio_trim_a_block(mio,ppa);
-	}
-	memio_trim_a_block(mio,checker.ent[block_n].pair_segnum+pp);
+void *memio_info_trim_a_block(uint32_t ppa){
+	collect_io_type(TRIM, &memio_info);
+	memio_trim_a_block(mio,ppa);
 	return NULL;
 }
 
@@ -164,47 +256,6 @@ void memio_flying_req_wait(){
 
 void memio_show_info_(){
 	memio_show_info();
-}
-
-void change_ppa_list(uint32_t *des, uint32_t *src, uint32_t num){
-	for(uint32_t i=0; i<num; i++){
-		bb_node t=checker.ent[src[i]>>14];
-		des[i]=	bb_checker_fix_ppa(t.flag,t.fixed_segnum,t.pair_segnum,src[i]);
-	}
-}
-
-uint32_t memio_do_merge(uint32_t lp_num, ppa_t *lp_array, uint32_t hp_num,ppa_t *hp_array,ppa_t *tp_array, uint32_t* ktable_num, uint32_t *invalidate_num){
-	volatile static bool res_dma_first=true;
-	ppa_t * dma_hli=(ppa_t*)get_high_ppali();
-	ppa_t * dma_lli=(ppa_t*)get_low_ppali();
-	ppa_t * dma_rli=(res_dma_first?(ppa_t*)get_res_ppali():(ppa_t*)get_res_ppali2());
-
-	change_ppa_list(dma_hli,hp_array,hp_num);
-	change_ppa_list(dma_lli,lp_array,lp_num);
-	change_ppa_list(dma_rli,tp_array,hp_num+lp_num);
-	/*
-	memcpy(dma_hli,hp_array,sizeof(ppa_t)*hp_num);
-	memcpy(dma_lli,lp_array,sizeof(ppa_t)*lp_num);
-	memcpy(dma_rli,tp_array,sizeof(ppa_t)*(hp_num+lp_num));*/
-	memio_do_merge(hp_num,lp_num,(unsigned int*)ktable_num,(unsigned int*)invalidate_num,(uint32_t)(res_dma_first?0:1));
-	
-	res_dma_first=!res_dma_first;
-	//end
-	return 1;
-}
-
-void *memio_info_hw_read(uint32_t ppa, char* key, uint32_t key_len, value_set* value, bool async, algo_req *const req){
-	bb_node t=checker.ent[ppa>>14];
-	uint32_t fppa=bb_checker_fix_ppa(t.flag,t.fixed_segnum,t.pair_segnum,ppa);
-	memio_info.req_type_cnt[MAPPINGR]++;
-	memio_do_hw_read(mio,fppa,key,key_len,(uint8_t *)value->value,async,(void*)req,value->dmatag);
-	return NULL;
-}
-char *memio_get_kt(){
-	return (char*)get_merged_kt();
-}
-char *memio_get_inv(){
-	return (char*)get_inv_ppali();
 }
 
 uint32_t memio_tag_num(){

@@ -24,6 +24,7 @@ CFLAGS_LOWER += \
 	-D NOHOST \
 	-D LIBLSM \
 	-std=c++11 \
+#-fsanitize=address\
 	#-D USE_ACP \ # only valid for zc706. mkTop8k_ACP.exe should be used.
 	#-D ZYNQ=1 \ # Already defined in ConnectalProjectConfig.h:20 
 
