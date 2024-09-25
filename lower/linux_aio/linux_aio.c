@@ -2,7 +2,6 @@
 #include "../../include/settings.h"
 #include "../../bench/bench.h"
 #include "../../bench/measurement.h"
-#include "../../algorithm/Lsmtree/lsmtree.h"
 #include "../../include/utils/cond_lock.h"
 #include "../../include/utils/thpool.h"
 #include "linux_aio.h"

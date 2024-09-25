@@ -12,6 +12,7 @@
 #include "../translation_functions/bf_guard_mapping.h"
 #define DIR_PATH "/home/kukania/BloomFTL-project/FlashFTLDriverC1/algorithm/layeredLSM/design_knob"
 
+
 double *plr_dp;
 double *line_per_chunk;
 double *normal_plr_dp;
@@ -117,6 +118,9 @@ void init_memory_info(uint32_t error, uint32_t target_bit){
 		printf("%u\t%lf\n", i, normal_plr_dp[i]);
 	}
 	*/
+	for(uint32_t i=0; i<1001; i++){
+		printf("%u, %lf\n", i, plr_dp[i]);
+	}
 	find_sub_member_num((float)global_error/100, 10000, target_bit);
 	close(fd);
 }

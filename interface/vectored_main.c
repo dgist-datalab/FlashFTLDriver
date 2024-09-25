@@ -98,6 +98,7 @@ int main(int argc,char* argv[]){
 		inf_free();
 		return 0;
 #else 
+		uint32_t target_range_number=RANGE/100*utilization;
 		bench_init();
 		bench_vectored_configure();
 	//	bench_add(VECTOREDSSET,0,RANGE,RANGE);
@@ -107,21 +108,27 @@ int main(int argc,char* argv[]){
 		{
 		case 0:
 		case -1: //Random RW
-			bench_add(VECTOREDRSET,0,RANGE/100*utilization,RANGE*(round-1), 0);
-			bench_add(VECTOREDRW,0,RANGE/100*utilization,RANGE*2, 0);
+			bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
+			bench_add(VECTOREDRSET,0,target_range_number,target_range_number*(round), 0);
+//			bench_add(VECTOREDRGET,0,target_range_number,target_range_number, 0);
 			break;
 		case 1: //Sequential RW
-			bench_add(VECTOREDSSET,0,RANGE/100*utilization,RANGE*round, 0);
-			bench_add(VECTOREDSGET,0,RANGE/100*utilization,RANGE*round, 0);
+			bench_add(VECTOREDSSET,0,target_range_number,target_range_number*round, 0);
+			bench_add(VECTOREDSGET,0,target_range_number,target_range_number*round, 0);
 			break;
 
 		case 2: //Temporal locality RW
-			bench_add(VECTOREDUNIQRSET,0,RANGE/100*utilization,RANGE*round, param);
-			bench_add(VECTOREDTEMPLOCALRW,0,RANGE/100*utilization,RANGE*round, param);
+			bench_add(VECTOREDUNIQRSET,0,target_range_number,target_range_number*round, param);
+			bench_add(VECTOREDTEMPLOCALRW,0,target_range_number,target_range_number*round, param);
 			break;
 
 		case 3: //Spatial locality RW
-			bench_add(VECTOREDSPATIALRW,0,RANGE/100*utilization,RANGE*round, param);
+			bench_add(VECTOREDSPATIALRW,0,target_range_number,target_range_number*round, param);
+			break;
+		case 4: //Random RW
+			bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
+//			bench_add(VECTOREDRSET,0,target_range_number,target_range_number*(round), 0);
+//			bench_add(VECTOREDRGET,0,target_range_number,target_range_number, 0);
 			break;
 		default:
 			printf("type error\n");

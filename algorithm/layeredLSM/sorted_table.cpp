@@ -114,7 +114,7 @@ sid_info* sorted_array_master_get_info_mapgc(uint32_t start_lba, uint32_t piece_
 st_array *st_array_init(run *r, uint32_t max_sector_num, L2P_bm *bm, bool pinning, map_param param){
 	st_array *res=(st_array*)calloc(1, sizeof(st_array));
 	res->bm=bm;
-	res->max_STE_num=CEIL(max_sector_num, MAX_SECTOR_IN_BLOCK);
+	res->max_STE_num=CEIL(max_sector_num, MAX_SECTOR_IN_BLOCK)*2;
 	res->pba_array=(STE*)malloc((res->max_STE_num+1) * (sizeof(STE)));
 	//memset(res->pba_array, -1, (res->max_STE_num+1)*sizeof(STE));
 	for(uint32_t i=0; i<res->max_STE_num+1; i++){

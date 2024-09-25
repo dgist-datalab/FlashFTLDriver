@@ -30,6 +30,7 @@ float find_sub_member_num(float fpr, uint32_t member, uint32_t lba_bit_num){
 }
 
 map_function *	bfg_map_init(uint32_t contents_num, float fpr, uint32_t bit){
+	//fpr=0.4;
 	if(__target_fpr==0){
 		find_sub_member_num(fpr, contents_num, bit);
 	}
