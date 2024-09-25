@@ -277,6 +277,9 @@ static inline void pm_gc_finish(page_manager *pm, blockmanager *bm, __gsegment *
     }
 }
 
+extern uint64_t total_gc_size;
+extern uint64_t total_gc_lba_distance;
+
 void pm_data_gc(page_manager *pm, __gsegment *target, temp_map *res){
     uint32_t page;
     uint32_t bidx, pidx;
@@ -320,6 +323,11 @@ void pm_data_gc(page_manager *pm, __gsegment *target, temp_map *res){
     }
 
     sort(temp_vector.begin(), temp_vector.end(), gc_node_cmp);
+
+    total_gc_size+=temp_vector.size();
+    for(uint32_t i=1; i<temp_vector.size(); i++){
+        total_gc_lba_distance+=temp_vector[i].lba-temp_vector[i-1].lba;
+    }
 
     /*write_data*/
     align_buffer g_buffer;

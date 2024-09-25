@@ -90,3 +90,19 @@ void lea_write_buffer_free(lea_write_buffer *wb){
     free(wb->sector_buffer);
     free(wb);
 }
+
+
+uint32_t lea_write_buffer_total_LBA_distance(lea_write_buffer *wb){
+    uint32_t res=0;
+    std::map<uint32_t, uint32_t>::iterator iter;
+    uint32_t prev_lba=-1;
+    for(iter=wb->L2P_map.begin(); iter!=wb->L2P_map.end(); iter++){
+        if(prev_lba!=-1){
+            res+=iter->first-prev_lba;
+        }
+        else{
+            prev_lba=iter->first;
+        }
+    }
+    return res;
+}

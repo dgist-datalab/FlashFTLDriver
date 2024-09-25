@@ -21,3 +21,4 @@ bool lea_write_buffer_isfull(lea_write_buffer *wb);
 uint32_t lea_write_buffer_insert(lea_write_buffer *wb, uint32_t lba, char *data);
 char * lea_write_buffer_get(lea_write_buffer *wb, uint32_t lba);
 void lea_write_buffer_free(lea_write_buffer *wb);
+uint32_t lea_write_buffer_total_LBA_distance(lea_write_buffer *wb);

@@ -73,6 +73,10 @@ typedef struct user_io_param{
     value_set *value;
 }user_io_param;
 
+uint64_t total_wb_size=0;
+uint64_t total_wb_lba_distance=0;
+uint64_t total_gc_size=0;
+uint64_t total_gc_lba_distance=0;
 
 uint32_t lea_print_log(){
     printf("===========LEA LOG===============\n");
@@ -90,6 +94,14 @@ uint32_t lea_print_log(){
 
 	}
 	printf("total index size:%lu, %lf\n", total_index_size, (double)total_index_size/(RANGE*32));
+    printf("wb: %lu, %lf\n", total_wb_size, (double)total_wb_lba_distance/total_wb_size);
+    printf("gc: %lu, %lf\n", total_gc_size, (double)total_gc_lba_distance/total_gc_size);
+
+    total_wb_size=0;
+    total_wb_lba_distance=0;
+    total_gc_size=0;
+    total_gc_lba_distance=0;
+
     return 1;
 }
 
@@ -609,7 +621,6 @@ uint32_t *lea_gp_to_mapping(group *gp){
 }
 
 void lea_compaction(){
-    return;
     int64_t new_lru_now_byte=0;
 	printf("compaction start!\n");
     for(uint32_t idx=0; idx<TRANSMAPNUM ;idx++){
@@ -777,6 +788,8 @@ uint32_t lea_write(request *const req){
         uint32_t remain_space;
 retry:
         remain_space=pm_remain_space(pm, true);
+        total_wb_size+=wb->L2P_map.size();
+        total_wb_lba_distance+=lea_write_buffer_total_LBA_distance(wb);
 
         if(lea_write_buffer_flush(wb, pm, user_temp_map, remain_space) == false){
             if(user_temp_map->size){

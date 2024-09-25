@@ -123,7 +123,6 @@ int main(int argc,char* argv[]){
 		case 3: //Spatial locality RW
 			bench_add(VECTOREDSPATIALRW,0,RANGE/100*utilization,RANGE*round, param);
 			break;
-
 		default:
 			printf("type error\n");
 
