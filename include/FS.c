@@ -16,14 +16,13 @@ int F_malloc(void **ptr, int size,int rw){
 	}
 #ifdef bdbm_drv
 	dmatag=memio_info.lower_alloc(rw,(char**)ptr);
-#elif linux_aio
-	if(size%(4*K)){
+#elif posix_aio
+	if(size%(4*_K)){
 		(*ptr)=malloc(size);
 	}else{
 		int res;
 		void *target;
-		res=posix_memalign(&target,4*K,size);
-		memset(target,0,size);
+		res=posix_memalign(&target,4*_K,size);
 
 		if(res){
 			printf("failed to allocate memory:%d\n",errno);

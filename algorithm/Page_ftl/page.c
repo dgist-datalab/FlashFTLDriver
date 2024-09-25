@@ -82,7 +82,7 @@ void page_destroy (lower_info* li, algorithm *algo){
 	return;
 }
 
-inline void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
+void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
 	
 	if(type==DATAR){

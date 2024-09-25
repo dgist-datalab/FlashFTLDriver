@@ -79,6 +79,8 @@ typedef struct{
 	uint64_t read_cdf[1000000/TIMESLOT+1];
 	uint64_t vector_read_cdf[1000000/TIMESLOT+1];
 	uint64_t vector_read_cnt;
+	uint64_t vector_write_cdf[1000000/TIMESLOT+1];
+	uint64_t vector_write_cnt;
 
 	uint64_t map_cpu_time[1000000/TIMESLOT+1];
 	uint64_t start_time_micro;

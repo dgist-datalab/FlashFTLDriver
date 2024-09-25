@@ -535,16 +535,25 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 	uint64_t cumulate_number=0;
 	if(type>RANDSET)
 		nor/=2;
-/*	if((type>RANDSET || type%2==1) || type==NOR){
+	if((type>RANDSET || type%2==1) || type==NOR || true){
 		printf("\n[cdf]write---\n");
 		for(int i=0; i<1000000/TIMESLOT+1; i++){
 			cumulate_number+=_d->write_cdf[i];
 			if(_d->write_cdf[i]==0) continue;
+			fprintf(stderr,"%d,%ld,%f\n",i * 10,_d->write_cdf[i],(float)cumulate_number/_d->write_cnt);	
 			//printf("%d\t%ld\t%f\n",i * 10,_d->write_cdf[i],(float)cumulate_number/_d->write_cnt);
 			if(nor==cumulate_number)
 				break;
-		}	
-	} */
+		}
+
+		printf("\n\n[cdf] vector write\n");
+		uint64_t vector_aggregate_num=0;
+		for(int i=0; i<1000000/TIMESLOT+1; i++){
+			vector_aggregate_num+=_d->vector_write_cdf[i];
+			if(_d->vector_write_cdf[i]==0) continue;
+			fprintf(stderr, "%d,%ld,%f\n", i*10, _d->vector_write_cdf[i], (float)vector_aggregate_num/_d->vector_write_cnt);
+		}
+	}
 	static int cnt=0;
 	cumulate_number=0;
 	if((type>RANDSET || type%2==0)|| type==RANDGET || type==NOR || type==FILLRAND){
@@ -635,6 +644,21 @@ void bench_vector_latency(vec_request *req){
 		}
 		else{
 			_data->vector_read_cdf[slot_num]++;
+		}
+	}
+	else if(req->type==FS_SET_T){
+		uint32_t idx=req->mark;
+		bench_data *_data=&_master->datas[idx];
+
+		//bench_vector_data_collect_sec(_data, req);
+
+		_data->vector_write_cnt++;
+		int slot_num=req->latency_checker.micro_time/TIMESLOT;
+		if(slot_num>=1000000/TIMESLOT){
+			_data->vector_write_cdf[1000000/TIMESLOT]++;
+		}
+		else{
+			_data->vector_write_cdf[slot_num]++;
 		}
 	}
 #endif

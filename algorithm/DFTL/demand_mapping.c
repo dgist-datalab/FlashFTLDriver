@@ -343,8 +343,8 @@ void demand_map_create_body(uint32_t total_caching_physical_pages, lower_info *l
 	printf("|DFTL settings\n");
 	
 	printf("|cache type: %s\n", cache_type(dmm.c_type));
-	printf("|cache size: %.2lf(mb)\n", ((double)dmm.max_caching_pages * PAGESIZE)/M);
-	printf("|\tratio of PFTL: %.2lf%%\n", ((double)dmm.max_caching_pages * PAGESIZE)/(SHOWINGSIZE/K)*100);
+	printf("|cache size: %.2lf(mb)\n", ((double)dmm.max_caching_pages * PAGESIZE)/_M);
+	printf("|\tratio of PFTL: %.2lf%%\n", ((double)dmm.max_caching_pages * PAGESIZE)/(SHOWINGSIZE/_K)*100);
 
 	uint32_t cached_entry=dmm.cache->init(dmm.cache, dmm.max_caching_pages);
 	printf("|\tcaching percentage: %.2lf%%\n", (double)cached_entry/total_logical_page_num *100);
@@ -1733,7 +1733,7 @@ uint32_t demand_argument(int argc, char **argv){
 			case 'p':
 				cache_size=true;
 				cache_percentage=atof(argv[optind])/100;
-				physical_page_num=(SHOWINGSIZE/K) * cache_percentage;
+				physical_page_num=(SHOWINGSIZE/_K) * cache_percentage;
 				physical_page_num/=PAGESIZE;
 				break;
 			case 'l':
@@ -1781,7 +1781,7 @@ uint32_t demand_argument(int argc, char **argv){
 
 	if(!cache_size){
 		//physical_page_num=((SHOWINGSIZE/K)/4)/PAGESIZE;
-		physical_page_num=(((SHOWINGSIZE/K))/100*21)/PAGESIZE;
+		physical_page_num=(((SHOWINGSIZE/_K))/100*21)/PAGESIZE;
 	}
 	dmm.max_caching_pages=physical_page_num;
 	return 1;

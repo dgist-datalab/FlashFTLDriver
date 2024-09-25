@@ -1,5 +1,8 @@
 #ifndef POSIX_HEADER
 #define POSIX_HEADER
+
+#include <sys/uio.h>
+
 #include "../../include/container.h"
 #include "../../include/sem_lock.h"
 #include "../../include/data_struct/partitioned_slab.h"
@@ -41,5 +44,6 @@ typedef struct posix_request {
 	bool isAsync;
 	int tag;
 	fdriver_lock_t lock;
+	struct iovec io;
 }posix_request;
 #endif

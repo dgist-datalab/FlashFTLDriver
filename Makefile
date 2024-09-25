@@ -8,17 +8,17 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=leaFTL
+export TARGET_ALGO=layeredLSM
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
-PPWD=$(pwd)
+
 
 DEBUGFLAGS=\
 			-Wno-pointer-arith\
 			-g\
 			-export-dynamic\
-	-fsanitize=address\
+#	-fsanitize=address\
 
 export COMMONFLAGS+=\
 			-Wno-write-strings\
@@ -29,14 +29,14 @@ export COMMONFLAGS+=\
 			-DSLC\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
-			-DLSM_DEBUG\
 			-DPROGRESS\
 			-mcmodel=large\
-#			-O3\
-#			-DPARALLEL_MANAGER\
-#			-DTRACE_REPLAY\
-#			-DWRITE_STOP_READ\
+			-DAPPL_DESIGN_PATH="\"$(PWD)/algorithm/layeredLSM/design_knob/\""\
+			-O3\
 #			-DTRACE_COLLECT\
+#			-DTRACE_REPLAY\
+#			-DPARALLEL_MANAGER\
+#			-DWRITE_STOP_READ\
 #			-DMAPPING_TIME_CHECK\
 #			-DTRACE_REPLAY\
 
@@ -149,7 +149,8 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
-		-ldw\
+#		-luring\
+#		-ldw\
 #	-laio\
 		-ljemalloc\
 

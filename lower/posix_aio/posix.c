@@ -19,9 +19,10 @@
 #include <limits.h>
 #include <queue>
 #include <set>
+#include <sys/uio.h>
 
 #include <liburing.h>
-#define FILENAME "test.data"
+#define FILENAME "/mnt/ramdisk/temp"
 int fd;
 PS_master *ps_master;
 pthread_t t_id;
@@ -94,27 +95,46 @@ static uint8_t convert_type(uint8_t type) {
 }
 
 io_uring ring;
-tag_manager *tm=nullptr;
+static tag_manager *tm=nullptr;
 posix_request request_list[QDEPTH];
 
 void *uring_poller(void *arg){
+	int got_comp = 0;
 	while(true){
+		int ret;
 		io_uring_cqe *cqe;
-		int ret = io_uring_wait_cqes(&ring, NULL, 0, NULL, NULL);
-		if (ret < 0) {
-			perror("io_uring_wait_cqes");
+		if(!got_comp){
+			ret = io_uring_wait_cqe(&ring, &cqe);
+			got_comp=1;
 		}
-		uint32_t i=0;
-		io_uring_for_each_cqe(&ring, i, cqe) {
-        	if (cqe->res < 0) {
-            	fprintf(stderr, "Error: %d\n", cqe->res);
-        	} else {
-				posix_request *req = (posix_request*)io_uring_cqe_get_data(cqe);
-				req->upper_req->end_req(req->upper_req);
-				tag_manager_free_tag(tm, req->tag);
-        	}
-    	}
-		io_uring_cq_advance(&ring, i);
+		else{
+			ret = io_uring_peek_cqe(&ring, &cqe);
+			if(ret == -EAGAIN){
+				got_comp=0;
+				continue;
+			}
+		}
+		
+		if(ret == -EAGAIN) continue;
+		else if (ret<0){
+            fprintf(stderr, "io_uring_peek_cqe: %s\n", strerror(-ret));
+		}
+		if(!cqe) continue;
+	
+		if(cqe->res<0){
+			fprintf(stderr, "I/O error: %s\n", strerror(-cqe->res));
+			posix_request *req = (posix_request*)io_uring_cqe_get_data(cqe);
+			uint32_t tag=req->tag;
+			printf("tag:%u\n", tag);
+		}
+		else{
+			posix_request *req = (posix_request*)io_uring_cqe_get_data(cqe);
+			uint32_t tag=req->tag;
+			req->upper_req->end_req(req->upper_req);
+			tag_manager_free_tag(tm, tag);	
+		}
+
+		io_uring_cqe_seen(&ring, cqe);
 	}
 	return NULL;
 }
@@ -129,14 +149,20 @@ static uint32_t posix_create_body(lower_info *li){
 	li->PPS=_PPS;
 	li->TS=TOTALSIZE;
 	
-	fd = open(FILENAME, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	fd = open(FILENAME, O_RDWR);
 	tm = tag_manager_init(QDEPTH);
+
+	if (fd < 0) {
+        perror("open");
+        exit(1);
+    }
 
  	if (io_uring_queue_init(QDEPTH, &ring, 0) < 0) {
         perror("io_uring_queue_init");
         close(fd);
         return 1;
     }
+
 	
 	printf("!!! posix AIO NOP:%d!!!\n",li->NOP);
 	li->write_op=li->read_op=li->trim_op=0;
@@ -190,18 +216,28 @@ void send_req(FSTYPE type, uint32_t ppa, value_set *value, algo_req *upper_reque
 	target_req->type=type;
 	target_req->upper_req=upper_request;
 	target_req->ppa=ppa;
+	target_req->tag=tag;
+
+	target_req->io.iov_base=value->value;
+	target_req->io.iov_len=PAGESIZE;
+
 	io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+
 
 	switch (type){
 		case FS_SET_T:
-		io_uring_prep_write(sqe, fd, value->value, ppa*PAGESIZE, PAGESIZE);
+		io_uring_prep_writev(sqe, fd, &target_req->io, 1, ppa*PAGESIZE);
 		break;
 		case FS_GET_T:
-		io_uring_prep_read(sqe, fd, value->value, ppa*PAGESIZE, PAGESIZE);
+		io_uring_prep_readv(sqe, fd, &target_req->io, 1, ppa*PAGESIZE);
 		break;
 	}
+
 	io_uring_sqe_set_data(sqe, target_req);
-	io_uring_submit(&ring);
+	int ret=io_uring_submit(&ring);
+	if (ret < 0) {
+        fprintf(stderr, "io_uring_submit: %s\n", strerror(-ret));
+    }
 }
 
 
@@ -229,11 +265,11 @@ void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const
 
 		if (collect_io_type(req->type, &my_posix))
 		{
-			send_req(FS_SET_T, req->ppa, value, req);
+			send_req(FS_SET_T, PPA, value, req);
 		}
 	}
 
-	req->end_req(req);
+	//req->end_req(req);
 	return NULL;
 }
 
@@ -257,10 +293,10 @@ void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, algo_req *const
 	}
 
 	if(collect_io_type(req->type, &my_posix)){
-		send_req(FS_GET_T, req->ppa, value, req);
+		send_req(FS_GET_T, PPA, value, req);
 	}
 
-	req->end_req(req);
+	//req->end_req(req);
 	return NULL;
 }
 

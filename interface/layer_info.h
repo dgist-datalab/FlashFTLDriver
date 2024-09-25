@@ -27,7 +27,7 @@ static void layer_info_mapping(master_processor *mp, bool data_load, int argc, c
 #ifdef PARALLEL_MANAGER
 	mp->li=&pu_manager;
 #else
-#if defined(posix) || defined(posix_async) || defined(posix_memory)
+#if defined(posix) || defined(posix_async) || defined(posix_memory) || defined(posix_aio)
 	mp->li=&my_posix;
 #elif defined(bdbm_drv)
 	mp->li=&memio_info;
@@ -40,6 +40,7 @@ static void layer_info_mapping(master_processor *mp, bool data_load, int argc, c
 #elif defined(AMF)
 	mp->li=&amf_info;
 #endif
+
 #endif
 
 

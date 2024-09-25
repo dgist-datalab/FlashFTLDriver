@@ -8,24 +8,24 @@
 #include <string.h>
 #include <execinfo.h>
 
-#define K (1024)
-#define M (1024*K)
-#define G (1024*M)
-#define T (1024L*G)
-#define P (1024L*T)
+#define _K (1024)
+#define _M (1024*_K)
+#define _G (1024*_M)
+#define _T (1024L*_G)
+#define _P (1024L*_T)
 #define MILI (1000000)
 
-#define GIGAUNIT 16LL//440LL-->max
+#define GIGAUNIT 32LL//440LL-->max
 #ifndef OP
 #define OP 90
 #endif
-#define SHOWINGSIZE (GIGAUNIT * G)
+#define SHOWINGSIZE (GIGAUNIT * _G)
 #define TOTALSIZE (SHOWINGSIZE + (SHOWINGSIZE/100*(100-OP)))
-#define REALSIZE (256L*G)
+#define REALSIZE (256L*_G)
 #define PAGE_TARGET_KILO (16)
-#define PAGESIZE (PAGE_TARGET_KILO*K)
+#define PAGESIZE (PAGE_TARGET_KILO*_K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
-#define COPYMETA_ONLY 10
+//#define COPYMETA_ONLY 10
 //#define GLOBAL_WRITE_BUFFER (128*1024)//(256*1024) //1MB
 
 #if 1
