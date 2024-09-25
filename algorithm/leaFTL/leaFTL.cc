@@ -211,7 +211,7 @@ uint32_t lea_argument(int argc, char **argv){
 	uint64_t base;
 	uint32_t physical_page_num;
 	double cache_percentage;
-    gm.fast_search=false;
+    gm.fast_search=true;
 	while((c=getopt(argc,argv,"cpf"))!=-1){
 		switch(c){
 			case 'c':
@@ -554,6 +554,9 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
             for(;master_iter!=target_grp_list.end(); master_iter++){
                 t_grp=*master_iter;
 
+                if(t_grp->lba==test_key){
+                    //GDB_MAKE_BREAKPOINT;
+                }
                 if(lea_cache_evict(t_grp->gp)==false){
                     break;
                 }
@@ -570,6 +573,7 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
                         continue;
                     }
 
+
                     if(t_grp->r_type==DATAREAD && t_grp->retry_flag==RETRY_FLAG::DATA_FOUND){
                         goto found_end;
                     }
@@ -582,6 +586,7 @@ void lea_mapping_find_exact_piece_ppa(temp_map *map, bool invalidate, blockmanag
 
                     if(t_grp->retry_flag==RETRY_FLAG::DATA_FOUND){
                     found_end:
+                        //t_grp->piece_ppa=exact_map[t_grp->lba];
                         #ifdef DEBUG
                         if(t_grp->piece_ppa!=exact_map[t_grp->lba]){
                             printf("address error find_ppa:%u lea_mapping_update:%u!\n", find_exact_piece_ppa_cnt, lea_mapping_find_exact_piece_ppa);
@@ -621,6 +626,7 @@ uint32_t *lea_gp_to_mapping(group *gp){
 }
 
 void lea_compaction(){
+    return;
     int64_t new_lru_now_byte=0;
 	printf("compaction start!\n");
     for(uint32_t idx=0; idx<TRANSMAPNUM ;idx++){
