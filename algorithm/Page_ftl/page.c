@@ -5,6 +5,7 @@
 #include <getopt.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "../../include/utils/data_copy.h"
 #include "../../include/data_struct/lrucache.hpp"
 #include "page.h"
 #include "map.h"
@@ -84,14 +85,13 @@ void page_destroy (lower_info* li, algorithm *algo){
 
 void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value){
 	/*you can implement your own structur for your specific FTL*/
-	
 	if(type==DATAR){
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
 			if(test_key==req->key){
 				printf("%u page hit(piece_ppa:%u)\n", req->key,value->ppa);
 			}
-			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+			data_copy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 			req->buffer_hit++;
 			req->end_req(req);
 			fdriver_unlock(&rb.read_buffer_lock);
@@ -154,7 +154,7 @@ uint32_t page_read(request *const req){
 	for(uint32_t i=0; i<a_buffer.idx; i++){
 		if(req->key==a_buffer.key[i]){
 			//		printf("buffered read!\n");
-			memcpy(req->value->value, a_buffer.value[i]->value, LPAGESIZE);
+			data_copy(req->value->value, a_buffer.value[i]->value, LPAGESIZE);
 			req->end_req(req);		
 			return 1;
 		}
@@ -213,7 +213,7 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 			if(a_buffer.key[i]==0){
 				printf("target key:%u->%u\n", 0,ppa*L2PGAP+i);
 			}
-			memcpy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
+			data_copy(&value->value[i*LPAGESIZE], a_buffer.value[i]->value, LPAGESIZE);
 			inf_free_valueset(a_buffer.value[i], FS_MALLOC_W);
 		}
 		req->value=NULL;
@@ -277,7 +277,7 @@ uint32_t page_flush(request *const req){
 static void processing_pending_req(algo_req *req, value_set *v){
 	request *parents=req->parents;
 	page_param *param=(page_param*)req->param;
-	memcpy(param->value->value, &v->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+	data_copy(param->value->value, &v->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 	if(parents){
 		if(parents->type_lower < 10){
 			parents->type_lower+=req->type_lower;
@@ -321,11 +321,11 @@ void *page_end_req(algo_req* input){
 
 			fdriver_lock(&rb.read_buffer_lock);
 			rb.buffer_ppa=param->value->ppa/L2PGAP;
-			memcpy(rb.buffer_value, param->value->value, PAGESIZE);
+			data_copy(rb.buffer_value, param->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
 
 			if(param->value->ppa%L2PGAP){
-				memmove(param->value->value, &param->value->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+				data_move(param->value->value, &param->value->value[(param->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 			}
 
 			break;

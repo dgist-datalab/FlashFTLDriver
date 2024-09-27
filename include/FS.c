@@ -15,18 +15,21 @@ int F_malloc(void **ptr, int size,int rw){
 		abort();
 	}
 
-#ifdef linux_aio
-	if(size%(4*K)){
+#if defined(linux_aio) || defined(posix_aio)
+	if(size%(4*_K)){
 		(*ptr)=malloc(size);
-	}else{
-		int res;
-		void *target;
-		res=posix_memalign(&target,4*_K,size);
+	}
+	else{
+		// int res;
+		// void *target;
+		// res=posix_memalign(&target,4*_K,size);
 
-		if(res){
-			printf("failed to allocate memory:%d\n",errno);
-		}
-		*ptr=target;
+		// if(res){
+		// 	printf("failed to allocate memory:%d\n",errno);
+		// }
+		// *ptr=target;
+
+		*ptr=memalign(4*_K,size);
 	}
 #else
 	(*ptr)=malloc(size);

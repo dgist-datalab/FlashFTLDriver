@@ -11,6 +11,7 @@
 #include "../include/data_struct/redblack.h"
 #include "../include/utils/cond_lock.h"
 #include "../include/utils/tag_q.h"
+#include "../include/utils/data_copy.h"
 #include "../include/utils/data_checker.h"
 #include "../blockmanager/block_manager_master.h"
 #include "../interface/global_write_buffer.h"
@@ -958,10 +959,10 @@ value_set *inf_get_valueset(char * in_v, int type, uint32_t length){
 
 	res->from_app=false;
 	if(in_v){
-		memcpy(res->value,in_v,length);
+		data_copy(res->value,in_v,length);
 	}
 	else{
-		memset(res->value,0,length);
+		data_set(res->value,0,length);
 	}
 	res->ppa=UINT32_MAX;
 	return res;

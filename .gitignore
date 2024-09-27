@@ -35,3 +35,4 @@ last_level_dump
 *-result
 *.dump
 .vscode/
+OPT_TESTING/

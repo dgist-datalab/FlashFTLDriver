@@ -4,6 +4,9 @@
 #include "../../bench/measurement.h"
 #include "../../include/utils/cond_lock.h"
 #include "../../include/utils/thpool.h"
+#include "../../include/utils/tag_q.h"
+#include "../../include/data_struct/partitioned_slab.h"
+
 #include "linux_aio.h"
 #include <libaio.h>
 #include <fcntl.h>
@@ -21,12 +24,17 @@
 #include <errno.h>
 #include <assert.h>
 #include <semaphore.h>
+#include <malloc.h>
+void posix_traffic_print(lower_info *li);
+void posix_invalidate_inform(uint64_t ppa);
 
 lower_info aio_info={
 	.create=aio_create,
 	.destroy=aio_destroy,
-	.write=aio_push_data,
-	.read=aio_pull_data,
+	.write=aio_write,
+	.read=aio_read,
+	.write_sync=NULL,
+	.read_sync=NULL,
 	.device_badblock_checker=NULL,
 	.trim_block=aio_trim_block,
 	.trim_a_block=aio_trim_a_block,
@@ -34,49 +42,63 @@ lower_info aio_info={
 	.stop=aio_stop,
 	.lower_alloc=NULL,
 	.lower_free=NULL,
-	.lower_flying_req_wait=aio_flying_req_wait
+	.lower_flying_req_wait=aio_flying_req_wait,
+	.lower_show_info=NULL,
+	.lower_tag_num=NULL,
+	.print_traffic=posix_traffic_print,
+	.dump=NULL,
+	.load=NULL,
+	.invalidate_inform=posix_invalidate_inform,
 };
 
-threadpool thpool;
+typedef struct aio_private{
+	algo_req *req;
+	uint32_t tag;
+}aio_private;
+
+struct iocb request_list[QDEPTH];
+aio_private private_list[QDEPTH];
+char *temp_value[QDEPTH];
 
 static int _fd;
-static pthread_mutex_t fd_lock,flying_lock;
 static pthread_t t_id;
 static io_context_t ctx;
-cl_lock *lower_flying;
-bool flying_flag;
-//static int write_cnt, read_cnt;
-sem_t sem;
-bool wait_flag;
-bool stopflag;
-uint64_t lower_micro_latency;
-MeasureTime total_time;
-long int a, b, sum1, sum2, max1, max2;
+static tag_manager *tm=NULL;
+static PS_master *ps_master;
 
-int type_dist[9][1000];
-int read_dist[1000], write_dist[1000];
+void posix_invalidate_inform(uint64_t ppa){
+#ifdef COPYMETA_ONLY
+	PS_master_free_slab(ps_master, ppa);
+#else
+	return;
+#endif
+}
 
-int ptrn_idx;
-int rw_pattern[1000];
-long int ppa_pattern[1000];
+void posix_traffic_print(lower_info *li){
+	static int cnt=0;
+	printf("info print %u\n",cnt);
+	for(int i=0; i<LREQ_TYPE_NUM;i++){
+		printf("%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
+	}
+	printf("WAF: %lf\n\n",
+		   (double)(li->req_type_cnt[MAPPINGW] +
+					li->req_type_cnt[DATAW] +
+					li->req_type_cnt[GCDW] +
+					li->req_type_cnt[GCMW_DGC] +
+					li->req_type_cnt[GCMW] +
+					li->req_type_cnt[COMPACTIONDATAW]) /
+			   li->req_type_cnt[DATAW]);
+	memset(li->req_type_cnt, 0,  sizeof(uint64_t)*LREQ_TYPE_NUM);
+	printf("end\n");
+}
 
 static uint8_t test_type(uint8_t type){
 	uint8_t t_type=0xff>>1;
 	return type&t_type;
 }
 
-#ifdef THPOOL
-void io_submit_wrap(void *arg, int id) {
-	struct iocb *cb = (struct iocb *)arg;
-
-	if (io_submit(ctx,1,&cb) !=1) {
-        printf("Error on aio_write()\n");
-        exit(1);
-    }
-}
-#endif
-
 void *poller(void *input) {
+	aio_private *pri;
 	algo_req *req;
 	int ret;
 	struct io_event done_array[128];
@@ -87,44 +109,27 @@ void *poller(void *input) {
 	w_t.tv_nsec=10*1000;
 
     for (int i = 0; ; i++) {
-        if (stopflag) {
-            pthread_exit(NULL);
-        }
 		if((ret=io_getevents(ctx,0,128,done_array,&w_t))){
 			for(int i=0; i<ret; i++){
 				r=&done_array[i];
-				req=(algo_req*)r->data;
 				cb=r->obj;
+				pri=(aio_private*)cb->data;
 				if(r->res==(uint32_t)-22){
 					printf("error! %s %lu %llu\n",strerror(-r->res),r->res2,cb->u.c.offset);
 				}else if(r->res!=PAGESIZE){
 					printf("data size error %d!\n",errno);
 				}
-				else{
-				//	printf("cb->offset:%d cb->nbytes:%d\n",cb->u.c.offset,cb->u.c.nbytes);
-				}
-				//if(req->parents){
-				//}
-				req->end_req(req);
-				cl_release(lower_flying);
+				req=pri->req;
 
-				free(r->obj);
+				req->end_req(req);
+				tag_manager_free_tag(tm, pri->tag);
 			}
 		}
-		if(lower_flying->now==lower_flying->cnt){
-			if(wait_flag){
-				wait_flag=false;
-				sem_post(&sem);
-			}
-		}
-        if (i == 1-1) i = -1;
     }
 	return NULL;
 }
 
 uint32_t aio_create(lower_info *li,blockmanager *bm){
-	int ret;
-	sem_init(&sem,0,0);
 	li->NOB=_NOS;
 	li->NOP=_NOP;
 	li->SOB=BLOCKSIZE * BPS;
@@ -133,45 +138,38 @@ uint32_t aio_create(lower_info *li,blockmanager *bm){
 	li->PPB=_PPB;
 	li->PPS=_PPS;
 	li->TS=TOTALSIZE;
-	li->DEV_SIZE=DEVSIZE;
-	li->all_pages_in_dev=DEVSIZE/PAGESIZE;
 
 	li->write_op=li->read_op=li->trim_op=0;
-	printf("file name : %s\n",LOWER_FILE_NAME);
-	//_fd=open(LOWER_FILE_NAME,O_RDWR|O_DIRECT,0644);
-#ifdef __cplusplus
-	_fd=open(LOWER_FILE_NAME,O_RDWR|O_CREAT|O_DIRECT,0666);
-#else
-	_fd=open(LOWER_FILE_NAME,O_RDWR|O_CREAT,0666);
-#endif
-	//_fd=open64(LOWER_FILE_NAME,O_RDWR|O_CREAT|O_DIRECT,0666);
+	printf("file name : %s\n", MEDIA_NAME);
+	_fd = open(MEDIA_NAME, O_RDWR|O_DIRECT);
 	if(_fd==-1){
 		printf("file open error!\n");
 		exit(1);
 	}
 	
-	ret=io_setup(128,&ctx);
+	printf("!!! posix libaio NOP:%d!!!\n",li->NOP);
+	li->write_op=li->read_op=li->trim_op=0;
+
+	int ret=io_setup(QDEPTH,&ctx);
 	if(ret!=0){
 		printf("io setup error\n");
 		exit(1);
 	}
+	tm=tag_manager_init(QDEPTH);
 
-	lower_flying=cl_init(128,false);
-
-	pthread_mutex_init(&fd_lock,NULL);
-	pthread_mutex_init(&flying_lock,NULL);
-	sem_init(&sem,0,0);
-
-	measure_init(&total_time);
-	MS(&total_time);
-
-    stopflag = false;
-    pthread_create(&t_id, NULL, &poller, NULL);
-
-#ifdef THPOOL
-	thpool = thpool_init(NUM_THREAD);
+#ifdef COPYMETA_ONLY
+	ps_master=PS_master_init(_NOS, _PPS, _NOP/100*COPYMETA_ONLY);
+#else
+	for(uint32_t i=0; i<QDEPTH; i++){
+		pp_cache[i].ppa=UINT32_MAX;
+	}
 #endif
 
+	for(uint32_t i=0; i<QDEPTH; i++){
+		temp_value[i]=(char*)memalign(4*_K, PAGESIZE);
+	}
+
+    pthread_create(&t_id, NULL, &poller, NULL);
 	return 1;
 }
 
@@ -179,39 +177,37 @@ void *aio_refresh(lower_info *li){
 	li->write_op=li->read_op=li->trim_op=0;
 	return NULL;
 }
+
 void *aio_destroy(lower_info *li){
-	for(int i=0; i<LREQ_TYPE_NUM;i++){
-		fprintf(stderr,"%s %lu\n",bench_lower_type(i),li->req_type_cnt[i]);
-	}
-	close(_fd);
-
+	posix_traffic_print(li);
+	tag_manager_free_manager(tm);
 	return NULL;
 }
-uint64_t offset_hooker(uint64_t origin_offset, uint8_t req_type){
-	uint64_t res=origin_offset;
-	switch(req_type){
-		case TRIM:
-			break;
-		case MAPPINGR:
-			break;
-		case MAPPINGW:
-			break;
-		case GCMR:
-			break;
-		case GCMW:
-			break;
-		case DATAR:
-			break;
-		case DATAW:
-			break;
-		case GCDR:
-			break;
-		case GCDW:
-			break;
+
+
+void send_req(FSTYPE type, uint32_t ppa, value_set* value, algo_req *upper_request){
+	uint32_t tag=tag_manager_get_tag(tm);
+
+	struct iocb *target_req = &request_list[tag];
+	aio_private *pri_req = &private_list[tag];
+	pri_req->req = upper_request;
+	pri_req->tag =tag;
+
+
+	switch(type){
+		case FS_SET_T:
+		io_prep_pwrite(target_req, _fd, (void*)temp_value[tag], PAGESIZE, ppa*PAGESIZE);
+		break;
+		case FS_GET_T:
+		io_prep_pread(target_req, _fd, (void*)temp_value[tag], PAGESIZE, ppa*PAGESIZE);
+		break;
 	}
-	return res%(aio_info.DEV_SIZE);
+	target_req->data=(void*)pri_req;
+
+	io_submit(ctx,1,&target_req);
 }
-void *aio_push_data(uint32_t PPA, uint32_t size, value_set* value, bool async,algo_req *const req){
+
+void *aio_write(uint32_t PPA, uint32_t size, value_set* value, algo_req *const req){
 	req->ppa = PPA;
 	if(value->dmatag==-1){
 		printf("dmatag -1 error!\n");
@@ -221,34 +217,18 @@ void *aio_push_data(uint32_t PPA, uint32_t size, value_set* value, bool async,al
 	if(t_type < LREQ_TYPE_NUM){
 		aio_info.req_type_cnt[t_type]++;
 	}
-	
-	if(size !=PAGESIZE){
-		abort();
-	}
-	struct iocb *cb=(struct iocb*)malloc(sizeof(struct iocb));
-	cl_grap(lower_flying);
-	
-//	fprintf(stderr,"w %u\n",PPA);
-	//io_prep_pwrite(cb,_fd,(void*)value->value,PAGESIZE,aio_info.SOP*PPA);
-	io_prep_pwrite(cb,_fd,(void*)value->value,PAGESIZE,offset_hooker((uint64_t)aio_info.SOP*PPA,t_type));
-	cb->data=(void*)req;	
 
-#ifdef THPOOL
-	while(thpool_num_threads_working(thpool)>=NUM_THREAD);
-	thpool_add_work(thpool, io_submit_wrap, (void *)cb);
-#else
-	pthread_mutex_lock(&fd_lock);
-	if (io_submit(ctx,1,&cb) !=1) {
-        printf("Error on aio_write()\n");
-        exit(1);
-    }
-	pthread_mutex_unlock(&fd_lock);
+#ifdef COPYMETA_ONLY
+	if(PS_ismeta_data(req->type)){
+		PS_master_insert(ps_master, PPA, value->value);
+	}
 #endif
 
+	send_req(FS_SET_T, PPA, value, req);
 	return NULL;
 }
 
-void *aio_pull_data(uint32_t PPA, uint32_t size, value_set* value, bool async,algo_req *const req){	
+void *aio_read(uint32_t PPA, uint32_t size, value_set* value, algo_req *const req){	
 	req->ppa = PPA;
 	if(value->dmatag==-1){
 		printf("dmatag -1 error!\n");
@@ -260,51 +240,21 @@ void *aio_pull_data(uint32_t PPA, uint32_t size, value_set* value, bool async,al
 		aio_info.req_type_cnt[t_type]++;
 	}
 	
-	struct iocb *cb=(struct iocb*)malloc(sizeof(struct iocb));
-	cl_grap(lower_flying);
-	io_prep_pread(cb,_fd,(void*)value->value,PAGESIZE,offset_hooker((uint64_t)aio_info.SOP*PPA,t_type));
-	cb->data=(void*)req;
-
-#ifdef THPOOL
-	while(thpool_num_threads_working(thpool)>=NUM_THREAD);
-	thpool_add_work(thpool, io_submit_wrap, (void *)cb);
-#else
-	pthread_mutex_lock(&fd_lock);
-	if (io_submit(ctx,1,&cb) !=1) {
-        printf("Error on aio_write()\n");
-        exit(1);
-    }
-	pthread_mutex_unlock(&fd_lock);
-#endif
+	send_req(FS_GET_T, PPA, value, req);
 
 	return NULL;
 }
 
-void *aio_trim_block(uint32_t PPA, bool async){
-	aio_info.req_type_cnt[TRIM]++;
-	uint64_t range[2];
-	//range[0]=PPA*aio_info.SOP;
-	range[0]=offset_hooker((uint64_t)PPA*aio_info.SOP,TRIM);
-	range[1]=_PPS*aio_info.SOP;
-	fprintf(stderr,"T %u\n",PPA);
-	ioctl(_fd,BLKDISCARD,&range);
+void *aio_trim_block(uint32_t PPA){
 	return NULL;
 }
 
-void *aio_trim_a_block(uint32_t PPA, bool async){
-	aio_info.req_type_cnt[TRIM]++;
-	uint64_t range[2];
-	//range[0]=PPA*aio_info.SOP;
-	range[0]=offset_hooker((uint64_t)PPA*aio_info.SOP,TRIM);
-	range[1]=_PPB*aio_info.SOP;
-	//fprintf(stderr,"T %u\n",PPA);
-	ioctl(_fd,BLKDISCARD,&range);
+void *aio_trim_a_block(uint32_t PPA){
 	return NULL;
 }
 
 void aio_stop(){}
 
 void aio_flying_req_wait(){
-	while (lower_flying->now != 0) {}
 	return ;
 }

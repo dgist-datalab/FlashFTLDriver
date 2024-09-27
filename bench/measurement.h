@@ -27,6 +27,7 @@ void measure_stamp(MeasureTime *);
 void measure_adding(MeasureTime *);
 void measure_calc_max(MeasureTime *);
 void measure_adding_print(MeasureTime *m);
+uint64_t measure_get_time(MeasureTime *);
 struct timeval measure_res(MeasureTime *);
 static inline void print_adding_result(const char* front,MeasureTime *m, const char *behind){
 	if(!m->isadding){

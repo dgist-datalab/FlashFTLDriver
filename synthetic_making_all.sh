@@ -2,6 +2,8 @@
 mkdir -f ./result
 rm ./result/*_driver
 
+make clean
+
 make TARGET_ALGO=DFTL driver -j
 mv driver ./result/dftl_driver
 make clean

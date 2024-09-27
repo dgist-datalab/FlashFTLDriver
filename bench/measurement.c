@@ -88,6 +88,12 @@ void measure_calc_max(MeasureTime *m){
 	}
 }
 
+
+uint64_t measure_get_time(MeasureTime *m){
+	measure_calc(m);
+	return m->micro_time;
+}
+
 #ifdef DCPP
 void measure_end(MeasureTime *m,std::string input ){
 	char format[200];
@@ -116,3 +122,4 @@ void measure_end(MeasureTime *m,const char *format){
 	return;
 }
 #endif
+

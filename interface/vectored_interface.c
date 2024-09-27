@@ -169,6 +169,8 @@ void *vectored_main(void *__input){
 	vec_request *vec_req;
 	request* inf_req;
 	processor *_this=NULL;
+	MeasureTime mt;
+	measure_init(&mt);
 	for(int i=0; i<1; i++){
 		if(pthread_self()==mp.processors[i].t_id){
 			_this=&mp.processors[i];

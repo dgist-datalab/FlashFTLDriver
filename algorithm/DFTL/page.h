@@ -36,4 +36,3 @@ uint32_t demand_dump(FILE *fp);
 uint32_t demand_load(lower_info *li, blockmanager *bm, struct algorithm *algo, FILE *fp);
 void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value);
 void update_cache_mapping();
-

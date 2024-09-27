@@ -1,5 +1,6 @@
 #include "gc.h"
 #include "map.h"
+#include "../../include/utils/data_copy.h"
 #include "../../include/data_struct/list.h"
 #include "../../include/debug_utils.h"
 #include <stdlib.h>
@@ -83,7 +84,7 @@ void new_do_gc(){
 		lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 		for(uint32_t i=0; i<L2PGAP; i++){
 			if(page_map_pick(lbas[i])!=gv->ppa*L2PGAP+i) continue;
-			memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
+			data_copy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 			g_buffer.key[g_buffer.idx]=lbas[i];
 
 			g_buffer.idx++;
@@ -158,7 +159,7 @@ void do_gc(){
 			lbas=(KEYT*)bm->get_oob(bm, gv->ppa);
 			for(uint32_t i=0; i<L2PGAP; i++){
 				if(bm->is_invalid_piece(bm,gv->ppa*L2PGAP+i)) continue;
-				memcpy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
+				data_copy(&g_buffer.value[g_buffer.idx*LPAGESIZE],&gv->value->value[i*LPAGESIZE],LPAGESIZE);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
 				g_buffer.idx++;
