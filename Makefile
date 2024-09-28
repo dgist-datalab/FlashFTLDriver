@@ -30,7 +30,6 @@ export COMMONFLAGS+=\
 			-D$(TARGET_BM)\
 			-Wno-unused-but-set-variable\
 			-DPROGRESS\
-			-mcmodel=large\
 			-DAPPL_DESIGN_PATH="\"$(PWD)/algorithm/layeredLSM/design_knob/\""\
 			-DMEDIA_NAME="\"/dev/nvme2n1\""\
 			-DTIME_BREAKDOWN\
