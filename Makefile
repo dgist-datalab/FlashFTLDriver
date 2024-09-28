@@ -32,6 +32,8 @@ export COMMONFLAGS+=\
 			-DPROGRESS\
 			-mcmodel=large\
 			-DAPPL_DESIGN_PATH="\"$(PWD)/algorithm/layeredLSM/design_knob/\""\
+			-DMEDIA_NAME="\"/dev/nvme2n1\""\
+			-DTIME_BREAKDOWN\
 			-O3\
 #			-DTRACE_COLLECT\
 #			-DTRACE_REPLAY\
@@ -149,9 +151,9 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
-#		-luring\
+		-luring\
+	-laio\
 #		-ldw\
-#	-laio\
 		-ljemalloc\
 
 all: driver
