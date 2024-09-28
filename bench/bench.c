@@ -585,20 +585,6 @@ void bench_reap_nostart(request *const req){
 	pthread_mutex_unlock(&bench_lock);
 }
 
-void bench_collect_map_cpu_time(bench_data *bd, request *req){
-#ifdef CDF
-	uint64_t cpu_time = req->mapping_cpu.adding.tv_sec * 1000000 + req->mapping_cpu.adding.tv_usec;
-	int slot_num = cpu_time / TIMESLOT;
-	if(slot_num>=1000000/TIMESLOT){
-			bd->map_cpu_time[1000000/TIMESLOT]++;
-	}	
-	else{
-		bd->map_cpu_time[slot_num]++;
-	}
-	bench_update_ftl_time(&bd->cpu_time, cpu_time);
-#endif
-}
-
 void bench_vector_data_collect_sec(bench_data *bd, vec_request *vec_req){
 	uint64_t slot=vec_req->latency_checker.end_time_micro-bd->start_time_micro;
 	slot/=1000000;
@@ -679,9 +665,6 @@ void bench_reap_data(request *const req,lower_info *li, bool print_latency){
 	if(idx==-1){return;}
 	monitor *_m=&_master->m[idx];
 	bench_data *_data=&_master->datas[idx];
-	if(req->mapping_cpu_check){
-		bench_collect_map_cpu_time(_data, req);
-	}
 	if(req->type==FS_GET_T || req->type==FS_NOTFOUND_T){
 		bench_update_typetime(_data, req->type_ftl, req->type_lower, req->buffer_hit, req->latency_checker.micro_time);
 	}

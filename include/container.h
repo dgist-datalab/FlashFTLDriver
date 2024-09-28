@@ -67,16 +67,10 @@ struct request {
 	uint64_t ppa;/*it can be the iter_idx*/
 	uint32_t seq;
 	uint32_t global_seq;
-#ifdef hash_dftl
-	volatile int num; /*length of requests*/
-	volatile int cpl; /*number of completed requests*/
-#endif
 	int not_found_cnt;
 	value_set *value;
-	//value_set **multi_value;
 	char **app_result;
 
-	//KEYT *multi_key;
 	bool (*end_req)(struct request *const);
 	void *(*special_func)(void *);
 	bool (*added_end_req)(struct request *const);
@@ -84,19 +78,10 @@ struct request {
 	uint8_t magic;
 	void *param;
 	void *__hash_node;
-	//pthread_mutex_t async_mutex;
 	int mark;
 	bool is_sequential_start;
 	uint32_t consecutive_length; 
 	uint32_t round_cnt;
-
-/*s:for application req
-	char *target_buf;
-	uint32_t inter_offset;
-	uint32_t target_len;
-	char istophalf;
-	FSTYPE org_type;
-e:for application req*/
 
 	uint8_t type_ftl;
 	uint8_t type_lower;
@@ -106,16 +91,9 @@ e:for application req*/
 	bool isstart;
 	MeasureTime latency_checker;
 
-	bool mapping_cpu_check;
-	MeasureTime mapping_cpu;
-
 	fdriver_lock_t done_lock;
 	bool write_done;
 	bool map_done;
-	/* HASH_KVSSD */
-#ifdef hash_dftl
-	void *hash_param;
-#endif
 	struct vectored_request *parents;
 };
 

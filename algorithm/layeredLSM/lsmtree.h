@@ -76,6 +76,22 @@ typedef struct lsmtree_monitor{
 	uint64_t compaction_output_entry_num[10];
 	uint32_t force_compaction_cnt;
 	uint32_t reinsert_cnt;
+
+	uint64_t memtable_search_cnt;
+	uint64_t memtable_search_time;
+
+	uint64_t binary_search_cnt[2];
+	uint64_t binary_search_time[2];
+
+	uint64_t bf_cnt;
+	uint64_t bf_time;
+	uint64_t bf_retry_cnt;
+	uint64_t bf_retry_time;
+
+	uint64_t plr_cnt;
+	uint64_t plr_time;
+	uint64_t plr_retry_cnt;
+	uint64_t plr_retry_time;
 }lsmtree_monitor;
 
 typedef struct lsmtree{
@@ -136,6 +152,9 @@ void __lsm_free_run(lsmtree *lsm, run *r);
 void __lsm_calculate_memory_usage(lsmtree *lsm,uint64_t entry_num, int32_t memory_usage_bit, uint32_t map_type, bool pinning);
 bool __lsm_pinning_enable(lsmtree *lsm, uint32_t entry_num);
 uint32_t lsm_get_ppa_from_scseg(void *arg, void (*update_addr)(uint32_t *, uint32_t*, uint32_t));
+
+void time_breakdown_start();
+uint64_t time_breakdown_end();
 
 static inline uint32_t bit_calculate(uint32_t lba_range){
 	uint32_t res=0;

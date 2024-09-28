@@ -8,6 +8,7 @@ extern uint32_t test_key2;
 extern lower_info *g_li;
 extern lsmtree *LSM;
 extern page_read_buffer rb;
+extern MeasureTime lsmtree_mt;
 
 static void __check_data(algo_req *req, char *value){
 	request *p_req=req->parents;
@@ -21,16 +22,10 @@ static void __check_data(algo_req *req, char *value){
 		fdriver_unlock(&LSM->read_cnt_lock);
 
 		memmove(&p_req->value->value[0], &value[intra_offset*LPAGESIZE], LPAGESIZE);
-	//	fdriver_unlock(&param->r->lock);
-		//if(param->r->type!=RUN_LOG){
-		//	cache_layer_idx_unpin(LSM, param->r->st_body->sp_meta[param->ste_num].piece_ppa);
-		//}
 		p_req->end_req(p_req);
 		param->mf->query_done(param->mf, param);
 	}
 	else{
-	//	static int cnt=0;
-	//	printf("retry! %u\n", cnt++);
 		inf_assign_try(p_req);
 	}
 	free(req);
@@ -143,15 +138,10 @@ uint32_t run_pick_target_mf(run *r, uint32_t lba, map_function **mf){
 }
 
 uint32_t run_query(run *r, request *req){
-	//fdriver_lock(&r->lock);
-	if(req->key==test_key){
-	//	GDB_MAKE_BREAKPOINT;
-	}
 	if(r->pp){
 		char *res=pp_find_value(r->pp, req->key);
 		if (res){
 			memcpy(req->value->value, res, LPAGESIZE);
-	//		fdriver_unlock(&r->lock);
 			req->end_req(req);
 			return READ_DONE;
 		}
@@ -166,14 +156,7 @@ uint32_t run_query(run *r, request *req){
 
 	if(r->type==RUN_LOG){
 		mf=r->run_log_mf;
-#ifdef MAPPING_TIME_CHECK
-	//	measure_start(&req->mapping_cpu);
-#endif
 		uint32_t global_intra_offset=mf->query_by_req(mf, req, &param);
-
-#ifdef MAPPING_TIME_CHECK
-	//	measure_adding(&req->mapping_cpu);
-#endif
 		if(global_intra_offset==NOT_FOUND){
 			param->mf->query_done(param->mf, param);
 			goto not_found_end;
@@ -181,31 +164,47 @@ uint32_t run_query(run *r, request *req){
 		else{
 			ste_num=global_intra_offset;
 			psa=run_translate_intra_offset(r, UINT32_MAX, global_intra_offset);
+			req->type_ftl+=10;
 		}
 	}
 	else{
-#ifdef MAPPING_TIME_CHECK
-	//	measure_start(&req->mapping_cpu);
-#endif
+		uint64_t bs_search_time=0;
+		uint64_t map_search_time=0;
 
+		time_breakdown_start();
 		ste_num = st_array_get_target_STE(r->st_body, req->key);
+		bs_search_time=time_breakdown_end();
 
-#ifdef MAPPING_TIME_CHECK
-	//	measure_adding(&req->mapping_cpu);
-#endif
 		if (ste_num == UINT32_MAX)
 		{
 			goto not_found_end;
 		}
 		req->retry = true;
 		mf = r->st_body->pba_array[ste_num].mf;
-#ifdef MAPPING_TIME_CHECK
-		measure_start(&req->mapping_cpu);
-#endif
+
+		time_breakdown_start();
 		uint32_t intra_offset = mf->query_by_req(mf, req, &param);
-#ifdef MAPPING_TIME_CHECK
-		measure_adding(&req->mapping_cpu);
-#endif
+		map_search_time=time_breakdown_end();
+
+		switch(mf->type){
+			case BF:
+			case GUARD_BF:
+			req->type_ftl+=20;
+			LSM->monitor.binary_search_cnt[0]++;
+			LSM->monitor.binary_search_time[0]+=bs_search_time;
+
+			LSM->monitor.bf_cnt++;
+			LSM->monitor.bf_time+=map_search_time;
+			break;
+			case PLR_MAP:
+			req->type_ftl+=30;
+			LSM->monitor.binary_search_cnt[1]++;
+			LSM->monitor.binary_search_time[1]+=bs_search_time;
+
+			LSM->monitor.plr_cnt++;
+			LSM->monitor.plr_time+=map_search_time;
+			break;
+		}
 retry:
 		if(intra_offset==READ_MAP){
 			goto read_map;
@@ -220,17 +219,14 @@ retry:
 		{
 			intra_offset=mf->query_retry(mf, param);
 			goto retry;
-			//EPRINT("shortcut error", false);
-			//param->mf->query_done(param->mf, param);
-			//goto not_found_end;
 		}
 	}
-read_map:
-	//DEBUG_CNT_PRINT(test, UINT32_MAX, __FUNCTION__, __LINE__);
 
+read_map:
 	fdriver_lock(&LSM->read_cnt_lock);
 	LSM->now_flying_read_cnt++;
 	fdriver_unlock(&LSM->read_cnt_lock);
+
 	if(param->read_map){
 		param->intra_offset=r->st_body->sp_meta[ste_num].piece_ppa %L2PGAP;
 		param->ste_num=ste_num;
@@ -247,8 +243,8 @@ read_map:
 		__run_issue_read(req, psa/L2PGAP, req->value, param, false);
 	}
 	return READ_DONE;
+
 not_found_end:
-	//fdriver_unlock(&param->r->lock);
 	return READ_NOT_FOUND;
 }
 
@@ -264,13 +260,24 @@ uint32_t run_query_retry(run *r, request *req){
 	uint32_t ste_num=param->ste_num;
 	map_function *mf=r->st_body->pba_array[ste_num].mf;
 retry:
-#ifdef MAPPING_TIME_CHECK
-	//measure_start(&req->mapping_cpu);
-#endif
+	uint64_t retry_time=0;
+	time_breakdown_start();
 	uint32_t intra_offset=mf->query_retry(mf, param);
-#ifdef MAPPING_TIME_CHECK
-	//measure_adding(&req->mapping_cpu);
-#endif
+	retry_time=time_breakdown_end();
+
+	switch(mf->type){
+		case BF:
+		case GUARD_BF:
+		LSM->monitor.bf_retry_cnt++;
+		LSM->monitor.bf_retry_time+=retry_time;
+		break;
+		case PLR_MAP:
+		LSM->monitor.plr_retry_cnt++;
+		LSM->monitor.plr_retry_time+=retry_time;
+		break;
+	}
+
+
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
 		fdriver_lock(&LSM->read_cnt_lock);

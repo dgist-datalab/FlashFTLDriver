@@ -37,6 +37,7 @@ char all_set_data[PAGESIZE];
 lsmtree *LSM;
 lsmtree_parameter *target_param;
 lower_info *g_li;
+MeasureTime lsmtree_mt;
 
 uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	g_li=li;
@@ -48,6 +49,7 @@ uint32_t create_temp(lower_info *li,blockmanager *sm, struct algorithm *){
 	}
 	LSM=lsmtree_init(*target_param, sm);
 	memset(all_set_data, -1, PAGESIZE);
+	measure_init(&lsmtree_mt);
 	return 1;
 }
 
@@ -84,7 +86,6 @@ uint32_t write_temp(request *const req){
 	/*
 	static bool print_test=false;
 	if(print_test==false && g_li->req_type_cnt[DATAW]>=19755371){
-		running_flag=true;
 		g_li->print_traffic(g_li);
 	}*/
 	return 1;

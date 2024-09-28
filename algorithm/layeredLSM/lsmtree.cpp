@@ -3,6 +3,7 @@
 #include "cache_layer.h"
 
 page_read_buffer rb;
+extern MeasureTime lsmtree_mt;
 
 
 extern lower_info *g_li;
@@ -29,6 +30,20 @@ static inline void __rm_free_ridx(run_manager *rm, uint32_t ridx){
 	rm->run_array[ridx]=NULL;
 	rm->ridx_queue->push(ridx);
 	fdriver_unlock(&rm->lock);
+}
+
+void time_breakdown_start(){
+#ifdef TIME_BREAKDOWN
+	measure_start(&lsmtree_mt);
+#endif
+}
+
+uint64_t time_breakdown_end(){
+#ifdef TIME_BREAKDOWN
+	return measure_get_time(&lsmtree_mt);
+#else
+	return 0;
+#endif
 }
 
 run *__lsm_populate_new_run(lsmtree *lsm, uint32_t map_type, uint32_t run_type, uint32_t entry_num, uint32_t level_num){
@@ -263,7 +278,7 @@ uint32_t  lsmtree_pending_sc(lsmtree *lsm, request *req){
 	}
 	else
 	{ // map miss
-		req->type_ftl += 20;
+		req->type_ftl += 200;
 	}
 	return res;
 }
@@ -284,22 +299,29 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	uint32_t res=READ_DONE;
 	run *r;
 	bool temp;
+	uint64_t memtable_search_time=0;
 	if(req->key==test_key){
 		static int cnt=0;
 		printf("req->key read:%u cnt:%u seq:%u\n", req->key, ++cnt, req->seq);
 	}
 	if(req->retry==false){
-		//first check memtable
 		req->flag=READ_REQ_INIT;
+		time_breakdown_start();
 		res=run_query(lsm->memtable[lsm->now_memtable_idx], req);
+
+		memtable_search_time=time_breakdown_end();
+
+		lsm->monitor.memtable_search_cnt++;
+		lsm->monitor.memtable_search_time+=memtable_search_time;
+
+		
 		if(res!=READ_NOT_FOUND){
 			return res;
 		}
 
-		if(cache_layer_sc_read(lsm, req->key, &r, req, true, &temp)==NULL && r==NULL){
-			
-			req->flag=READ_REQ_DONE;
+		if(cache_layer_sc_read(lsm, req->key, &r, req, true, &temp)==NULL && r==NULL){	
 			//NOT FOUND
+			req->flag=READ_REQ_DONE;
 			req->type=FS_NOTFOUND_T;
 			req->end_req(req);
 			return READ_NOT_FOUND;
@@ -307,11 +329,10 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 		else if(r==NULL){
 			//cache miss in sc
 			req->flag=READ_REQ_SC;
-			req->type_ftl+=10;
+			req->type_ftl+=100;
 		}
 		else{
 			//sc cache hit
-			//cache_layer_sc_unpin(lsm, req->key);
 			req->flag=READ_REQ_MAP;
 			map_function *mf;
 			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
@@ -320,46 +341,13 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 				res=run_query(r, req);
 			}
 			else{ //map miss
-				req->type_ftl+=20;
+				req->type_ftl+=200;
 			}
 		}
 		res=READ_DONE;
-
-		//r = shortcut_query(lsm->shortcut, req->key);
-		//if (r == NULL)
-		//{
-		//	req->type = FS_NOTFOUND_T;
-		//	//printf("req->key :%u not found\n", req->key);
-		//	req->end_req(req);
-		//	return READ_NOT_FOUND;
-		//}
-		//res = run_query(r, req);
 	}
 	else{
 		if(req->flag==READ_REQ_SC){
-			//cache_read_param *crparam=(cache_read_param*)req->param;
-			//cache_layer_sc_retry(lsm, req->key, &r, crparam);
-
-			//if(r==NULL){
-			//	req->flag=READ_REQ_DONE;
-			//	//NOT FOUND
-			//	req->type=FS_NOTFOUND_T;
-			//	req->end_req(req);
-			//	res=READ_NOT_FOUND;
-			//}
-			//req->param=NULL;
-			//req->flag=READ_REQ_MAP;
-
-			//map_function *mf;
-			//uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
-			//if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_hit
-			//	req->flag=READ_REQ_DATA;
-			//	res=run_query(r, req);
-			//}
-			//else{ //map miss
-			//	req->type_ftl+=20;
-			//}
-
 			std::vector<algo_req*>* pending_req=cache_layer_get_pending_req(lsm, req->key, SHORTCUT);
 			res=lsmtree_pending_sc(lsm, req);
     		std::vector<algo_req*>::iterator iter;
@@ -369,17 +357,12 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 				free(temp);
 			}
 			delete pending_req;
+
 			if(res==READ_NOT_FOUND){
 				return res;
 			}
 		}
 		else if(req->flag==READ_REQ_MAP){
-			//cache_read_param *crparam=(cache_read_param*)req->param;
-			//r=crparam->r;
-			//cache_layer_idx_retry(lsm, crparam->pba_or_scidx, crparam);
-			//req->param=NULL;
-			//req->flag=READ_REQ_DATA;
-			//res=run_query(r, req);
 			uint32_t pba=((cache_read_param*)req->param)->pba_or_scidx;
 			std::vector<algo_req*>* pending_req=cache_layer_get_pending_req(lsm, pba, IDX);
 			res=lsmtree_pending_idx(lsm, req);
@@ -460,6 +443,22 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 	}
 	printf("\t force_compaction_cnt:%u\n", lsm->monitor.force_compaction_cnt);
 	printf("\t reinsert_compaction_cnt:%u\n", lsm->monitor.reinsert_cnt);
+
+	printf("memtable search time\n");
+	printf("memtable search time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.memtable_search_time, lsm->monitor.memtable_search_cnt, (double)lsm->monitor.memtable_search_time/lsm->monitor.memtable_search_cnt);
+
+	printf("BF time\n");
+	printf("BF search time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.binary_search_time[0], lsm->monitor.binary_search_cnt[0], (double)lsm->monitor.binary_search_time[0]/lsm->monitor.binary_search_cnt[0]);
+	printf("BF map time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.bf_time, lsm->monitor.bf_cnt, (double)lsm->monitor.bf_time/lsm->monitor.bf_cnt);
+
+	printf("BF retry time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.bf_retry_time, lsm->monitor.bf_retry_cnt, (double)lsm->monitor.bf_retry_time/lsm->monitor.bf_retry_cnt);
+
+	printf("PLR time\n");
+	printf("PLR search time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.binary_search_time[1], lsm->monitor.binary_search_cnt[1], (double)lsm->monitor.binary_search_time[1]/lsm->monitor.binary_search_cnt[1]);
+
+	printf("PLR map time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.plr_time, lsm->monitor.plr_cnt, (double)lsm->monitor.plr_time/lsm->monitor.plr_cnt);
+
+	printf("PLR retry time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.plr_retry_time, lsm->monitor.plr_retry_cnt, (double)lsm->monitor.plr_retry_time/lsm->monitor.plr_retry_cnt);
 	return 1;
 }
 
