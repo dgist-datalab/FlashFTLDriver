@@ -87,6 +87,9 @@ typedef struct{
 	vector_bench_data read_data_info[20000];
 #endif
 	uint64_t read_cnt,write_cnt;
+	uint64_t read_queue_time;
+	uint64_t write_queue_time;
+
 	bench_ftl_time ftl_poll[ALGOTYPE][LOWERTYPE][BUFFER_HIT];
 	bench_ftl_time cpu_time;	
 	MeasureTime bench;

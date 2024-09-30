@@ -3,6 +3,7 @@
 #include "./lsmtree.h"
 #include "./piece_ppa.h"
 #include "./cache_layer.h"
+#include "../../include/utils/data_copy.h"
 extern uint32_t test_key;
 extern uint32_t test_key2;
 extern lower_info *g_li;
@@ -10,18 +11,15 @@ extern lsmtree *LSM;
 extern page_read_buffer rb;
 extern MeasureTime lsmtree_mt;
 
-static void __check_data(algo_req *req, char *value){
+static inline void __check_data(algo_req *req, char *value){
 	request *p_req=req->parents;
 
 	map_read_param *param=(map_read_param*)req->param;
 	param->oob_set=(uint32_t*)LSM->bm->segment_manager->get_oob(LSM->bm->segment_manager, req->ppa);
 	uint32_t intra_offset=param->mf->oob_check(param->mf, param);
+	//uint32_t intra_offset=0;
 	if(intra_offset!=NOT_FOUND){
-		fdriver_lock(&LSM->read_cnt_lock);
-		LSM->now_flying_read_cnt--;
-		fdriver_unlock(&LSM->read_cnt_lock);
-
-		memmove(&p_req->value->value[0], &value[intra_offset*LPAGESIZE], LPAGESIZE);
+		data_move(p_req->value->value, &value[intra_offset*LPAGESIZE], LPAGESIZE);
 		p_req->end_req(p_req);
 		param->mf->query_done(param->mf, param);
 	}
@@ -49,7 +47,7 @@ static void *__run_read_end_req(algo_req *req){
 		if(param->mf->type==COMP_MAP){
 #ifdef AMF
 #else
-			memcpy(pending_req->value->value, req->value->value, PAGESIZE);
+			data_copy(pending_req->value->value, req->value->value, PAGESIZE);
 #endif
 		}
 		__check_data(pending_req, req->value->value);
@@ -60,7 +58,7 @@ static void *__run_read_end_req(algo_req *req){
 
 	fdriver_lock(&rb.read_buffer_lock);
 	rb.buffer_ppa = req->value->ppa;
-	memcpy(rb.buffer_value, req->value->value, PAGESIZE);
+	data_copy(rb.buffer_value, req->value->value, PAGESIZE);
 	__check_data(req, rb.buffer_value);;
 	fdriver_unlock(&rb.read_buffer_lock);
 
@@ -68,6 +66,8 @@ static void *__run_read_end_req(algo_req *req){
 }
 
 static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_read_param *param, bool retry){
+
+
 	algo_req *res=(algo_req*)calloc(1, sizeof(algo_req));
 	res->parents=req;
 	res->ppa=ppa;
@@ -84,24 +84,30 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 		res->type=MAPPINGR;
 	}
 
+
+
 	fdriver_lock(&rb.read_buffer_lock);
 	if (ppa == rb.buffer_ppa)
 	{
-		//memcpy(value->value, &rb.buffer_value, PAGESIZE);
+		data_copy(value->value, &rb.buffer_value, PAGESIZE);
 		map_read_param *param=(map_read_param*)res->param;
 
 		if(param->mf->type==COMP_MAP){
 #ifdef AMF
 #else
-			memcpy(res->value->value, rb.buffer_value, PAGESIZE);
+			data_copy(res->value->value, rb.buffer_value, PAGESIZE);
 #endif
 		}
 		req->buffer_hit++;
 		__check_data(res, rb.buffer_value);
 		fdriver_unlock(&rb.read_buffer_lock);
+		//issue_time=time_breakdown_end();
+		//LSM->monitor.issue_time+=issue_time;
+		//LSM->monitor.issue_cnt++;
 		return;
 	}
 	fdriver_unlock(&rb.read_buffer_lock);
+
 
 	fdriver_lock(&rb.pending_lock);
 	rb_r_iter temp_r_iter = rb.issue_req->find(ppa);
@@ -115,9 +121,19 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 		req->buffer_hit++;
 		rb.pending_req->insert(std::pair<uint32_t, algo_req *>(ppa, res));
 		fdriver_unlock(&rb.pending_lock);
+		//issue_time=time_breakdown_end();
+		//LSM->monitor.issue_time+=issue_time;
+		//LSM->monitor.issue_cnt++;
 		return;
 	}
+	uint64_t issue_time=0;
+	time_breakdown_start();
 	g_li->read(ppa, PAGESIZE, value, res);
+
+	issue_time=time_breakdown_end();
+	LSM->monitor.issue_time+=issue_time;
+	LSM->monitor.issue_cnt++;
+
 }
 
 uint32_t run_translate_intra_offset(run *r, uint32_t ste_num, uint32_t intra_offset){
@@ -141,7 +157,7 @@ uint32_t run_query(run *r, request *req){
 	if(r->pp){
 		char *res=pp_find_value(r->pp, req->key);
 		if (res){
-			memcpy(req->value->value, res, LPAGESIZE);
+			data_copy(req->value->value, res, LPAGESIZE);
 			req->end_req(req);
 			return READ_DONE;
 		}
@@ -223,9 +239,9 @@ retry:
 	}
 
 read_map:
-	fdriver_lock(&LSM->read_cnt_lock);
-	LSM->now_flying_read_cnt++;
-	fdriver_unlock(&LSM->read_cnt_lock);
+	//fdriver_lock(&LSM->read_cnt_lock);
+	//LSM->now_flying_read_cnt++;
+	//fdriver_unlock(&LSM->read_cnt_lock);
 
 	if(param->read_map){
 		param->intra_offset=r->st_body->sp_meta[ste_num].piece_ppa %L2PGAP;
@@ -280,10 +296,9 @@ retry:
 
 	if(intra_offset==NOT_FOUND){
 		param->mf->query_done(param->mf, param);
-		fdriver_lock(&LSM->read_cnt_lock);
-		LSM->now_flying_read_cnt--;
-		fdriver_unlock(&LSM->read_cnt_lock);
-		//fdriver_unlock(&param->r->lock);
+		//fdriver_lock(&LSM->read_cnt_lock);
+		//LSM->now_flying_read_cnt--;
+		//fdriver_unlock(&LSM->read_cnt_lock);
 		return READ_NOT_FOUND;
 	}
 	uint32_t psa=st_array_read_translation(r->st_body, ste_num, intra_offset);

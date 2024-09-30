@@ -1,6 +1,7 @@
 #include "lsmtree.h"
 #include "compaction.h"
 #include "cache_layer.h"
+#include "mapping_function.h"
 
 page_read_buffer rb;
 extern MeasureTime lsmtree_mt;
@@ -188,13 +189,13 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 		printf("%u inserted from user\n", req->key);
 	}
 
-	fdriver_lock(&lsm->read_cnt_lock);
-	if(lsm->now_flying_read_cnt && r->now_entry_num+1==r->max_entry_num){
-		inf_assign_try(req);
-		fdriver_unlock(&lsm->read_cnt_lock);
-		return 1;
-	}
-	fdriver_unlock(&lsm->read_cnt_lock);
+	//fdriver_lock(&lsm->read_cnt_lock);
+	//if(lsm->now_flying_read_cnt && r->now_entry_num+1==r->max_entry_num){
+	//	inf_assign_try(req);
+	//	fdriver_unlock(&lsm->read_cnt_lock);
+	//	return 1;
+	//}
+	//fdriver_unlock(&lsm->read_cnt_lock);
 
 	uint32_t res=0;
 	if(run_is_full(r)){
@@ -307,7 +308,11 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 	if(req->retry==false){
 		req->flag=READ_REQ_INIT;
 		time_breakdown_start();
+#if defined(NO_CPU_TEST) && (NO_CPU_TEST >=1 )
+		res=READ_NOT_FOUND;
+#else
 		res=run_query(lsm->memtable[lsm->now_memtable_idx], req);
+#endif
 
 		memtable_search_time=time_breakdown_end();
 
@@ -332,17 +337,32 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 			req->type_ftl+=100;
 		}
 		else{
+#if defined(NO_CPU_TEST) && (NO_CPU_TEST>=1)
+			if(r->type==RUN_LOG){
+				//NOT FOUND
+				req->flag=READ_REQ_DONE;
+				req->type=FS_NOTFOUND_T;
+				req->end_req(req);
+				return READ_NOT_FOUND;			
+			}
+#endif
 			//sc cache hit
 			req->flag=READ_REQ_MAP;
 			map_function *mf;
+			uint64_t map_search_time=0;
+			time_breakdown_start();
 			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
 			if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_hit
+				map_search_time=time_breakdown_end();
 				req->flag=READ_REQ_DATA;
 				res=run_query(r, req);
 			}
 			else{ //map miss
+				map_search_time=time_breakdown_end();
 				req->type_ftl+=200;
 			}
+			lsm->monitor.map_search_cnt++;
+			lsm->monitor.map_search_time+=map_search_time;
 		}
 		res=READ_DONE;
 	}
@@ -459,6 +479,15 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 	printf("PLR map time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.plr_time, lsm->monitor.plr_cnt, (double)lsm->monitor.plr_time/lsm->monitor.plr_cnt);
 
 	printf("PLR retry time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.plr_retry_time, lsm->monitor.plr_retry_cnt, (double)lsm->monitor.plr_retry_time/lsm->monitor.plr_retry_cnt);
+
+	printf("Issue_time\n");
+	printf("issue time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.issue_time, lsm->monitor.issue_cnt, (double)lsm->monitor.issue_time/lsm->monitor.issue_cnt);
+
+	printf("read total time\n");
+	printf("read total time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.read_total_time, lsm->monitor.read_total_cnt, (double)lsm->monitor.read_total_time/lsm->monitor.read_total_cnt);
+
+	printf("map search time\n");
+	printf("map search time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.map_search_time, lsm->monitor.map_search_cnt, (double)lsm->monitor.map_search_time/lsm->monitor.map_search_cnt);
 	return 1;
 }
 

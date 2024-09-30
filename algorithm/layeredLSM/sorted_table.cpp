@@ -343,6 +343,7 @@ value_set* st_swp_write(st_array *sa, summary_write_param *swp, uint32_t *oob, b
 		sa->mp_manager.target_value=inf_get_valueset(NULL,FS_MALLOC_W,PAGESIZE);
 	}
 	uint32_t idx=swp->spm->piece_ppa%L2PGAP;
+	/*this line is needed to sort data*/
 	memcpy(&sa->mp_manager.target_value->value[(idx)*LPAGESIZE], swp->value, LPAGESIZE);
 	sa->mp_manager.oob[idx]=swp->oob;
 	if(force || sa->mp_manager.now_idx==L2PGAP){

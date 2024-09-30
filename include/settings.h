@@ -15,7 +15,7 @@
 #define _P (1024L*_T)
 #define MILI (1000000)
 
-#define GIGAUNIT 32LL//440LL-->max
+#define GIGAUNIT 16LL//440LL-->max
 #ifndef OP
 #define OP 90
 #endif
@@ -25,7 +25,7 @@
 #define PAGE_TARGET_KILO (16)
 #define PAGESIZE (PAGE_TARGET_KILO*_K)
 #define _PPB (256*8/PAGE_TARGET_KILO)
-//#define COPYMETA_ONLY 10
+#define COPYMETA_ONLY 10
 //#define GLOBAL_WRITE_BUFFER (128*1024)//(256*1024) //1MB
 
 #if 1

@@ -1,6 +1,7 @@
 #include "./gc.h"
 #include "./piece_ppa.h"
 #include "../../include/data_struct/list.h"
+#include "../../include/utils/data_copy.h"
 #include "./shortcut.h"
 #include "./page_aligner.h"
 #include "./lsmtree.h"
@@ -177,7 +178,7 @@ void gc_summary_segment(L2P_bm *bm, __gsegment *target, uint32_t activie_assign)
 				}
 				info->sa->sp_meta[intra_idx].piece_ppa=target_r_piece_ppa;
 				write_gc_value->oob[gc_idx]=g_value->oob[i];
-				memcpy(&write_gc_value->value->value[(gc_idx)*LPAGESIZE], &g_value->value->value[(i)*LPAGESIZE], LPAGESIZE);
+				data_copy(&write_gc_value->value->value[(gc_idx)*LPAGESIZE], &g_value->value->value[(i)*LPAGESIZE], LPAGESIZE);
 				gc_idx++;
 
 				if(gc_idx==L2PGAP){

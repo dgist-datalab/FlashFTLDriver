@@ -92,6 +92,15 @@ typedef struct lsmtree_monitor{
 	uint64_t plr_time;
 	uint64_t plr_retry_cnt;
 	uint64_t plr_retry_time;
+
+	uint64_t issue_cnt;
+	uint64_t issue_time;
+
+	uint64_t read_total_time;
+	uint64_t read_total_cnt;
+
+	uint64_t map_search_time;
+	uint64_t map_search_cnt;
 }lsmtree_monitor;
 
 typedef struct lsmtree{

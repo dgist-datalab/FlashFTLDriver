@@ -42,9 +42,11 @@ uint64_t run_memory_usage(run *target_run, uint32_t target_bit, bool pinning){
 					memory_usage_run+=mf->memory_usage_bit;
 				}
 				else{
-					uint64_t memory_usage_bit=mf->get_memory_usage(mf, target_bit);
-					memory_usage_run += memory_usage_bit;
-					mf->memory_usage_bit=memory_usage_bit;
+					if(mf->get_memory_usage){
+						uint64_t memory_usage_bit=mf->get_memory_usage(mf, target_bit);
+						memory_usage_run += memory_usage_bit;
+						mf->memory_usage_bit=memory_usage_bit;
+					}
 				}
 			}
 		}

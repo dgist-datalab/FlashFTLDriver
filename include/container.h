@@ -90,6 +90,8 @@ struct request {
 	uint8_t before_type_lower;
 	bool isstart;
 	MeasureTime latency_checker;
+	MeasureTime queue_checker;
+	uint64_t queue_time;
 
 	fdriver_lock_t done_lock;
 	bool write_done;

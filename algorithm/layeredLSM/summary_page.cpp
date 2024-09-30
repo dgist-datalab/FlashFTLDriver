@@ -6,12 +6,6 @@ extern char all_set_data[PAGESIZE];
 summary_page *sp_init(){
 	summary_page *res=(summary_page *)malloc(sizeof(summary_page));
 	res->write_pointer=0;
-	//res->value=inf_get_valueset(all_set_data, FS_MALLOC_W, PAGESIZE);
-	/*
-	res->value=(char*)malloc(LPAGESIZE);
-	memcpy(res->value, all_set_data, LPAGESIZE);
-	res->body=res->value;
-	*/
 	res->body=(char*)malloc(LPAGESIZE);
 	memcpy(res->body, all_set_data, LPAGESIZE);
 	res->sorted=true;

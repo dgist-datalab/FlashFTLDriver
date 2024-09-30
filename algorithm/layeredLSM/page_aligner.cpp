@@ -1,4 +1,5 @@
 #include "page_aligner.h"
+#include "../../include/utils/data_copy.h"
 pp_buffer *pp_init(){
 	pp_buffer *res=(pp_buffer*)calloc(1, sizeof(pp_buffer));
 	return res;
@@ -11,7 +12,7 @@ void pp_free(pp_buffer *pp){
 bool pp_insert_value(pp_buffer *pp, uint32_t lba, char *value){
 	uint32_t now_idx=pp->buffered_num;
 	pp->LBA[now_idx]=lba;
-	memcpy(&pp->value[now_idx*LPAGESIZE], value, LPAGESIZE);
+	data_copy(&pp->value[now_idx*LPAGESIZE], value, LPAGESIZE);
 
 	pp->buffered_num++;
 	if(pp->buffered_num==L2PGAP){
@@ -40,6 +41,6 @@ char *pp_find_value(pp_buffer *pp, uint32_t lba){
 }
 
 void pp_reinit_buffer(pp_buffer *pp){
-	memset(pp->LBA,-1, L2PGAP*sizeof(uint32_t));
+	data_set(pp->LBA,-1, L2PGAP*sizeof(uint32_t));
 	pp->buffered_num=0;
 }

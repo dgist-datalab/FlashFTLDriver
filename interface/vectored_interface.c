@@ -193,10 +193,12 @@ void *vectored_main(void *__input){
 			inf_algorithm_caller(inf_req);	
 		}else{
 			uint32_t size=vec_req->size;
+		
 			measure_init(&vec_req->latency_checker);
 			measure_start(&vec_req->latency_checker);
 
 			for(uint32_t i=0; i<size; i++){
+
 				/*retry queue*/
 				while(1){
 					request *temp_req=get_retry_request(_this);
@@ -210,6 +212,9 @@ void *vectored_main(void *__input){
 				}
 	
 				request *req=&vec_req->req_array[i];
+#ifdef QUEUE_TIME_CHECK
+				req->queue_time=measure_get_time(&req->queue_checker);
+#endif
 				req->type_ftl=req->type_lower=req->buffer_hit=0;
 				switch(req->type){
 					case FS_GET_T:
@@ -332,6 +337,7 @@ void release_each_req(request *req){
 volatile bool stop_flag=false;
 void assign_vectored_req(vec_request *txn){
 	while(stop_flag){}
+
 #ifdef WRITE_STOP_READ
 	for(uint32_t i=0; i<txn->size; i++){
 		request* req=&txn->req_array[i];
@@ -354,6 +360,14 @@ void assign_vectored_req(vec_request *txn){
 			pthread_mutex_unlock(&flying_cnt_lock);
 		}
 	//	printf("flying tagnum %u, txn->size %u, req_q->size:%u\n", QDEPTH-flying_cnt, txn->size, mp.processors[0].req_q->size);
+
+#ifdef QUEUE_TIME_CHECK
+	for(uint32_t i=0; i<txn->size; i++){
+		request* req=&txn->req_array[i];
+		measure_init(&req->queue_checker);
+		measure_start(&req->queue_checker);
+	}
+#endif
 
 		if(q_enqueue((void*)txn, mp.processors[0].req_q)){
 			break;

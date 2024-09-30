@@ -574,6 +574,8 @@ void bench_cdf_print(uint64_t nor, uint8_t type, bench_data *_d){//number of req
 			fprintf(stderr, "%d,%ld,%f\n", i*10, _d->vector_read_cdf[i], (float)vector_aggregate_num/_d->vector_read_cnt);
 		}
 	}
+	printf("read_queu_time:%lf %lu %lu \n", (double)_d->read_queue_time/_d->read_cnt, _d->read_queue_time, _d->read_cnt);
+	printf("write_queu_time:%lf %lu %lu\n", (double)_d->write_queue_time/_d->write_cnt, _d->write_queue_time, _d->write_cnt);
 }
 #endif
 void bench_reap_nostart(request *const req){
@@ -675,6 +677,7 @@ void bench_reap_data(request *const req,lower_info *li, bool print_latency){
 #ifdef CDF
 	int slot_num=req->latency_checker.micro_time/TIMESLOT;
 	if(req->type==FS_GET_T || req->type==FS_RANGEGET_T){
+		_data->read_queue_time+=req->queue_time;
 		if(slot_num>=1000000/TIMESLOT){
 			_data->read_cdf[1000000/TIMESLOT]++;
 		}
@@ -685,6 +688,7 @@ void bench_reap_data(request *const req,lower_info *li, bool print_latency){
 		}
 	}
 	else if(req->type==FS_SET_T){
+		_data->write_queue_time+=req->queue_time;
 		if(slot_num>=1000000/TIMESLOT){
 			_data->write_cdf[1000000/TIMESLOT]++;
 		}

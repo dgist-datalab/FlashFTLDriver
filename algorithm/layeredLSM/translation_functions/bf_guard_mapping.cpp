@@ -5,6 +5,9 @@ float __target_fpr;
 uint32_t __target_member;
 static bloom_filter_meta * __global_bfm;
 
+static uint32_t *exact_map;
+static bool populate_flag=false;
+
 float find_sub_member_num(float fpr, uint32_t member, uint32_t lba_bit_num){
 	static float target_avg_bit=0;
 	if(target_avg_bit) return target_avg_bit;
@@ -60,10 +63,22 @@ map_function *	bfg_map_init(uint32_t contents_num, float fpr, uint32_t bit){
 	map->write_pointer=0;
 
 	res->private_data=map;
+
+#if defined(NO_CPU_TEST) && (NO_CPU_TEST>=2)
+	if(!populate_flag){
+		exact_map=(uint32_t*)malloc(sizeof(uint32_t)*RANGE);
+		memset(exact_map, -1, sizeof(uint32_t)*RANGE);
+		populate_flag=true;
+	}
+#endif
 	return res;
 }
 
 uint32_t			bfg_map_insert(map_function *mf, uint32_t lba, uint32_t offset){
+#if defined(NO_CPU_TEST) && (NO_CPU_TEST>=2)
+	exact_map[lba]=offset;
+#endif
+
 	bfg_map *map=extract_bfg_map(mf);
 	if(map_full_check(mf)){
 		EPRINT("data overflow", true);
@@ -109,6 +124,11 @@ uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 	if(target_set_idx==UINT32_MAX){
 		return NOT_FOUND;
 	}
+
+#if defined(NO_CPU_TEST) && (NO_CPU_TEST>=2)
+	if(exact_map[lba]==UINT32_MAX) return NOT_FOUND;
+	else return exact_map[lba];
+#else
 	res_param->prev_offset=target_set_idx*__target_member;
 	bf_map *t_map=&map->bf_set[target_set_idx];
 	for(uint32_t i=0; i<t_map->write_pointer; i++){
@@ -117,6 +137,7 @@ uint32_t		bfg_map_query(map_function *mf, uint32_t lba, map_read_param **param){
 			return res_param->prev_offset;
 		}
 	}
+#endif
 	return NOT_FOUND;
 }
 

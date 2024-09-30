@@ -33,6 +33,9 @@ export COMMONFLAGS+=\
 			-DAPPL_DESIGN_PATH="\"$(PWD)/algorithm/layeredLSM/design_knob/\""\
 			-DMEDIA_NAME="\"/dev/nvme2n1\""\
 			-DTIME_BREAKDOWN\
+			-DNO_MEMCPY_DATA\
+			-DNO_CPU_TEST=0\
+			-DQUEUE_TIME_CHECK\
 			-O3\
 #			-DTRACE_COLLECT\
 #			-DTRACE_REPLAY\
@@ -150,8 +153,8 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
-		-luring\
-	-laio\
+#		-luring\
+#	-laio\
 #		-ldw\
 		-ljemalloc\
 
