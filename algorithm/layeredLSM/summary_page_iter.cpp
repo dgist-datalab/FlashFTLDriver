@@ -11,6 +11,7 @@ static void *__spi_read_end_req(algo_req *req){
 		EPRINT("not_allowed type", true);
 	}
 	spi->read_flag=true;
+	spi->body=&spi->value->value[(spi->spm->piece_ppa%L2PGAP)*LPAGESIZE];
 	fdriver_unlock(&spi->read_done);
 	free(req);
 	return NULL;

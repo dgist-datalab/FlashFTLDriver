@@ -3,15 +3,14 @@
 #include "cache_layer.h"
 #include <list>
 #include <pthread.h>
-pthread_mutex_t pinning_lock=PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t idx_map_lock=PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t req_wait_lock=PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t lru_lock=PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t idx_map_lock=PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t req_wait_lock=PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t lru_lock=PTHREAD_MUTEX_INITIALIZER;
 static inline void print_error(uint64_t line){
     printf("%s error :%u\n", __FILE__, line);
 }
 
-void pc_set_init(pc_set *target, uint32_t max_cached_size, uint32_t lba_num, lower_info *li){
+void pc_set_init(pc_set *target, uint32_t max_cached_size, uint32_t lba_num, lower_info *li, bool sc_pinning){
     lru_init(&target->lru, NULL, NULL);
     target->now_cached_size=0;
     target->max_cached_size=max_cached_size;
@@ -41,6 +40,7 @@ void pc_set_init(pc_set *target, uint32_t max_cached_size, uint32_t lba_num, low
     target->li=li;
     target->pending_req_map.clear();
     target->pending_sc_req_map.clear();
+    target->sc_pinning=sc_pinning;
 }
 
 void lru_checker(LRU *lru){
@@ -58,7 +58,7 @@ void lru_checker(LRU *lru){
 void pc_set_free(pc_set *target){
     lru_free(target->lru);
 
-    std::map<uint32_t, page_cache*>::iterator miter;
+    std::unordered_map<uint32_t, page_cache*>::iterator miter;
     for(miter=target->cached_idx.begin(); miter!=target->cached_idx.end(); miter++){
         free(miter->second->data);
         delete(miter->second);
@@ -69,19 +69,16 @@ void pc_set_free(pc_set *target){
 
 page_cache* pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx, bool pinned){
     page_cache *pc=NULL;
-    pthread_mutex_lock(&lru_lock);
+    //pthread_mutex_lock(&lru_lock);
     
     if(type==SHORTCUT){
-        pthread_mutex_lock(&idx_map_lock);
         pc=&target->cached_sc[ppa_or_scidx];
         if(pc->flag==EMPTY){
             pc=NULL;
         }
-        pthread_mutex_unlock(&idx_map_lock);
     }
     else if(type==IDX){
-        pthread_mutex_lock(&idx_map_lock);
-        std::map<uint32_t, page_cache*>::iterator miter;
+        std::unordered_map<uint32_t, page_cache*>::iterator miter;
         miter=target->cached_idx.find(ppa_or_scidx);
         if(miter==target->cached_idx.end()){
             pc=NULL;
@@ -92,7 +89,6 @@ page_cache* pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx,
                 pc=NULL;
             }
         }
-        pthread_mutex_unlock(&idx_map_lock);
     }
     else{
         print_error(__LINE__);
@@ -112,14 +108,14 @@ page_cache* pc_is_cached(pc_set *target, cache_type type, uint32_t ppa_or_scidx,
         //    pthread_mutex_unlock(&pinning_lock);
         //}
     }
-    pthread_mutex_unlock(&lru_lock);
+    //pthread_mutex_unlock(&lru_lock);
     return pc;
 }
 
 bool pc_has_space(pc_set *target, uint32_t need_size){
-    pthread_mutex_lock(&lru_lock);
+    //pthread_mutex_lock(&lru_lock);
     bool res=target->now_cached_size + need_size < target->max_cached_size;
-    pthread_mutex_unlock(&lru_lock);
+    //pthread_mutex_unlock(&lru_lock);
 
     return res;
 }
@@ -127,14 +123,13 @@ bool pc_has_space(pc_set *target, uint32_t need_size){
 
 page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, uint32_t size){
     page_cache *pc=NULL;
-    pthread_mutex_lock(&lru_lock);
+    //pthread_mutex_lock(&lru_lock);
     if(target->now_cached_size + size > target->max_cached_size){
         //print_error(__LINE__);
         //abort();
     }
 
 
-    pthread_mutex_lock(&idx_map_lock);
     if(type==SHORTCUT){
         pc = &target->cached_sc[ppa_or_scidx];
         if(pc->flag!=EMPTY){
@@ -153,7 +148,7 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
             printf("errror %s:%u\n",__FILE__, __LINE__);
             abort();
         }
-        std::map<uint32_t, page_cache*>::iterator miter;
+        std::unordered_map<uint32_t, page_cache*>::iterator miter;
         miter=target->cached_idx.find(ppa_or_scidx);
         if(miter!=target->cached_idx.end()){
             pc=miter->second; 
@@ -180,7 +175,6 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
         print_error(__LINE__);
         abort();
     }
-    pthread_mutex_unlock(&idx_map_lock);
 
     pc->flag=OCCUPIED;
     //pc->data=(char*)malloc(size);
@@ -189,12 +183,12 @@ page_cache* pc_occupy(pc_set *target, cache_type type, uint32_t ppa_or_scidx, ui
     pc->node=NULL;
 
     //target->pinned_size+=size;
-    pthread_mutex_unlock(&lru_lock);
+    //pthread_mutex_unlock(&lru_lock);
     return pc;
 }
 
 void pc_reclaim(pc_set *pcs, page_cache *pc){
-    pthread_mutex_lock(&lru_lock);
+    //pthread_mutex_lock(&lru_lock);
     if(pc->type!=SHORTCUT){
         print_error(__LINE__);
         abort();
@@ -208,18 +202,17 @@ void pc_reclaim(pc_set *pcs, page_cache *pc){
     //pcs->pinned_size-=pc->size;
     pcs->now_cached_size-=pc->size;
     pcs->cached_sc_num--;
-    pthread_mutex_unlock(&lru_lock);
+    //pthread_mutex_unlock(&lru_lock);
 }
 
 void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void *data, void (*converter)(void *data, page_cache *pc), uint32_t (*get_ppa)(uint32_t sc_idx, page_cache *pc)){
     page_cache *pc=NULL;
 
-    pthread_mutex_lock(&idx_map_lock);
     if(type==SHORTCUT){
         pc=&target->cached_sc[ppa_or_scidx];
     }
     else if(type==IDX){
-        std::map<uint32_t, page_cache*>::iterator miter;
+        std::unordered_map<uint32_t, page_cache*>::iterator miter;
         miter=target->cached_idx.find(ppa_or_scidx);
         if(miter==target->cached_idx.end()){
             print_error(__LINE__);
@@ -233,7 +226,6 @@ void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void 
         print_error(__LINE__);
         abort();
     }
-    pthread_mutex_unlock(&idx_map_lock);
 
     if(converter){
         converter(data, pc);
@@ -244,14 +236,14 @@ void pc_set_insert(pc_set *target, cache_type type, uint32_t ppa_or_scidx, void 
 
     target->now_cached_size+=pc->size;
 
-    pthread_mutex_lock(&lru_lock);
+    //pthread_mutex_lock(&lru_lock);
     pc->node=lru_push_special(target->lru, pc, type, ppa_or_scidx, pc->size);
     if(type==IDX && (ppa_or_scidx==16223878 || ppa_or_scidx==16238486)){
         static int cnt=0;
         printf("tttt %u\n", ++cnt);
     }
     lru_checker(target->lru);
-    pthread_mutex_unlock(&lru_lock);
+    //pthread_mutex_unlock(&lru_lock);
     pc->waiting_req.clear();
     pc->flag=CLEAN;
 
@@ -325,7 +317,7 @@ static void __send_write_reqeust(pc_set *target, page_cache *pc, uint32_t new_pp
 void pc_evict(pc_set *target, bool internal, int32_t need_size, uint32_t (*get_ppa)(uint32_t sc_idx, page_cache *pc)){
     int32_t remain_size=target->max_cached_size-target->now_cached_size;
     if(remain_size > need_size) return;
-    pthread_mutex_lock(&lru_lock);
+    //pthread_mutex_lock(&lru_lock);
     int32_t target_size=need_size-remain_size;
     page_cache *pc=NULL;
     uint32_t type;
@@ -366,7 +358,6 @@ void pc_evict(pc_set *target, bool internal, int32_t need_size, uint32_t (*get_p
         target->now_cached_size-=size;
         target_size-=size;
 
-        pthread_mutex_lock(&idx_map_lock);
         if(type==SHORTCUT){
             target->cached_sc_num--;
             if(pc->flag==DIRTY){
@@ -393,7 +384,7 @@ void pc_evict(pc_set *target, bool internal, int32_t need_size, uint32_t (*get_p
                 abort();
             }
             target->cached_idx_num--;
-            std::map<uint32_t, page_cache*>::iterator miter;
+            std::unordered_map<uint32_t, page_cache*>::iterator miter;
             miter=target->cached_idx.find(id);
             if(miter!=target->cached_idx.end()){
                 delete miter->second;
@@ -415,23 +406,20 @@ void pc_evict(pc_set *target, bool internal, int32_t need_size, uint32_t (*get_p
             printf("type %u, id: %u error!\n", type, id);
             abort();
         }
-        pthread_mutex_unlock(&idx_map_lock);
     }
     lru_checker(target->lru);
-    pthread_mutex_unlock(&lru_lock);
+    //pthread_mutex_unlock(&lru_lock);
     return;
 }
 
 
 void pc_force_evict_idx(pc_set *pcs, uint32_t pba){
 
-    pthread_mutex_lock(&lru_lock);
-    pthread_mutex_lock(&idx_map_lock);
-    std::map<uint32_t, page_cache*>::iterator miter;
+    //pthread_mutex_lock(&lru_lock);
+    std::unordered_map<uint32_t, page_cache*>::iterator miter;
     miter=pcs->cached_idx.find(pba);
     if(miter==pcs->cached_idx.end()){
-        pthread_mutex_unlock(&idx_map_lock);
-        pthread_mutex_unlock(&lru_lock);
+        //pthread_mutex_unlock(&lru_lock);
         return;
     }
     if (pcs->cached_idx_num != pcs->cached_idx.size())
@@ -453,8 +441,7 @@ void pc_force_evict_idx(pc_set *pcs, uint32_t pba){
 
     lru_checker(pcs->lru);
 
-    pthread_mutex_unlock(&idx_map_lock);
-    pthread_mutex_unlock(&lru_lock);
+    //pthread_mutex_unlock(&lru_lock);
 }
 
 algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents, uint32_t ppa_or_scidx, value_set *value, void *param, void* (*end_req)(algo_req*)){
@@ -471,7 +458,7 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
         res->ppa=pc->ppa;
     }
     else if(type==IDX){
-        std::map<uint32_t, page_cache*>::iterator miter;
+        std::unordered_map<uint32_t, page_cache*>::iterator miter;
         miter=target->cached_idx.find(ppa_or_scidx);
         if(miter==target->cached_idx.end()){
             print_error(__LINE__);
@@ -492,7 +479,7 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
     pc->flag=FLYING;
     ((cache_read_param*)param)->pc=pc;
     /*add waiting request*/
-    pthread_mutex_lock(&req_wait_lock);
+    //pthread_mutex_lock(&req_wait_lock);
     if(type==SHORTCUT){
         if(parents==NULL){
             target->li->read(res->ppa, PAGESIZE, value, res);
@@ -522,7 +509,7 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
             pm_iter->second->push_back(res);
         }
     }
-    pthread_mutex_unlock(&req_wait_lock);
+    //pthread_mutex_unlock(&req_wait_lock);
 
     return res;
 }
@@ -530,19 +517,17 @@ algo_req* pc_send_get_request(pc_set *target, cache_type type, request *parents,
 page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx, bool lock_flag){
     page_cache *pc=NULL;
     if(lock_flag){
-        pthread_mutex_lock(&lru_lock);  
-        pthread_mutex_lock(&idx_map_lock);
+        //pthread_mutex_lock(&lru_lock);  
     }
     if(type==SHORTCUT){
         pc=&pcs->cached_sc[ppa_or_scidx];
     }
     else if(type==IDX){
-        std::map<uint32_t, page_cache*>::iterator miter;
+        std::unordered_map<uint32_t, page_cache*>::iterator miter;
         miter=pcs->cached_idx.find(ppa_or_scidx);
         if(miter==pcs->cached_idx.end()){
            if(lock_flag){
-                pthread_mutex_unlock(&lru_lock);  
-                pthread_mutex_unlock(&idx_map_lock);
+                //pthread_mutex_unlock(&lru_lock);  
             }
             return NULL;
         }
@@ -553,8 +538,7 @@ page_cache *pc_set_pick(pc_set *pcs, cache_type type, uint32_t ppa_or_scidx, boo
         abort();
     }
     if(lock_flag){
-        pthread_mutex_unlock(&idx_map_lock);
-        pthread_mutex_unlock(&lru_lock);
+        //pthread_mutex_unlock(&lru_lock);
     }
 
     return pc;

@@ -324,6 +324,7 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 			return res;
 		}
 
+		uint64_t map_search_time=0;
 		if(cache_layer_sc_read(lsm, req->key, &r, req, true, &temp)==NULL && r==NULL){	
 			//NOT FOUND
 			req->flag=READ_REQ_DONE;
@@ -349,9 +350,8 @@ uint32_t lsmtree_read(lsmtree *lsm, request *req){
 			//sc cache hit
 			req->flag=READ_REQ_MAP;
 			map_function *mf;
-			uint64_t map_search_time=0;
-			time_breakdown_start();
 			uint32_t mf_pba=run_pick_target_mf(r, req->key, &mf);
+			time_breakdown_start();
 			if(cache_layer_idx_read(lsm, mf_pba, req->key, r, req, mf)==NULL){//map_hit
 				map_search_time=time_breakdown_end();
 				req->flag=READ_REQ_DATA;

@@ -60,6 +60,8 @@ typedef struct lsmtree_parameter{
 	range PLR_level_range;
 	uint64_t max_memory_usage_bit;
 	uint32_t memory_limit;
+
+	bool sc_pinning;
 }lsmtree_parameter;
 
 typedef struct lsmtree_monitor{

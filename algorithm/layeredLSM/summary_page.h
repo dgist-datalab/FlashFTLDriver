@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <algorithm>
 
 #define MAX_CUR_POINTER (PAGESIZE/sizeof(summary_pair))
 #define MAX_IDX_SP (MAX_CUR_POINTER-1)
@@ -40,6 +41,7 @@ typedef struct summary_page_meta{
 	bool unlinked_data_copy;
 	bool copied;
 	bool all_reinsert;
+
 	void *private_data;
 }summary_page_meta;
 

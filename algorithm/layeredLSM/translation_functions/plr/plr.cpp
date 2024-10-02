@@ -1,4 +1,5 @@
 #include "plr.h"
+
 uint32_t PLR::plr_idx=0;
 inline uint64_t PLR::get_x(int index) {
 	int start_bit = index * X_BIT;
@@ -666,6 +667,7 @@ uint64_t PLR::get_normal_memory_usage(uint32_t lba_unit){
 	return line_cnt*(2*lba_unit+sizeof(double)*8);
 }
 
+#if 0
 int64_t PLR::get(int64_t LBA) {
 
 	int low_x = 0, high_x = chunk_cnt;
@@ -706,6 +708,59 @@ int64_t PLR::get(int64_t LBA) {
 
 	return expected / TICK;
 }
+#else
+int64_t PLR::get(int64_t LBA) {
+    // 초기 이진 탐색
+    int low_x = 0, high_x = chunk_cnt;
+    while (high_x - low_x > 1) {  // 조건 수정
+        int mid_x = low_x + (high_x - low_x) / 2;  // 중간값 계산 최적화
+        if (LBA >= chunk_x[mid_x]) {
+            low_x = mid_x;  // LBA가 mid_x 이상인 경우
+        } else {
+            high_x = mid_x;  // LBA가 mid_x 미만인 경우
+        }
+    }
+
+    int64_t x = chunk_x[low_x];
+    int64_t y = chunk_y[low_x];
+    int index = chunk_offset[low_x] + 1;
+
+    // 루프 최적화
+    while (index < chunk_offset[low_x + 1]) {
+        int dx = get_x(index);
+        if (LBA >= x + dx) {
+            x += dx;
+            y += get_y(index);
+            index++;
+        } else {
+            break;  // LBA가 x + dx보다 작거나 같으면 루프 종료
+        }
+    }
+
+    // 상수 미리 계산
+    LBA *= CORRECTION;
+    x *= CORRECTION;
+    y = (y * TICK) + (TICK / 2);
+
+    // a와 b를 구하는 과정 최적화
+    int64_t a = get_a(index - 1);
+    int64_t b = get_b(index - 1);
+
+    // 조건문 최적화
+    if (b & (1 << (B_BIT - 1))) {
+        b = -((b & ((1 << (B_BIT - 1)) - 1)) + 1); // 음수 처리 최적화
+    }
+
+    // 기대 값 계산
+    int64_t expected = (y * bit + (LBA - x) * a + b) / bit;
+
+    // 범위 체크 최적화
+    if (expected < PPA_min * TICK) return PPA_min; 
+    if (expected > PPA_max * TICK) return PPA_max; 
+
+    return expected / TICK;
+}
+#endif
 
 void PLR::clear() {
 	free(x_compressed);

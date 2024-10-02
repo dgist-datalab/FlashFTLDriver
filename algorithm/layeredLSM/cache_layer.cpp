@@ -7,7 +7,14 @@ static lsmtree *main_lsm;
 extern uint32_t test_key;
 void cache_layer_init(lsmtree *lsm, uint32_t cached_size, lower_info *li){
     lsm->pcs=new pc_set();
-    pc_set_init(lsm->pcs, cached_size, RANGE, li);
+    bool sc_pinning=false;
+    uint64_t sc_memory_limit = 5*RANGE/8;
+    if(cached_size>sc_memory_limit){
+        cached_size-=sc_memory_limit;
+        sc_pinning=true;
+    }
+
+    pc_set_init(lsm->pcs, cached_size, RANGE, li, sc_pinning);
     main_lsm=lsm;
 }
 
@@ -140,6 +147,11 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
     (*isdone)=true;
     (*ridx)=NULL;
 
+    if(lsm->pcs->sc_pinning){
+        (*ridx)=shortcut_query(lsm->shortcut, lba);
+        return NULL;       
+    }
+
     page_cache *target_pc=pc_is_cached(lsm->pcs, SHORTCUT, sc_idx, cache_check);
     if(cache_check && target_pc && target_pc->flag!=FLYING){
         (*ridx)=shortcut_query(lsm->shortcut, lba);
@@ -212,6 +224,10 @@ void* cache_layer_sc_read(lsmtree *lsm, uint32_t lba, run **ridx, request *paren
 }
 
 void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *des_run, uint32_t size){
+    if(lsm->pcs->sc_pinning){
+        return NULL;
+    }
+
     //figure out which sc_idx to update
     /*
     static int cnt=0;
@@ -313,7 +329,7 @@ void* cache_layer_sc_update(lsmtree *lsm, std::vector<uint32_t> &lba_set, run *d
     return NULL;
 }
 
-bool __cache_check_and_occupy(lsmtree *lsm, uint32_t pba, map_function *mf, bool read_path, page_cache **res){
+bool __cache_idx_check_and_occupy(lsmtree *lsm, uint32_t pba, map_function *mf, bool read_path, page_cache **res){
     page_cache *target_pc=pc_is_cached(lsm->pcs, IDX, pba, read_path);
     if(target_pc && target_pc->flag!=FLYING){
         return true;
@@ -343,7 +359,7 @@ bool __cache_check_and_occupy(lsmtree *lsm, uint32_t pba, map_function *mf, bool
 
 void cache_layer_idx_insert(lsmtree *lsm, uint32_t pba, map_function *mf, bool pinning, bool trivial_move){
     page_cache *temp;
-    if(__cache_check_and_occupy(lsm, pba, mf, pinning | trivial_move, &temp)){
+    if(__cache_idx_check_and_occupy(lsm, pba, mf, pinning | trivial_move, &temp)){
         //hit case
         return;
     }
@@ -371,7 +387,7 @@ void *cache_layer_read_idx_endreq(algo_req *req){
 
 void *cache_layer_idx_read(lsmtree *lsm, uint32_t pba, uint32_t lba, run *r, request *parent, map_function *mf){
     page_cache *target_pc=NULL;
-    if(__cache_check_and_occupy(lsm, pba, mf, true, &target_pc)){
+    if(__cache_idx_check_and_occupy(lsm, pba, mf, true, &target_pc)){
         /*hit case*/
         return NULL;
     }

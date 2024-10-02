@@ -1,6 +1,7 @@
 #include "./nocpu_sftl_cache.h"
 #include "../../demand_mapping.h"
 #include "../../../../include/settings.h"
+#include "../../../../include/utils/data_copy.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "../../../../include/debug_utils.h"
@@ -471,9 +472,14 @@ uint32_t nocpu_sftl_insert_entry_from_translation(struct my_cache *, GTD_entry *
 }
 
 uint32_t nocpu_sftl_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa){
+#ifdef NO_MEMCPY_DATA
+	uint32_t old_ppa=real_mapping[lba];
+	real_mapping[lba]=ppa;
+#else
 	uint32_t *ppa_list=(uint32_t*)data;
 	uint32_t old_ppa=ppa_list[GETOFFSET(lba)];
 	ppa_list[GETOFFSET(lba)]=ppa;
+#endif
 
 	nscm.temp_ent[GETGTDIDX(lba)].head_array[GETOFFSET(lba)]=ppa;
 	real_mapping[lba]=ppa;
@@ -628,7 +634,7 @@ struct GTD_entry *nocpu_sftl_get_eviction_GTD_entry(struct my_cache *, uint32_t 
 bool nocpu_sftl_update_eviction_target_translation(struct my_cache* ,uint32_t,  GTD_entry *etr,mapping_entry *map, char *data, void *, bool){
 	nocpu_sftl_cache *sc=(nocpu_sftl_cache*)((lru_node*)etr->private_data)->data;
 
-	memcpy(data, sc->head_array, PAGESIZE);
+	data_copy(data, sc->head_array, PAGESIZE);
 	#ifdef FASTSFTLCPU
 	nscm.temp_ent[etr->idx].head_array=sc->head_array;
 	nscm.temp_ent[etr->idx].run_length=sc->run_length;

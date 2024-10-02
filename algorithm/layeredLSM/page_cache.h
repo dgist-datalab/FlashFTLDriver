@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #define RIDXINPAGE (PAGESIZE*8/5)
 
 enum cache_type{
@@ -30,6 +31,7 @@ typedef struct page_cache{
 }page_cache;
 
 typedef struct page_cache_set{
+    bool sc_pinning;
     LRU *lru;
     int32_t now_cached_size;
     int32_t max_cached_size;
@@ -40,14 +42,14 @@ typedef struct page_cache_set{
     uint32_t cached_idx_num;
 
     std::vector<page_cache> cached_sc; 
-    std::map<uint32_t, page_cache*> cached_idx; //read only cache, key - ppa and data - idx
+    std::unordered_map<uint32_t, page_cache*> cached_idx; //read only cache, key - ppa and data - idx
     std::map<uint32_t, std::vector<algo_req*>* > pending_req_map;
     std::map<uint32_t, std::vector<algo_req*>* > pending_sc_req_map;
     lower_info *li;
 }pc_set;
 
 //max_cached_page_num at least is equal to QDEPTH
-void pc_set_init(pc_set *, uint32_t max_cached_size, uint32_t lba_num, lower_info *li);
+void pc_set_init(pc_set *, uint32_t max_cached_size, uint32_t lba_num, lower_info *li, bool sc_pinning);
 void pc_set_free(pc_set *);
 
 page_cache* pc_is_cached(pc_set *, cache_type type, uint32_t ppa_or_scidx, bool pinned);

@@ -1,6 +1,7 @@
 #include "coarse_cache.h"
 #include "../../demand_mapping.h"
 #include "../../../../include/settings.h"
+#include "../../../../include/utils/data_copy.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -36,6 +37,9 @@ my_cache coarse_cache_func{
 
 coarse_cache_monitor ccm;
 extern demand_map_manager dmm;
+#ifdef NO_MEMCPY_DATA
+static uint32_t *exact_mapping;
+#endif
 
 uint32_t coarse_init(struct my_cache *mc, uint32_t total_caching_physical_pages){
 	lru_init(&ccm.lru, NULL, NULL);
@@ -45,6 +49,11 @@ uint32_t coarse_init(struct my_cache *mc, uint32_t total_caching_physical_pages)
 	ccm.now_caching_page=0;
 	mc->type=COARSE;
 	mc->private_data=NULL;
+	
+#ifdef NO_MEMCPY_DATA
+	exact_mapping=(uint32_t*)malloc(sizeof(uint32_t)*RANGE);
+	memset(exact_mapping, -1, sizeof(uint32_t)*RANGE);
+#endif
 
 	return ccm.max_caching_page * (PAGESIZE/sizeof(uint32_t));
 }
@@ -105,7 +114,7 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 	if(etr->status==EMPTY){
 		cc=(coarse_cache*)malloc(sizeof(coarse_cache));
 		cc->data=(char*)malloc(PAGESIZE);
-		memset(cc->data, -1, PAGESIZE);
+		data_set(cc->data, -1, PAGESIZE);
 		cc->etr=etr;
 		ln=lru_push(ccm.lru, cc);
 		etr->private_data=(void*)ln;
@@ -119,9 +128,14 @@ inline static uint32_t __update_entry(GTD_entry *etr, uint32_t lba, uint32_t ppa
 		cc=(coarse_cache*)(ln->data);
 	}
 
+#ifdef NO_MEMCPY_DATA
+	old_ppa=exact_mapping[lba];
+	exact_mapping[lba]=ppa;
+#else
 	uint32_t *ppa_list=(uint32_t*)cc->data;
 	old_ppa=ppa_list[GETOFFSET(lba)];
 	ppa_list[GETOFFSET(lba)]=ppa;
+#endif
 /*
 	if(lba==test_key)
 		printf("%u ppa change %u to %u\n",test_key, old_ppa, ppa);
@@ -156,7 +170,7 @@ uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *etr,
 
 	coarse_cache *cc=(coarse_cache*)malloc(sizeof(coarse_cache));
 	cc->data=(char*)malloc(PAGESIZE);
-	memcpy(cc->data, data, PAGESIZE);
+	data_copy(cc->data, data, PAGESIZE);
 	cc->etr=etr;
 	etr->private_data=(void *)lru_push(ccm.lru, (void*)cc);
 	etr->status=CLEAN;
@@ -168,8 +182,13 @@ uint32_t coarse_insert_entry_from_translation(struct my_cache *, GTD_entry *etr,
 
 uint32_t coarse_update_from_translation_gc(struct my_cache *, char *data, uint32_t lba, uint32_t ppa){
 	uint32_t *ppa_list=(uint32_t*)data;
+#ifdef NO_MEMCPY_DATA
+	uint32_t old_ppa=exact_mapping[lba];
+	exact_mapping[lba]=ppa;
+#else
 	uint32_t old_ppa=ppa_list[GETOFFSET(lba)];
 	ppa_list[GETOFFSET(lba)]=ppa;
+#endif
 	return old_ppa;
 }
 
@@ -181,8 +200,12 @@ uint32_t coarse_get_mapping(struct my_cache *, uint32_t lba){
 		abort();
 	}
 
+#ifdef NO_MEMCPY_DATA
+	return exact_mapping[lba];
+#else
 	uint32_t *ppa_list=(uint32_t*)DATAFROMLN((lru_node*)etr->private_data);
 	return ppa_list[GETOFFSET(lba)];
+#endif
 }
 
 struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *, uint32_t lba){

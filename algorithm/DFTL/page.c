@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <getopt.h>
+#include "../../include/utils/data_copy.h"
 #include "../../include/data_struct/lrucache.hpp"
 #include "../../interface/vectored_interface.h"
 #include "../../bench/bench.h"
@@ -80,7 +81,7 @@ uint32_t page_read(request *const req){
 	if(!req->param){
 		for(uint32_t i=0; i<a_buffer.idx; i++){
 			if(req->key==a_buffer.key[i]){
-				memcpy(req->value->value, &a_buffer.value[i*LPAGESIZE], LPAGESIZE);
+				data_copy(req->value->value, &a_buffer.value[i*LPAGESIZE], LPAGESIZE);
 				req->end_req(req);		
 				return 1;
 			}
@@ -104,12 +105,12 @@ uint32_t align_buffering(request *const req, KEYT key, value_set *value){
 	uint32_t target_idx=overlap?overlapped_idx:a_buffer.idx;
 
 	if(req){
-		memcpy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE);
+		data_copy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE);
 		a_buffer.key[target_idx]=req->key;
 		a_buffer.prefetching_info[target_idx]=req->consecutive_length;
 	}
 	else{
-		memcpy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE);
+		data_copy(&a_buffer.value[target_idx*LPAGESIZE], req->value->value, LPAGESIZE);
 		a_buffer.key[target_idx]=key;
 		a_buffer.prefetching_info[target_idx]=req->consecutive_length;
 	}
@@ -185,7 +186,7 @@ uint32_t page_remove(request *const req){
 					if(j+1!=a_buffer.idx){
 						a_buffer.key[j]=a_buffer.key[j+1];
 						a_buffer.prefetching_info[j]=a_buffer.prefetching_info[j+1];
-						memcpy(&a_buffer.value[j*LPAGESIZE], &a_buffer.value[(j+1)*LPAGESIZE], LPAGESIZE);
+						data_copy(&a_buffer.value[j*LPAGESIZE], &a_buffer.value[(j+1)*LPAGESIZE], LPAGESIZE);
 					}
 				}
 				a_buffer.idx--;
@@ -217,7 +218,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 		fdriver_lock(&rb.read_buffer_lock);
 		if(ppa==rb.buffer_ppa){
 			read_buffer_hit_cnt++;
-			memcpy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+			data_copy(value->value, &rb.buffer_value[(value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 			req->buffer_hit++;
 			req->end_req(req);
 			fdriver_unlock(&rb.read_buffer_lock);
@@ -265,7 +266,7 @@ void send_user_req(request *const req, uint32_t type, ppa_t ppa,value_set *value
 static void processing_pending_req(algo_req *req, value_set *v){
 	request *parents=req->parents;
 	page_params *params=(page_params*)req->param;
-	memcpy(params->value->value, &v->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+	data_copy(params->value->value, &v->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 	if(parents){
 		if(parents->type_lower < 10){
 			parents->type_lower+=req->type_lower;
@@ -306,11 +307,11 @@ void *page_end_req(algo_req* input){
 			fdriver_unlock(&rb.pending_lock);
 			fdriver_lock(&rb.read_buffer_lock);
 			rb.buffer_ppa=params->value->ppa/L2PGAP;
-			memcpy(rb.buffer_value, params->value->value, PAGESIZE);
+			data_copy(rb.buffer_value, params->value->value, PAGESIZE);
 			fdriver_unlock(&rb.read_buffer_lock);
 
 			if(params->value->ppa%L2PGAP){
-				memmove(params->value->value, &params->value->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
+				data_move(params->value->value, &params->value->value[(params->value->ppa%L2PGAP)*LPAGESIZE], LPAGESIZE);
 			}
 			break;
 	}
