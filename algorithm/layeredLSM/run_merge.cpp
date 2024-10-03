@@ -266,6 +266,7 @@ extern lsmtree *LSM;
 static inline void __write_merged_data(run *r, std::list<__sorted_pair> *sorted_list, 
 	sc_master *shortcut){
 	std::list<__sorted_pair>::iterator iter=sorted_list->begin();
+
 	if(r->type==RUN_NORMAL){
 		for(; iter!=sorted_list->end();iter++){
 			__sorted_pair *t_pair=&(*iter);
@@ -474,8 +475,10 @@ uint32_t trivial_move(run *r, sc_master *shortcut, mm_container *mm, summary_pai
 
 static inline void __sorted_array_flush(run *res, std::list<__sorted_pair> *sorted_arr, lsmtree *lsm)
 {
+	time_breakdown_start();
 	//read data
 	__read_merged_data(res, sorted_arr, lsm->bm->segment_manager);
+	lsm->monitor.compaction_io_time+=time_breakdown_end();
 	//write data
 	__write_merged_data(res, sorted_arr, lsm->shortcut);
 }
@@ -662,6 +665,8 @@ void run_merge_thread(uint32_t run_num, run **rset, run *target_run, bool force,
 }
 
 void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtree *lsm){
+	lsm->monitor.total_compaction_cnt++;
+	time_breakdown_start();
 	//DEBUG_CNT_PRINT(run_cnt, UINT32_MAX, __FUNCTION__ , __LINE__);
 	mm_container *mm_set=__make_mmset(rset, target_run, run_num, lsm->shortcut);
 
@@ -690,9 +695,11 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	bool trivial_move_flag_for_cache=false;
 	while(1){
 		target_round+=force?rset[0]->st_body->now_STE_num:4*BPS/run_num;
+		
 		mm_container *tirivial_move_target=__sorting_mm_set(mm_set, run_num, target_round, &sorted_arr, lsm, trivial_move_flag, &prev_lba);
 
 		if(sorted_arr.size()){
+			lsm->monitor.compaction_io_entry_num+=sorted_arr.size();
 			__sorted_array_flush(res, &sorted_arr, lsm);
 		}
 		if(tirivial_move_target){
@@ -729,7 +736,7 @@ void run_merge(uint32_t run_num, run **rset, run *target_run, bool force, lsmtre
 	for(uint32_t i=0; i<target_run_ste_num; i++){
 		cache_layer_idx_insert(lsm, res->st_body->sp_meta[i].piece_ppa, res->st_body->pba_array[i].mf, false, trivial_move_flag_for_cache);
 	}
-	
+	lsm->monitor.total_compaction_time+=time_breakdown_end();
 	printf("merge end\n");
 }
 

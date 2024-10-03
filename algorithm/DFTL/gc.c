@@ -1,5 +1,6 @@
 #include "gc.h"
 #include "../../include/data_struct/list.h"
+#include "../../include/utils/data_copy.h"
 #include "../../include/container.h"
 #include "demand_mapping.h"
 #include <stdlib.h>
@@ -267,7 +268,7 @@ void do_gc(){
 				}
 
 				invalidate_ppa(gv->ppa*L2PGAP+i);
-				memcpy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
+				data_copy(&g_buffer.value[g_buffer.idx*4096],&gv->value->value[i*4096],4096);
 				g_buffer.key[g_buffer.idx]=lbas[i];
 
 

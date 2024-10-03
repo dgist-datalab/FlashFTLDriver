@@ -33,6 +33,8 @@ typedef struct value_set{
 	uint32_t len;
 	uint32_t offset;
 	char oob[OOB_SIZE];
+
+	bool free_unavailable;
 }value_set;
 
 

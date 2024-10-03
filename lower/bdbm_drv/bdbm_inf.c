@@ -191,6 +191,10 @@ void *memio_info_write_data(uint32_t ppa, uint32_t size, value_set *value, algo_
 	collect_io_type(req->type, &memio_info);
 	if(PS_ismeta_data(req->type)){
 		PS_master_insert(ps_master,ppa,value->value);
+#ifdef NO_MEMCPY_DATA
+		value->value=NULL;
+		value->free_unavailable=true;
+#endif
 	}
 
 	//memio_write(mio,ppa,(uint32_t)size,(uint8_t*)value->value,async,(void*)req,value->dmatag);
@@ -205,14 +209,20 @@ void *memio_info_read_data(uint32_t ppa, uint32_t size, value_set *value, algo_r
 	//memio_empty_read(mio,ppa,(void*)req);
 	//memio_read(mio,ppa,(uint32_t)size,(uint8_t*)value->value,async,(void*)req,value->dmatag);
 
-	__issue(2, req, ppa);
 	if(PS_ismeta_data(req->type)){
 		char *temp = PS_master_get(ps_master,ppa);
 		if(temp==NULL){
 			printf("target data null: %s:%u\n", __FILE__, __LINE__);
 		}
+		#ifdef NO_MEMCPY_DATA
+		free(value->value);
+		value->value=temp;
+		value->free_unavailable=true;
+		#else
 		memcpy(value->value,temp,PAGESIZE);
+		#endif
 	}
+	__issue(2, req, ppa);
 	return NULL;
 }
 

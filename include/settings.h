@@ -15,7 +15,7 @@
 #define _P (1024L*_T)
 #define MILI (1000000)
 
-#define GIGAUNIT 16LL//440LL-->max
+#define GIGAUNIT 128LL//440LL-->max
 #ifndef OP
 #define OP 90
 #endif
@@ -48,7 +48,7 @@
 #define ABS(a) ((a)<0?-(a):(a))
 #define CEIL(a,b) ((a)/(b) + ((a)%(b)?1:0))
 
-#define OOB_SIZE 128
+#define OOB_SIZE 16
 #define LPAGESIZE 4096
 #define L2PGAP (PAGESIZE/LPAGESIZE)
 #define BLOCKSIZE (_PPB*PAGESIZE)

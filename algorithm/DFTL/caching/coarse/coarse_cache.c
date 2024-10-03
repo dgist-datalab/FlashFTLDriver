@@ -238,7 +238,10 @@ struct GTD_entry *coarse_get_eviction_GTD_entry(struct my_cache *, uint32_t lba)
 
 bool coarse_update_eviction_target_translation(struct my_cache* , uint32_t, GTD_entry *etr,mapping_entry *map, char *data, void *, bool){
 	char *c_data=(char*)DATAFROMLN((lru_node*)etr->private_data);
+#ifdef NO_MEMCPY_DATA
+#else
 	memcpy(data, c_data, PAGESIZE);
+#endif
 	free(c_data);
 	free(((lru_node*)etr->private_data)->data);
 	lru_delete(ccm.lru, (lru_node*)etr->private_data);

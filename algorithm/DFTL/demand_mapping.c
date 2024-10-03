@@ -5,6 +5,7 @@
 #include <getopt.h>
 #include <stdint.h>
 #include <unistd.h>
+#include "../../include/utils/data_copy.h"
 extern uint32_t test_key;
 extern uint32_t test_ppa;
 extern uint32_t debug_lba;
@@ -541,7 +542,6 @@ static inline void write_updated_map(request *req, GTD_entry *target_etr,
 	bool is_map_gc_triggered=false;
 	target_etr->physical_address=get_map_ppa(target_etr->idx, &is_map_gc_triggered)*L2PGAP;
 
-
 	if(is_map_gc_triggered){
 		req->type_ftl|=4;
 	}
@@ -748,7 +748,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	if(etr->pending_req->size > 1){
 		value_free=true;
 		temp_value=(char*)malloc(PAGESIZE);
-		memcpy(temp_value, req->value->value, PAGESIZE);
+		data_copy(temp_value, req->value->value, PAGESIZE);
 	}
 	else{
 		temp_value=req->value->value;
@@ -889,7 +889,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	}
 
 	if(head_req_is_missread && pending_isupdated_mapping){ /*write mapping*/
-		memcpy(eviction_last_req->value->value, temp_value, PAGESIZE);
+		data_copy(eviction_last_req->value->value, temp_value, PAGESIZE);
 		write_updated_map(eviction_last_req, etr, (demand_param*)eviction_last_req->param);
 	}
 	else if(pending_isupdated_mapping){
@@ -900,7 +900,7 @@ uint32_t demand_map_fine_type_pending(request *const req, mapping_entry *mapping
 	}
 
 	if(head_req_is_missread==0 && value_free){
-		memcpy(req->value->value, temp_value, PAGESIZE);
+		data_copy(req->value->value, temp_value, PAGESIZE);
 	}
 
 //end:

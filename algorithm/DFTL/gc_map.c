@@ -21,7 +21,10 @@ void invalidate_map_ppa(uint32_t piece_ppa){
 		if(!demand_ftl.bm->bit_unset(demand_ftl.bm, piece_ppa+i)){
 			EPRINT("double invalidation!", true);
 		}
+		//#ifdef NO_MEMCPY_DATA
+		//#else
 		dmm.li->invalidate_inform(piece_ppa/L2PGAP);
+		//#endif
 	}
 }
 

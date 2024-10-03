@@ -25,7 +25,7 @@ typedef struct partitioned_slab_master{
 
 PS_master *PS_master_init(uint64_t partition_num, uint64_t block_in_partition, uint64_t max_slab_num);
 void PS_master_destroy(PS_master *master);
-void PS_master_insert(PS_master *master, int key, char *value);
+void PS_master_insert(PS_master *master, int key, uint32_t prev_key, char *value);
 void PS_master_free_partition(PS_master *master, int key);
 void PS_master_free_slab(PS_master *master, uint64_t key);
 char *PS_master_get(PS_master *master, int key);

@@ -108,8 +108,8 @@ int main(int argc,char* argv[]){
 		{
 		case 0:
 		case -1: //Random RW
-			bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
-			//bench_add(VECTOREDRSET,0,target_range_number,target_range_number*(round), 0);
+			//bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
+			bench_add(VECTOREDRSET,0,target_range_number,target_range_number*(round), 0);
 			bench_add(VECTOREDRGET,0,target_range_number,target_range_number, 0);
 			break;
 		case 1: //Sequential RW

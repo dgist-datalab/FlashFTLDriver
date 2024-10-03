@@ -1,4 +1,5 @@
 #include "./partitioned_slab.h"
+#include "../utils/data_copy.h"
 
 PS_master *PS_master_init(uint64_t partition_num, uint64_t block_in_partition, uint64_t max_slab_num){
     PS_master *master = new PS_master();
@@ -20,7 +21,11 @@ PS_master *PS_master_init(uint64_t partition_num, uint64_t block_in_partition, u
     master->slab_deref_count=(uint8_t *)malloc(sizeof(uint8_t) * max_slab_num);
     memset(master->slab_deref_count, 0, sizeof(uint8_t) * max_slab_num);
     for(int i=0; i<max_slab_num; i++){
+#ifdef NO_MEMCPY_DATA
+        master->slabs[i] = NULL;
+#else
         master->slabs[i] = (char *)malloc(SLABSIZE);
+#endif
         master->free_slabs.push(i);
     }
     return master;
@@ -37,7 +42,7 @@ void PS_master_destroy(PS_master *master){
     delete master;
 }
 
-void PS_master_insert(PS_master *master, int key, char *value){
+void PS_master_insert(PS_master *master, int key, uint32_t prev_key, char *value){
     uint64_t partition = key / master->block_in_partition;
     pthread_mutex_lock(&master->partition_locks[partition]);
 
@@ -53,7 +58,40 @@ void PS_master_insert(PS_master *master, int key, char *value){
 
     master->partitiones[partition][key] = slab_num;
     pthread_mutex_unlock(&master->partition_locks[partition]);
+
+    if(key ==16449 || prev_key==16449){
+        printf("key:%d, prev_key:%d\n", key, prev_key);
+    }
+
+#ifdef NO_MEMCPY_DATA
+    #ifdef DFTL
+    free(value);
+    value=NULL;
+    #endif
+    //if(prev_key!=UINT32_MAX){
+    //    uint32_t invalidate_partition = prev_key / master->block_in_partition;
+    //    pthread_mutex_lock(&master->partition_locks[invalidate_partition]);
+    //    auto it=master->partitiones[invalidate_partition].find(prev_key);
+    //    if (it== master->partitiones[invalidate_partition].end())
+    //    {
+    //        printf("error in slab data???\n");
+    //        pthread_mutex_unlock(&master->partition_locks[invalidate_partition]);
+    //    }
+    //    else{
+    //        master->slabs[it->second]=NULL;
+    //        pthread_mutex_lock(&master->queue_lock);
+    //        master->free_slabs.push(it->second);
+    //        pthread_mutex_unlock(&master->queue_lock);
+    //        master->partitiones[invalidate_partition].erase(it);
+    //    }
+    //    pthread_mutex_unlock(&master->partition_locks[invalidate_partition]);
+    //}
+
+    free(master->slabs[slab_num]);
+    master->slabs[slab_num] = value;
+#else
     memcpy(master->slabs[slab_num], value, SLABSIZE);
+#endif
 }
 
 char *PS_master_get(PS_master *master, int key){

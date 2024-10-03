@@ -103,6 +103,17 @@ typedef struct lsmtree_monitor{
 
 	uint64_t map_search_time;
 	uint64_t map_search_cnt;
+
+	uint64_t sorting_time;
+	uint64_t sorting_cnt;
+
+	uint64_t compaction_io_time;
+	uint64_t compaction_io_cnt;
+
+	uint64_t compaction_io_entry_num;
+
+	uint64_t total_compaction_time;
+	uint64_t total_compaction_cnt;
 }lsmtree_monitor;
 
 typedef struct lsmtree{

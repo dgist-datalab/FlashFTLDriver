@@ -965,6 +965,7 @@ value_set *inf_get_valueset(char * in_v, int type, uint32_t length){
 		data_set(res->value,0,length);
 	}
 	res->ppa=UINT32_MAX;
+	res->free_unavailable=false;
 	return res;
 }
 
@@ -997,6 +998,7 @@ value_set *inf_get_valueset_oob(char * in_v, char *oob, int type, uint32_t lengt
 		memcpy(res->oob, oob, OOB_SIZE);
 	}
 	res->ppa=UINT32_MAX;
+	res->free_unavailable=false;
 	return res;
 }
 
@@ -1009,10 +1011,14 @@ void inf_free_valueset(value_set *in, int type){
     }
 	if(!in->from_app){
 		if(in->dmatag==-1){
-			free(in->value);
+			if(!in->free_unavailable){
+				free(in->value);
+			}
 		}
 		else{
-			F_free((void*)in->value,in->dmatag,type);
+			if(!in->free_unavailable){
+				F_free((void*)in->value,in->dmatag,type);
+			}
 		}
 	}
 	free(in);

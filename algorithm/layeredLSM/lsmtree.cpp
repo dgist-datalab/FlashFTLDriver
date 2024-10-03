@@ -488,6 +488,18 @@ uint32_t lsmtree_print_log(lsmtree *lsm){
 
 	printf("map search time\n");
 	printf("map search time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.map_search_time, lsm->monitor.map_search_cnt, (double)lsm->monitor.map_search_time/lsm->monitor.map_search_cnt);
+
+	printf("sorting time\n");
+	printf("sorting time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.sorting_time, lsm->monitor.sorting_cnt, (double)lsm->monitor.sorting_time/lsm->monitor.sorting_cnt);
+
+	printf("compaction io time\n");
+	printf("compaction io time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.compaction_io_time, lsm->monitor.compaction_io_cnt, (double)lsm->monitor.compaction_io_time/lsm->monitor.compaction_io_cnt);
+
+	printf("compaction_io_entry_nun: %lu\n", lsm->monitor.compaction_io_entry_num);
+
+
+	printf("total compaction\n");
+	printf("total_compaction time, cnt, avg: %lu, %lu, %lf\n", lsm->monitor.total_compaction_time, lsm->monitor.total_compaction_cnt, (double)lsm->monitor.total_compaction_time/lsm->monitor.total_compaction_cnt);
 	return 1;
 }
 

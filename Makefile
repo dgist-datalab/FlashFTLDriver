@@ -33,9 +33,9 @@ export COMMONFLAGS+=\
 			-DAPPL_DESIGN_PATH="\"$(PWD)/algorithm/layeredLSM/design_knob/\""\
 			-DMEDIA_NAME="\"/dev/nvme2n1\""\
 			-DTIME_BREAKDOWN\
-			-DNO_MEMCPY_DATA\
-			-DNO_CPU_TEST=0\
+			-DNO_CPU_TEST=1\
 			-DQUEUE_TIME_CHECK\
+			-DNO_MEMCPY_DATA\
 			-O3\
 #			-DTRACE_COLLECT\
 #			-DTRACE_REPLAY\

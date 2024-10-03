@@ -8,6 +8,7 @@
 #include "../../interface/queue.h"
 #include "../../interface/bb_checker.h"
 #include "../../include/utils/cond_lock.h"
+#include "../../include/utils/data_copy.h"
 #include "../../include/data_struct/partitioned_slab.h"
 #include "../../include/debug_utils.h"
 
@@ -54,8 +55,8 @@ lower_info my_posix={
 	.write=posix_write,
 	.read=posix_read,
 #endif
-	.write_sync=posix_write_sync,
-	.read_sync=posix_read_sync,
+	.write_sync=NULL,
+	.read_sync=NULL,
 	.device_badblock_checker=NULL,
 #ifdef LASYNC
 	.trim_block=posix_make_trim,
@@ -118,7 +119,7 @@ static uint8_t convert_type(uint8_t type) {
 
 
 
-void data_copy_from(uint32_t ppa, char *data, uint32_t type){
+void data_copy_from(uint32_t ppa, value_set *v, uint32_t type){
 #ifdef COPYMETA_ONLY
 	if(!seg_table[ppa].populate){
 		printf("%u not populated!\n", ppa );
@@ -126,11 +127,17 @@ void data_copy_from(uint32_t ppa, char *data, uint32_t type){
 	}
 	if(PS_ismeta_data(type)){
 		char *saved_data=PS_master_get(ps_master, ppa);
-		if(data==NULL){
+		if(v==NULL){
 			printf("not a target_data! %s:%d\n", __FILE__, __LINE__);
 			abort();
 		}
-		memcpy(data, saved_data, PAGESIZE);
+		#ifdef NO_MEMCPY_DATA
+		free(v->value);
+		v->value=saved_data;
+		v->free_unavailable=true;
+		#else
+		memcpy(v->value, saved_data, PAGESIZE);
+		#endif
 	}
 #else
 	if(!seg_table[ppa].storage){
@@ -143,7 +150,7 @@ void data_copy_from(uint32_t ppa, char *data, uint32_t type){
 #endif
 }
 
-void data_copy_to(uint32_t ppa, char *data, uint32_t type){
+void data_copy_to(uint32_t ppa, value_set *v, uint32_t type){
 #ifdef COPYMETA_ONLY
 	if(!seg_table[ppa].populate){
 		seg_table[ppa].populate=true;
@@ -153,8 +160,13 @@ void data_copy_to(uint32_t ppa, char *data, uint32_t type){
 		abort();
 	}
 	if(PS_ismeta_data(type)){
-		PS_master_insert(ps_master, ppa, data);
+		PS_master_insert(ps_master, ppa, UINT32_MAX, v->value);
+		#ifdef NO_MEMCPY_DATA
+		v->value=NULL;
+		v->free_unavailable=true;
+		#endif
 	}
+	
 #else
 	if(!seg_table[ppa].storage){
 		seg_table[ppa].storage = (char *)malloc(PAGESIZE);
@@ -197,10 +209,10 @@ void *l_main(void *__input){
 		else{
 			switch(inf_req->type){
 				case FS_LOWER_W: 
-					data_copy_to(inf_req->key, inf_req->data, inf_req->upper_req->type);
+					data_copy_to(inf_req->key, inf_req->value, inf_req->upper_req->type);
 					break;
 				case FS_LOWER_R:
-					data_copy_from(inf_req->key, inf_req->data, inf_req->upper_req->type);
+					data_copy_from(inf_req->key, inf_req->value, inf_req->upper_req->type);
 					break;
 			}
 			fdriver_unlock(&inf_req->lock);
@@ -414,7 +426,7 @@ void *posix_write(uint32_t _PPA, uint32_t size, value_set* value,algo_req *const
 
 		if (collect_io_type(req->type, &my_posix))
 		{
-			data_copy_to(PPA, value->value, req->type);
+			data_copy_to(PPA, value, req->type);
 		}
 	}
 
@@ -442,38 +454,10 @@ void *posix_read(uint32_t _PPA, uint32_t size, value_set* value, algo_req *const
 	}
 
 	if(collect_io_type(req->type, &my_posix)){
-		data_copy_from(PPA, value->value, req->type);
+		data_copy_from(PPA, value, req->type);
 	}
 
 	req->end_req(req);
-	return NULL;
-}
-
-void *posix_write_sync(uint32_t type, uint32_t ppa, char *data){
-	if(collect_io_type(type, &my_posix)){
-#ifdef LASYNC
-		posix_request *p_req=posix_get_preq(FS_LOWER_W, ppa, NULL, data, false, NULL);
-		posix_async_make_req(p_req);
-		fdriver_lock(&p_req->lock);
-		free(p_req);
-#else
-		data_copy_to(ppa, data, type);
-#endif
-	}
-	return NULL;
-}
-
-void *posix_read_sync(uint32_t type, uint32_t ppa, char *data){
-	if(collect_io_type(type, &my_posix)){
-#ifdef LASYNC
-		posix_request *p_req=posix_get_preq(FS_LOWER_R, ppa, NULL, data, false, NULL);
-		posix_async_make_req(p_req);
-		fdriver_lock(&p_req->lock);
-		free(p_req);
-#else
-		data_copy_from(ppa, data, type);
-#endif
-	}
 	return NULL;
 }
 
