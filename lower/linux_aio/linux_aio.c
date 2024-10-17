@@ -25,6 +25,14 @@
 #include <assert.h>
 #include <semaphore.h>
 #include <malloc.h>
+#include <queue>
+#include <sched.h>
+
+#define MAX_REQ_NUM 64
+
+pthread_mutex_t cbs_queue_lock = PTHREAD_MUTEX_INITIALIZER;
+std::queue<uint32_t> cbs_queue;
+
 void posix_traffic_print(lower_info *li);
 void posix_invalidate_inform(uint64_t ppa);
 
@@ -56,12 +64,15 @@ typedef struct aio_private{
 	uint32_t tag;
 }aio_private;
 
-struct iocb request_list[QDEPTH];
-aio_private private_list[QDEPTH];
-char *temp_value[QDEPTH];
+
+
+struct iocb request_list[MAX_REQ_NUM];
+aio_private private_list[MAX_REQ_NUM];
+char *temp_value[MAX_REQ_NUM];
 
 static int _fd;
-static pthread_t t_id;
+static pthread_t poller_id;
+static pthread_t sender_id;
 static io_context_t ctx;
 static tag_manager *tm=NULL;
 static PS_master *ps_master;
@@ -97,11 +108,58 @@ static uint8_t test_type(uint8_t type){
 	return type&t_type;
 }
 
+void *sender(void *input){
+	uint32_t cpu_number=5;
+	cpu_set_t cpuset;
+	pthread_t thread = pthread_self();
+	CPU_ZERO(&cpuset);
+	CPU_SET(cpu_number, &cpuset);
+
+	int result=pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
+	if (result != 0) {
+        fprintf(stderr, "Error setting CPU affinity for CPU %d\n", cpu_number);
+        return NULL;
+	}
+
+	uint32_t request_num=0;
+	struct iocb *cbs[MAX_REQ_NUM]={NULL,};
+	while(1){
+		pthread_mutex_lock(&cbs_queue_lock);
+		if(cbs_queue.empty()){
+			pthread_mutex_unlock(&cbs_queue_lock);
+			continue;
+		}
+		request_num=cbs_queue.size();
+		for(uint32_t i=0; i<request_num; i++){
+			uint32_t tag=cbs_queue.front();
+			cbs_queue.pop();
+			cbs[i]=&request_list[tag];
+		}
+		pthread_mutex_unlock(&cbs_queue_lock);
+
+		io_submit(ctx,request_num, cbs);
+	}
+	return NULL;
+}
+
+
 void *poller(void *input) {
+	uint32_t cpu_number=4;
+	cpu_set_t cpuset;
+	pthread_t thread = pthread_self();
+	CPU_ZERO(&cpuset);
+	CPU_SET(cpu_number, &cpuset);
+
+	int result=pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
+	if (result != 0) {
+        fprintf(stderr, "Error setting CPU affinity for CPU %d\n", cpu_number);
+        return NULL;
+    }
+
 	aio_private *pri;
 	algo_req *req;
 	int ret;
-	struct io_event done_array[128];
+	struct io_event done_array[MAX_REQ_NUM];
 	struct io_event *r;
 	struct timespec w_t;
 	struct iocb *cb;
@@ -109,7 +167,7 @@ void *poller(void *input) {
 	w_t.tv_nsec=10*1000;
 
     for (int i = 0; ; i++) {
-		if((ret=io_getevents(ctx,0,128,done_array,&w_t))){
+		if((ret=io_getevents(ctx,0,1,done_array,&w_t))){
 			for(int i=0; i<ret; i++){
 				r=&done_array[i];
 				cb=r->obj;
@@ -141,7 +199,7 @@ uint32_t aio_create(lower_info *li,blockmanager *bm){
 
 	li->write_op=li->read_op=li->trim_op=0;
 	printf("file name : %s\n", MEDIA_NAME);
-	_fd = open(MEDIA_NAME, O_RDWR|O_DIRECT);
+	_fd = open(MEDIA_NAME, O_RDWR | O_DIRECT);
 	if(_fd==-1){
 		printf("file open error!\n");
 		exit(1);
@@ -150,26 +208,27 @@ uint32_t aio_create(lower_info *li,blockmanager *bm){
 	printf("!!! posix libaio NOP:%d!!!\n",li->NOP);
 	li->write_op=li->read_op=li->trim_op=0;
 
-	int ret=io_setup(QDEPTH,&ctx);
+	int ret=io_setup(MAX_REQ_NUM,&ctx);
 	if(ret!=0){
 		printf("io setup error\n");
 		exit(1);
 	}
-	tm=tag_manager_init(QDEPTH);
+	tm=tag_manager_init(MAX_REQ_NUM);
 
 #ifdef COPYMETA_ONLY
 	ps_master=PS_master_init(_NOS, _PPS, _NOP/100*COPYMETA_ONLY);
 #else
-	for(uint32_t i=0; i<QDEPTH; i++){
+	for(uint32_t i=0; i<MAX_REQ_NUM; i++){
 		pp_cache[i].ppa=UINT32_MAX;
 	}
 #endif
 
-	for(uint32_t i=0; i<QDEPTH; i++){
+	for(uint32_t i=0; i<MAX_REQ_NUM; i++){
 		temp_value[i]=(char*)memalign(4*_K, PAGESIZE);
 	}
 
-    pthread_create(&t_id, NULL, &poller, NULL);
+    pthread_create(&poller_id, NULL, &poller, NULL);
+    pthread_create(&sender_id, NULL, &sender, NULL);
 	return 1;
 }
 
@@ -204,7 +263,10 @@ void send_req(FSTYPE type, uint32_t ppa, value_set* value, algo_req *upper_reque
 	}
 	target_req->data=(void*)pri_req;
 
-	io_submit(ctx,1,&target_req);
+	//io_submit(ctx,1,&target_req);
+	pthread_mutex_lock(&cbs_queue_lock);
+	cbs_queue.push(tag);
+	pthread_mutex_unlock(&cbs_queue_lock);
 }
 
 void *aio_write(uint32_t PPA, uint32_t size, value_set* value, algo_req *const req){
@@ -220,7 +282,11 @@ void *aio_write(uint32_t PPA, uint32_t size, value_set* value, algo_req *const r
 
 #ifdef COPYMETA_ONLY
 	if(PS_ismeta_data(req->type)){
-		PS_master_insert(ps_master, PPA, value->value);
+		PS_master_insert(ps_master, PPA, UINT32_MAX, value->value);
+	#ifdef NO_MEMCPY_DATA
+		value->value=NULL;
+		value->free_unavailable=true;
+	#endif
 	}
 #endif
 
@@ -240,6 +306,20 @@ void *aio_read(uint32_t PPA, uint32_t size, value_set* value, algo_req *const re
 		aio_info.req_type_cnt[t_type]++;
 	}
 	
+
+#ifdef COPYMETA_ONLY
+	if(PS_ismeta_data(req->type)){
+		char *temp = PS_master_get(ps_master, PPA);
+	#ifdef NO_MEMCPY_DATA
+		free(value->value);
+		value->value=temp;
+		value->free_unavailable=true;
+	#else
+		memcpy(value->value,temp,PAGESIZE);
+	#endif
+	}
+#endif
+
 	send_req(FS_GET_T, PPA, value, req);
 
 	return NULL;

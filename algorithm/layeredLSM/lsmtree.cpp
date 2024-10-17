@@ -6,6 +6,10 @@
 page_read_buffer rb;
 extern MeasureTime lsmtree_mt;
 
+MeasureTime gc_mt_data;
+MeasureTime gc_mt_map;
+MeasureTime gc_mt_sc;
+MeasureTime mt_compaction;
 
 extern lower_info *g_li;
 extern uint32_t test_key;
@@ -155,6 +159,11 @@ lsmtree* lsmtree_init(lsmtree_parameter param, blockmanager *sm){
 	rb.buffer_ppa=UINT32_MAX;
 
 	cache_layer_init(res, param.memory_limit, g_li);
+
+	measure_init(&gc_mt_data);
+	measure_init(&gc_mt_map);
+	measure_init(&gc_mt_sc);
+	measure_init(&mt_compaction);
 	return res;
 }
 
@@ -180,6 +189,18 @@ void lsmtree_free(lsmtree *lsm){
 	free(lsm);
 	delete rb.pending_req;
 	delete rb.issue_req;
+
+	printf("gc_data: ");
+	measure_adding_print(&gc_mt_data);
+
+	printf("gc_map: ");
+	measure_adding_print(&gc_mt_map);
+
+	printf("gc_sc: ");
+	measure_adding_print(&gc_mt_sc);
+
+	printf("compaction: ");
+	measure_adding_print(&mt_compaction);
 }
 
 uint32_t lsmtree_insert(lsmtree *lsm, request *req){
@@ -205,8 +226,10 @@ uint32_t lsmtree_insert(lsmtree *lsm, request *req){
 			thpool_wait(lsm->tp);
 		}
 		thpool_add_work(lsm->tp,compaction_thread_run, (void*)r);
-#else
+#else	
+		measure_start(&mt_compaction);
 		compaction_flush(lsm, r);
+		measure_adding(&mt_compaction);
 #endif
 		//printf("free block num:%u\n", L2PBm_get_free_block_num(lsm->bm));
 		lsm->now_memtable_idx=(lsm->now_memtable_idx+1)%MEMTABLE_NUM;
@@ -557,6 +580,7 @@ static inline sc_gc_node* __issue_gc_read_node(uint32_t ppa){
 }
 
 uint32_t lsm_get_ppa_from_scseg(void *arg, void (*update_addr)(uint32_t*,uint32_t*, uint32_t)){
+	measure_start(&gc_mt_sc);
 	lsmtree *lsm=(lsmtree*)arg;
 	blockmanager *sm=lsm->master_sm;
 	if(sm->check_full(lsm->sc_seg)){
@@ -616,6 +640,7 @@ uint32_t lsm_get_ppa_from_scseg(void *arg, void (*update_addr)(uint32_t*,uint32_
 		free(new_ppa_set);
 	}
 
+	measure_adding(&gc_mt_sc);
 	uint32_t res=sm->get_page_addr(lsm->sc_seg);
 	return res;
 }

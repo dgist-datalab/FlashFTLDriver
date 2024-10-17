@@ -13,6 +13,9 @@ extern uint32_t test_key;
 extern uint32_t debug_lba;
 align_buffer a_buffer;
 extern MeasureTime mt;
+MeasureTime gc_mt_data;
+MeasureTime gc_mt_map;
+
 struct algorithm demand_ftl={
 	.argument_set=demand_argument,
 	.create=page_create,
@@ -45,6 +48,8 @@ void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo){
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
 
+	measure_init(&gc_mt_data);
+	measure_init(&gc_mt_map);
 }
 
 uint32_t page_create (lower_info* li,blockmanager *bm,algorithm *algo){
@@ -71,6 +76,12 @@ void page_destroy (lower_info* li, algorithm *algo){
 
 	printf("map %u data %u", now_map_seg, now_data_seg);
 	free(a_buffer.value);
+
+	printf("gc_data: ");
+	measure_adding_print(&gc_mt_data);
+
+	printf("gc_map: ");
+	measure_adding_print(&gc_mt_map);
 
 	delete rb.pending_req;
 	delete rb.issue_req;

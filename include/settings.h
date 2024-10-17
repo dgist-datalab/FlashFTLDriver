@@ -15,7 +15,7 @@
 #define _P (1024L*_T)
 #define MILI (1000000)
 
-#define GIGAUNIT 128LL//440LL-->max
+#define GIGAUNIT 230LL//440LL-->max
 #ifndef OP
 #define OP 90
 #endif
@@ -67,7 +67,7 @@
 #define BLOCKT uint32_t
 #define PTR_BIT 32
 
-#define QSIZE		(64) 
+#define QSIZE		(64)
 #define LOWQDEPTH	(64)
 #define QDEPTH		(64)
 #define DEV_QDEPTH 	(64)

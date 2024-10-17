@@ -194,6 +194,7 @@ void do_gc(){
 	list_free(temp_list);
 }
 
+extern MeasureTime gc_mt;
 
 ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	uint32_t res;
@@ -201,7 +202,9 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	/*you can check if the gc is needed or not, using this condition*/
 	if(page_ftl.bm->check_full(p->active) && page_ftl.bm->is_gc_needed(page_ftl.bm)){
 //		new_do_gc();//call gc
+		measure_start(&gc_mt);
 		do_gc();//call gc
+		measure_adding(&gc_mt);
 	}
 
 retry:

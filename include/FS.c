@@ -16,6 +16,7 @@ int F_malloc(void **ptr, int size,int rw){
 	}
 
 #if defined(linux_aio) || defined(posix_aio)
+//#if defined(posix_aio)
 	if(size%(4*_K)){
 		(*ptr)=malloc(size);
 	}

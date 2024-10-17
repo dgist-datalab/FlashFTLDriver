@@ -72,13 +72,16 @@ void L2PBm_invalidate_PBA(L2P_bm *bm, uint32_t PBA){
 }
 
 extern lsmtree *LSM;
+extern MeasureTime gc_mt_data;
 uint32_t L2PBm_pick_empty_PBA(L2P_bm *bm){
 	fdriver_lock(&bm->data_block_lock);
 retry:
 	if(bm->now_seg_idx==NO_SEG){
 		blockmanager *sm=bm->segment_manager;
 		if(sm->is_gc_needed(sm)){
+			measure_start(&gc_mt_data);
 			if(gc(bm, DATA_SEG)==GC_COPY){
+				measure_adding(&gc_mt_data);
 				if(bm->now_block_idx==BPS){
 					lsmtree_run_print(LSM);
 					//lsmtree_print_log(LSM);
@@ -89,6 +92,7 @@ retry:
 				}
 				goto out;
 			}
+			measure_adding(&gc_mt_data);
 		}
 		
 		__segment *seg=bm->segment_manager->get_segment(bm->segment_manager, BLOCK_ACTIVE);
@@ -203,17 +207,21 @@ void check_block_sanity(uint32_t piece_ppa){
 	}
 }
 
+extern MeasureTime gc_mt_map;
 uint32_t L2PBm_get_map_ppa(L2P_bm *bm){
 	fdriver_lock(&bm->map_block_lock);
 	blockmanager *sm=bm->segment_manager;
 	if(sm->check_full(bm->now_summary_seg)){
 		if(sm->is_gc_needed(sm)){
+			measure_start(&gc_mt_map);
 			if(gc(bm, SUMMARY_SEG)==GC_COPY){
+				measure_adding(&gc_mt_map);
 				if(sm->check_full(bm->now_summary_seg)){
 					EPRINT("not effective gc on summary", true);
 				}
 				goto out;
 			}
+			measure_adding(&gc_mt_map);
 			//gcing all invalid target
 		}
 		bm->now_summary_seg=sm->get_segment(sm, BLOCK_ACTIVE);

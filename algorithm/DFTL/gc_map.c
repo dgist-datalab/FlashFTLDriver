@@ -37,12 +37,15 @@ void validate_map_ppa(uint32_t piece_ppa, KEYT gtd_idx){
 	demand_ftl.bm->set_oob(demand_ftl.bm,(char*)&gtd_idx, sizeof(KEYT), piece_ppa/L2PGAP);
 }
 
+extern MeasureTime gc_mt_map;
 ppa_t get_map_ppa(KEYT gtd_idx, bool *gc_triggered){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
 	if(demand_ftl.bm->check_full(p->map_active)){
 		if((limit_map_seg && now_map_seg >= map_seg_limit) || demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
+			measure_start(&gc_mt_map);
 			do_map_gc();//call gc
+			measure_adding(&gc_mt_map);
 			if(gc_triggered){
 				*gc_triggered=true;
 			}

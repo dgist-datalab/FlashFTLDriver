@@ -19,7 +19,7 @@ static inline void __check_data(algo_req *req, char *value){
 	uint32_t intra_offset=param->mf->oob_check(param->mf, param);
 	//uint32_t intra_offset=0;
 	if(intra_offset!=NOT_FOUND){
-		data_move(p_req->value->value, &value[intra_offset*LPAGESIZE], LPAGESIZE);
+		//data_move(p_req->value->value, &value[intra_offset*LPAGESIZE], LPAGESIZE);
 		p_req->end_req(p_req);
 		param->mf->query_done(param->mf, param);
 	}
@@ -38,30 +38,24 @@ static void *__run_read_end_req(algo_req *req){
 	rb_r_iter target_r_iter;
 	algo_req *pending_req;
 
-	fdriver_lock(&rb.pending_lock);
-	target_r_iter=rb.pending_req->find(req->value->ppa);
-	for(;target_r_iter->first==req->value->ppa && 
-					target_r_iter!=rb.pending_req->end();){
-		pending_req=target_r_iter->second;
-		map_read_param *param=(map_read_param*)pending_req->param;
-		if(param->mf->type==COMP_MAP){
-#ifdef AMF
-#else
-			data_copy(pending_req->value->value, req->value->value, PAGESIZE);
-#endif
-		}
-		__check_data(pending_req, req->value->value);
-		rb.pending_req->erase(target_r_iter++);
-	}
-	rb.issue_req->erase(req->value->ppa);
-	fdriver_unlock(&rb.pending_lock);
+	//fdriver_lock(&rb.pending_lock);
+	//target_r_iter=rb.pending_req->find(req->value->ppa);
+	//for(;target_r_iter->first==req->value->ppa && 
+	//				target_r_iter!=rb.pending_req->end();){
+	//	pending_req=target_r_iter->second;
+	//	map_read_param *param=(map_read_param*)pending_req->param;
+	//	__check_data(pending_req, req->value->value);
+	//	rb.pending_req->erase(target_r_iter++);
+	//}
+	//rb.issue_req->erase(req->value->ppa);
+	//fdriver_unlock(&rb.pending_lock);
 
-	fdriver_lock(&rb.read_buffer_lock);
-	rb.buffer_ppa = req->value->ppa;
-	data_copy(rb.buffer_value, req->value->value, PAGESIZE);
+	//fdriver_lock(&rb.read_buffer_lock);
+	//rb.buffer_ppa = req->value->ppa;
+	//data_copy(rb.buffer_value, req->value->value, PAGESIZE);
+	//fdriver_unlock(&rb.read_buffer_lock);
+
 	__check_data(req, rb.buffer_value);;
-	fdriver_unlock(&rb.read_buffer_lock);
-
 	return NULL;
 }
 
@@ -86,46 +80,40 @@ static void __run_issue_read(request *req, uint32_t ppa, value_set *value, map_r
 
 
 
-	fdriver_lock(&rb.read_buffer_lock);
-	if (ppa == rb.buffer_ppa)
-	{
-		data_copy(value->value, &rb.buffer_value, PAGESIZE);
-		map_read_param *param=(map_read_param*)res->param;
+	//fdriver_lock(&rb.read_buffer_lock);
+	//if (ppa == rb.buffer_ppa)
+	//{
+	//	data_copy(value->value, &rb.buffer_value, PAGESIZE);
+	//	map_read_param *param=(map_read_param*)res->param;
 
-		if(param->mf->type==COMP_MAP){
-#ifdef AMF
-#else
-			data_copy(res->value->value, rb.buffer_value, PAGESIZE);
-#endif
-		}
-		req->buffer_hit++;
-		__check_data(res, rb.buffer_value);
-		fdriver_unlock(&rb.read_buffer_lock);
-		//issue_time=time_breakdown_end();
-		//LSM->monitor.issue_time+=issue_time;
-		//LSM->monitor.issue_cnt++;
-		return;
-	}
-	fdriver_unlock(&rb.read_buffer_lock);
+	//	req->buffer_hit++;
+	//	__check_data(res, rb.buffer_value);
+	//	fdriver_unlock(&rb.read_buffer_lock);
+	//	//issue_time=time_breakdown_end();
+	//	//LSM->monitor.issue_time+=issue_time;
+	//	//LSM->monitor.issue_cnt++;
+	//	return;
+	//}
+	//fdriver_unlock(&rb.read_buffer_lock);
 
 
-	fdriver_lock(&rb.pending_lock);
-	rb_r_iter temp_r_iter = rb.issue_req->find(ppa);
-	if (temp_r_iter == rb.issue_req->end())
-	{
-		rb.issue_req->insert(std::pair<uint32_t, algo_req *>(ppa, res));
-		fdriver_unlock(&rb.pending_lock);
-	}
-	else
-	{
-		req->buffer_hit++;
-		rb.pending_req->insert(std::pair<uint32_t, algo_req *>(ppa, res));
-		fdriver_unlock(&rb.pending_lock);
-		//issue_time=time_breakdown_end();
-		//LSM->monitor.issue_time+=issue_time;
-		//LSM->monitor.issue_cnt++;
-		return;
-	}
+	//fdriver_lock(&rb.pending_lock);
+	//rb_r_iter temp_r_iter = rb.issue_req->find(ppa);
+	//if (temp_r_iter == rb.issue_req->end())
+	//{
+	//	rb.issue_req->insert(std::pair<uint32_t, algo_req *>(ppa, res));
+	//	fdriver_unlock(&rb.pending_lock);
+	//}
+	//else
+	//{
+	//	req->buffer_hit++;
+	//	rb.pending_req->insert(std::pair<uint32_t, algo_req *>(ppa, res));
+	//	fdriver_unlock(&rb.pending_lock);
+	//	//issue_time=time_breakdown_end();
+	//	//LSM->monitor.issue_time+=issue_time;
+	//	//LSM->monitor.issue_cnt++;
+	//	return;
+	//}
 	uint64_t issue_time=0;
 	time_breakdown_start();
 	g_li->read(ppa, PAGESIZE, value, res);

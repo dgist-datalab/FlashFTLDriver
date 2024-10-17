@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sched.h>
 
 extern master_processor mp;
 extern tag_manager *tm;
@@ -166,6 +167,18 @@ void *vectored_read_retry_main(void* __input){
 }
 
 void *vectored_main(void *__input){
+	uint32_t cpu_number=0;
+	cpu_set_t cpuset;
+	pthread_t thread = pthread_self();
+	CPU_ZERO(&cpuset);
+	CPU_SET(cpu_number, &cpuset);
+
+	int result=pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
+	if (result != 0) {
+        fprintf(stderr, "Error setting CPU affinity for CPU %d\n", cpu_number);
+        return NULL;
+    }
+
 	vec_request *vec_req;
 	request* inf_req;
 	processor *_this=NULL;

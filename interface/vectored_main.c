@@ -14,6 +14,8 @@
 #include "interface.h"
 #include "vectored_interface.h"
 #include "../include/utils/kvssd.h"
+#include <sched.h>
+
 extern int req_cnt_test;
 extern uint64_t dm_intr_cnt;
 extern int LOCALITY;
@@ -34,6 +36,15 @@ static int type=-1;
 static int param=0;
 
 int main(int argc,char* argv[]){
+
+	uint32_t cpu_number=1;
+	cpu_set_t cpuset;
+	pthread_t thread = pthread_self();
+	CPU_ZERO(&cpuset);
+	CPU_SET(cpu_number, &cpuset);
+
+	int result=pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
+
 	//int temp_cnt=bench_set_params(argc,argv,temp_argv);
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
@@ -107,14 +118,14 @@ int main(int argc,char* argv[]){
 	    switch (type)
 		{
 		case 0:
-		case -1: //Random RW
-			//bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
-			bench_add(VECTOREDRSET,0,target_range_number,target_range_number*(round), 0);
-			bench_add(VECTOREDRGET,0,target_range_number,target_range_number, 0);
+		case -1: //Random WRITE
+			bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
+			//bench_add(VECTOREDRSET,0,target_range_number,target_range_number, 0);
+			//bench_add(VECTOREDRGET,0,target_range_number, 10000, 0);
 			break;
-		case 1: //Sequential RW
-			bench_add(VECTOREDSSET,0,target_range_number,target_range_number*round, 0);
-			bench_add(VECTOREDSGET,0,target_range_number,target_range_number*round, 0);
+		case 1: //RANDOM read
+			bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
+			bench_add(VECTOREDRGET,0,target_range_number,target_range_number, 0);
 			break;
 
 		case 2: //Temporal locality RW

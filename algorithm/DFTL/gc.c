@@ -328,7 +328,7 @@ finish:
 	}
 }
 
-
+extern MeasureTime gc_mt_data;
 ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	uint32_t res;
 	pm_body *p=(pm_body*)demand_ftl.algo_body;
@@ -336,7 +336,9 @@ ppa_t get_ppa(KEYT *lbas, uint32_t max_idx){
 	/*you can check if the gc is needed or not, using this condition*/
 	if(demand_ftl.bm->check_full(p->active)){
 		if((limit_map_seg && now_data_seg>data_seg_limit) || demand_ftl.bm->is_gc_needed(demand_ftl.bm)){
+			measure_start(&gc_mt_data);
 			do_gc();//call gc
+			measure_adding(&gc_mt_data);
 		}
 	}
 

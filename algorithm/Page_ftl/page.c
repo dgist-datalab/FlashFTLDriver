@@ -18,6 +18,9 @@ uint32_t log_fd;
 #endif
 
 
+MeasureTime write_mt;
+MeasureTime gc_mt;
+
 extern uint32_t test_key;
 align_buffer a_buffer;
 typedef std::multimap<uint32_t, algo_req*>::iterator rb_r_iter;
@@ -56,6 +59,9 @@ void page_create_body(lower_info *li, blockmanager *bm, algorithm *algo){
 	fdriver_mutex_init(&rb.read_buffer_lock);
 	rb.buffer_ppa=UINT32_MAX;
 
+	measure_init(&write_mt);
+	measure_init(&gc_mt);
+
 #ifdef LBA_LOGGING
 	log_fd=open(LBA_LOGGING, 0x666, O_CREAT | O_WRONLY | O_TRUNC);
 	if (log_fd < 0) {
@@ -80,6 +86,10 @@ void page_destroy (lower_info* li, algorithm *algo){
 	
 	delete rb.pending_req;
 	delete rb.issue_req;
+
+	measure_adding_print(&write_mt);
+	printf("gc: ");
+	measure_adding_print(&gc_mt);
 	return;
 }
 
@@ -241,8 +251,10 @@ uint32_t page_write(request *const req){
 
 #ifdef WRITE_STOP_READ
 #else
+	measure_start(&write_mt);
 	req->value=NULL;
 	req->end_req(req);
+	measure_adding(&write_mt);
 #endif
 	return 0;
 }

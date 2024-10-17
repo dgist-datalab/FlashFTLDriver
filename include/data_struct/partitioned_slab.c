@@ -64,7 +64,7 @@ void PS_master_insert(PS_master *master, int key, uint32_t prev_key, char *value
     }
 
 #ifdef NO_MEMCPY_DATA
-    #ifdef DFTL
+    #if defined(DFTL)
     free(value);
     value=NULL;
     #endif
