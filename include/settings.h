@@ -15,7 +15,7 @@
 #define _P (1024L*_T)
 #define MILI (1000000)
 
-#define GIGAUNIT 230LL//440LL-->max
+#define GIGAUNIT 128LL//440LL-->max
 #ifndef OP
 #define OP 90
 #endif

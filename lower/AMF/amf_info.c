@@ -175,7 +175,11 @@ void* amf_info_write(uint32_t ppa, uint32_t size, value_set *value,algo_req * co
 	else{
 #ifdef COPYMETA_ONLY
 		if(PS_ismeta_data(req->type)){
-			PS_master_insert(ps_master, ppa, value->value);
+			PS_master_insert(ps_master, ppa, UINT32_MAX,value->value);
+		#ifdef NO_MEMCPY_DATA
+			value->value=NULL;
+			value->free_unavailable=true;
+		#endif
 		}
 #else
 		memcpy(mem_pool[ppa], value->value, PAGESIZE);
@@ -199,11 +203,13 @@ void* amf_info_read(uint32_t ppa, uint32_t size, value_set *value,algo_req * con
 #ifdef COPYMETA_ONLY
 	if(PS_ismeta_data(req->type)){
 		char *temp=PS_master_get(ps_master, ppa);
-		if(temp==NULL){
-			printf("meta data is not exist! %u\n", ppa);
-			abort();
-		}
-		memcpy(value->value, temp, PAGESIZE);
+	#ifdef NO_MEMCPY_DATA
+		free(value->value);
+		value->value=temp;
+		value->free_unavailable=true;
+	#else
+		memcpy(value->value,temp,PAGESIZE);
+	#endif
 	}
 #else
 	memcpy(value->value, mem_pool[ppa], PAGESIZE);
@@ -271,7 +277,7 @@ void *amf_info_write_sync(uint32_t type, uint32_t ppa, char *data){
 	collect_io_type(type, &amf_info);
 #ifdef COPYMETA_ONLY
 	if(PS_ismeta_data(type)){
-		PS_master_insert(ps_master, ppa, data);
+		PS_master_insert(ps_master, ppa, UINT32_MAX, data);
 	}
 #else
 	memcpy(mem_pool[ppa], data, PAGESIZE);

@@ -8,7 +8,7 @@ export CXX=g++
 
 TARGET_INF=interface
 export TARGET_LOWER=posix_memory
-export TARGET_ALGO=leaFTL
+export TARGET_ALGO=Page_ftl
 export TARGET_BM=sequential
 JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export USER_DEF
@@ -31,14 +31,12 @@ export COMMONFLAGS+=\
 			-Wno-unused-but-set-variable\
 			-DPROGRESS\
 			-DAPPL_DESIGN_PATH="\"$(PWD)/algorithm/layeredLSM/design_knob/\""\
-			-DMEDIA_NAME="\"/dev/nvme1n1\""\
 			-O3\
 			-DNO_MEMCPY_DATA\
-			-DNO_CPU_TEST=3\
+#			-DTRACE_REPLAY\
+#			-DTRACE_COLLECT\
 #			-DTIME_BREAKDOWN\
 #			-DQUEUE_TIME_CHECK\
-#			-DTRACE_COLLECT\
-#			-DTRACE_REPLAY\
 #			-DPARALLEL_MANAGER\
 #			-DWRITE_STOP_READ\
 #			-DMAPPING_TIME_CHECK\
@@ -153,7 +151,6 @@ endif
 LIBS +=\
 		-lpthread\
 		-lm\
-	-laio\
 #		-luring\
 #		-ldw\
 		-ljemalloc\

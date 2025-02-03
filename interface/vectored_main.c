@@ -5,7 +5,6 @@
 #include <limits.h>
 #include <getopt.h>
 
-//#include <libconfig.h>
 
 #include "../include/FS.h"
 #include "../include/settings.h"
@@ -45,14 +44,9 @@ int main(int argc,char* argv[]){
 
 	int result=pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
 
-	//int temp_cnt=bench_set_params(argc,argv,temp_argv);
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
-	//bench_parameters* bp=bench_parsing_parameters(&argc,argv);
 
-	//parsing argc for 'U','T' and 'R', which are used to set utilization and round
-	//after that remove 'U', 'T' and 'R' from argv
-	//ignore other options
 	for(int i=1; i<argc; i++){
 		if(argv[i][0]=='-' && argv[i][1]=='U'){
 			utilization=atoi(&argv[i+1][0]);
@@ -90,38 +84,18 @@ int main(int argc,char* argv[]){
 
 	printf("U:%u R:%u T:%d P:%u N:%u\n", utilization, round, type, param, RANGE/100*utilization);
 
-	//if(bp){
-	//	inf_init(0,0,argc,argv);
-	//	bench_init();
-	//	bench_vectored_configure();
-	//	for(int i=0; i<bp->max_bench_num; i++){
-	//		bench_meta *bpv=&bp->bench_list[i];
-	//		bench_add(bpv->type,bpv->start, bpv->end, bpv->number);
-	//	}
-	//}
-	//else{
 
+	inf_init(0,0,argc,argv);
 
-		inf_init(0,0,argc,argv);
-#if 0
-		/*test function code start*/
-		inf_algorithm_testing();
-		inf_free();
-		return 0;
-#else 
-		uint32_t target_range_number=RANGE/100*utilization;
-		bench_init();
-		bench_vectored_configure();
-	//	bench_add(VECTOREDSSET,0,RANGE,RANGE);
-	//	bench_add(VECTOREDSGET,0,RANGE,RANGE);
-	//	bench_add(VECTOREDRSET,0,RANGE,RANGE);
-	    switch (type)
-		{
+	uint32_t target_range_number=RANGE/100*utilization;
+	bench_init();
+	bench_vectored_configure();
+	switch (type)
+	{
 		case 0:
 		case -1: //Random WRITE
 			bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
-			//bench_add(VECTOREDRSET,0,target_range_number,target_range_number, 0);
-			//bench_add(VECTOREDRGET,0,target_range_number, 10000, 0);
+			bench_add(VECTOREDRSET,0,target_range_number,target_range_number, 0);
 			break;
 		case 1: //RANDOM read
 			bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
@@ -138,18 +112,13 @@ int main(int argc,char* argv[]){
 			break;
 		case 4: //Random RW
 			bench_add(VECTOREDUNIQRSET,0,target_range_number, target_range_number, 0);
-//			bench_add(VECTOREDRSET,0,target_range_number,target_range_number*(round), 0);
-//			bench_add(VECTOREDRGET,0,target_range_number,target_range_number, 0);
 			break;
 		default:
 			printf("type error\n");
 
 			break;
-		}
-#endif
+	}
 
-	//}
-	//printf("range: %lu!\n",RANGE);
 
 	char *value;
 	uint32_t mark;
@@ -158,19 +127,15 @@ int main(int argc,char* argv[]){
 	}
 
 	force_write_start=true;
-	
+
 	printf("bench finish\n");
 	while(!bench_is_finish()){
 #ifdef LEAKCHECK
 		sleep(1);
 #endif
 	}
-
-	//if(bp){
-		//bench_parameters_free(bp);
-	//}
 	bench_custom_print(write_opt_time,11);
-	
-		inf_free();
+
+	inf_free();
 	return 0;
 }

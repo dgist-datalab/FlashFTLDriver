@@ -15,8 +15,8 @@ extern master_processor mp;
 #define TRACE_DEV_SIZE (128ULL * 1024L * 1024L * 1024L)
 #define CRC_BUFSIZE (2ULL * 1024L * 1024L)
 
-static uint64_t PHYS_ADDR=0xb000000000; // c1pt1
-//static uint64_t PHYS_ADDR=0x1800000000; // c0pt1
+//static uint64_t PHYS_ADDR=0xb000000000; // c1pt1
+static uint64_t PHYS_ADDR=0x1800000000; // c0pt1
 static void *page_addr;
 static uint8_t *send_event_addr; // CHEEZE_QUEUE_SIZE ==> 16B
 static uint8_t *recv_event_addr; // 16B
@@ -525,10 +525,12 @@ bool cheeze_end_req(request *const req){
 			bench_reap_data(req, mp.li, print_read_latency);
 			//EPRINT("%u not found!\n", false, req->key);
 #ifdef TRACE_REPLAY
+			/*
 			if(req->crc_value && req->crc_value!=*(uint32_t*)req->value->value){
 				printf("not_found lba:%u data fail abort!\n", req->key);
 				abort();
 			}
+			*/
 #endif
 			if(preq->buf){
 				memcpy(&preq->buf[req->seq*LPAGESIZE], null_value,LPAGESIZE);

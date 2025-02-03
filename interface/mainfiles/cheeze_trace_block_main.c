@@ -12,6 +12,8 @@
 #include "../vectored_interface.h"
 #include "../cheeze_hg_block.h"
 
+
+MeasureTime mt;
 void log_print(int sig){
 	request_print_log();
 	request_memset_print_log();
@@ -23,12 +25,21 @@ void log_print(int sig){
 	fflush(stderr);
 	sync();
 	printf("before exit\n");
-
+	measure_adding(&mt);
+	printf("Total time:");
+	measure_adding_print(&mt);
 
 	exit(1);
 }
 
 void * thread_test(void *){
+	uint32_t cpu_number=3;
+	cpu_set_t cpuset;
+	pthread_t thread = pthread_self();
+	CPU_ZERO(&cpuset);
+	CPU_SET(cpu_number, &cpuset);
+	measure_init(&mt);
+	measure_start(&mt);
 	vec_request *req=NULL;
 	while((req=get_trace_vectored_request())){
 		assign_vectored_req(req);
